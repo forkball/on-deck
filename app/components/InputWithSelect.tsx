@@ -2,12 +2,14 @@ import { useMemo, useState } from "react";
 
 interface Props extends React.ComponentPropsWithoutRef<"input"> {
   items: { name: string }[];
+  onSelection: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 export default function InputWithSelect({
   items,
   value = "",
   onChange,
+  onSelection,
   className,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -19,10 +21,16 @@ export default function InputWithSelect({
     }
   }
 
-  const results = useMemo(() =>
-    items.filter((item) =>
-      item.name.toLowerCase().includes((value as string).toLowerCase())
-    ),
+  function handleSelection(e: React.MouseEvent<HTMLButtonElement>) {
+    setOpen(false);
+    onSelection(e);
+  }
+
+  const results = useMemo(
+    () =>
+      items.filter((item) =>
+        item.name.toLowerCase().includes((value as string).toLowerCase())
+      ),
     [value, items]
   );
 
@@ -38,10 +46,16 @@ export default function InputWithSelect({
         onChange={onChange}
       />
       {open && (
-        <div className="border-2 border-stone-600 rounded-b-xl w-full absolute top-8">
+        <div className="border-2 border-stone-600 rounded-b-xl w-full absolute top-8 bg-white">
           {results.map((result) => (
             <div key={result.name} className="w-full hover:bg-stone-200 p-1">
-              <button className="w-full text-left">{result.name}</button>
+              <button
+                name={result.name}
+                className="w-full text-left"
+                onClick={handleSelection}
+              >
+                {result.name}
+              </button>
             </div>
           ))}
         </div>
