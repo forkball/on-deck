@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 
 interface Props extends React.ComponentPropsWithoutRef<"input"> {
-  items: { name: string }[];
+  items: { id: number; value: string }[];
   onSelection: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
@@ -29,7 +29,7 @@ export default function InputWithSelect({
   const results = useMemo(
     () =>
       items.filter((item) =>
-        item.name.toLowerCase().includes((value as string).toLowerCase())
+        item.value.toLowerCase().includes((value as string).toLowerCase())
       ),
     [value, items]
   );
@@ -40,24 +40,33 @@ export default function InputWithSelect({
         type="text"
         value={value}
         className={`w-full p-1 outline-none ${
-          open ? "border-x-2 border-t-2 rounded-t-xl" : "border-2 rounded-xl"
+          open
+            ? "border-x-2 border-t-2 rounded-t-xl"
+            : "border-2 rounded-xl border-stone-200"
         } focus:border-stone-600`}
         onFocus={() => setOpen(true)}
         onChange={onChange}
       />
       {open && (
-        <div className="border-2 border-stone-600 rounded-b-xl w-full absolute top-8 bg-white">
-          {results.map((result) => (
-            <div key={result.name} className="w-full hover:bg-stone-200 p-1">
-              <button
-                name={result.name}
-                className="w-full text-left"
-                onClick={handleSelection}
+        <div className="flex flex-col border-2 border-stone-600 rounded-b-xl absolute w-full max-h-56 overflow-hidden">
+          <div className="top-8 bg-white overflow-y-scroll">
+            {results.map((result, index) => (
+              <div
+                key={result.value}
+                className={`w-full hover:bg-stone-100 p-1 ${
+                  index === results.length - 1 ? "rounded-b-xl" : ""
+                }`}
               >
-                {result.name}
-              </button>
-            </div>
-          ))}
+                <button
+                  name={`${result.id}`}
+                  className="w-full text-left"
+                  onClick={handleSelection}
+                >
+                  {result.value}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

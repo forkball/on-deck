@@ -11,16 +11,19 @@ export type Database = {
     Tables: {
       emotions: {
         Row: {
+          code: number
           created_at: string
           id: number
           value: string
         }
         Insert: {
+          code?: number
           created_at?: string
           id?: number
           value: string
         }
         Update: {
+          code?: number
           created_at?: string
           id?: number
           value?: string
