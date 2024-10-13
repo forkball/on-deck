@@ -28,13 +28,29 @@ export async function loader() {
 
 export default function Index() {
   const { emotions } = useLoaderData<typeof loader>();
-  const [value, setValue] = useState("");
+  const [emotionInput, setEmotionInput] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+
+  // map the db data into the expected format
+  const selectOptions = useMemo(
+    () => (emotions || []).map(({ id, value }) => ({ id, value })),
+    [emotions]
+  );
+
+  const [filteredOptions, setFilteredOptions] = useState<
+    { id: number; value: string }[]
+  >(selectOptions);
 
   // handle a change in the select input field
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const { target } = e;
-    setValue(target.value);
+    const { value } = e.target;
+    setEmotionInput(value);
+    
+    const newOptions = selectOptions.filter((item) =>
+      item.value.toLowerCase().includes((value as string).toLowerCase())
+    );
+
+    setFilteredOptions(newOptions);
   }
 
   // handle the selection of an element in the dropdown
@@ -43,13 +59,9 @@ export default function Index() {
     if (selected.includes(currentTarget.name)) {
       setSelected(selected.filter((v) => v != currentTarget.name));
     } else setSelected([...selected, currentTarget.name]);
-  }
 
-  // map the db data into the expected format
-  const selectOptions = useMemo(
-    () => (emotions || []).map(({ id, value }) => ({ id, value })),
-    [emotions]
-  );
+    setEmotionInput("")
+  }
 
   const emotionsCache = useMemo(
     () =>
@@ -64,8 +76,8 @@ export default function Index() {
       <h1 className="text-4xl font-semibold">On Deck</h1>
       <div>
         <InputWithSelect
-          value={value}
-          items={selectOptions}
+          value={emotionInput}
+          items={filteredOptions}
           className="w-80"
           onChange={handleChange}
           onSelection={handleSelect}

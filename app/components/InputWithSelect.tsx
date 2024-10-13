@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 interface Props extends React.ComponentPropsWithoutRef<"input"> {
   items: { id: number; value: string }[];
@@ -26,14 +26,6 @@ export default function InputWithSelect({
     onSelection(e);
   }
 
-  const results = useMemo(
-    () =>
-      items.filter((item) =>
-        item.value.toLowerCase().includes((value as string).toLowerCase())
-      ),
-    [value, items]
-  );
-
   return (
     <div className={`relative ${className}`} onBlur={handleBlur}>
       <input
@@ -50,19 +42,20 @@ export default function InputWithSelect({
       {open && (
         <div className="flex flex-col border-2 border-stone-600 rounded-b-xl absolute w-full max-h-56 overflow-hidden">
           <div className="top-8 bg-white overflow-y-scroll">
-            {results.map((result, index) => (
+            {items.length === 0 && <p className="p-1">No results found</p>}
+            {items.map((item, index) => (
               <div
-                key={result.value}
+                key={item.value}
                 className={`w-full hover:bg-stone-100 p-1 ${
-                  index === results.length - 1 ? "rounded-b-xl" : ""
+                  index === items.length - 1 ? "rounded-b-xl" : ""
                 }`}
               >
                 <button
-                  name={`${result.id}`}
+                  name={`${item.id}`}
                   className="w-full text-left"
                   onClick={handleSelection}
                 >
-                  {result.value}
+                  {item.value}
                 </button>
               </div>
             ))}

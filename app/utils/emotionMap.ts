@@ -24,7 +24,3 @@ export const emotionToCode: { [key: string]: number } = {
 export const codeToEmotion: { [key: number]: string } = Object.fromEntries(
   Object.entries(emotionToCode).map(([key, value]) => [value, key])
 );
-
-export const emotionSynonyms: {[key:string]: string[]} = {
-
-}
