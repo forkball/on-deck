@@ -1,48 +1,103 @@
 import type { MetaFunction } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
+import { useMemo, useState } from "react";
+import { InputWithSelect } from "~/components";
+import { emotionColors } from "~/styles/emotionColors";
+import { Database } from "~/types/supabase";
+import { codeToEmotion } from "~/utils/emotionMap";
+import supabase from "~/utils/supabase";
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "New Remix App" },
-    { name: "description", content: "Welcome to Remix!" },
+    { title: "On Deck | A Movie Recommender" },
+    {
+      name: "description",
+      content:
+        "A movie recommendation app that gives you a new movie each day!",
+    },
   ];
 };
 
+export async function loader() {
+  const { data: emotions } = await supabase
+    .from("emotions")
+    .select("*")
+    .order("code", { ascending: true });
+  return { emotions };
+}
+
 export default function Index() {
+  const { emotions } = useLoaderData<typeof loader>();
+  const [emotionInput, setEmotionInput] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+
+  // map the db data into the expected format
+  const selectOptions = useMemo(
+    () => (emotions || []).map(({ id, value }) => ({ id, value })),
+    [emotions]
+  );
+
+  const [filteredOptions, setFilteredOptions] = useState<
+    { id: number; value: string }[]
+  >(selectOptions);
+
+  // handle a change in the select input field
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const { value } = e.target;
+    setEmotionInput(value);
+    
+    const newOptions = selectOptions.filter((item) =>
+      item.value.toLowerCase().includes((value as string).toLowerCase())
+    );
+
+    setFilteredOptions(newOptions);
+  }
+
+  // handle the selection of an element in the dropdown
+  function handleSelect(e: React.MouseEvent<HTMLButtonElement>) {
+    const { currentTarget } = e;
+    if (selected.includes(currentTarget.name)) {
+      setSelected(selected.filter((v) => v != currentTarget.name));
+    } else setSelected([...selected, currentTarget.name]);
+
+    setEmotionInput("")
+  }
+
+  const emotionsCache = useMemo(
+    () =>
+      (emotions || []).reduce((prev, curr) => {
+        return { ...prev, [curr.id]: { ...curr } };
+      }, {}),
+    [emotions]
+  ) as { [id: string]: Database["public"]["Tables"]["emotions"]["Row"] };
+
   return (
-    <div className="font-sans p-4">
-      <h1 className="text-3xl">Welcome to Remix</h1>
-      <ul className="list-disc mt-4 pl-6 space-y-2">
-        <li>
-          <a
-            className="text-blue-700 underline visited:text-purple-900"
-            target="_blank"
-            href="https://remix.run/start/quickstart"
-            rel="noreferrer"
+    <main id="content" className="flex flex-col gap-4 p-4">
+      <h1 className="text-4xl font-semibold">On Deck</h1>
+      <div>
+        <InputWithSelect
+          value={emotionInput}
+          items={filteredOptions}
+          className="w-80"
+          onChange={handleChange}
+          onSelection={handleSelect}
+        />
+      </div>
+      <div className="flex flex-row gap-2">
+        {selected.map((id) => (
+          <div
+            key={id}
+            className="border-2 p-2 rounded-xl"
+            style={{
+              borderColor: `${
+                emotionColors[codeToEmotion[emotionsCache[id].code]]
+              }`,
+            }}
           >
-            5m Quick Start
-          </a>
-        </li>
-        <li>
-          <a
-            className="text-blue-700 underline visited:text-purple-900"
-            target="_blank"
-            href="https://remix.run/start/tutorial"
-            rel="noreferrer"
-          >
-            30m Tutorial
-          </a>
-        </li>
-        <li>
-          <a
-            className="text-blue-700 underline visited:text-purple-900"
-            target="_blank"
-            href="https://remix.run/docs"
-            rel="noreferrer"
-          >
-            Remix Docs
-          </a>
-        </li>
-      </ul>
-    </div>
+            <p>{emotionsCache[id].value}</p>
+          </div>
+        ))}
+      </div>
+    </main>
   );
 }
