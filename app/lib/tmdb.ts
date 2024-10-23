@@ -48,7 +48,7 @@ async function getMoviesBasedOnFilters(
     page=REPLACE_PAGE&\
     sort_by=popularity.desc`;
 
-  // if start y
+  // if start decade is provided, valide it and add it as a query parameter
   if (filters.decade) {
     const { decade } = filters;
     const currentYear = new Date().getFullYear();
