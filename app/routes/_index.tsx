@@ -1,12 +1,12 @@
 import type { MetaFunction } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { useMemo, useState } from "react";
-import { InputWithSelect } from "~/components";
-import Button from "~/components/Button";
-import { emotionColors } from "~/styles/emotionColors";
-import { Database } from "~/types/supabase";
-import { codeToEmotion } from "~/utils/emotionMap";
-import supabase from "~/lib/supabase";
+
+import { getMovieGenreList } from "~/lib/tmdb";
+import { capitalCase } from "~/utils/strings";
+import { Button, InputWithSelect } from "~/components";
+
+import RouterPaths from "~/constants/routerPaths";
 
 export const meta: MetaFunction = () => {
   return [
@@ -20,33 +20,33 @@ export const meta: MetaFunction = () => {
 };
 
 export async function loader() {
-  const { data: emotions } = await supabase
-    .from("emotions")
-    .select("*")
-    .order("code", { ascending: true });
-
-  return { emotions };
+  const genres = await getMovieGenreList();
+  return { genres };
 }
 
 export default function Index() {
   const navigate = useNavigate();
-  const { emotions } = useLoaderData<typeof loader>();
-  const [emotionInput, setEmotionInput] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
+  const { genres } = useLoaderData<typeof loader>();
+  const [genreInput, setGenreInput] = useState("");
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
   // map the db data into the expected format
   const selectOptions = useMemo(
-    () => (emotions || []).map(({ id, value }) => ({ id, value })),
-    [emotions]
+    () =>
+      Object.keys(genres).map((value) => ({
+        id: value,
+        value: capitalCase(value.replace("_", " ")),
+      })),
+    [genres]
   );
 
   const [filteredOptions, setFilteredOptions] =
-    useState<{ id: number; value: string }[]>(selectOptions);
+    useState<{ id: string; value: string }[]>(selectOptions);
 
   // handle a change in the select input field
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { value } = e.target;
-    setEmotionInput(value);
+    setGenreInput(value);
 
     const newOptions = selectOptions.filter((item) =>
       item.value.toLowerCase().includes((value as string).toLowerCase())
@@ -58,53 +58,45 @@ export default function Index() {
   // handle the selection of an element in the dropdown
   function handleSelect(e: React.MouseEvent<HTMLButtonElement>) {
     const { currentTarget } = e;
-    if (selected.includes(currentTarget.name)) {
-      setSelected(selected.filter((v) => v != currentTarget.name));
-    } else setSelected([...selected, currentTarget.name]);
+    if (selectedGenres.includes(currentTarget.name)) {
+      setSelectedGenres(selectedGenres.filter((v) => v != currentTarget.name));
+    } else setSelectedGenres([...selectedGenres, currentTarget.name]);
 
-    setEmotionInput("");
+    setGenreInput("");
   }
 
   function handleSubmit() {
-    const selectedEmotions = selected.map((id) => emotionsCache[id].value);
-    navigate(`/movies?emotions=${selectedEmotions.join(",")}`);
-  }
+    let url = `${RouterPaths.RECOMMENDER}?`;
 
-  const emotionsCache = useMemo(
-    () =>
-      (emotions || []).reduce((prev, curr) => {
-        return { ...prev, [curr.id]: { ...curr } };
-      }, {}),
-    [emotions]
-  ) as { [id: string]: Database["public"]["Tables"]["emotions"]["Row"] };
+    if (selectedGenres.length > 0) {
+      url += `genres=${selectedGenres.join(",")}&`;
+    }
+
+    navigate(url);
+  }
 
   return (
     <main id="content" className="flex flex-col gap-4 p-4">
-      <h1 className="text-4xl font-semibold">On Deck</h1>
-      <div className="flex gap-2">
-        <InputWithSelect
-          value={emotionInput}
-          items={filteredOptions}
-          className="w-80"
-          onChange={handleChange}
-          onSelection={handleSelect}
-        />
-        <Button label="Submit" onClick={handleSubmit} />
-      </div>
-      <div className="flex flex-row gap-2">
-        {selected.map((id) => (
-          <div
-            key={id}
-            className="border-2 p-2 rounded-xl"
-            style={{
-              borderColor: `${
-                emotionColors[codeToEmotion[emotionsCache[id].code]]
-              }`,
-            }}
-          >
-            <p>{emotionsCache[id].value}</p>
+      <div className="border-2 flex flex-col gap-4 w-96 rounded-xl p-2">
+        <h1 className="text-4xl font-semibold">On Deck</h1>
+        <div className="flex flex-col gap-2">
+          <InputWithSelect
+            value={genreInput}
+            items={filteredOptions}
+            className="w-full"
+            onChange={handleChange}
+            onSelection={handleSelect}
+            placeholder="Genre"
+          />
+          <div className="flex flex-row gap-2">
+            {selectedGenres.map((genre) => (
+              <div key={genre} className="border-2 p-2 rounded-xl">
+                <p>{capitalCase(genre.replace("_", " "))}</p>
+              </div>
+            ))}
           </div>
-        ))}
+          <Button label="Submit" onClick={handleSubmit} />
+        </div>
       </div>
     </main>
   );

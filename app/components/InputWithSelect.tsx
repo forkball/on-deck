@@ -1,13 +1,14 @@
 import { useState } from "react";
 
 interface Props extends React.ComponentPropsWithoutRef<"input"> {
-  items: { id: number; value: string }[];
+  items: { id: string | number; value: string }[];
   onSelection: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 export default function InputWithSelect({
   items,
   value = "",
+  placeholder,
   onChange,
   onSelection,
   className,
@@ -31,6 +32,7 @@ export default function InputWithSelect({
       <input
         type="text"
         value={value}
+        placeholder={placeholder}
         className={`w-full p-1 outline-none ${
           open
             ? "border-x-2 border-t-2 rounded-t-xl"

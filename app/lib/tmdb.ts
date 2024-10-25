@@ -1,4 +1,4 @@
-async function getMovieGenreList() {
+async function getMovieGenreList(): Promise<{ [id: string]: string }> {
   const options = {
     method: "GET",
     headers: {
@@ -11,6 +11,7 @@ async function getMovieGenreList() {
     `${process.env.TMDB_API}/genre/movie/list`,
     options
   );
+
   const { genres } = await response.json();
   return genres.reduce(
     (
@@ -27,7 +28,8 @@ async function getMovieGenreList() {
 async function getMoviesBasedOnFilters(
   numberOfPages: number = 1,
   filters: {
-    decade?: number;
+    startYear: number;
+    endYear: number;
     origin?: string;
     genres?: string[];
     withGenres?: boolean;
@@ -49,17 +51,16 @@ async function getMoviesBasedOnFilters(
     sort_by=popularity.desc`;
 
   // if start decade is provided, valide it and add it as a query parameter
-  if (filters.decade) {
-    const { decade } = filters;
-    const currentYear = new Date().getFullYear();
-    // ensure greater than 1900, the input is not greater than the current year, input year is a decade
-    if (decade < 1900 || decade > currentYear || decade % 10 !== 0)
-      throw new Error("The provided year is not valid");
-
-    url += `&release_date.gte=${decade}-01-01&release_date.lte=${
-      decade + 10
-    }-12-31`;
-  }
+  const { startYear, endYear } = filters;
+  const currentYear = new Date().getFullYear();
+  // ensure greater than 1900, the input is not greater than the current year, input year is a decade
+  if (
+    startYear < 1900 ||
+    startYear > currentYear ||
+    endYear < startYear ||
+    endYear > currentYear
+  )
+    url += `&release_date.gte=${startYear}-01-01&release_date.lte=${endYear}-12-31`;
 
   // if genres are provided, validate it and add it as a query parameter
   if (filters.genres) {
@@ -67,8 +68,7 @@ async function getMoviesBasedOnFilters(
     const validGenres = await getMovieGenreList();
 
     const genreIds: string[] = [];
-    console.log(validGenres);
-    console.log(genres);
+
     const validInputGenres = genres.every((genre) => {
       if (validGenres[genre]) {
         genreIds.push(validGenres[genre]);
@@ -76,6 +76,7 @@ async function getMoviesBasedOnFilters(
       }
       return false;
     });
+
     if (!validInputGenres) throw new Error("The provided genres are not valid");
 
     if (withGenres) url += `&with_genres=${genreIds.join(",")}`;

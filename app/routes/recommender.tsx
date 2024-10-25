@@ -1,0 +1,44 @@
+import { LoaderFunctionArgs } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
+import { getMoviesBasedOnFilters } from "~/lib/tmdb";
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const startParam = new URL(request.url).searchParams.get("startYear");
+  const endParam = new URL(request.url).searchParams.get("endYear");
+  const genresParam = new URL(request.url).searchParams.get("genres");
+  const withGenresParam = new URL(request.url).searchParams.get("withGenres");
+
+  let startYear = 1900;
+  if (startParam) {
+    startYear = parseInt(startParam);
+  }
+
+  let endYear = new Date().getFullYear();
+  if (endParam) {
+    endYear = parseInt(endParam);
+  }
+
+  let genres: string[] = [];
+  if (genresParam) {
+    genres = genresParam.split(",");
+  }
+
+  let withGenres = true;
+  if (withGenresParam) {
+    withGenres = withGenresParam === "true";
+  }
+
+  const moviesBasedOnFilters = getMoviesBasedOnFilters(1, {
+    startYear,
+    endYear,
+    genres,
+    withGenres,
+  });
+
+  return moviesBasedOnFilters;
+}
+
+export default function Recommender() {
+  const movieSet = useLoaderData<typeof loader>();
+  return <pre>{JSON.stringify(movieSet, null, 2)}</pre>;
+}
