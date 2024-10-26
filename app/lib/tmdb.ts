@@ -60,7 +60,9 @@ async function getMoviesBasedOnFilters(
     endYear < startYear ||
     endYear > currentYear
   )
-    url += `&release_date.gte=${startYear}-01-01&release_date.lte=${endYear}-12-31`;
+    throw new Error("THe provided date range is invalid")  
+    
+  url += `&release_date.gte=${startYear}-01-01&release_date.lte=${endYear}-12-31`;
 
   // if genres are provided, validate it and add it as a query parameter
   if (filters.genres) {

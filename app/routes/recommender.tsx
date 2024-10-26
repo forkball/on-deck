@@ -15,6 +15,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   let endYear = new Date().getFullYear();
   if (endParam) {
+    console.log(endParam)
     endYear = parseInt(endParam);
   }
 
