@@ -2,12 +2,13 @@ import type { MetaFunction } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { useMemo, useState } from "react";
 
-import { getMovieGenreList } from "~/lib/tmdb";
+import { getMovieCountries, getMovieGenreList } from "~/lib/tmdb";
 import { capitalCase } from "~/utils/strings";
 import { Button, InputWithSelect } from "~/components";
 
 import RouterPaths from "~/constants/routerPaths";
 import Input from "~/components/Input";
+import { l } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
 
 export const meta: MetaFunction = () => {
   return [
@@ -22,23 +23,26 @@ export const meta: MetaFunction = () => {
 
 export async function loader() {
   const genres = await getMovieGenreList();
-  return { genres };
+  const countries = await getMovieCountries();
+  return { genres, countries };
 }
 
 export default function Index() {
   const navigate = useNavigate();
 
-  const { genres } = useLoaderData<typeof loader>();
+  const { genres, countries } = useLoaderData<typeof loader>();
   const [genreInput, setGenreInput] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [countryInput, setCountryInput] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState("");
 
   const [dateRange, setDateRange] = useState({
     startYear: 1900,
     endYear: new Date().getFullYear(),
   });
 
-  // map the db data into the expected format
-  const selectOptions = useMemo(
+  // map the tmdb genre data into the expected format
+  const genreSelectOptions = useMemo(
     () =>
       Object.keys(genres).map((value) => ({
         id: value,
@@ -47,29 +51,59 @@ export default function Index() {
     [genres]
   );
 
-  const [filteredOptions, setFilteredOptions] =
-    useState<{ id: string; value: string }[]>(selectOptions);
+  // map the tmdb country data into the expected format
+  const countrySelectOptions = useMemo(
+    () =>
+      Object.keys(countries).map((value) => ({
+        id: countries[value],
+        value: capitalCase(value),
+      })),
+    [countries]
+  );
+
+  const [filteredGenres, setFilteredGenres] =
+    useState<{ id: string; value: string }[]>(genreSelectOptions);
+  const [filteredCountries, setFilteredCountries] =
+    useState<{ id: string; value: string }[]>(countrySelectOptions);
 
   // handle a change in the select input field
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const { value } = e.target;
-    setGenreInput(value);
+  function handleSelectChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const { value, name } = e.target;
 
-    const newOptions = selectOptions.filter((item) =>
-      item.value.toLowerCase().includes((value as string).toLowerCase())
-    );
+    if (name === "genreSelect") {
+      setGenreInput(value);
 
-    setFilteredOptions(newOptions);
+      const newOptions = filteredGenres.filter((item) =>
+        item.value.toLowerCase().includes((value as string).toLowerCase())
+      );
+
+      setFilteredGenres(newOptions);
+    } else if (name === "countrySelect") {
+      setCountryInput(value);
+
+      const newOptions = filteredCountries.filter((item) =>
+        item.value.toLowerCase().includes((value as string).toLowerCase())
+      );
+
+      setSelectedCountry("");
+      setFilteredCountries(newOptions);
+    }
   }
 
   // handle the selection of an element in the dropdown
-  function handleSelect(e: React.MouseEvent<HTMLButtonElement>) {
+  function handleGenreSelect(e: React.MouseEvent<HTMLButtonElement>) {
     const { currentTarget } = e;
     if (selectedGenres.includes(currentTarget.name)) {
       setSelectedGenres(selectedGenres.filter((v) => v != currentTarget.name));
     } else setSelectedGenres([...selectedGenres, currentTarget.name]);
 
     setGenreInput("");
+  }
+
+  function handleCountrySelect(e: React.MouseEvent<HTMLButtonElement>) {
+    const { currentTarget } = e;
+    setCountryInput(currentTarget.innerText);
+    setSelectedCountry(currentTarget.name);
   }
 
   function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -81,8 +115,12 @@ export default function Index() {
     const { startYear, endYear } = dateRange;
     let url = `${RouterPaths.RECOMMENDER}?`;
 
-    if (selectedGenres.length > 0) {
+    if (selectedGenres.length) {
       url += `genres=${selectedGenres.join(",")}&`;
+    }
+
+    if (selectedCountry.length) {
+      url += `originCountry=${selectedCountry}&`;
     }
 
     url += `startYear=${startYear}&endYear=${endYear}`;
@@ -96,11 +134,12 @@ export default function Index() {
         <h1 className="text-4xl font-semibold">On Deck</h1>
         <div className="flex flex-col gap-2">
           <InputWithSelect
+            name="genreSelect"
             value={genreInput}
-            items={filteredOptions}
-            className="w-full"
-            onChange={handleChange}
-            onSelection={handleSelect}
+            items={filteredGenres}
+            className="w-full z-10"
+            onChange={handleSelectChange}
+            onSelection={handleGenreSelect}
             placeholder="Genre"
           />
           <div className="flex flex-row gap-2">
@@ -124,6 +163,15 @@ export default function Index() {
               onChange={handleDateChange}
             />
           </div>
+          <InputWithSelect
+            name="countrySelect"
+            value={countryInput}
+            items={filteredCountries}
+            className="w-full"
+            onChange={handleSelectChange}
+            onSelection={handleCountrySelect}
+            placeholder="Country of Origin"
+          />
           <Button label="Submit" onClick={handleSubmit} />
         </div>
       </div>

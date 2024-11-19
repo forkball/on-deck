@@ -6,6 +6,7 @@ interface Props extends React.ComponentPropsWithoutRef<"input"> {
 }
 
 export default function InputWithSelect({
+  name,
   items,
   value = "",
   placeholder,
@@ -30,13 +31,12 @@ export default function InputWithSelect({
   return (
     <div className={`relative ${className}`} onBlur={handleBlur}>
       <input
+        name={name}
         type="text"
         value={value}
         placeholder={placeholder}
         className={`w-full p-1 outline-none ${
-          open
-            ? "border-x-2 border-t-2"
-            : "border-2 border-stone-200"
+          open ? "border-x-2 border-t-2" : "border-2 border-stone-200"
         } focus:border-stone-600`}
         onFocus={() => setOpen(true)}
         onChange={onChange}
@@ -46,10 +46,7 @@ export default function InputWithSelect({
           <div className="top-8 bg-white overflow-y-scroll">
             {items.length === 0 && <p className="p-1">No results found</p>}
             {items.map((item) => (
-              <div
-                key={item.value}
-                className={`w-full hover:bg-stone-100 p-1`}
-              >
+              <div key={item.value} className={`w-full hover:bg-stone-100 p-1`}>
                 <button
                   name={`${item.id}`}
                   className="w-full text-left"

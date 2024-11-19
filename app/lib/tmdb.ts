@@ -25,6 +25,33 @@ async function getMovieGenreList(): Promise<{ [id: string]: string }> {
   );
 }
 
+async function getMovieCountries(): Promise<{ [id: string]: string }> {
+  const options = {
+    method: "GET",
+    headers: {
+      accept: "application/json",
+      Authorization: `Bearer ${process.env.TMDB_API_KEY}`,
+    },
+  };
+
+  const response = await fetch(
+    `${process.env.TMDB_API}/configuration/countries`,
+    options
+  );
+
+  const countries = await response.json();
+  return countries.reduce(
+    (
+      previous: { iso_3166_1: string; english_name: string },
+      current: { iso_3166_1: string; english_name: string }
+    ) => ({
+      ...previous,
+      [current.english_name.toLowerCase()]: current.iso_3166_1,
+    }),
+    {}
+  );
+}
+
 async function getMoviesBasedOnFilters(
   numberOfPages: number = 1,
   filters: {
@@ -33,6 +60,7 @@ async function getMoviesBasedOnFilters(
     origin?: string;
     genres?: string[];
     withGenres?: boolean;
+    originCountry?: string;
   }
 ) {
   const options = {
@@ -60,8 +88,8 @@ async function getMoviesBasedOnFilters(
     endYear < startYear ||
     endYear > currentYear
   )
-    throw new Error("THe provided date range is invalid")  
-    
+    throw new Error("The provided date range is invalid");
+
   url += `&release_date.gte=${startYear}-01-01&release_date.lte=${endYear}-12-31`;
 
   // if genres are provided, validate it and add it as a query parameter
@@ -85,6 +113,17 @@ async function getMoviesBasedOnFilters(
     else url += `&without_genres=${genreIds.join(",")}`;
   }
 
+  if (filters.originCountry) {
+    const { originCountry } = filters;
+    const validCountries = await getMovieCountries();
+
+    if (!Object.values(validCountries).includes(originCountry)) {
+      throw new Error("The provided country is not valid");
+    }
+
+    url += `&with_origin_country=${originCountry}`;
+  }
+
   const results = [];
   for (let page = 0; page < numberOfPages; page++) {
     const response = await fetch(
@@ -98,4 +137,4 @@ async function getMoviesBasedOnFilters(
   return results.reduce((prev, curr) => prev.concat(curr), []);
 }
 
-export { getMovieGenreList, getMoviesBasedOnFilters };
+export { getMovieGenreList, getMovieCountries, getMoviesBasedOnFilters };

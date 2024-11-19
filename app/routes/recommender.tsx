@@ -7,6 +7,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const endParam = new URL(request.url).searchParams.get("endYear");
   const genresParam = new URL(request.url).searchParams.get("genres");
   const withGenresParam = new URL(request.url).searchParams.get("withGenres");
+  const countryParam = new URL(request.url).searchParams.get("originCountry");
 
   let startYear = 1900;
   if (startParam) {
@@ -15,7 +16,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   let endYear = new Date().getFullYear();
   if (endParam) {
-    console.log(endParam)
+    console.log(endParam);
     endYear = parseInt(endParam);
   }
 
@@ -29,11 +30,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
     withGenres = withGenresParam === "true";
   }
 
+  let originCountry = undefined;
+  if (countryParam) originCountry = countryParam;
+
   const moviesBasedOnFilters = getMoviesBasedOnFilters(1, {
     startYear,
     endYear,
     genres,
     withGenres,
+    originCountry,
   });
 
   return moviesBasedOnFilters;
