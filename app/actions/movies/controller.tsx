@@ -81,9 +81,10 @@ export default createController(routes.movies, {
       if (!detail) return new Response('Not Found', { status: 404 })
 
       const interaction = await getUserInteractionForItem(db, auth.identity.id, mediaItemId)
+      const from = context.url.searchParams.get('from') || undefined
 
       return context.render(
-        <MovieDetailPage item={detail.item} tags={detail.tags} interaction={interaction} />,
+        <MovieDetailPage item={detail.item} tags={detail.tags} interaction={interaction} from={from} />,
       )
     },
 

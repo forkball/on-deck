@@ -62,7 +62,13 @@ export function MoviesSearchPage(handle: Handle<MoviesSearchPageProps>) {
             action={routes.movies.search.href()}
             mix={css({ display: 'flex', gap: '8px', marginBottom: '16px' })}
           >
-            <input type="text" name="q" defaultValue={query} placeholder="Search TMDB for a movie…" />
+            <input
+              type="text"
+              name="q"
+              defaultValue={query}
+              placeholder="Search TMDB for a movie…"
+              mix={css({ flex: '1 1 auto', minWidth: 0 })}
+            />
             <button type="submit">Search</button>
           </form>
 
@@ -91,7 +97,7 @@ export function MoviesSearchPage(handle: Handle<MoviesSearchPageProps>) {
               <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
                 {results.map(({ item, tags }) => {
                   const { releaseYear, posterUrl } = parseMovieMetadata(item.metadata)
-                  const detailHref = routes.movies.show.href({ mediaItemId: String(item.id) })
+                  const detailHref = `${routes.movies.show.href({ mediaItemId: String(item.id) })}?from=${encodeURIComponent(returnTo)}`
                   const interaction = interactionsByItemId.get(item.id)
                   return (
                     <li

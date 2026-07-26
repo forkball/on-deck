@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/document.tsx'
 import { Nav } from '../../../ui/nav.tsx'
+import { stackedLabel } from '../../../ui/styles.ts'
 
 export function LoginPage(handle: Handle<{ error?: string }>) {
   return () => {
@@ -20,11 +21,11 @@ export function LoginPage(handle: Handle<{ error?: string }>) {
             action={routes.auth.login.action.href()}
             mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
           >
-            <label>
+            <label mix={stackedLabel}>
               Email
               <input type="email" name="email" required />
             </label>
-            <label>
+            <label mix={stackedLabel}>
               Password
               <input type="password" name="password" required />
             </label>

@@ -4,7 +4,9 @@ import { css } from 'remix/ui'
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/document.tsx'
+import { Modal } from '../../ui/modal.tsx'
 import { Nav } from '../../ui/nav.tsx'
+import { stackedLabel } from '../../ui/styles.ts'
 import { parseMovieMetadata } from '../../utils/mediaMetadata.ts'
 import { StarRatingDisplay, StarRatingInput } from '../../ui/star-rating.tsx'
 
@@ -12,6 +14,7 @@ export interface MovieDetailPageProps {
   item: MediaItem
   tags: string[]
   interaction: UserMediaInteraction | null
+  from?: string
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -23,15 +26,17 @@ const STATUS_LABELS: Record<string, string> = {
 
 export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
   return () => {
-    const { item, tags, interaction } = handle.props
+    const { item, tags, interaction, from } = handle.props
     const { releaseYear, posterUrl, overview } = parseMovieMetadata(item.metadata)
+    const showHref = routes.movies.show.href({ mediaItemId: String(item.id) })
+    const returnTo = from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref
 
     return (
       <Document title={`${item.title} | On Deck`}>
         <Nav authed={true} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
           <p>
-            <a href={routes.movies.search.href()}>← Back to search</a>
+            <a href={from || routes.movies.search.href()}>← Back</a>
           </p>
           <div mix={css({ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' })}>
             {posterUrl ? (
@@ -93,53 +98,50 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
                   <p mix={css({ margin: 0, color: '#555' })}>You haven't logged this one yet.</p>
                 )}
 
-                <details mix={css({ marginTop: '12px' })}>
-                  <summary mix={css({ cursor: 'pointer' })}>{interaction ? 'Edit' : 'Log this movie'}</summary>
-                  <form
-                    method="post"
-                    action={
-                      interaction
-                        ? routes.movies.interactions.update.href({ interactionId: String(interaction.id) })
-                        : routes.movies.log.href({ mediaItemId: String(item.id) })
-                    }
-                    mix={css({ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' })}
-                  >
-                    {interaction && <input type="hidden" name="_method" value="PUT" />}
-                    <input
-                      type="hidden"
-                      name="return_to"
-                      value={routes.movies.show.href({ mediaItemId: String(item.id) })}
-                    />
-                    <label>
-                      Status
-                      <select name="status" defaultValue={interaction?.status ?? 'want_to_consume'}>
-                        <option value="want_to_consume">Want to watch</option>
-                        <option value="in_progress">Watching</option>
-                        <option value="consumed">Watched</option>
-                        <option value="dropped">Dropped</option>
-                      </select>
-                    </label>
-                    <div>
-                      <p mix={css({ margin: '0 0 4px' })}>Rating</p>
-                      <StarRatingInput
-                        name="rating"
-                        idPrefix={`rating-${item.id}`}
-                        defaultValue={interaction?.rating ?? null}
-                      />
-                    </div>
-                    <label>
-                      Notes
-                      <textarea
-                        name="notes"
-                        rows={3}
-                        defaultValue={interaction?.notes ?? ''}
-                        placeholder="What did you think?"
-                        mix={css({ width: '100%' })}
-                      />
-                    </label>
-                    <button type="submit">{interaction ? 'Update' : 'Save'}</button>
-                  </form>
-                </details>
+                <div mix={css({ marginTop: '12px' })}>
+                  <Modal id={`edit-movie-${item.id}`} triggerLabel={interaction ? 'Edit' : 'Log this movie'}>
+                    <form
+                      method="post"
+                      action={
+                        interaction
+                          ? routes.movies.interactions.update.href({ interactionId: String(interaction.id) })
+                          : routes.movies.log.href({ mediaItemId: String(item.id) })
+                      }
+                      mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
+                    >
+                      {interaction && <input type="hidden" name="_method" value="PUT" />}
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <label mix={stackedLabel}>
+                        Status
+                        <select name="status" defaultValue={interaction?.status ?? 'want_to_consume'}>
+                          <option value="want_to_consume">Want to watch</option>
+                          <option value="in_progress">Watching</option>
+                          <option value="consumed">Watched</option>
+                          <option value="dropped">Dropped</option>
+                        </select>
+                      </label>
+                      <div>
+                        <p mix={css({ margin: '0 0 4px' })}>Rating</p>
+                        <StarRatingInput
+                          name="rating"
+                          idPrefix={`rating-${item.id}`}
+                          defaultValue={interaction?.rating ?? null}
+                        />
+                      </div>
+                      <label mix={stackedLabel}>
+                        Notes
+                        <textarea
+                          name="notes"
+                          rows={3}
+                          defaultValue={interaction?.notes ?? ''}
+                          placeholder="What did you think?"
+                          mix={css({ width: '100%' })}
+                        />
+                      </label>
+                      <button type="submit">{interaction ? 'Update' : 'Save'}</button>
+                    </form>
+                  </Modal>
+                </div>
               </div>
             </div>
           </div>
