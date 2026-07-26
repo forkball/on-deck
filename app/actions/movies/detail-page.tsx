@@ -6,22 +6,17 @@ import { routes } from '../../routes.ts'
 import { Document } from '../../ui/document.tsx'
 import { Modal } from '../../ui/modal.tsx'
 import { Nav } from '../../ui/nav.tsx'
+import { StatusSelect } from '../../ui/status-select.tsx'
 import { stackedLabel } from '../../ui/styles.ts'
 import { parseMovieMetadata } from '../../utils/mediaMetadata.ts'
 import { StarRatingDisplay, StarRatingInput } from '../../ui/star-rating.tsx'
+import { STATUS_LABELS } from '../../utils/status.ts'
 
 export interface MovieDetailPageProps {
   item: MediaItem
   tags: string[]
   interaction: UserMediaInteraction | null
   from?: string
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  want_to_consume: 'Want to watch',
-  in_progress: 'Watching',
-  consumed: 'Watched',
-  dropped: 'Dropped',
 }
 
 export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
@@ -113,12 +108,7 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
                       <input type="hidden" name="return_to" value={returnTo} />
                       <label mix={stackedLabel}>
                         Status
-                        <select name="status" defaultValue={interaction?.status ?? 'want_to_consume'}>
-                          <option value="want_to_consume">Want to watch</option>
-                          <option value="in_progress">Watching</option>
-                          <option value="consumed">Watched</option>
-                          <option value="dropped">Dropped</option>
-                        </select>
+                        <StatusSelect name="status" defaultValue={interaction?.status ?? 'want_to_consume'} />
                       </label>
                       <div>
                         <p mix={css({ margin: '0 0 4px' })}>Rating</p>

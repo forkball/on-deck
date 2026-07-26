@@ -4,9 +4,13 @@ import { css } from 'remix/ui'
 import type { getUserInteractionForItem, MovieResult } from '../../data/movies.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/document.tsx'
+import { FloatingDropdown } from '../../ui/floating-dropdown.tsx'
 import { Nav } from '../../ui/nav.tsx'
+import { StarRatingDisplay, StarRatingInput } from '../../ui/star-rating.tsx'
+import { StatusSelect } from '../../ui/status-select.tsx'
+import { stackedLabel } from '../../ui/styles.ts'
 import { parseMovieMetadata } from '../../utils/mediaMetadata.ts'
-import { StarRatingInput } from '../../ui/star-rating.tsx'
+import { STATUS_LABELS } from '../../utils/status.ts'
 
 export interface MoviesSearchPageProps {
   query: string
@@ -148,31 +152,50 @@ export function MoviesSearchPage(handle: Handle<MoviesSearchPageProps>) {
                             ))}
                           </div>
                         )}
-                        <form
-                          method="post"
-                          action={routes.movies.log.href({ mediaItemId: String(item.id) })}
-                          mix={css({ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px', flexWrap: 'wrap' })}
-                        >
-                          <input type="hidden" name="return_to" value={returnTo} />
-                          <select name="status" defaultValue={interaction?.status ?? 'want_to_consume'}>
-                            <option value="want_to_consume">Want to watch</option>
-                            <option value="in_progress">Watching</option>
-                            <option value="consumed">Watched</option>
-                            <option value="dropped">Dropped</option>
-                          </select>
-                          <StarRatingInput
-                            name="rating"
-                            idPrefix={`rating-${item.id}`}
-                            defaultValue={interaction?.rating ?? null}
-                          />
-                          <input
-                            type="text"
-                            name="notes"
-                            defaultValue={interaction?.notes ?? ''}
-                            placeholder="What did you think?"
-                          />
-                          <button type="submit">Save</button>
-                        </form>
+                        {interaction && (
+                          <p mix={css({ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0 0', fontSize: '13px', color: '#555' })}>
+                            {STATUS_LABELS[interaction.status] ?? interaction.status}
+                            {interaction.rating != null && (
+                              <>
+                                <StarRatingDisplay value={interaction.rating} /> ({interaction.rating})
+                              </>
+                            )}
+                          </p>
+                        )}
+
+                        <div mix={css({ marginTop: '8px' })}>
+                          <FloatingDropdown triggerLabel={interaction ? 'Edit' : '+ Add to list'}>
+                            <form
+                              method="post"
+                              action={routes.movies.log.href({ mediaItemId: String(item.id) })}
+                              mix={css({ display: 'flex', flexDirection: 'column', gap: '10px' })}
+                            >
+                              <input type="hidden" name="return_to" value={returnTo} />
+                              <label mix={stackedLabel}>
+                                Add to watch list
+                                <StatusSelect name="status" defaultValue={interaction?.status ?? 'want_to_consume'} />
+                              </label>
+                              <div>
+                                <p mix={css({ margin: '0 0 4px' })}>Rating</p>
+                                <StarRatingInput
+                                  name="rating"
+                                  idPrefix={`rating-${item.id}`}
+                                  defaultValue={interaction?.rating ?? null}
+                                />
+                              </div>
+                              <label mix={stackedLabel}>
+                                Add thoughts
+                                <input
+                                  type="text"
+                                  name="notes"
+                                  defaultValue={interaction?.notes ?? ''}
+                                  placeholder="What did you think?"
+                                />
+                              </label>
+                              <button type="submit">Save</button>
+                            </form>
+                          </FloatingDropdown>
+                        </div>
                       </div>
                     </li>
                   )

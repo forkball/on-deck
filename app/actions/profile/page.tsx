@@ -6,9 +6,11 @@ import { routes } from '../../routes.ts'
 import { Document } from '../../ui/document.tsx'
 import { Modal } from '../../ui/modal.tsx'
 import { Nav } from '../../ui/nav.tsx'
+import { StarRatingDisplay, StarRatingInput } from '../../ui/star-rating.tsx'
+import { StatusSelect } from '../../ui/status-select.tsx'
 import { stackedLabel } from '../../ui/styles.ts'
 import { parseMovieMetadata } from '../../utils/mediaMetadata.ts'
-import { StarRatingDisplay, StarRatingInput } from '../../ui/star-rating.tsx'
+import { STATUS_LABELS } from '../../utils/status.ts'
 
 export interface ProfilePageProps {
   summary: string
@@ -18,53 +20,100 @@ export interface ProfilePageProps {
   saved?: boolean
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  want_to_consume: 'Want to watch',
-  in_progress: 'Watching',
-  consumed: 'Watched',
-  dropped: 'Dropped',
+function TagChip(handle: Handle<{ label: string; tone: 'liked' | 'disliked' }>) {
+  return () => {
+    const { label, tone } = handle.props
+    return (
+      <span
+        mix={css({
+          display: 'inline-block',
+          padding: '2px 10px',
+          borderRadius: '999px',
+          fontSize: '12px',
+          border: '1px solid',
+          borderColor: tone === 'liked' ? '#15803d' : '#b91c1c',
+          color: tone === 'liked' ? '#15803d' : '#b91c1c',
+        })}
+      >
+        {label}
+      </span>
+    )
+  }
 }
 
 export function ProfilePage(handle: Handle<ProfilePageProps>) {
   return () => {
     const { summary, likedTags, dislikedTags, movieLog, saved } = handle.props
     const profileHref = routes.profile.index.href()
+    const hasProfile = summary || likedTags.length > 0 || dislikedTags.length > 0
 
     return (
       <Document title="My profile | On Deck">
         <Nav authed={true} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
           <h1>My taste profile</h1>
-          <p mix={css({ color: '#555' })}>
-            This is what drives your recommendations — edit it any time. It also updates itself
-            automatically as you log what you liked or didn't about things you watch.
-          </p>
           {saved && <p mix={css({ color: '#15803d' })}>Saved.</p>}
-          <form
-            method="post"
-            action={routes.profile.update.href()}
-            mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}
+
+          <div
+            mix={css({
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+            })}
           >
-            <input type="hidden" name="_method" value="PUT" />
-            <label mix={stackedLabel}>
-              Summary
-              <textarea name="summary" rows={4} defaultValue={summary} mix={css({ width: '100%' })} />
-            </label>
-            <label mix={stackedLabel}>
-              Liked tags (comma-separated)
-              <input type="text" name="liked_tags" defaultValue={likedTags.join(', ')} mix={css({ width: '100%' })} />
-            </label>
-            <label mix={stackedLabel}>
-              Disliked tags (comma-separated)
-              <input
-                type="text"
-                name="disliked_tags"
-                defaultValue={dislikedTags.join(', ')}
-                mix={css({ width: '100%' })}
-              />
-            </label>
-            <button type="submit">Save profile</button>
-          </form>
+            {hasProfile ? (
+              <>
+                {summary && <p mix={css({ margin: 0 })}>{summary}</p>}
+                {likedTags.length > 0 && (
+                  <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '6px' })}>
+                    {likedTags.map((tag) => (
+                      <TagChip key={tag} label={tag} tone="liked" />
+                    ))}
+                  </div>
+                )}
+                {dislikedTags.length > 0 && (
+                  <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '6px' })}>
+                    {dislikedTags.map((tag) => (
+                      <TagChip key={tag} label={tag} tone="disliked" />
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <p mix={css({ margin: 0, color: '#555' })}>
+                Nothing set yet — this drives your recommendations, and it also updates itself as you
+                log what you liked or didn't about things you watch.
+              </p>
+            )}
+
+            <div>
+              <Modal id="edit-taste-profile" triggerLabel={hasProfile ? 'Edit' : 'Set up your profile'}>
+                <form
+                  method="post"
+                  action={routes.profile.update.href()}
+                  mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}
+                >
+                  <input type="hidden" name="_method" value="PUT" />
+                  <label mix={stackedLabel}>
+                    Summary
+                    <textarea name="summary" rows={4} defaultValue={summary} />
+                  </label>
+                  <label mix={stackedLabel}>
+                    Liked tags (comma-separated)
+                    <input type="text" name="liked_tags" defaultValue={likedTags.join(', ')} />
+                  </label>
+                  <label mix={stackedLabel}>
+                    Disliked tags (comma-separated)
+                    <input type="text" name="disliked_tags" defaultValue={dislikedTags.join(', ')} />
+                  </label>
+                  <button type="submit">Save profile</button>
+                </form>
+              </Modal>
+            </div>
+          </div>
 
           <section mix={css({ marginTop: '40px' })}>
             <h2>What I've watched</h2>
@@ -111,7 +160,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                           })}
                         />
                       )}
-                      <div mix={css({ flex: '1 1 auto' })}>
+                      <div mix={css({ flex: '1 1 auto', display: 'flex', flexDirection: 'column' })}>
                         <a href={detailHref}>
                           <strong>{item?.title ?? 'Unknown title'}</strong>
                         </a>
@@ -125,7 +174,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                           <p mix={css({ margin: '4px 0 0', fontStyle: 'italic' })}>"{interaction.notes}"</p>
                         )}
 
-                        <div mix={css({ marginTop: '8px' })}>
+                        <div mix={css({ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' })}>
                           <Modal id={`edit-log-${interaction.id}`} triggerLabel="Edit">
                             <form
                               method="post"
@@ -138,12 +187,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                               <input type="hidden" name="return_to" value={`${profileHref}?saved=1`} />
                               <label mix={stackedLabel}>
                                 Status
-                                <select name="status" defaultValue={interaction.status}>
-                                  <option value="want_to_consume">Want to watch</option>
-                                  <option value="in_progress">Watching</option>
-                                  <option value="consumed">Watched</option>
-                                  <option value="dropped">Dropped</option>
-                                </select>
+                                <StatusSelect name="status" defaultValue={interaction.status} />
                               </label>
                               <div>
                                 <p mix={css({ margin: '0 0 4px' })}>Rating</p>
@@ -155,13 +199,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                               </div>
                               <label mix={stackedLabel}>
                                 Notes
-                                <textarea
-                                  name="notes"
-                                  rows={3}
-                                  defaultValue={interaction.notes ?? ''}
-                                  placeholder="What did you think?"
-                                  mix={css({ width: '100%' })}
-                                />
+                                <textarea name="notes" rows={3} defaultValue={interaction.notes ?? ''} placeholder="What did you think?" />
                               </label>
                               <button type="submit">Save</button>
                             </form>
