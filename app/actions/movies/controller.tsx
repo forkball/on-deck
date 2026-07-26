@@ -4,19 +4,20 @@ import { Database } from 'remix/data-table'
 import { Auth, requireAuth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
-import type { Handle } from 'remix/ui'
-import { css } from 'remix/ui'
 
 import {
+  getMovieDetail,
+  getUserInteractionForItem,
   listUserMovieLog,
   logInteraction,
   searchAndImportMovies,
   type LogInteractionInput,
 } from '../../data/movies.ts'
-import type { MediaItem, User } from '../../data/schema.ts'
+import type { User } from '../../data/schema.ts'
 import { routes } from '../../routes.ts'
-import { Document } from '../../ui/document.tsx'
-import { Nav } from '../../ui/nav.tsx'
+import { parseRatingInput } from '../../utils/stars.ts'
+import { MovieDetailPage } from './detail-page.tsx'
+import { MoviesSearchPage } from './page.tsx'
 
 const logSchema = f.object({
   status: f.field(
@@ -29,92 +30,8 @@ const logSchema = f.object({
   ),
   rating: f.field(s.defaulted(s.string(), '')),
   notes: f.field(s.defaulted(s.string(), '')),
-  q: f.field(s.defaulted(s.string(), '')),
+  return_to: f.field(s.defaulted(s.string(), '')),
 })
-
-interface MoviesSearchPageProps {
-  query: string
-  results: MediaItem[]
-  log: Awaited<ReturnType<typeof listUserMovieLog>>
-  message?: string
-}
-
-function MoviesSearchPage(handle: Handle<MoviesSearchPageProps>) {
-  return () => {
-    const { query, results, log, message } = handle.props
-
-    return (
-      <Document title="Search movies | On Deck">
-        <Nav authed={true} />
-        <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>Search movies</h1>
-          {message && <p mix={css({ color: '#15803d' })}>{message}</p>}
-          <form
-            method="get"
-            action={routes.movies.search.href()}
-            mix={css({ display: 'flex', gap: '8px', marginBottom: '24px' })}
-          >
-            <input type="text" name="q" defaultValue={query} placeholder="Search TMDB for a movie…" />
-            <button type="submit">Search</button>
-          </form>
-
-          {results.length > 0 && (
-            <section>
-              <h2>Results</h2>
-              <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
-                {results.map((item) => {
-                  const metadata = JSON.parse(item.metadata) as { releaseYear: number | null }
-                  return (
-                    <li
-                      key={item.id}
-                      mix={css({ border: '1px solid #ddd', borderRadius: '8px', padding: '16px' })}
-                    >
-                      <strong>{item.title}</strong>
-                      {metadata.releaseYear ? ` (${metadata.releaseYear})` : ''}
-                      <form
-                        method="post"
-                        action={routes.movies.log.href({ mediaItemId: String(item.id) })}
-                        mix={css({ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px', flexWrap: 'wrap' })}
-                      >
-                        <input type="hidden" name="q" value={query} />
-                        <select name="status">
-                          <option value="want_to_consume">Want to watch</option>
-                          <option value="in_progress">Watching</option>
-                          <option value="consumed">Watched</option>
-                          <option value="dropped">Dropped</option>
-                        </select>
-                        <input type="number" name="rating" min="1" max="10" step="1" placeholder="Rating 1-10" />
-                        <input type="text" name="notes" placeholder="What did you think?" />
-                        <button type="submit">Save</button>
-                      </form>
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
-          )}
-
-          <section mix={css({ marginTop: '32px' })}>
-            <h2>My movie log</h2>
-            {log.length === 0 ? (
-              <p>Nothing logged yet — search above and save a status for a movie.</p>
-            ) : (
-              <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '8px' })}>
-                {log.map(({ interaction, item }) => (
-                  <li key={interaction.id}>
-                    <strong>{item?.title ?? 'Unknown title'}</strong> — {interaction.status}
-                    {interaction.rating != null ? ` (${interaction.rating}/10)` : ''}
-                    {interaction.notes ? `: "${interaction.notes}"` : ''}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </main>
-      </Document>
-    )
-  }
-}
 
 export default createController(routes.movies, {
   middleware: [requireAuth<User>()],
@@ -131,6 +48,22 @@ export default createController(routes.movies, {
       return context.render(<MoviesSearchPage query={query} results={results} log={log} />)
     },
 
+    async show(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const mediaItemId = Number(context.params.mediaItemId)
+      const db = context.get(Database)
+      const detail = await getMovieDetail(db, mediaItemId)
+      if (!detail) return new Response('Not Found', { status: 404 })
+
+      const interaction = await getUserInteractionForItem(db, auth.identity.id, mediaItemId)
+
+      return context.render(
+        <MovieDetailPage item={detail.item} tags={detail.tags} interaction={interaction} />,
+      )
+    },
+
     async log(context) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -143,8 +76,7 @@ export default createController(routes.movies, {
         return new Response('Invalid log input', { status: 400 })
       }
 
-      const ratingRaw = parsed.value.rating.trim()
-      const rating = ratingRaw && Number.isFinite(Number(ratingRaw)) ? Number(ratingRaw) : null
+      const rating = parseRatingInput(parsed.value.rating)
 
       const db = context.get(Database)
       await logInteraction(db, auth.identity.id, mediaItemId, {
@@ -153,8 +85,7 @@ export default createController(routes.movies, {
         notes: parsed.value.notes || null,
       })
 
-      const q = parsed.value.q
-      return redirect(`${routes.movies.search.href()}${q ? `?q=${encodeURIComponent(q)}` : ''}`, 303)
+      return redirect(parsed.value.return_to || routes.movies.search.href(), 303)
     },
   },
 })

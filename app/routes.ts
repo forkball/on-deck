@@ -1,4 +1,4 @@
-import { form, get, post, route } from 'remix/routes'
+import { form, get, put, post, route } from 'remix/routes'
 
 export const routes = route({
   assets: get('/assets/*path'),
@@ -10,7 +10,11 @@ export const routes = route({
   }),
   movies: route('movies', {
     search: get('search'),
+    show: get(':mediaItemId'),
     log: post(':mediaItemId/log'),
+    interactions: route('interactions', {
+      update: put(':interactionId'),
+    }),
   }),
   profile: form('profile', { formMethod: 'PUT', names: { action: 'update' } }),
 })

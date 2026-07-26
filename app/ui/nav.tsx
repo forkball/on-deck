@@ -25,7 +25,11 @@ export function Nav(handle: Handle<{ authed: boolean }>) {
           <>
             <a href={routes.movies.search.href()}>Search Movies</a>
             <a href={routes.profile.index.href()}>My Profile</a>
-            <form method="post" action={routes.auth.logout.href()}>
+            <form
+              method="post"
+              action={routes.auth.logout.href()}
+              mix={css({ marginLeft: 'auto' })}
+            >
               <button type="submit">Log out</button>
             </form>
           </>

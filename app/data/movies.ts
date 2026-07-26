@@ -88,6 +88,40 @@ export async function logInteraction(
   )
 }
 
+// Updates an existing interaction directly by id (the editable-log flow on the
+// profile page), rather than upserting by media item. Returns null if the
+// interaction doesn't exist or doesn't belong to this user.
+export async function updateInteraction(
+  db: Db,
+  interactionId: number,
+  userId: number,
+  input: LogInteractionInput,
+) {
+  const existing = await db.find(userMediaInteractions, interactionId)
+  if (!existing || existing.user_id !== userId) return null
+
+  const now = Date.now()
+  return db.update(userMediaInteractions, interactionId, {
+    status: input.status,
+    rating: input.rating ?? undefined,
+    notes: input.notes ?? undefined,
+    consumed_at: input.status === 'consumed' ? (existing.consumed_at ?? now) : (existing.consumed_at ?? undefined),
+    updated_at: now,
+  })
+}
+
+export async function getMovieDetail(db: Db, mediaItemId: number) {
+  const item = await db.find(mediaItems, mediaItemId)
+  if (!item) return null
+
+  const tagRows = await db.findMany(mediaItemTags, { where: { media_item_id: mediaItemId } })
+  return { item, tags: tagRows.map((row) => row.tag) }
+}
+
+export async function getUserInteractionForItem(db: Db, userId: number, mediaItemId: number) {
+  return db.findOne(userMediaInteractions, { where: { user_id: userId, media_item_id: mediaItemId } })
+}
+
 export async function listUserMovieLog(db: Db, userId: number) {
   const interactions = await db.findMany(userMediaInteractions, {
     where: { user_id: userId },
