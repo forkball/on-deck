@@ -1,0 +1,103 @@
+import type { Db } from './db.ts'
+import { mediaItems, mediaItemTags, userMediaInteractions, type MediaItem } from './schema.ts'
+import { searchMovies as searchTmdbMovies, type TmdbSearchResult } from './tmdb.ts'
+
+export async function searchAndImportMovies(db: Db, query: string): Promise<MediaItem[]> {
+  const results = await searchTmdbMovies(query)
+  const items: MediaItem[] = []
+  for (const result of results) {
+    items.push(await upsertMovie(db, result))
+  }
+  return items
+}
+
+async function upsertMovie(db: Db, result: TmdbSearchResult): Promise<MediaItem> {
+  const existing = await db.findOne(mediaItems, {
+    where: { type: 'movie', external_source: 'tmdb', external_id: result.externalId },
+  })
+
+  const item =
+    existing ??
+    (await db.create(
+      mediaItems,
+      {
+        type: 'movie',
+        external_source: 'tmdb',
+        external_id: result.externalId,
+        title: result.title,
+        metadata: JSON.stringify({ releaseYear: result.releaseYear, posterUrl: result.posterUrl }),
+        popularity_score: result.popularity,
+        created_at: Date.now(),
+      },
+      { returnRow: true },
+    ))
+
+  for (const tag of result.tags) {
+    const existingTag = await db.findOne(mediaItemTags, {
+      where: { media_item_id: item.id, tag },
+    })
+    if (!existingTag) {
+      await db.create(mediaItemTags, { media_item_id: item.id, tag })
+    }
+  }
+
+  return item
+}
+
+export interface LogInteractionInput {
+  status: 'want_to_consume' | 'in_progress' | 'consumed' | 'dropped'
+  rating: number | null
+  notes: string | null
+}
+
+export async function logInteraction(
+  db: Db,
+  userId: number,
+  mediaItemId: number,
+  input: LogInteractionInput,
+) {
+  const existing = await db.findOne(userMediaInteractions, {
+    where: { user_id: userId, media_item_id: mediaItemId },
+  })
+
+  const now = Date.now()
+
+  if (existing) {
+    return db.update(userMediaInteractions, existing.id, {
+      status: input.status,
+      rating: input.rating ?? undefined,
+      notes: input.notes ?? undefined,
+      consumed_at: input.status === 'consumed' ? now : (existing.consumed_at ?? undefined),
+      updated_at: now,
+    })
+  }
+
+  return db.create(
+    userMediaInteractions,
+    {
+      user_id: userId,
+      media_item_id: mediaItemId,
+      status: input.status,
+      rating: input.rating ?? undefined,
+      notes: input.notes ?? undefined,
+      consumed_at: input.status === 'consumed' ? now : undefined,
+      created_at: now,
+      updated_at: now,
+    },
+    { returnRow: true },
+  )
+}
+
+export async function listUserMovieLog(db: Db, userId: number) {
+  const interactions = await db.findMany(userMediaInteractions, {
+    where: { user_id: userId },
+    orderBy: ['updated_at', 'desc'],
+  })
+
+  return Promise.all(
+    interactions.map(async (interaction) => ({
+      interaction,
+      item: await db.find(mediaItems, interaction.media_item_id),
+    })),
+  )
+}

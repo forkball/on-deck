@@ -1,40 +1,29 @@
-# Welcome to Remix!
+# On Deck Scaffold
 
-- 📖 [Remix docs](https://remix.run/docs)
+A minimal Remix application starter with a home page.
 
-## Development
+## Starter Shape
 
-Run the dev server:
+- `app/actions/controller.tsx` owns the top-level route actions.
+- `app/routes.ts` defines the route contract.
+- `app/router.ts` wires routes to handlers.
+- `app/middleware/render.tsx` installs the request-scoped renderer used by actions.
+- `app/ui/` holds the shared document shell and home page UI.
+- `app/assets.ts` owns the server-side asset pipeline used by the asset route and renderer.
+- `public/` contains static files served from the app root.
 
-```shellscript
-npm run dev
-```
+## Growing The App
 
-## Deployment
+- Put top-level route actions in `app/actions/controller.tsx`.
+- Add `app/actions/<route-key>/controller.tsx` when a nested route map needs its own actions or middleware.
+- Add directories like `app/data/` or `test/` when the app actually needs them.
+- Move shared UI into `app/ui/` once more than one route needs it.
 
-First, build your app for production:
+## Commands
 
 ```sh
-npm run build
+npm i
+npm run start
+npm test
+npm run typecheck
 ```
-
-Then run the app in production mode:
-
-```sh
-npm start
-```
-
-Now you'll need to pick a host to deploy it to.
-
-### DIY
-
-If you're familiar with deploying Node applications, the built-in Remix app server is production-ready.
-
-Make sure to deploy the output of `npm run build`
-
-- `build/server`
-- `build/client`
-
-## Styling
-
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever css framework you prefer. See the [Vite docs on css](https://vitejs.dev/guide/features.html#css) for more information.
