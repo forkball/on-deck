@@ -2,11 +2,17 @@ import type { Db } from './db.ts'
 import { mediaItems, mediaItemTags, userMediaInteractions, type MediaItem } from './schema.ts'
 import { searchMovies as searchTmdbMovies, type TmdbSearchResult } from './tmdb.ts'
 
-export async function searchAndImportMovies(db: Db, query: string): Promise<MediaItem[]> {
+export interface MovieResult {
+  item: MediaItem
+  tags: string[]
+}
+
+export async function searchAndImportMovies(db: Db, query: string): Promise<MovieResult[]> {
   const results = await searchTmdbMovies(query)
-  const items: MediaItem[] = []
+  const items: MovieResult[] = []
   for (const result of results) {
-    items.push(await upsertMovie(db, result))
+    const item = await upsertMovie(db, result)
+    items.push({ item, tags: result.tags })
   }
   return items
 }
@@ -42,6 +48,27 @@ async function upsertMovie(db: Db, result: TmdbSearchResult): Promise<MediaItem>
   }
 
   return item
+}
+
+// All distinct tags seen across the imported catalog so far — grows as more
+// movies get searched/imported. Powers the genre-pill browse row.
+export async function listDistinctTags(db: Db): Promise<string[]> {
+  const rows = await db.query(mediaItemTags).select('tag').distinct().orderBy('tag', 'asc').all()
+  return rows.map((row) => row.tag)
+}
+
+// Browse the local catalog by a genre tag someone already imported, without
+// hitting TMDB again.
+export async function listMediaItemsByTag(db: Db, tag: string): Promise<MovieResult[]> {
+  const tagRows = await db.findMany(mediaItemTags, { where: { tag } })
+  const results: MovieResult[] = []
+  for (const tagRow of tagRows) {
+    const item = await db.find(mediaItems, tagRow.media_item_id)
+    if (!item) continue
+    const allTags = await db.findMany(mediaItemTags, { where: { media_item_id: item.id } })
+    results.push({ item, tags: allTags.map((t) => t.tag) })
+  }
+  return results
 }
 
 export interface LogInteractionInput {

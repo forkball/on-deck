@@ -1,25 +1,55 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { listUserMovieLog } from '../../data/movies.ts'
-import type { MediaItem } from '../../data/schema.ts'
+import type { getUserInteractionForItem, MovieResult } from '../../data/movies.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/document.tsx'
 import { Nav } from '../../ui/nav.tsx'
 import { parseMovieMetadata } from '../../utils/mediaMetadata.ts'
-import { formatStars, RATING_OPTIONS } from '../../utils/stars.ts'
+import { StarRatingInput } from '../../ui/star-rating.tsx'
 
 export interface MoviesSearchPageProps {
   query: string
-  results: MediaItem[]
-  log: Awaited<ReturnType<typeof listUserMovieLog>>
+  genre: string
+  results: MovieResult[]
+  availableTags: string[]
+  interactionsByItemId: Map<number, Awaited<ReturnType<typeof getUserInteractionForItem>>>
   message?: string
+}
+
+function capitalize(tag: string): string {
+  return tag.replace(/^./, (c) => c.toUpperCase())
+}
+
+function TagPill(handle: Handle<{ label: string; href: string; active: boolean }>) {
+  return () => {
+    const { label, href, active } = handle.props
+    return (
+      <a
+        href={href}
+        mix={css({
+          display: 'inline-block',
+          padding: '4px 12px',
+          borderRadius: '999px',
+          border: '1px solid #3c3c3c',
+          fontSize: '13px',
+          textDecoration: 'none',
+          color: active ? '#fff' : '#3c3c3c',
+          backgroundColor: active ? '#3c3c3c' : 'transparent',
+        })}
+      >
+        {label}
+      </a>
+    )
+  }
 }
 
 export function MoviesSearchPage(handle: Handle<MoviesSearchPageProps>) {
   return () => {
-    const { query, results, log, message } = handle.props
-    const returnTo = `${routes.movies.search.href()}?q=${encodeURIComponent(query)}`
+    const { query, genre, results, availableTags, interactionsByItemId, message } = handle.props
+    const returnTo = genre
+      ? `${routes.movies.search.href()}?genre=${encodeURIComponent(genre)}`
+      : `${routes.movies.search.href()}?q=${encodeURIComponent(query)}`
 
     return (
       <Document title="Search movies | On Deck">
@@ -30,19 +60,39 @@ export function MoviesSearchPage(handle: Handle<MoviesSearchPageProps>) {
           <form
             method="get"
             action={routes.movies.search.href()}
-            mix={css({ display: 'flex', gap: '8px', marginBottom: '24px' })}
+            mix={css({ display: 'flex', gap: '8px', marginBottom: '16px' })}
           >
             <input type="text" name="q" defaultValue={query} placeholder="Search TMDB for a movie…" />
             <button type="submit">Search</button>
           </form>
 
+          {availableTags.length > 0 && (
+            <section mix={css({ marginBottom: '24px' })}>
+              <p mix={css({ margin: '0 0 8px', fontSize: '13px', color: '#555' })}>
+                Genres in your catalog so far — click one to browse movies you've already imported:
+              </p>
+              <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '8px' })}>
+                <TagPill label="All" href={routes.movies.search.href()} active={!genre} />
+                {availableTags.map((tag) => (
+                  <TagPill
+                    key={tag}
+                    label={capitalize(tag)}
+                    href={`${routes.movies.search.href()}?genre=${encodeURIComponent(tag)}`}
+                    active={genre === tag}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
           {results.length > 0 && (
             <section>
-              <h2>Results</h2>
+              <h2>{genre ? `Tagged "${capitalize(genre)}"` : 'Results'}</h2>
               <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
-                {results.map((item) => {
+                {results.map(({ item, tags }) => {
                   const { releaseYear, posterUrl } = parseMovieMetadata(item.metadata)
                   const detailHref = routes.movies.show.href({ mediaItemId: String(item.id) })
+                  const interaction = interactionsByItemId.get(item.id)
                   return (
                     <li
                       key={item.id}
@@ -74,27 +124,47 @@ export function MoviesSearchPage(handle: Handle<MoviesSearchPageProps>) {
                           {item.title}
                         </a>
                         {releaseYear ? ` (${releaseYear})` : ''}
+                        {tags.length > 0 && (
+                          <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' })}>
+                            {tags.map((tag) => (
+                              <span
+                                key={tag}
+                                mix={css({
+                                  fontSize: '11px',
+                                  padding: '2px 8px',
+                                  borderRadius: '999px',
+                                  border: '1px solid #ccc',
+                                  color: '#555',
+                                })}
+                              >
+                                {capitalize(tag)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <form
                           method="post"
                           action={routes.movies.log.href({ mediaItemId: String(item.id) })}
                           mix={css({ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px', flexWrap: 'wrap' })}
                         >
                           <input type="hidden" name="return_to" value={returnTo} />
-                          <select name="status">
+                          <select name="status" defaultValue={interaction?.status ?? 'want_to_consume'}>
                             <option value="want_to_consume">Want to watch</option>
                             <option value="in_progress">Watching</option>
                             <option value="consumed">Watched</option>
                             <option value="dropped">Dropped</option>
                           </select>
-                          <select name="rating" defaultValue="">
-                            <option value="">No rating</option>
-                            {RATING_OPTIONS.map((v) => (
-                              <option key={v} value={v}>
-                                {formatStars(v)} {v}
-                              </option>
-                            ))}
-                          </select>
-                          <input type="text" name="notes" placeholder="What did you think?" />
+                          <StarRatingInput
+                            name="rating"
+                            idPrefix={`rating-${item.id}`}
+                            defaultValue={interaction?.rating ?? null}
+                          />
+                          <input
+                            type="text"
+                            name="notes"
+                            defaultValue={interaction?.notes ?? ''}
+                            placeholder="What did you think?"
+                          />
                           <button type="submit">Save</button>
                         </form>
                       </div>
@@ -105,31 +175,10 @@ export function MoviesSearchPage(handle: Handle<MoviesSearchPageProps>) {
             </section>
           )}
 
-          <section mix={css({ marginTop: '32px' })}>
-            <h2>My movie log</h2>
-            <p>
-              <a href={routes.profile.index.href()}>Edit what you've watched or your ratings</a> on
-              your profile page.
-            </p>
-            {log.length === 0 ? (
-              <p>Nothing logged yet — search above and save a status for a movie.</p>
-            ) : (
-              <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '8px' })}>
-                {log.map(({ interaction, item }) => (
-                  <li key={interaction.id}>
-                    <a href={item ? routes.movies.show.href({ mediaItemId: String(item.id) }) : '#'}>
-                      <strong>{item?.title ?? 'Unknown title'}</strong>
-                    </a>{' '}
-                    — {interaction.status}
-                    {interaction.rating != null
-                      ? ` ${formatStars(interaction.rating)} (${interaction.rating})`
-                      : ''}
-                    {interaction.notes ? `: "${interaction.notes}"` : ''}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <p mix={css({ marginTop: '32px' })}>
+            <a href={routes.profile.index.href()}>See everything you've watched and edit your ratings</a> on
+            your profile page.
+          </p>
         </main>
       </Document>
     )

@@ -6,7 +6,7 @@ import { routes } from '../../routes.ts'
 import { Document } from '../../ui/document.tsx'
 import { Nav } from '../../ui/nav.tsx'
 import { parseMovieMetadata } from '../../utils/mediaMetadata.ts'
-import { formatStars, RATING_OPTIONS } from '../../utils/stars.ts'
+import { StarRatingDisplay, StarRatingInput } from '../../ui/star-rating.tsx'
 
 export interface MovieDetailPageProps {
   item: MediaItem
@@ -60,6 +60,11 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
               {tags.length > 0 && (
                 <p mix={css({ color: '#555' })}>{tags.map((t) => t.replace(/^./, (c) => c.toUpperCase())).join(', ')}</p>
               )}
+              {interaction?.rating != null && (
+                <p mix={css({ display: 'flex', alignItems: 'center', gap: '8px' })}>
+                  Your rating: <StarRatingDisplay value={interaction.rating} /> ({interaction.rating})
+                </p>
+              )}
 
               <form
                 method="post"
@@ -85,17 +90,14 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
                     <option value="dropped">Dropped</option>
                   </select>
                 </label>
-                <label>
-                  Rating
-                  <select name="rating" defaultValue={interaction?.rating ?? ''}>
-                    <option value="">No rating</option>
-                    {RATING_OPTIONS.map((v) => (
-                      <option key={v} value={v}>
-                        {formatStars(v)} {v}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div>
+                  <p mix={css({ margin: '0 0 4px' })}>Rating</p>
+                  <StarRatingInput
+                    name="rating"
+                    idPrefix={`rating-${item.id}`}
+                    defaultValue={interaction?.rating ?? null}
+                  />
+                </div>
                 <label>
                   Notes
                   <textarea

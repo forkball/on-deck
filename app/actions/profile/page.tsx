@@ -6,7 +6,7 @@ import { routes } from '../../routes.ts'
 import { Document } from '../../ui/document.tsx'
 import { Nav } from '../../ui/nav.tsx'
 import { parseMovieMetadata } from '../../utils/mediaMetadata.ts'
-import { formatStars, RATING_OPTIONS } from '../../utils/stars.ts'
+import { StarRatingInput } from '../../ui/star-rating.tsx'
 
 export interface ProfilePageProps {
   summary: string
@@ -118,14 +118,11 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                             <option value="consumed">Watched</option>
                             <option value="dropped">Dropped</option>
                           </select>
-                          <select name="rating" defaultValue={interaction.rating ?? ''}>
-                            <option value="">No rating</option>
-                            {RATING_OPTIONS.map((v) => (
-                              <option key={v} value={v}>
-                                {formatStars(v)} {v}
-                              </option>
-                            ))}
-                          </select>
+                          <StarRatingInput
+                            name="rating"
+                            idPrefix={`rating-${interaction.id}`}
+                            defaultValue={interaction.rating ?? null}
+                          />
                           <input
                             type="text"
                             name="notes"
