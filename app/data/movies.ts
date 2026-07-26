@@ -22,21 +22,27 @@ async function upsertMovie(db: Db, result: TmdbSearchResult): Promise<MediaItem>
     where: { type: 'movie', external_source: 'tmdb', external_id: result.externalId },
   })
 
-  const item =
-    existing ??
-    (await db.create(
-      mediaItems,
-      {
-        type: 'movie',
-        external_source: 'tmdb',
-        external_id: result.externalId,
-        title: result.title,
-        metadata: JSON.stringify({ releaseYear: result.releaseYear, posterUrl: result.posterUrl }),
-        popularity_score: result.popularity,
-        created_at: Date.now(),
-      },
-      { returnRow: true },
-    ))
+  const metadata = JSON.stringify({
+    releaseYear: result.releaseYear,
+    posterUrl: result.posterUrl,
+    overview: result.overview,
+  })
+
+  const item = existing
+    ? await db.update(mediaItems, existing.id, { metadata, popularity_score: result.popularity })
+    : await db.create(
+        mediaItems,
+        {
+          type: 'movie',
+          external_source: 'tmdb',
+          external_id: result.externalId,
+          title: result.title,
+          metadata,
+          popularity_score: result.popularity,
+          created_at: Date.now(),
+        },
+        { returnRow: true },
+      )
 
   for (const tag of result.tags) {
     const existingTag = await db.findOne(mediaItemTags, {

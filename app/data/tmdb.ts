@@ -33,6 +33,7 @@ export interface TmdbSearchResult {
   tags: string[]
   posterUrl: string | null
   popularity: number
+  overview: string | null
 }
 
 interface TmdbSearchResponse {
@@ -43,6 +44,7 @@ interface TmdbSearchResponse {
     genre_ids: number[]
     poster_path: string | null
     popularity: number
+    overview: string
   }[]
 }
 
@@ -71,5 +73,6 @@ export async function searchMovies(query: string): Promise<TmdbSearchResult[]> {
     tags: r.genre_ids.map((id) => GENRE_ID_TO_NAME[id]).filter((t): t is string => Boolean(t)),
     posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
     popularity: r.popularity,
+    overview: r.overview?.trim() || null,
   }))
 }
