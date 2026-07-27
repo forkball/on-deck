@@ -5,9 +5,11 @@ import { css } from 'remix/ui'
 // the overlay uses `:target` to show itself only when its own id matches the
 // URL fragment. Closing is a link back to a bare `#`, which clears the
 // fragment so `:target` stops matching.
-export function Modal(handle: Handle<{ id: string; triggerLabel: string; children?: RemixNode }>) {
+export function Modal(
+  handle: Handle<{ id: string; triggerLabel: string; title?: string; children?: RemixNode }>,
+) {
   return () => {
-    const { id, triggerLabel, children } = handle.props
+    const { id, triggerLabel, title, children } = handle.props
 
     return (
       <>
@@ -43,8 +45,17 @@ export function Modal(handle: Handle<{ id: string; triggerLabel: string; childre
               overflowY: 'auto',
             })}
           >
-            <div mix={css({ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' })}>
-              <a href="#" mix={css({ textDecoration: 'none', fontSize: '20px', color: '#3c3c3c' })}>
+            <div
+              mix={css({
+                display: 'flex',
+                justifyContent: title ? 'space-between' : 'flex-end',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: title ? '16px' : '8px',
+              })}
+            >
+              {title && <h3 mix={css({ margin: 0 })}>{title}</h3>}
+              <a href="#" mix={css({ textDecoration: 'none', fontSize: '20px' })}>
                 ✕
               </a>
             </div>

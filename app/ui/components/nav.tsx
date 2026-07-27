@@ -1,11 +1,11 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { routes } from '../routes.ts'
+import { routes } from '../../routes.ts'
 
-export function Nav(handle: Handle<{ authed: boolean }>) {
+export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
   return () => {
-    const { authed } = handle.props
+    const { authed, displayName } = handle.props
 
     return (
       <nav
@@ -24,12 +24,15 @@ export function Nav(handle: Handle<{ authed: boolean }>) {
         {authed ? (
           <>
             <a href={routes.movies.search.href()}>Search Movies</a>
-            <a href={routes.profile.index.href()}>My Profile</a>
-            <form
-              method="post"
-              action={routes.auth.logout.href()}
+            <a href={routes.recommendations.index.href()}>Recommendations</a>
+            <a href={routes.users.search.href()}>Find People</a>
+            <a
+              href={routes.profile.index.href()}
               mix={css({ marginLeft: 'auto' })}
             >
+              {displayName || 'My Profile'}
+            </a>
+            <form method="post" action={routes.auth.logout.href()}>
               <button type="submit">Log out</button>
             </form>
           </>

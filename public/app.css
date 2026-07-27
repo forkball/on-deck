@@ -1,0 +1,58 @@
+/* App-level interaction states layered on top of the vendored DoodleCSS,
+   which ships with focus-visible styling but no hover/idle distinction —
+   every bordered control uses the same dark hand-drawn stroke all the time.
+   Here the border starts light and only turns dark (the vendored button.svg
+   / border.svg) on hover or focus, so idle controls read as quieter. */
+
+.doodle button,
+.doodle .doodle-border,
+.doodle select,
+.doodle input:not([type='checkbox']):not([type='radio']) {
+  border-image: url(/button-light.svg) 10 10 10 10 stretch stretch;
+}
+
+.doodle fieldset,
+.doodle textarea {
+  border-image: url(/border-light.svg) 10 10 10 10 stretch stretch;
+}
+
+.doodle button:hover:not(:disabled),
+.doodle .doodle-border:hover,
+.doodle select:hover,
+.doodle input:not([type='checkbox']):not([type='radio']):hover,
+.doodle button:focus-visible,
+.doodle .doodle-border:focus-visible,
+.doodle select:focus-visible,
+.doodle input:not([type='checkbox']):not([type='radio']):focus-visible {
+  border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
+}
+
+.doodle fieldset:hover,
+.doodle textarea:hover,
+.doodle textarea:focus-visible {
+  border-image: url(/vendor/doodle/border.svg) 10 10 10 10 stretch stretch;
+}
+
+.doodle button,
+.doodle .doodle-border,
+.doodle select,
+.doodle input[type='checkbox'],
+.doodle input[type='radio'] {
+  cursor: pointer;
+}
+
+/* Component styles render inside a CSS @layer, which always loses to
+   unlayered CSS regardless of specificity — so doodle.css's unlayered
+   `.doodle a { color: #1c1c1c }` was silently winning over a pill's own
+   `color: #fff` on its active (dark-filled) state, making the label
+   invisible. These rules live here, unlayered, specifically to win that
+   fight for tag pills. */
+.doodle a.tag-pill {
+  color: #1c1c1c;
+  background-color: transparent;
+}
+
+.doodle a.tag-pill-active {
+  color: #fff;
+  background-color: #1c1c1c;
+}
