@@ -22,9 +22,10 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
       month: 'short',
       day: 'numeric',
     })
+    const forLabel = ['you', ...run.otherMemberLabels].join(', ')
 
     return (
-      <Document title={`Recommendations #${run.id} | On Deck`}>
+      <Document title={`Recommendations for ${forLabel} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
           <p>
@@ -35,10 +36,8 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
               You can keep up to 3 recommendation runs at a time, so your oldest one was removed.
             </p>
           )}
-          <h1>Recommendations #{run.id}</h1>
-          <p mix={css({ color: '#555' })}>
-            {date} — {run.groupLabel}
-          </p>
+          <h1>Recommendations for {forLabel}</h1>
+          <p mix={css({ color: '#555' })}>{date}</p>
 
           <ul
             mix={css({
