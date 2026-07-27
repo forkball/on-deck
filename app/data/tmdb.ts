@@ -76,3 +76,44 @@ export async function searchMovies(query: string): Promise<TmdbSearchResult[]> {
     overview: r.overview?.trim() || null,
   }))
 }
+
+interface TmdbMovieDetailResponse {
+  id: number
+  title: string
+  release_date: string
+  genres: { id: number; name: string }[]
+  poster_path: string | null
+  popularity: number
+  overview: string
+}
+
+// Looks a movie up by its known TMDB id — used when the autosuggest dropdown
+// already resolved a pick, so selecting it doesn't need a second title
+// search (which could in principle even resolve to a different movie).
+export async function getMovieById(externalId: string): Promise<TmdbSearchResult | null> {
+  const apiKey = process.env.TMDB_API_KEY
+  if (!apiKey) {
+    throw new Error('TMDB_API_KEY is required')
+  }
+
+  const url = new URL(`${TMDB_API_BASE}/movie/${encodeURIComponent(externalId)}`)
+  url.searchParams.set('api_key', apiKey)
+
+  const response = await fetch(url)
+  if (response.status === 404) return null
+  if (!response.ok) {
+    throw new Error(`TMDB movie lookup failed: ${response.status} ${await response.text()}`)
+  }
+
+  const r = (await response.json()) as TmdbMovieDetailResponse
+
+  return {
+    externalId: String(r.id),
+    title: r.title,
+    releaseYear: r.release_date ? Number(r.release_date.slice(0, 4)) : null,
+    tags: r.genres.map((g) => g.name.toLowerCase()),
+    posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
+    popularity: r.popularity,
+    overview: r.overview?.trim() || null,
+  }
+}

@@ -8,8 +8,14 @@ export const routes = route({
     login: form('login'),
     logout: post('logout'),
   }),
+  notifications: route('notifications', {
+    index: get('/'),
+    unreadCount: get('unread-count'),
+  }),
   movies: route('movies', {
     search: get('search'),
+    suggest: get('suggest'),
+    import: get('import'),
     show: get(':mediaItemId'),
     log: post(':mediaItemId/log'),
     interactions: route('interactions', {
@@ -29,6 +35,7 @@ export const routes = route({
   }),
   users: route('users', {
     search: get('search'),
+    suggest: get('suggest'),
     show: get(':userId'),
     watched: get(':userId/watched'),
     following: get(':userId/following'),

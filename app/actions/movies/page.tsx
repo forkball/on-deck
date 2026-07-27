@@ -54,7 +54,12 @@ export function MoviesSearchPage(handle: Handle<MoviesSearchPageProps>) {
           <MediaTypeFab />
           <h1 mix={css({ margin: "0 0 16px" })}>Search movies</h1>
           {message && <p mix={css({ color: "#15803d" })}>{message}</p>}
-          <MovieSearchForm query={query} searchHref={routes.movies.search.href()} />
+          <MovieSearchForm
+            query={query}
+            searchHref={routes.movies.search.href()}
+            suggestHref={routes.movies.suggest.href()}
+            importHref={routes.movies.import.href()}
+          />
 
           {results.length > 0 && (
             <section>
