@@ -11,11 +11,12 @@ import { STATUS_LABELS } from '../../utils/status.ts'
 export interface RecommendationRunPageProps {
   run: RecommendationRunDetail
   displayName: string
+  prunedOldestRun?: boolean
 }
 
 export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>) {
   return () => {
-    const { run, displayName } = handle.props
+    const { run, displayName, prunedOldestRun } = handle.props
     const date = new Date(run.createdAt).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
@@ -29,6 +30,11 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
           <p>
             <a href={routes.recommendations.index.href()}>← All recommendations</a>
           </p>
+          {prunedOldestRun && (
+            <p mix={css({ color: '#15803d' })}>
+              You can keep up to 3 recommendation runs at a time, so your oldest one was removed.
+            </p>
+          )}
           <h1>Recommendations #{run.id}</h1>
           <p mix={css({ color: '#555' })}>
             {date} — {run.groupLabel}

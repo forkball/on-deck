@@ -55,6 +55,9 @@ interface Pick {
 const TARGET_COUNT = 10
 const REQUESTED_COUNT = 15
 
+// Exported so the UI can tell users about the cap without duplicating it.
+export const MAX_RUNS_PER_USER = 3
+
 export interface RecommendationResult {
   item: MediaItem
   tags: string[]
@@ -84,13 +87,22 @@ async function buildGroupLabel(db: Db, requestingUserId: number, run: Recommenda
   return `You + ${otherUsers.map(displayLabel).join(', ')}`
 }
 
+export interface GenerateRecommendationsOutcome {
+  runId: number
+  // Whether generating this run pushed the user over MAX_RUNS_PER_USER and
+  // caused their oldest run to be deleted.
+  prunedOldestRun: boolean
+}
+
 // Generates one indexed, dated run of picks and returns its id — history is
 // kept (never replaced), so every run stays browsable at /recommendations/:id.
+// Runs are capped at MAX_RUNS_PER_USER per user; generating past the cap
+// deletes the oldest run (cascading to its members/results).
 export async function generateRecommendations(
   db: Db,
   requestingUserId: number,
   memberUserIds: number[],
-): Promise<number> {
+): Promise<GenerateRecommendationsOutcome> {
   // Independent per member — regenerate every profile (and fetch their name) concurrently.
   const members = await Promise.all(
     memberUserIds.map(async (memberId) => {
@@ -158,7 +170,24 @@ export async function generateRecommendations(
     })
   }
 
-  return run.id
+  const prunedOldestRun = await pruneOldRuns(db, requestingUserId)
+
+  return { runId: run.id, prunedOldestRun }
+}
+
+// Deletes the oldest run(s) for a user beyond MAX_RUNS_PER_USER. Returns
+// whether anything was deleted. Relies on recommendation_run_members and
+// user_recommendations cascading on delete of the run row.
+async function pruneOldRuns(db: Db, userId: number): Promise<boolean> {
+  const runs = await db.findMany(recommendationRuns, {
+    where: { user_id: userId },
+    orderBy: ['created_at', 'asc'],
+  })
+  if (runs.length <= MAX_RUNS_PER_USER) return false
+
+  const excess = runs.slice(0, runs.length - MAX_RUNS_PER_USER)
+  await db.deleteMany(recommendationRuns, { where: inList('id', excess.map((run) => run.id)) })
+  return true
 }
 
 async function requestPicks(profiles: MemberProfile[], excludedTitles: string[]): Promise<Pick[]> {

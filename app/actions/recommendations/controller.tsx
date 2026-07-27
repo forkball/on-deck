@@ -52,9 +52,13 @@ export default createController(routes.recommendations, {
           : []
 
       const db = context.get(Database)
-      const runId = await generateRecommendations(db, auth.identity.id, [auth.identity.id, ...friendIds])
+      const { runId, prunedOldestRun } = await generateRecommendations(db, auth.identity.id, [
+        auth.identity.id,
+        ...friendIds,
+      ])
 
-      return redirect(routes.recommendations.show.href({ runId: String(runId) }), 303)
+      const href = routes.recommendations.show.href({ runId: String(runId) })
+      return redirect(prunedOldestRun ? `${href}?prunedOldest=1` : href, 303)
     },
 
     async show(context) {
@@ -65,7 +69,13 @@ export default createController(routes.recommendations, {
       const run = await getRecommendationRun(db, Number(context.params.runId), auth.identity.id)
       if (!run) return new Response('Not Found', { status: 404 })
 
-      return context.render(<RecommendationRunPage run={run} displayName={displayLabel(auth.identity)} />)
+      return context.render(
+        <RecommendationRunPage
+          run={run}
+          displayName={displayLabel(auth.identity)}
+          prunedOldestRun={context.url.searchParams.get('prunedOldest') === '1'}
+        />,
+      )
     },
   },
 })

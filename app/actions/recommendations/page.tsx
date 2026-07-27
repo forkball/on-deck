@@ -2,7 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { GenerateRecommendationsForm } from '../../assets/generate-recommendations-form.tsx'
-import type { RecommendationRunSummary } from '../../data/recommendations.ts'
+import { MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
@@ -36,6 +36,11 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
 
           <section mix={css({ marginTop: '40px' })}>
             <h2>Past recommendations</h2>
+            {runs.length > 0 && (
+              <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
+                Only your {MAX_RUNS_PER_USER} most recent runs are kept — generating a new one removes the oldest.
+              </p>
+            )}
             {runs.length === 0 ? (
               <p>
                 Nothing yet — log a few movies on your{' '}
@@ -63,7 +68,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
                       })}
                     >
                       <a href={routes.recommendations.show.href({ runId: String(run.id) })}>
-                        <strong>#{run.id}</strong> — {date} — {run.groupLabel}
+                        <strong>{date}</strong> — {run.groupLabel}
                       </a>
                     </li>
                   )
