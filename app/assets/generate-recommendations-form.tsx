@@ -21,12 +21,19 @@ const THINKING_MESSAGES = [
   'Almost there…',
 ]
 
+const FRIENDS_PAGE_SIZE = 8
+
 // The only client-hydrated component in the app — everything else is
 // CSS-only. Generating recommendations is a genuine multi-second wait (a few
 // Claude calls plus TMDB lookups), so this shows a "Generating…" state the
 // instant you submit, cycling through THINKING_MESSAGES for as long as the
 // wait continues. The <form> still works as a plain POST without JS; this
 // only adds feedback on top.
+//
+// The friend picker is search-filtered and paginated client-side (the
+// server hands over the full list once). Every friend's checkbox always
+// stays mounted — only its visibility toggles — so a selection made before
+// searching/paging away never gets silently dropped from the submitted form.
 //
 // URLs come in as plain string props rather than importing routes.ts — the
 // asset server only allows bundling files under app/assets/**, and routes.ts
@@ -36,9 +43,19 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
   function GenerateRecommendationsForm(handle) {
     let submitting = false
     let thinkingIndex = 0
+    let mode: 'self' | 'group' = 'self'
+    let search = ''
+    let page = 1
 
     return () => {
       const { friends, generateHref, findPeopleHref } = handle.props
+
+      const query = search.trim().toLowerCase()
+      const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
+      const totalPages = Math.max(1, Math.ceil(filtered.length / FRIENDS_PAGE_SIZE))
+      if (page > totalPages) page = totalPages
+      const start = (page - 1) * FRIENDS_PAGE_SIZE
+      const visibleIds = new Set(filtered.slice(start, start + FRIENDS_PAGE_SIZE).map((friend) => friend.id))
 
       return (
         <form
@@ -62,24 +79,99 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
           ]}
         >
           <label>
-            <input type="radio" name="mode" value="self" defaultChecked /> Just me
+            <input
+              type="radio"
+              name="mode"
+              value="self"
+              defaultChecked
+              mix={on('change', () => {
+                mode = 'self'
+                handle.update()
+              })}
+            />{' '}
+            Just me
           </label>
           <label>
-            <input type="radio" name="mode" value="group" disabled={friends.length === 0} /> With friends
+            <input
+              type="radio"
+              name="mode"
+              value="group"
+              disabled={friends.length === 0}
+              mix={on('change', () => {
+                mode = 'group'
+                handle.update()
+              })}
+            />{' '}
+            With friends
           </label>
 
-          {friends.length > 0 ? (
-            <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '24px' })}>
-              {friends.map((friend) => (
-                <label key={friend.id}>
-                  <input type="checkbox" name="friend_ids" value={String(friend.id)} /> {friend.label}
-                </label>
-              ))}
-            </div>
-          ) : (
+          {friends.length === 0 ? (
             <p mix={css({ margin: 0, paddingLeft: '24px', fontSize: '13px', color: '#888' })}>
               <a href={findPeopleHref}>Find and follow people</a> to build a group.
             </p>
+          ) : (
+            <div
+              mix={css({
+                display: mode === 'group' ? 'flex' : 'none',
+                flexDirection: 'column',
+                gap: '8px',
+                paddingLeft: '24px',
+              })}
+            >
+              <input
+                type="text"
+                placeholder="Search friends…"
+                value={search}
+                mix={on('input', (event) => {
+                  search = (event.target as HTMLInputElement).value
+                  page = 1
+                  handle.update()
+                })}
+              />
+
+              {filtered.length === 0 && (
+                <p mix={css({ margin: 0, fontSize: '13px', color: '#888' })}>No friends match "{search}".</p>
+              )}
+
+              <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
+                {friends.map((friend) => (
+                  <label
+                    key={friend.id}
+                    mix={css({ display: visibleIds.has(friend.id) ? 'block' : 'none' })}
+                  >
+                    <input type="checkbox" name="friend_ids" value={String(friend.id)} /> {friend.label}
+                  </label>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div mix={css({ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' })}>
+                  <button
+                    type="button"
+                    disabled={page <= 1}
+                    mix={on('click', () => {
+                      page = Math.max(1, page - 1)
+                      handle.update()
+                    })}
+                  >
+                    ← Prev
+                  </button>
+                  <span mix={css({ color: '#888' })}>
+                    Page {page} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={page >= totalPages}
+                    mix={on('click', () => {
+                      page = Math.min(totalPages, page + 1)
+                      handle.update()
+                    })}
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           <button type="submit" disabled={submitting}>
