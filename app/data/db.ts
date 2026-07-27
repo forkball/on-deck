@@ -1,13 +1,12 @@
-import { DatabaseSync } from 'node:sqlite'
+import { Pool } from 'pg'
 
 import { createDatabase, Database } from 'remix/data-table'
-import { createSqliteDatabaseAdapter } from 'remix/data-table/sqlite'
+import { createPostgresDatabaseAdapter } from 'remix/data-table/postgres'
 import type { Middleware } from 'remix/router'
 
-const sqlite = new DatabaseSync(process.env.DATABASE_PATH ?? './db/app.db')
-sqlite.exec('PRAGMA foreign_keys = ON')
+const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
-export const db = createDatabase(createSqliteDatabaseAdapter(sqlite))
+export const db = createDatabase(createPostgresDatabaseAdapter(pool))
 export type Db = typeof db
 
 export function loadDatabase(): Middleware<{ key: typeof Database; value: Db }> {

@@ -1,3 +1,7 @@
+drop table if exists user_recommendations;
+drop table if exists recommendation_run_members;
+drop table if exists recommendation_runs;
+drop table if exists user_follows;
 drop table if exists user_taste_profiles;
 drop table if exists user_media_interactions;
 drop table if exists media_item_tags;
