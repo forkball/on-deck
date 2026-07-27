@@ -1,6 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import { ProfileMenu } from '../../assets/profile-menu.tsx'
 import { routes } from '../../routes.ts'
 
 export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
@@ -11,8 +12,8 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
       <nav
         mix={css({
           display: 'flex',
-          gap: '20px',
           alignItems: 'center',
+          gap: '20px',
           padding: '16px 24px',
           borderBottom: '1px solid #ccc',
           fontSize: '14px',
@@ -22,20 +23,16 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
           On Deck
         </a>
         {authed ? (
-          <>
-            <a href={routes.movies.search.href()}>Search Movies</a>
-            <a href={routes.recommendations.index.href()}>Recommendations</a>
-            <a href={routes.users.search.href()}>Find People</a>
-            <a
-              href={routes.profile.index.href()}
-              mix={css({ marginLeft: 'auto' })}
-            >
-              {displayName || 'My Profile'}
-            </a>
-            <form method="post" action={routes.auth.logout.href()}>
-              <button type="submit">Log out</button>
-            </form>
-          </>
+          <ProfileMenu
+            displayName={displayName || 'My Profile'}
+            links={[
+              { href: routes.movies.search.href(), label: 'Search Movies' },
+              { href: routes.recommendations.index.href(), label: 'Recommendations' },
+              { href: routes.users.search.href(), label: 'Find People' },
+              { href: routes.profile.index.href(), label: 'My Profile' },
+            ]}
+            logoutHref={routes.auth.logout.href()}
+          />
         ) : (
           <>
             <a href={routes.auth.login.index.href()}>Log in</a>
