@@ -11,6 +11,8 @@ import authSignupController from './actions/auth/signup/controller.tsx'
 import moviesController from './actions/movies/controller.tsx'
 import moviesInteractionsController from './actions/movies/interactions/controller.tsx'
 import profileController from './actions/profile/controller.tsx'
+import recommendationsController from './actions/recommendations/controller.tsx'
+import usersController from './actions/users/controller.tsx'
 import { loadDatabase } from './data/db.ts'
 import { loadAuth } from './middleware/auth.ts'
 import { render } from './middleware/render.tsx'
@@ -52,3 +54,5 @@ router.map(routes.auth.signup, authSignupController)
 router.map(routes.movies, moviesController)
 router.map(routes.movies.interactions, moviesInteractionsController)
 router.map(routes.profile, profileController)
+router.map(routes.recommendations, recommendationsController)
+router.map(routes.users, usersController)

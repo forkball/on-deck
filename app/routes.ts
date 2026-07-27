@@ -16,5 +16,16 @@ export const routes = route({
       update: put(':interactionId'),
     }),
   }),
-  profile: form('profile', { formMethod: 'PUT', names: { action: 'update' } }),
+  profile: route('profile', {
+    index: get('/'),
+    watched: get('watched'),
+  }),
+  recommendations: form('recommendations', { names: { action: 'generate' } }),
+  users: route('users', {
+    search: get('search'),
+    show: get(':userId'),
+    watched: get(':userId/watched'),
+    follow: post(':userId/follow'),
+    unfollow: post(':userId/unfollow'),
+  }),
 })

@@ -17,7 +17,7 @@ export async function searchAndImportMovies(db: Db, query: string): Promise<Movi
   return items
 }
 
-async function upsertMovie(db: Db, result: TmdbSearchResult): Promise<MediaItem> {
+export async function upsertMovie(db: Db, result: TmdbSearchResult): Promise<MediaItem> {
   const existing = await db.findOne(mediaItems, {
     where: { type: 'movie', external_source: 'tmdb', external_id: result.externalId },
   })
@@ -155,10 +155,16 @@ export async function getUserInteractionForItem(db: Db, userId: number, mediaIte
   return db.findOne(userMediaInteractions, { where: { user_id: userId, media_item_id: mediaItemId } })
 }
 
-export async function listUserMovieLog(db: Db, userId: number) {
+export async function listUserMovieLog(
+  db: Db,
+  userId: number,
+  options: { limit?: number; offset?: number } = {},
+) {
   const interactions = await db.findMany(userMediaInteractions, {
     where: { user_id: userId },
     orderBy: ['updated_at', 'desc'],
+    limit: options.limit,
+    offset: options.offset,
   })
 
   return Promise.all(
@@ -167,4 +173,8 @@ export async function listUserMovieLog(db: Db, userId: number) {
       item: await db.find(mediaItems, interaction.media_item_id),
     })),
   )
+}
+
+export async function countUserMovieLog(db: Db, userId: number): Promise<number> {
+  return db.count(userMediaInteractions, { where: { user_id: userId } })
 }

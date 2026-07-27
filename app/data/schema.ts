@@ -65,8 +65,37 @@ export const userTasteProfiles = table({
   },
 })
 
+// AI-generated recommendation picks for a user — replaced wholesale each time
+// recommendations are regenerated. See app/data/recommendations.ts.
+export const userRecommendations = table({
+  name: 'user_recommendations',
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    user_id: c.integer().notNull().references('users', 'id'),
+    media_item_id: c.integer().notNull().references('media_items', 'id'),
+    reason: c.text().notNull(),
+    rank: c.integer().notNull(),
+    // Set when this batch was generated for a group ("You + Alex, Sam"); null for solo runs.
+    group_label: c.text(),
+    created_at: c.integer().notNull(),
+  },
+})
+
+// One-directional follow — no accept step. See app/data/follows.ts.
+export const userFollows = table({
+  name: 'user_follows',
+  primaryKey: ['follower_id', 'followed_id'],
+  columns: {
+    follower_id: c.integer().notNull().references('users', 'id'),
+    followed_id: c.integer().notNull().references('users', 'id'),
+    created_at: c.integer().notNull(),
+  },
+})
+
 export type User = TableRow<typeof users>
 export type MediaItem = TableRow<typeof mediaItems>
 export type MediaItemTag = TableRow<typeof mediaItemTags>
 export type UserMediaInteraction = TableRow<typeof userMediaInteractions>
 export type UserTasteProfile = TableRow<typeof userTasteProfiles>
+export type UserRecommendation = TableRow<typeof userRecommendations>
+export type UserFollow = TableRow<typeof userFollows>

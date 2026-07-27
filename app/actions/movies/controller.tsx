@@ -16,6 +16,7 @@ import {
   type MovieResult,
 } from '../../data/movies.ts'
 import type { User } from '../../data/schema.ts'
+import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { parseRatingInput } from '../../utils/stars.ts'
 import { MovieDetailPage } from './detail-page.tsx'
@@ -67,6 +68,7 @@ export default createController(routes.movies, {
           results={results}
           availableTags={availableTags}
           interactionsByItemId={interactionsByItemId}
+          displayName={displayLabel(auth.identity)}
         />,
       )
     },
@@ -84,7 +86,13 @@ export default createController(routes.movies, {
       const from = context.url.searchParams.get('from') || undefined
 
       return context.render(
-        <MovieDetailPage item={detail.item} tags={detail.tags} interaction={interaction} from={from} />,
+        <MovieDetailPage
+          item={detail.item}
+          tags={detail.tags}
+          interaction={interaction}
+          from={from}
+          displayName={displayLabel(auth.identity)}
+        />,
       )
     },
 
