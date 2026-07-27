@@ -34,7 +34,6 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
         mix={[
           css({
             position: 'relative',
-            marginLeft: 'auto',
             '& summary': {
               display: 'inline-flex',
               alignItems: 'center',
