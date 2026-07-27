@@ -10,6 +10,7 @@ import authLoginController from './actions/auth/login/controller.tsx'
 import authSignupController from './actions/auth/signup/controller.tsx'
 import moviesController from './actions/movies/controller.tsx'
 import moviesInteractionsController from './actions/movies/interactions/controller.tsx'
+import notificationsController from './actions/notifications/controller.tsx'
 import profileController from './actions/profile/controller.tsx'
 import recommendationsController from './actions/recommendations/controller.tsx'
 import usersController from './actions/users/controller.tsx'
@@ -53,6 +54,7 @@ router.map(routes.auth.login, authLoginController)
 router.map(routes.auth.signup, authSignupController)
 router.map(routes.movies, moviesController)
 router.map(routes.movies.interactions, moviesInteractionsController)
+router.map(routes.notifications, notificationsController)
 router.map(routes.profile, profileController)
 router.map(routes.recommendations, recommendationsController)
 router.map(routes.users, usersController)

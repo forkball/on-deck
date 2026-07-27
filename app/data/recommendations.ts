@@ -2,7 +2,9 @@ import { and, eq, inList } from 'remix/data-table'
 
 import { claude, parseStructuredResponse } from './claude.ts'
 import type { Db } from './db.ts'
+import { isFollowing } from './follows.ts'
 import { upsertMovie } from './movies.ts'
+import { createNotification } from './notifications.ts'
 import {
   mediaItems,
   mediaItemTags,
@@ -75,16 +77,25 @@ export interface RecommendationRunSummary {
 }
 
 export interface RecommendationRunDetail extends RecommendationRunSummary {
+  otherMemberLabels: string[]
   results: RecommendationResult[]
 }
 
-async function buildGroupLabel(db: Db, requestingUserId: number, run: RecommendationRun): Promise<string> {
+// Every other member's display label, relative to `viewerId` — not
+// necessarily the run's original requester, since any member can view a run.
+async function listOtherMemberLabels(db: Db, viewerId: number, run: RecommendationRun): Promise<string[]> {
   const memberRows = await db.findMany(recommendationRunMembers, { where: { run_id: run.id } })
-  const otherMemberIds = memberRows.map((m) => m.user_id).filter((id) => id !== requestingUserId)
-  if (otherMemberIds.length === 0) return 'Just you'
+  const otherMemberIds = memberRows.map((m) => m.user_id).filter((id) => id !== viewerId)
+  if (otherMemberIds.length === 0) return []
 
   const otherUsers = await db.findMany(users, { where: inList('id', otherMemberIds) })
-  return `You + ${otherUsers.map(displayLabel).join(', ')}`
+  return otherUsers.map(displayLabel)
+}
+
+async function buildGroupLabel(db: Db, viewerId: number, run: RecommendationRun): Promise<string> {
+  const otherMemberLabels = await listOtherMemberLabels(db, viewerId, run)
+  if (otherMemberLabels.length === 0) return 'Just you'
+  return `You + ${otherMemberLabels.join(', ')}`
 }
 
 export interface GenerateRecommendationsOutcome {
@@ -170,9 +181,35 @@ export async function generateRecommendations(
     })
   }
 
+  await notifyMutualFollowers(db, requestingUserId, memberUserIds, run.id)
+
   const prunedOldestRun = await pruneOldRuns(db, requestingUserId)
 
   return { runId: run.id, prunedOldestRun }
+}
+
+// Notifies the other members of a group run, but only ones who mutually
+// follow the requester (the friend picker already requires the requester to
+// follow them; this also requires the follow back before pinging them).
+async function notifyMutualFollowers(
+  db: Db,
+  requestingUserId: number,
+  memberUserIds: number[],
+  runId: number,
+): Promise<void> {
+  const otherMemberIds = memberUserIds.filter((id) => id !== requestingUserId)
+
+  await Promise.all(
+    otherMemberIds.map(async (memberId) => {
+      const [requesterFollowsMember, memberFollowsRequester] = await Promise.all([
+        isFollowing(db, requestingUserId, memberId),
+        isFollowing(db, memberId, requestingUserId),
+      ])
+      if (!requesterFollowsMember || !memberFollowsRequester) return
+
+      await createNotification(db, { userId: memberId, actorUserId: requestingUserId, runId })
+    }),
+  )
 }
 
 // Deletes the oldest run(s) for a user beyond MAX_RUNS_PER_USER. Returns
@@ -241,19 +278,29 @@ export async function listRecommendationRuns(db: Db, userId: number): Promise<Re
   )
 }
 
-// Returns null if the run doesn't exist or doesn't belong to userId — the
-// dedicated /recommendations/:id page treats that as 404.
+// Returns null if the run doesn't exist or userId wasn't part of it (the
+// requester or one of the invited members) — the dedicated
+// /recommendations/:id page treats that as 404. Membership, not just
+// ownership, matters now that other members get notified about group runs.
 export async function getRecommendationRun(
   db: Db,
   runId: number,
   userId: number,
 ): Promise<RecommendationRunDetail | null> {
   const run = await db.find(recommendationRuns, runId)
-  if (!run || run.user_id !== userId) return null
+  if (!run) return null
+
+  if (run.user_id !== userId) {
+    const membership = await db.findOne(recommendationRunMembers, { where: { run_id: runId, user_id: userId } })
+    if (!membership) return null
+  }
 
   const groupLabel = await buildGroupLabel(db, userId, run)
+  const otherMemberLabels = await listOtherMemberLabels(db, userId, run)
   const rows = await db.findMany(userRecommendations, { where: { run_id: runId }, orderBy: ['rank', 'asc'] })
-  if (rows.length === 0) return { id: run.id, createdAt: run.created_at, groupLabel, results: [] }
+  if (rows.length === 0) {
+    return { id: run.id, createdAt: run.created_at, groupLabel, otherMemberLabels, results: [] }
+  }
 
   const mediaItemIds = rows.map((row) => row.media_item_id)
   const [items, tagRows, interactionRows] = await Promise.all([
@@ -286,5 +333,5 @@ export async function getRecommendationRun(
     })
   }
 
-  return { id: run.id, createdAt: run.created_at, groupLabel, results }
+  return { id: run.id, createdAt: run.created_at, groupLabel, otherMemberLabels, results }
 }
