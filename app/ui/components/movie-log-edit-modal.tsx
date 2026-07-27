@@ -33,18 +33,20 @@ export function MovieLogEditModal(handle: Handle<MovieLogEditModalProps>) {
             Status
             <StatusSelect name="status" defaultValue={interaction.status} />
           </label>
-          <div>
-            <p mix={css({ margin: '0 0 4px' })}>Rating</p>
-            <StarRatingInput
-              name="rating"
-              idPrefix={`rating-${interaction.id}`}
-              defaultValue={interaction.rating ?? null}
-            />
+          <div class="watched-only-fields" mix={css({ flexDirection: 'column', gap: '12px' })}>
+            <div>
+              <p mix={css({ margin: '0 0 4px' })}>Rating</p>
+              <StarRatingInput
+                name="rating"
+                idPrefix={`rating-${interaction.id}`}
+                defaultValue={interaction.rating ?? null}
+              />
+            </div>
+            <label mix={stackedLabel}>
+              Notes
+              <textarea name="notes" rows={3} defaultValue={interaction.notes ?? ''} placeholder="What did you think?" />
+            </label>
           </div>
-          <label mix={stackedLabel}>
-            Notes
-            <textarea name="notes" rows={3} defaultValue={interaction.notes ?? ''} placeholder="What did you think?" />
-          </label>
           <button type="submit">Save</button>
         </form>
       </Modal>

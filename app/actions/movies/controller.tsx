@@ -28,7 +28,6 @@ const logSchema = f.object({
       s.literal('want_to_consume'),
       s.literal('in_progress'),
       s.literal('consumed'),
-      s.literal('dropped'),
     ]),
   ),
   rating: f.field(s.defaulted(s.string(), '')),

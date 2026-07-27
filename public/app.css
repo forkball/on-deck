@@ -56,3 +56,13 @@
   color: #fff;
   background-color: #1c1c1c;
 }
+
+/* Rating/notes only make sense once something's actually been watched —
+   reacts live to the status <select> with no JS, via :has() + option:checked. */
+.watched-only-fields {
+  display: none;
+}
+
+form:has(select[name='status'] option[value='consumed']:checked) .watched-only-fields {
+  display: flex;
+}

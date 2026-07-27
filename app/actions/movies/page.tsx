@@ -268,23 +268,28 @@ export function MoviesSearchPage(handle: Handle<MoviesSearchPageProps>) {
                                   }
                                 />
                               </label>
-                              <div>
-                                <p mix={css({ margin: "0 0 4px" })}>Rating</p>
-                                <StarRatingInput
-                                  name="rating"
-                                  idPrefix={`rating-${item.id}`}
-                                  defaultValue={interaction?.rating ?? null}
-                                />
+                              <div
+                                class="watched-only-fields"
+                                mix={css({ flexDirection: "column", gap: "10px" })}
+                              >
+                                <div>
+                                  <p mix={css({ margin: "0 0 4px" })}>Rating</p>
+                                  <StarRatingInput
+                                    name="rating"
+                                    idPrefix={`rating-${item.id}`}
+                                    defaultValue={interaction?.rating ?? null}
+                                  />
+                                </div>
+                                <label mix={stackedLabel}>
+                                  Add thoughts
+                                  <input
+                                    type="text"
+                                    name="notes"
+                                    defaultValue={interaction?.notes ?? ""}
+                                    placeholder="What did you think?"
+                                  />
+                                </label>
                               </div>
-                              <label mix={stackedLabel}>
-                                Add thoughts
-                                <input
-                                  type="text"
-                                  name="notes"
-                                  defaultValue={interaction?.notes ?? ""}
-                                  placeholder="What did you think?"
-                                />
-                              </label>
                               <button type="submit">Save</button>
                             </form>
                           </FloatingDropdown>

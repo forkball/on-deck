@@ -78,7 +78,7 @@ export async function listMediaItemsByTag(db: Db, tag: string): Promise<MovieRes
 }
 
 export interface LogInteractionInput {
-  status: 'want_to_consume' | 'in_progress' | 'consumed' | 'dropped'
+  status: 'want_to_consume' | 'in_progress' | 'consumed'
   rating: number | null
   notes: string | null
 }

@@ -6,7 +6,6 @@ export const STATUS_OPTIONS: { value: InteractionStatus; label: string }[] = [
   { value: 'want_to_consume', label: 'Want to watch' },
   { value: 'in_progress', label: 'Watching' },
   { value: 'consumed', label: 'Watched' },
-  { value: 'dropped', label: 'Dropped' },
 ]
 
 export const STATUS_LABELS: Record<string, string> = Object.fromEntries(
