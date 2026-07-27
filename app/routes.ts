@@ -20,7 +20,11 @@ export const routes = route({
     index: get('/'),
     watched: get('watched'),
   }),
-  recommendations: form('recommendations', { names: { action: 'generate' } }),
+  recommendations: route('recommendations', {
+    index: get('/'),
+    generate: post('/'),
+    show: get(':runId'),
+  }),
   users: route('users', {
     search: get('search'),
     show: get(':userId'),

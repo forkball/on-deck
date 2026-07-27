@@ -1,9 +1,19 @@
-import { inList } from 'remix/data-table'
+import { and, eq, inList } from 'remix/data-table'
 
 import { claude, parseStructuredResponse } from './claude.ts'
 import type { Db } from './db.ts'
 import { upsertMovie } from './movies.ts'
-import { mediaItems, mediaItemTags, users, userRecommendations, type MediaItem } from './schema.ts'
+import {
+  mediaItems,
+  mediaItemTags,
+  recommendationRunMembers,
+  recommendationRuns,
+  users,
+  userMediaInteractions,
+  userRecommendations,
+  type MediaItem,
+  type RecommendationRun,
+} from './schema.ts'
 import { searchMovies } from './tmdb.ts'
 import { regenerateTasteProfile } from './tasteProfile.ts'
 import { displayLabel } from './users.ts'
@@ -49,18 +59,38 @@ export interface RecommendationResult {
   item: MediaItem
   tags: string[]
   reason: string
+  // Your current interaction with this item, if any (e.g. it's already on
+  // your watchlist, or you're mid-way through it) — looked up live, not
+  // frozen at generation time.
+  status: string | null
 }
 
-export interface RecommendationBatch {
+export interface RecommendationRunSummary {
+  id: number
+  createdAt: number
+  groupLabel: string
+}
+
+export interface RecommendationRunDetail extends RecommendationRunSummary {
   results: RecommendationResult[]
-  groupLabel: string | null
 }
 
+async function buildGroupLabel(db: Db, requestingUserId: number, run: RecommendationRun): Promise<string> {
+  const memberRows = await db.findMany(recommendationRunMembers, { where: { run_id: run.id } })
+  const otherMemberIds = memberRows.map((m) => m.user_id).filter((id) => id !== requestingUserId)
+  if (otherMemberIds.length === 0) return 'Just you'
+
+  const otherUsers = await db.findMany(users, { where: inList('id', otherMemberIds) })
+  return `You + ${otherUsers.map(displayLabel).join(', ')}`
+}
+
+// Generates one indexed, dated run of picks and returns its id — history is
+// kept (never replaced), so every run stays browsable at /recommendations/:id.
 export async function generateRecommendations(
   db: Db,
   requestingUserId: number,
   memberUserIds: number[],
-): Promise<RecommendationBatch> {
+): Promise<number> {
   // Independent per member — regenerate every profile (and fetch their name) concurrently.
   const members = await Promise.all(
     memberUserIds.map(async (memberId) => {
@@ -75,7 +105,7 @@ export async function generateRecommendations(
   const excludedExternalIds = new Set<string>()
   for (const { profile } of members) {
     for (const { interaction, item } of profile.log) {
-      if (interaction.status !== 'consumed' && interaction.status !== 'dropped') continue
+      if (interaction.status !== 'consumed') continue
       if (item?.title) excludedTitles.push(item.title)
       if (item?.external_id) excludedExternalIds.add(item.external_id)
     }
@@ -106,26 +136,29 @@ export async function generateRecommendations(
     seenExternalIds.add(match.externalId)
 
     const item = await upsertMovie(db, match)
-    results.push({ item, tags: match.tags, reason: pick.reason })
+    results.push({ item, tags: match.tags, reason: pick.reason, status: null })
   }
 
-  const otherMembers = members.filter((_, i) => memberUserIds[i] !== requestingUserId)
-  const groupLabel = otherMembers.length > 0 ? `You + ${otherMembers.map((m) => m.label).join(', ')}` : null
+  const run = await db.create(
+    recommendationRuns,
+    { user_id: requestingUserId, created_at: Date.now() },
+    { returnRow: true },
+  )
 
-  await db.deleteMany(userRecommendations, { where: { user_id: requestingUserId } })
-  const now = Date.now()
+  for (const memberId of memberUserIds) {
+    await db.create(recommendationRunMembers, { run_id: run.id, user_id: memberId })
+  }
+
   for (const [index, result] of results.entries()) {
     await db.create(userRecommendations, {
-      user_id: requestingUserId,
+      run_id: run.id,
       media_item_id: result.item.id,
       reason: result.reason,
       rank: index + 1,
-      group_label: groupLabel ?? undefined,
-      created_at: now,
     })
   }
 
-  return { results, groupLabel }
+  return run.id
 }
 
 async function requestPicks(profiles: MemberProfile[], excludedTitles: string[]): Promise<Pick[]> {
@@ -164,17 +197,42 @@ async function requestPicks(profiles: MemberProfile[], excludedTitles: string[])
   return parseStructuredResponse<{ picks: Pick[] }>(response).picks
 }
 
-export async function listRecommendations(db: Db, userId: number): Promise<RecommendationBatch> {
-  const rows = await db.findMany(userRecommendations, {
+export async function listRecommendationRuns(db: Db, userId: number): Promise<RecommendationRunSummary[]> {
+  const runs = await db.findMany(recommendationRuns, {
     where: { user_id: userId },
-    orderBy: ['rank', 'asc'],
+    orderBy: ['created_at', 'desc'],
   })
-  if (rows.length === 0) return { results: [], groupLabel: null }
+
+  return Promise.all(
+    runs.map(async (run) => ({
+      id: run.id,
+      createdAt: run.created_at,
+      groupLabel: await buildGroupLabel(db, userId, run),
+    })),
+  )
+}
+
+// Returns null if the run doesn't exist or doesn't belong to userId — the
+// dedicated /recommendations/:id page treats that as 404.
+export async function getRecommendationRun(
+  db: Db,
+  runId: number,
+  userId: number,
+): Promise<RecommendationRunDetail | null> {
+  const run = await db.find(recommendationRuns, runId)
+  if (!run || run.user_id !== userId) return null
+
+  const groupLabel = await buildGroupLabel(db, userId, run)
+  const rows = await db.findMany(userRecommendations, { where: { run_id: runId }, orderBy: ['rank', 'asc'] })
+  if (rows.length === 0) return { id: run.id, createdAt: run.created_at, groupLabel, results: [] }
 
   const mediaItemIds = rows.map((row) => row.media_item_id)
-  const [items, tagRows] = await Promise.all([
+  const [items, tagRows, interactionRows] = await Promise.all([
     db.findMany(mediaItems, { where: inList('id', mediaItemIds) }),
     db.findMany(mediaItemTags, { where: inList('media_item_id', mediaItemIds) }),
+    db.findMany(userMediaInteractions, {
+      where: and(eq('user_id', userId), inList('media_item_id', mediaItemIds)),
+    }),
   ])
   const itemsById = new Map(items.map((item) => [item.id, item]))
   const tagsByItemId = new Map<number, string[]>()
@@ -183,12 +241,21 @@ export async function listRecommendations(db: Db, userId: number): Promise<Recom
     tags.push(tagRow.tag)
     tagsByItemId.set(tagRow.media_item_id, tags)
   }
+  const statusByItemId = new Map<number, RecommendationResult['status']>(
+    interactionRows.map((i) => [i.media_item_id, i.status]),
+  )
 
   const results: RecommendationResult[] = []
   for (const row of rows) {
     const item = itemsById.get(row.media_item_id)
     if (!item) continue
-    results.push({ item, tags: tagsByItemId.get(item.id) ?? [], reason: row.reason })
+    results.push({
+      item,
+      tags: tagsByItemId.get(item.id) ?? [],
+      reason: row.reason,
+      status: statusByItemId.get(item.id) ?? null,
+    })
   }
-  return { results, groupLabel: rows[0]?.group_label ?? null }
+
+  return { id: run.id, createdAt: run.created_at, groupLabel, results }
 }

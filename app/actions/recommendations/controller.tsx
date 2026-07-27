@@ -7,10 +7,11 @@ import { redirect } from 'remix/response/redirect'
 
 import { listFollowedUsers } from '../../data/follows.ts'
 import type { User } from '../../data/schema.ts'
-import { generateRecommendations, listRecommendations } from '../../data/recommendations.ts'
+import { generateRecommendations, getRecommendationRun, listRecommendationRuns } from '../../data/recommendations.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { RecommendationsPage } from './page.tsx'
+import { RecommendationRunPage } from './run-page.tsx'
 
 const generateSchema = f.object({
   mode: f.field(s.union([s.literal('self'), s.literal('group')])),
@@ -24,17 +25,11 @@ export default createController(routes.recommendations, {
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
-      const { results, groupLabel } = await listRecommendations(db, auth.identity.id)
+      const runs = await listRecommendationRuns(db, auth.identity.id)
       const friends = await listFollowedUsers(db, auth.identity.id)
 
       return context.render(
-        <RecommendationsPage
-          recommendations={results}
-          groupLabel={groupLabel}
-          friends={friends}
-          generated={context.url.searchParams.get('generated') === '1'}
-          displayName={displayLabel(auth.identity)}
-        />,
+        <RecommendationsPage runs={runs} friends={friends} displayName={displayLabel(auth.identity)} />,
       )
     },
 
@@ -57,9 +52,20 @@ export default createController(routes.recommendations, {
           : []
 
       const db = context.get(Database)
-      await generateRecommendations(db, auth.identity.id, [auth.identity.id, ...friendIds])
+      const runId = await generateRecommendations(db, auth.identity.id, [auth.identity.id, ...friendIds])
 
-      return redirect(`${routes.recommendations.index.href()}?generated=1`, 303)
+      return redirect(routes.recommendations.show.href({ runId: String(runId) }), 303)
+    },
+
+    async show(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const db = context.get(Database)
+      const run = await getRecommendationRun(db, Number(context.params.runId), auth.identity.id)
+      if (!run) return new Response('Not Found', { status: 404 })
+
+      return context.render(<RecommendationRunPage run={run} displayName={displayLabel(auth.identity)} />)
     },
   },
 })

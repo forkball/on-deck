@@ -43,7 +43,7 @@ export const userMediaInteractions = table({
     id: c.integer().primaryKey().autoIncrement(),
     user_id: c.integer().notNull().references('users', 'id'),
     media_item_id: c.integer().notNull().references('media_items', 'id'),
-    status: c.enum(['want_to_consume', 'in_progress', 'consumed', 'dropped']).notNull(),
+    status: c.enum(['want_to_consume', 'in_progress', 'consumed']).notNull(),
     rating: c.decimal(3, 1),
     notes: c.text(),
     consumed_at: c.integer(),
@@ -65,19 +65,38 @@ export const userTasteProfiles = table({
   },
 })
 
-// AI-generated recommendation picks for a user — replaced wholesale each time
-// recommendations are regenerated. See app/data/recommendations.ts.
+// One "get recommendations" click — indexed and dated, kept forever (not
+// replaced on the next run) so past runs stay browsable by id. See
+// app/data/recommendations.ts.
+export const recommendationRuns = table({
+  name: 'recommendation_runs',
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    user_id: c.integer().notNull().references('users', 'id'), // the requester
+    created_at: c.integer().notNull(),
+  },
+})
+
+// Who was in a given run (the requester + any friends included) — the
+// "people involved" for that run.
+export const recommendationRunMembers = table({
+  name: 'recommendation_run_members',
+  primaryKey: ['run_id', 'user_id'],
+  columns: {
+    run_id: c.integer().notNull().references('recommendation_runs', 'id'),
+    user_id: c.integer().notNull().references('users', 'id'),
+  },
+})
+
+// The AI-generated picks belonging to one run.
 export const userRecommendations = table({
   name: 'user_recommendations',
   columns: {
     id: c.integer().primaryKey().autoIncrement(),
-    user_id: c.integer().notNull().references('users', 'id'),
+    run_id: c.integer().notNull().references('recommendation_runs', 'id'),
     media_item_id: c.integer().notNull().references('media_items', 'id'),
     reason: c.text().notNull(),
     rank: c.integer().notNull(),
-    // Set when this batch was generated for a group ("You + Alex, Sam"); null for solo runs.
-    group_label: c.text(),
-    created_at: c.integer().notNull(),
   },
 })
 
@@ -99,3 +118,5 @@ export type UserMediaInteraction = TableRow<typeof userMediaInteractions>
 export type UserTasteProfile = TableRow<typeof userTasteProfiles>
 export type UserRecommendation = TableRow<typeof userRecommendations>
 export type UserFollow = TableRow<typeof userFollows>
+export type RecommendationRun = TableRow<typeof recommendationRuns>
+export type RecommendationRunMember = TableRow<typeof recommendationRunMembers>
