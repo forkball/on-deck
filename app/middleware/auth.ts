@@ -1,7 +1,9 @@
-import { auth, createSessionAuthScheme } from 'remix/middleware/auth'
+import { auth, createSessionAuthScheme, requireAuth as requireAuthBase } from 'remix/middleware/auth'
+import { redirect } from 'remix/response/redirect'
 
 import { db } from '../data/db.ts'
 import { users, type User } from '../data/schema.ts'
+import { routes } from '../routes.ts'
 
 interface SessionAuthValue {
   userId: number
@@ -22,5 +24,18 @@ export function loadAuth() {
         },
       }),
     ],
+  })
+}
+
+// Wraps the framework's requireAuth so an unauthenticated request lands on
+// the login page (with `next` pointing back at what it asked for) instead of
+// a bare 401 — use this everywhere instead of importing requireAuth directly
+// from remix/middleware/auth.
+export function requireAuth<identity = unknown>() {
+  return requireAuthBase<identity>({
+    onFailure(context) {
+      const next = context.url.pathname + context.url.search
+      return redirect(`${routes.auth.login.index.href()}?next=${encodeURIComponent(next)}`, 303)
+    },
   })
 }

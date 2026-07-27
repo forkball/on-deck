@@ -1,11 +1,12 @@
 import * as s from 'remix/data-schema'
 import * as f from 'remix/data-schema/form-data'
 import { Database } from 'remix/data-table'
-import { Auth, requireAuth } from 'remix/middleware/auth'
+import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import { updateInteraction, type LogInteractionInput } from '../../../data/movies.ts'
+import { requireAuth } from '../../../middleware/auth.ts'
 import type { User } from '../../../data/schema.ts'
 import { routes } from '../../../routes.ts'
 import { parseRatingInput } from '../../../utils/stars.ts'

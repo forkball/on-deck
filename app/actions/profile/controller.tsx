@@ -1,5 +1,5 @@
 import { Database } from 'remix/data-table'
-import { Auth, requireAuth } from 'remix/middleware/auth'
+import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 
 import {
@@ -12,6 +12,7 @@ import {
 import { countUserMovieLog, listUserMovieLog } from '../../data/movies.ts'
 import { getTasteProfile } from '../../data/tasteProfile.ts'
 import type { User } from '../../data/schema.ts'
+import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'

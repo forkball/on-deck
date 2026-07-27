@@ -6,9 +6,9 @@ import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
 import { stackedLabel } from '../../../ui/components/styles.ts'
 
-export function LoginPage(handle: Handle<{ error?: string }>) {
+export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
   return () => {
-    const { error } = handle.props
+    const { error, next } = handle.props
 
     return (
       <Document title="Log in | On Deck">
@@ -21,6 +21,7 @@ export function LoginPage(handle: Handle<{ error?: string }>) {
             action={routes.auth.login.action.href()}
             mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
           >
+            {next && <input type="hidden" name="return_to" value={next} />}
             <label mix={stackedLabel}>
               Email
               <input type="email" name="email" required />

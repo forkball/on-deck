@@ -29,10 +29,18 @@ const passwordProvider = createCredentialsAuthProvider<{ email: string; password
   },
 })
 
+// Only redirect back to a same-origin relative path — `next`/`return_to`
+// come from a query param and form field respectively, both untrusted.
+function safeReturnTo(value: string | null | undefined): string | null {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return null
+  return value
+}
+
 export default createController(routes.auth.login, {
   actions: {
     index(context) {
-      return context.render(<LoginPage />)
+      const next = safeReturnTo(context.url.searchParams.get('next'))
+      return context.render(<LoginPage next={next ?? undefined} />)
     },
     async action(context) {
       const user = await verifyCredentials(passwordProvider, context)
@@ -44,7 +52,9 @@ export default createController(routes.auth.login, {
       const session = completeAuth(context)
       session.set('auth', { userId: user.id })
 
-      return redirect(routes.movies.search.href(), 303)
+      const formData = context.get(FormData)
+      const returnTo = safeReturnTo(String(formData.get('return_to') || ''))
+      return redirect(returnTo || routes.movies.search.href(), 303)
     },
   },
 })
