@@ -19,6 +19,8 @@ export const routes = route({
   profile: route('profile', {
     index: get('/'),
     watched: get('watched'),
+    following: get('following'),
+    followers: get('followers'),
   }),
   recommendations: route('recommendations', {
     index: get('/'),
@@ -29,6 +31,8 @@ export const routes = route({
     search: get('search'),
     show: get(':userId'),
     watched: get(':userId/watched'),
+    following: get(':userId/following'),
+    followers: get(':userId/followers'),
     follow: post(':userId/follow'),
     unfollow: post(':userId/unfollow'),
   }),

@@ -5,11 +5,21 @@ import { redirect } from 'remix/response/redirect'
 
 import type { Db } from '../../data/db.ts'
 import { countUserMovieLog, listUserMovieLog } from '../../data/movies.ts'
-import { followUser, isFollowing, listFollowingIds, unfollowUser } from '../../data/follows.ts'
+import {
+  countFollowers,
+  countFollowing,
+  followUser,
+  isFollowing,
+  listFollowedUsers,
+  listFollowers,
+  listFollowingIds,
+  unfollowUser,
+} from '../../data/follows.ts'
 import { getTasteProfile } from '../../data/tasteProfile.ts'
 import { users, type User } from '../../data/schema.ts'
 import { displayLabel, searchUsers } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
+import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { UserSearchPage } from './search-page.tsx'
 import { UserProfilePage } from './show-page.tsx'
 import { UserWatchedPage } from './watched-page.tsx'
@@ -63,6 +73,8 @@ export default createController(routes.users, {
       const row = await getTasteProfile(db, userId)
       const movieLog = await listUserMovieLog(db, userId, { limit: RECENT_COUNT })
       const totalWatched = await countUserMovieLog(db, userId)
+      const followingCount = await countFollowing(db, userId)
+      const followersCount = await countFollowers(db, userId)
 
       return context.render(
         <UserProfilePage
@@ -70,6 +82,8 @@ export default createController(routes.users, {
           summary={row?.summary ?? ''}
           movieLog={movieLog}
           totalWatched={totalWatched}
+          followingCount={followingCount}
+          followersCount={followersCount}
           displayName={displayLabel(auth.identity)}
         />,
       )
@@ -97,6 +111,62 @@ export default createController(routes.users, {
           movieLog={movieLog}
           page={page}
           totalPages={Math.max(1, Math.ceil(totalWatched / PAGE_SIZE))}
+          displayName={displayLabel(auth.identity)}
+        />,
+      )
+    },
+
+    async following(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const userId = Number(context.params.userId)
+      const db = context.get(Database)
+      const target = await requireFollowedUser(db, auth.identity.id, userId)
+      if (target instanceof Response) return target
+
+      const label = displayLabel(target)
+      const targetUsers = await listFollowedUsers(db, userId)
+      const followingIds = await listFollowingIds(db, auth.identity.id, targetUsers.map((u) => u.id))
+
+      return context.render(
+        <FollowListPage
+          title={`${label}'s following`}
+          heading={`Who ${label} follows`}
+          backHref={routes.users.show.href({ userId: String(userId) })}
+          backLabel={`← ${label}'s profile`}
+          users={targetUsers}
+          followingByUserId={new Map(targetUsers.map((u) => [u.id, followingIds.has(u.id)]))}
+          emptyMessage={`${label} isn't following anyone yet.`}
+          returnTo={routes.users.following.href({ userId: String(userId) })}
+          displayName={displayLabel(auth.identity)}
+        />,
+      )
+    },
+
+    async followers(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const userId = Number(context.params.userId)
+      const db = context.get(Database)
+      const target = await requireFollowedUser(db, auth.identity.id, userId)
+      if (target instanceof Response) return target
+
+      const label = displayLabel(target)
+      const targetUsers = await listFollowers(db, userId)
+      const followingIds = await listFollowingIds(db, auth.identity.id, targetUsers.map((u) => u.id))
+
+      return context.render(
+        <FollowListPage
+          title={`${label}'s followers`}
+          heading={`${label}'s followers`}
+          backHref={routes.users.show.href({ userId: String(userId) })}
+          backLabel={`← ${label}'s profile`}
+          users={targetUsers}
+          followingByUserId={new Map(targetUsers.map((u) => [u.id, followingIds.has(u.id)]))}
+          emptyMessage={`No one follows ${label} yet.`}
+          returnTo={routes.users.followers.href({ userId: String(userId) })}
           displayName={displayLabel(auth.identity)}
         />,
       )

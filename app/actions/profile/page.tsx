@@ -12,20 +12,29 @@ export interface ProfilePageProps {
   summary: string
   movieLog: Awaited<ReturnType<typeof listUserMovieLog>>
   totalWatched: number
+  followingCount: number
+  followersCount: number
   saved?: boolean
   displayName: string
 }
 
 export function ProfilePage(handle: Handle<ProfilePageProps>) {
   return () => {
-    const { summary, movieLog, totalWatched, saved, displayName } = handle.props
+    const { summary, movieLog, totalWatched, followingCount, followersCount, saved, displayName } = handle.props
     const profileHref = routes.profile.index.href()
 
     return (
       <Document title="My profile | On Deck">
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>My taste profile</h1>
+          <h1>{displayName}</h1>
+          <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
+            <a href={routes.profile.following.href()}>{followingCount} following</a> ·{' '}
+            <a href={routes.profile.followers.href()}>
+              {followersCount} follower{followersCount === 1 ? '' : 's'}
+            </a>
+          </p>
+          <h2>My taste profile</h2>
           {saved && <p mix={css({ color: '#15803d' })}>Saved.</p>}
 
           <div

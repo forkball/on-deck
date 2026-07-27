@@ -14,12 +14,14 @@ export interface UserProfilePageProps {
   summary: string
   movieLog: Awaited<ReturnType<typeof listUserMovieLog>>
   totalWatched: number
+  followingCount: number
+  followersCount: number
   displayName: string
 }
 
 export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
   return () => {
-    const { user, summary, movieLog, totalWatched, displayName } = handle.props
+    const { user, summary, movieLog, totalWatched, followingCount, followersCount, displayName } = handle.props
     const label = displayLabel(user)
     const returnTo = routes.users.show.href({ userId: String(user.id) })
 
@@ -30,7 +32,14 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
           <p>
             <a href={routes.users.search.href()}>← Back to search</a>
           </p>
-          <h1>{label}'s taste profile</h1>
+          <h1>{label}</h1>
+          <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
+            <a href={routes.users.following.href({ userId: String(user.id) })}>{followingCount} following</a> ·{' '}
+            <a href={routes.users.followers.href({ userId: String(user.id) })}>
+              {followersCount} follower{followersCount === 1 ? '' : 's'}
+            </a>
+          </p>
+          <h2>{label}'s taste profile</h2>
 
           <div
             mix={css({

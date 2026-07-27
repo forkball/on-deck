@@ -44,3 +44,18 @@ export async function listFollowedUsers(db: Db, followerId: number): Promise<Use
 
   return db.findMany(users, { where: inList('id', rows.map((row) => row.followed_id)) })
 }
+
+export async function listFollowers(db: Db, followedId: number): Promise<User[]> {
+  const rows = await db.findMany(userFollows, { where: { followed_id: followedId } })
+  if (rows.length === 0) return []
+
+  return db.findMany(users, { where: inList('id', rows.map((row) => row.follower_id)) })
+}
+
+export function countFollowing(db: Db, userId: number): Promise<number> {
+  return db.count(userFollows, { where: { follower_id: userId } })
+}
+
+export function countFollowers(db: Db, userId: number): Promise<number> {
+  return db.count(userFollows, { where: { followed_id: userId } })
+}
