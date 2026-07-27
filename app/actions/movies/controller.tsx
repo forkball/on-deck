@@ -8,8 +8,6 @@ import { redirect } from 'remix/response/redirect'
 import {
   getMovieDetail,
   getUserInteractionForItem,
-  listDistinctTags,
-  listMediaItemsByTag,
   logInteraction,
   searchAndImportMovies,
   type LogInteractionInput,
@@ -44,16 +42,8 @@ export default createController(routes.movies, {
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const query = context.url.searchParams.get('q')?.trim() ?? ''
-      const genre = context.url.searchParams.get('genre')?.trim() ?? ''
 
-      let results: MovieResult[] = []
-      if (genre) {
-        results = await listMediaItemsByTag(db, genre)
-      } else if (query) {
-        results = await searchAndImportMovies(db, query)
-      }
-
-      const availableTags = await listDistinctTags(db)
+      const results = query ? await searchAndImportMovies(db, query) : []
 
       const interactionsByItemId = new Map<number, Awaited<ReturnType<typeof getUserInteractionForItem>>>()
       for (const { item } of results) {
@@ -63,9 +53,7 @@ export default createController(routes.movies, {
       return context.render(
         <MoviesSearchPage
           query={query}
-          genre={genre}
           results={results}
-          availableTags={availableTags}
           interactionsByItemId={interactionsByItemId}
           displayName={displayLabel(auth.identity)}
         />,

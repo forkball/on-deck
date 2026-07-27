@@ -41,22 +41,6 @@
   cursor: pointer;
 }
 
-/* Component styles render inside a CSS @layer, which always loses to
-   unlayered CSS regardless of specificity — so doodle.css's unlayered
-   `.doodle a { color: #1c1c1c }` was silently winning over a pill's own
-   `color: #fff` on its active (dark-filled) state, making the label
-   invisible. These rules live here, unlayered, specifically to win that
-   fight for tag pills. */
-.doodle a.tag-pill {
-  color: #1c1c1c;
-  background-color: transparent;
-}
-
-.doodle a.tag-pill-active {
-  color: #fff;
-  background-color: #1c1c1c;
-}
-
 /* Rating/notes only make sense once something's actually been watched —
    reacts live to the status <select> with no JS, via :has() + option:checked. */
 .watched-only-fields {

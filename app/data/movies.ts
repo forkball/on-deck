@@ -56,27 +56,6 @@ export async function upsertMovie(db: Db, result: TmdbSearchResult): Promise<Med
   return item
 }
 
-// All distinct tags seen across the imported catalog so far — grows as more
-// movies get searched/imported. Powers the genre-pill browse row.
-export async function listDistinctTags(db: Db): Promise<string[]> {
-  const rows = await db.query(mediaItemTags).select('tag').distinct().orderBy('tag', 'asc').all()
-  return rows.map((row) => row.tag)
-}
-
-// Browse the local catalog by a genre tag someone already imported, without
-// hitting TMDB again.
-export async function listMediaItemsByTag(db: Db, tag: string): Promise<MovieResult[]> {
-  const tagRows = await db.findMany(mediaItemTags, { where: { tag } })
-  const results: MovieResult[] = []
-  for (const tagRow of tagRows) {
-    const item = await db.find(mediaItems, tagRow.media_item_id)
-    if (!item) continue
-    const allTags = await db.findMany(mediaItemTags, { where: { media_item_id: item.id } })
-    results.push({ item, tags: allTags.map((t) => t.tag) })
-  }
-  return results
-}
-
 export interface LogInteractionInput {
   status: 'want_to_consume' | 'in_progress' | 'consumed'
   rating: number | null
