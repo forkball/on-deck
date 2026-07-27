@@ -1,6 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import { NotificationBell } from '../../assets/notification-bell.tsx'
 import { ProfileMenu } from '../../assets/profile-menu.tsx'
 import { routes } from '../../routes.ts'
 
@@ -23,16 +24,22 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
           On Deck
         </a>
         {authed ? (
-          <ProfileMenu
-            displayName={displayName || 'My Profile'}
-            links={[
-              { href: routes.movies.search.href(), label: 'Search Movies' },
-              { href: routes.recommendations.index.href(), label: 'Recommendations' },
-              { href: routes.users.search.href(), label: 'Find People' },
-              { href: routes.profile.index.href(), label: 'My Profile' },
-            ]}
-            logoutHref={routes.auth.logout.href()}
-          />
+          <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: 'auto' })}>
+            <NotificationBell
+              href={routes.notifications.index.href()}
+              countHref={routes.notifications.unreadCount.href()}
+            />
+            <ProfileMenu
+              displayName={displayName || 'My Profile'}
+              links={[
+                { href: routes.movies.search.href(), label: 'Media' },
+                { href: routes.users.search.href(), label: 'People' },
+                { href: routes.recommendations.index.href(), label: 'Recommendations' },
+                { href: routes.profile.index.href(), label: 'Profile' },
+              ]}
+              logoutHref={routes.auth.logout.href()}
+            />
+          </div>
         ) : (
           <>
             <a href={routes.auth.login.index.href()}>Log in</a>

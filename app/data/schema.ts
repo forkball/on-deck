@@ -111,6 +111,21 @@ export const userFollows = table({
   },
 })
 
+// "X ran recommendations you can view" — created when a group run's
+// requester and another member mutually follow each other. See
+// app/data/notifications.ts.
+export const notifications = table({
+  name: 'notifications',
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    user_id: c.integer().notNull().references('users', 'id'), // recipient
+    actor_user_id: c.integer().notNull().references('users', 'id'), // who ran it
+    run_id: c.integer().notNull().references('recommendation_runs', 'id'),
+    read_at: c.integer(),
+    created_at: c.integer().notNull(),
+  },
+})
+
 export type User = TableRow<typeof users>
 export type MediaItem = TableRow<typeof mediaItems>
 export type MediaItemTag = TableRow<typeof mediaItemTags>
@@ -120,3 +135,4 @@ export type UserRecommendation = TableRow<typeof userRecommendations>
 export type UserFollow = TableRow<typeof userFollows>
 export type RecommendationRun = TableRow<typeof recommendationRuns>
 export type RecommendationRunMember = TableRow<typeof recommendationRunMembers>
+export type Notification = TableRow<typeof notifications>

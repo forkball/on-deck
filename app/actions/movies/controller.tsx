@@ -10,9 +10,11 @@ import {
   getUserInteractionForItem,
   logInteraction,
   searchAndImportMovies,
+  upsertMovie,
   type LogInteractionInput,
   type MovieResult,
 } from '../../data/movies.ts'
+import { getMovieById, searchMovies } from '../../data/tmdb.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
@@ -20,6 +22,8 @@ import { routes } from '../../routes.ts'
 import { parseRatingInput } from '../../utils/stars.ts'
 import { MovieDetailPage } from './detail-page.tsx'
 import { MoviesSearchPage } from './page.tsx'
+
+const SUGGESTION_LIMIT = 6
 
 const logSchema = f.object({
   status: f.field(
@@ -59,6 +63,49 @@ export default createController(routes.movies, {
           displayName={displayLabel(auth.identity)}
         />,
       )
+    },
+
+    // Live TMDB search for the autosuggest dropdown — deliberately doesn't
+    // import/upsert anything, unlike `search`, since most keystrokes never
+    // turn into a pick. Import only happens once you submit an actual search.
+    async suggest(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const query = context.url.searchParams.get('q')?.trim() ?? ''
+      if (query.length < 2) return Response.json({ suggestions: [] })
+
+      const results = await searchMovies(query)
+      const suggestions = results.slice(0, SUGGESTION_LIMIT).map((result) => ({
+        key: result.externalId,
+        label: result.title,
+        sublabel: result.releaseYear ? String(result.releaseYear) : undefined,
+        imageUrl: result.posterUrl ?? undefined,
+      }))
+
+      return Response.json({ suggestions })
+    },
+
+    // Where picking an autosuggest option lands — imports the exact TMDB
+    // movie the suggestion already resolved (by id) and goes straight to it,
+    // instead of resubmitting a title search that could in principle turn up
+    // something else and definitely re-hits TMDB for no reason.
+    async import(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const externalId = context.url.searchParams.get('externalId')?.trim() ?? ''
+      if (!externalId) return redirect(routes.movies.search.href(), 303)
+
+      const result = await getMovieById(externalId)
+      if (!result) return redirect(routes.movies.search.href(), 303)
+
+      const db = context.get(Database)
+      const item = await upsertMovie(db, result)
+
+      const from = context.url.searchParams.get('from') || undefined
+      const showHref = routes.movies.show.href({ mediaItemId: String(item.id) })
+      return redirect(from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref, 303)
     },
 
     async show(context) {

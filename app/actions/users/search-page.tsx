@@ -1,6 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import { UserSearchForm } from '../../assets/user-search-form.tsx'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
@@ -24,20 +25,11 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
           <h1>Find people</h1>
-          <form
-            method="get"
-            action={routes.users.search.href()}
-            mix={css({ display: 'flex', gap: '8px', marginBottom: '24px' })}
-          >
-            <input
-              type="text"
-              name="q"
-              defaultValue={query}
-              placeholder="Search by name or email…"
-              mix={css({ flex: '1 1 auto', minWidth: 0 })}
-            />
-            <button type="submit">Search</button>
-          </form>
+          <UserSearchForm
+            query={query}
+            searchHref={routes.users.search.href()}
+            suggestHref={routes.users.suggest.href()}
+          />
 
           {query && results.length === 0 && <p>No one found for "{query}".</p>}
 

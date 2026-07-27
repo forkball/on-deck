@@ -27,6 +27,7 @@ import { UserWatchedPage } from './watched-page.tsx'
 
 const RECENT_COUNT = 5
 const PAGE_SIZE = 10
+const SUGGESTION_LIMIT = 6
 
 async function requireFollowedUser(db: Db, followerId: number, userId: number): Promise<User | Response> {
   if (!(await isFollowing(db, followerId, userId))) {
@@ -58,6 +59,24 @@ export default createController(routes.users, {
           displayName={displayLabel(auth.identity)}
         />,
       )
+    },
+
+    async suggest(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const query = context.url.searchParams.get('q')?.trim() ?? ''
+      if (query.length < 2) return Response.json({ suggestions: [] })
+
+      const db = context.get(Database)
+      const results = await searchUsers(db, query, auth.identity.id)
+      const suggestions = results.slice(0, SUGGESTION_LIMIT).map((user) => ({
+        key: String(user.id),
+        label: displayLabel(user),
+        sublabel: user.email,
+      }))
+
+      return Response.json({ suggestions })
     },
 
     async show(context) {
