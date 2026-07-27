@@ -6,17 +6,32 @@ import { css } from 'remix/ui'
 // URL fragment. Closing is a link back to a bare `#`, which clears the
 // fragment so `:target` stops matching.
 export function Modal(
-  handle: Handle<{ id: string; triggerLabel: string; title?: string; children?: RemixNode }>,
+  handle: Handle<{ id: string; triggerLabel: string; title?: string; fab?: boolean; children?: RemixNode }>,
 ) {
   return () => {
-    const { id, triggerLabel, title, children } = handle.props
+    const { id, triggerLabel, title, fab, children } = handle.props
 
     return (
       <>
         <a
           href={`#${id}`}
           class="doodle-border"
-          mix={css({ display: 'inline-block', padding: '4px 14px', textDecoration: 'none' })}
+          mix={css(
+            fab
+              ? {
+                  display: 'inline-block',
+                  position: 'fixed',
+                  bottom: '24px',
+                  right: '24px',
+                  zIndex: 900,
+                  padding: '14px 22px',
+                  textDecoration: 'none',
+                  textAlign: 'center',
+                  backgroundColor: '#fdf7f1',
+                  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.3)',
+                }
+              : { display: 'inline-block', padding: '4px 14px', textDecoration: 'none' },
+          )}
         >
           {triggerLabel}
         </a>

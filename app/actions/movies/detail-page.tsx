@@ -104,6 +104,7 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
                   id={`edit-movie-${item.id}`}
                   triggerLabel={interaction ? 'Edit' : 'Log this movie'}
                   title={item.title}
+                  fab
                 >
                   <form
                     method="post"
@@ -120,24 +121,26 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
                       Status
                       <StatusSelect name="status" defaultValue={interaction?.status ?? 'want_to_consume'} />
                     </label>
-                    <div>
-                      <p mix={css({ margin: '0 0 4px' })}>Rating</p>
-                      <StarRatingInput
-                        name="rating"
-                        idPrefix={`rating-${item.id}`}
-                        defaultValue={interaction?.rating ?? null}
-                      />
+                    <div class="watched-only-fields" mix={css({ flexDirection: 'column', gap: '12px' })}>
+                      <div>
+                        <p mix={css({ margin: '0 0 4px' })}>Rating</p>
+                        <StarRatingInput
+                          name="rating"
+                          idPrefix={`rating-${item.id}`}
+                          defaultValue={interaction?.rating ?? null}
+                        />
+                      </div>
+                      <label mix={stackedLabel}>
+                        Notes
+                        <textarea
+                          name="notes"
+                          rows={3}
+                          defaultValue={interaction?.notes ?? ''}
+                          placeholder="What did you think?"
+                          mix={css({ width: '100%' })}
+                        />
+                      </label>
                     </div>
-                    <label mix={stackedLabel}>
-                      Notes
-                      <textarea
-                        name="notes"
-                        rows={3}
-                        defaultValue={interaction?.notes ?? ''}
-                        placeholder="What did you think?"
-                        mix={css({ width: '100%' })}
-                      />
-                    </label>
                     <button type="submit">{interaction ? 'Update' : 'Save'}</button>
                   </form>
                 </Modal>
