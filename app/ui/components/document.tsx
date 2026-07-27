@@ -1,7 +1,7 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { routes } from '../routes.ts'
+import { routes } from '../../routes.ts'
 
 export interface DocumentProps {
   children?: RemixNode
@@ -29,6 +29,7 @@ export function Document(handle: Handle<DocumentProps>) {
             href="https://fonts.googleapis.com/css2?family=Short+Stack&display=swap"
           />
           <link rel="stylesheet" href="/vendor/doodle/doodle.css" />
+          <link rel="stylesheet" href="/app.css" />
           {head}
         </head>
         <body class="doodle" mix={css({ margin: 0, fontFamily: "'Short Stack', cursive" })}>

@@ -1,6 +1,6 @@
 import type { Handle } from 'remix/ui'
 
-import { STATUS_OPTIONS } from '../utils/status.ts'
+import { STATUS_OPTIONS } from '../../utils/status.ts'
 
 // A <select defaultValue={...}> doesn't actually preselect anything in this
 // framework — real HTML needs `selected` set on the matching <option>. Set it

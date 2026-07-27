@@ -2,9 +2,9 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { routes } from '../../../routes.ts'
-import { Document } from '../../../ui/document.tsx'
-import { Nav } from '../../../ui/nav.tsx'
-import { stackedLabel } from '../../../ui/styles.ts'
+import { Document } from '../../../ui/components/document.tsx'
+import { Nav } from '../../../ui/components/nav.tsx'
+import { stackedLabel } from '../../../ui/components/styles.ts'
 
 export interface SignupPageProps {
   error?: string
