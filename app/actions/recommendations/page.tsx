@@ -73,79 +73,84 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
               <a href={routes.profile.index.href()}>profile page</a> first, then come back here.
             </p>
           ) : (
-            <ul
-              mix={css({
-                listStyle: 'none',
-                margin: '24px 0 0',
-                padding: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-              })}
-            >
-              {recommendations.map(({ item, tags, reason }) => {
-                const { releaseYear, posterUrl } = parseMovieMetadata(item.metadata)
-                const detailHref = `${routes.movies.show.href({ mediaItemId: String(item.id) })}?from=${encodeURIComponent(routes.recommendations.index.href())}`
+            <details open={generated} mix={css({ marginTop: '24px' })}>
+              <summary mix={css({ cursor: 'pointer', fontWeight: 700 })}>
+                {generated ? 'Recommendations' : 'Last recommendations'} ({recommendations.length})
+              </summary>
+              <ul
+                mix={css({
+                  listStyle: 'none',
+                  margin: '16px 0 0',
+                  padding: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                })}
+              >
+                {recommendations.map(({ item, tags, reason }) => {
+                  const { releaseYear, posterUrl } = parseMovieMetadata(item.metadata)
+                  const detailHref = `${routes.movies.show.href({ mediaItemId: String(item.id) })}?from=${encodeURIComponent(routes.recommendations.index.href())}`
 
-                return (
-                  <li
-                    key={item.id}
-                    mix={css({
-                      display: 'flex',
-                      gap: '12px',
-                      border: '1px solid #ddd',
-                      borderRadius: '8px',
-                      padding: '16px',
-                    })}
-                  >
-                    {posterUrl ? (
-                      <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
-                        <img
-                          src={posterUrl}
-                          alt={`${item.title} poster`}
-                          mix={css({ width: '60px', borderRadius: '4px', display: 'block' })}
+                  return (
+                    <li
+                      key={item.id}
+                      mix={css({
+                        display: 'flex',
+                        gap: '12px',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        padding: '16px',
+                      })}
+                    >
+                      {posterUrl ? (
+                        <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
+                          <img
+                            src={posterUrl}
+                            alt={`${item.title} poster`}
+                            mix={css({ width: '60px', borderRadius: '4px', display: 'block' })}
+                          />
+                        </a>
+                      ) : (
+                        <div
+                          mix={css({
+                            width: '60px',
+                            height: '90px',
+                            flex: '0 0 auto',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                          })}
                         />
-                      </a>
-                    ) : (
-                      <div
-                        mix={css({
-                          width: '60px',
-                          height: '90px',
-                          flex: '0 0 auto',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                        })}
-                      />
-                    )}
-                    <div mix={css({ flex: '1 1 auto' })}>
-                      <a href={detailHref} mix={css({ fontWeight: 700 })}>
-                        {item.title}
-                      </a>
-                      {releaseYear ? ` (${releaseYear})` : ''}
-                      {tags.length > 0 && (
-                        <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' })}>
-                          {tags.map((tag) => (
-                            <span
-                              key={tag}
-                              mix={css({
-                                fontSize: '11px',
-                                padding: '2px 8px',
-                                borderRadius: '999px',
-                                border: '1px solid #ccc',
-                                color: '#555',
-                              })}
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
                       )}
-                      <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: '#555' })}>{reason}</p>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+                      <div mix={css({ flex: '1 1 auto' })}>
+                        <a href={detailHref} mix={css({ fontWeight: 700 })}>
+                          {item.title}
+                        </a>
+                        {releaseYear ? ` (${releaseYear})` : ''}
+                        {tags.length > 0 && (
+                          <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' })}>
+                            {tags.map((tag) => (
+                              <span
+                                key={tag}
+                                mix={css({
+                                  fontSize: '11px',
+                                  padding: '2px 8px',
+                                  borderRadius: '999px',
+                                  border: '1px solid #ccc',
+                                  color: '#555',
+                                })}
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: '#555' })}>{reason}</p>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </details>
           )}
         </main>
       </Document>
