@@ -11,11 +11,22 @@ export type GenerateRecommendationsFormProps = {
   findPeopleHref: string
 }
 
+// Cycled through on the submit button while a run is generating, so the wait
+// reads as progress rather than a stall.
+const THINKING_MESSAGES = [
+  'Generating…',
+  'Reading taste profiles…',
+  'Asking Claude for picks…',
+  'Matching movies…',
+  'Almost there…',
+]
+
 // The only client-hydrated component in the app — everything else is
 // CSS-only. Generating recommendations is a genuine multi-second wait (a few
 // Claude calls plus TMDB lookups), so this shows a "Generating…" state the
-// instant you submit. The <form> still works as a plain POST without JS;
-// this only adds feedback on top.
+// instant you submit, cycling through THINKING_MESSAGES for as long as the
+// wait continues. The <form> still works as a plain POST without JS; this
+// only adds feedback on top.
 //
 // URLs come in as plain string props rather than importing routes.ts — the
 // asset server only allows bundling files under app/assets/**, and routes.ts
@@ -24,6 +35,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
   import.meta.url,
   function GenerateRecommendationsForm(handle) {
     let submitting = false
+    let thinkingIndex = 0
 
     return () => {
       const { friends, generateHref, findPeopleHref } = handle.props
@@ -37,6 +49,15 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             on('submit', () => {
               submitting = true
               handle.update()
+
+              const interval = setInterval(() => {
+                if (handle.signal.aborted) {
+                  clearInterval(interval)
+                  return
+                }
+                thinkingIndex = (thinkingIndex + 1) % THINKING_MESSAGES.length
+                handle.update()
+              }, 1800)
             }),
           ]}
         >
@@ -62,7 +83,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
           )}
 
           <button type="submit" disabled={submitting}>
-            {submitting ? 'Generating…' : 'Get recommendations'}
+            {submitting ? THINKING_MESSAGES[thinkingIndex] : 'Get recommendations'}
           </button>
         </form>
       )
