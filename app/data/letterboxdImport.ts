@@ -1,5 +1,3 @@
-import AdmZip from 'adm-zip'
-
 import type { Db } from './db.ts'
 import { logInteraction, upsertMovie } from './movies.ts'
 import { searchMovies, type TmdbSearchResult } from './tmdb.ts'
@@ -22,21 +20,15 @@ export interface LetterboxdImportResult {
 // app has no background job queue, so the whole import runs synchronously.
 const CONCURRENCY = 8
 
-// Extracts and imports ratings.csv from a Letterboxd export zip. Everything
-// else in the export (diary, reviews, watchlist, lists, comments, likes) is
-// ignored — ratings are the only thing asked for.
+// Imports a Letterboxd ratings.csv (the one file inside the Data Export zip
+// this cares about — asking for just that file directly means no zip
+// handling at all, and users don't need us to explain what we ignore).
 export async function importLetterboxdRatings(
   db: Db,
   userId: number,
-  zipBuffer: Buffer,
+  csvText: string,
 ): Promise<LetterboxdImportResult> {
-  const zip = new AdmZip(zipBuffer)
-  const entry = zip.getEntry('ratings.csv')
-  if (!entry) {
-    throw new Error('This doesn\'t look like a Letterboxd export — no ratings.csv found in the zip.')
-  }
-
-  const rows = parseRatingsCsv(entry.getData().toString('utf-8'))
+  const rows = parseRatingsCsv(csvText)
   const notFound: LetterboxdImportResult['notFound'] = []
   let imported = 0
   let nextIndex = 0

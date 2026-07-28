@@ -21,6 +21,9 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
       <Document title="Import from Letterboxd | On Deck">
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
+          <p>
+            <a href={routes.profile.index.href()}>← My profile</a>
+          </p>
           <h1>Import from Letterboxd</h1>
 
           {result ? (
@@ -45,18 +48,12 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
                   </ul>
                 </section>
               )}
-              <p mix={css({ marginTop: '24px' })}>
-                <a href={routes.profile.index.href()}>View your profile →</a>
-              </p>
             </>
           ) : (
             <>
               <p mix={css({ color: '#555' })}>
-                Upload the .zip Letterboxd emails you when you request your data (Settings → Data →
-                Export). We only read <code>ratings.csv</code> from it — everything else in the
-                export (diary, reviews, watchlist, lists, comments) is ignored. Each rated movie is
-                matched against TMDB by title and year and logged as watched with your original
-                rating and date.
+                Export your data from Letterboxd (Settings → Data → Export) and upload{' '}
+                <code>ratings.csv</code> from the zip.
               </p>
               {error && <p mix={css({ color: '#b91c1c' })}>{error}</p>}
               <LetterboxdImportForm uploadHref={routes.letterboxd.upload.href()} />
