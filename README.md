@@ -27,3 +27,26 @@ npm run start
 npm test
 npm run typecheck
 ```
+
+## Deployment (Fly.io)
+
+The app is a plain long-running Node server (`server.ts`) with no build
+step — it runs TypeScript directly at runtime via `remix/node-tsx` — so the
+`Dockerfile` just installs production dependencies and runs `npm start`,
+which applies pending DB migrations then starts the server.
+
+First-time setup:
+
+```sh
+fly auth login
+fly launch --no-deploy   # rename the app in fly.toml first if "on-deck" is taken
+fly secrets set \
+  SESSION_SECRET=... \
+  TMDB_API_KEY=... \
+  ANTHROPIC_API_KEY=... \
+  DATABASE_URL=...       # same Postgres (Supabase) instance used locally
+fly deploy
+```
+
+Subsequent deploys are just `fly deploy`. The database is external
+(Supabase) and isn't managed by Fly — nothing to provision there.

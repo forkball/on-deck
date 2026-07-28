@@ -1,0 +1,24 @@
+# App name must be globally unique across all of Fly — rename this if
+# "on-deck" is already taken before running `fly launch`/`fly apps create`.
+app = "on-deck"
+primary_region = "iad"
+
+[build]
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # 0 lets the machine scale to zero when idle (cheaper for a personal-scale
+  # app) at the cost of a cold start on the next request. Set to 1 to keep it
+  # always warm.
+  min_machines_running = 0
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

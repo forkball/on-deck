@@ -1,0 +1,10 @@
+node_modules/
+.git/
+.env*
+tmp/
+db/*.sqlite
+db/app.db
+.agents/
+.claude/
+Dockerfile
+.dockerignore
