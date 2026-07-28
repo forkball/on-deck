@@ -41,7 +41,7 @@ interface TmdbSearchResponse {
     id: number
     title: string
     release_date: string
-    genre_ids: number[]
+    genre_ids?: number[]
     poster_path: string | null
     popularity: number
     overview: string
@@ -70,7 +70,8 @@ export async function searchMovies(query: string): Promise<TmdbSearchResult[]> {
     externalId: String(r.id),
     title: r.title,
     releaseYear: r.release_date ? Number(r.release_date.slice(0, 4)) : null,
-    tags: r.genre_ids.map((id) => GENRE_ID_TO_NAME[id]).filter((t): t is string => Boolean(t)),
+    // TMDB occasionally omits genre_ids on sparse/placeholder entries.
+    tags: (r.genre_ids ?? []).map((id) => GENRE_ID_TO_NAME[id]).filter((t): t is string => Boolean(t)),
     posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
     popularity: r.popularity,
     overview: r.overview?.trim() || null,

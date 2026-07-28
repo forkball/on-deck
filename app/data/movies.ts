@@ -60,6 +60,9 @@ export interface LogInteractionInput {
   status: 'want_to_consume' | 'in_progress' | 'consumed'
   rating: number | null
   notes: string | null
+  // Overrides the consumed_at timestamp instead of stamping "now" — used by
+  // the Letterboxd import to preserve the original watch/rating date.
+  consumedAt?: number
 }
 
 export async function logInteraction(
@@ -73,13 +76,14 @@ export async function logInteraction(
   })
 
   const now = Date.now()
+  const consumedAt = input.consumedAt ?? now
 
   if (existing) {
     return db.update(userMediaInteractions, existing.id, {
       status: input.status,
       rating: input.rating ?? undefined,
       notes: input.notes ?? undefined,
-      consumed_at: input.status === 'consumed' ? now : (existing.consumed_at ?? undefined),
+      consumed_at: input.status === 'consumed' ? consumedAt : (existing.consumed_at ?? undefined),
       updated_at: now,
     })
   }
@@ -92,7 +96,7 @@ export async function logInteraction(
       status: input.status,
       rating: input.rating ?? undefined,
       notes: input.notes ?? undefined,
-      consumed_at: input.status === 'consumed' ? now : undefined,
+      consumed_at: input.status === 'consumed' ? consumedAt : undefined,
       created_at: now,
       updated_at: now,
     },
