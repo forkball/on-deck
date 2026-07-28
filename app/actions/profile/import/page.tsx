@@ -55,8 +55,7 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
                 Export your data from Letterboxd (Settings → Data → Export) and upload{' '}
                 <code>ratings.csv</code> from the zip.
               </p>
-              {error && <p mix={css({ color: '#b91c1c' })}>{error}</p>}
-              <LetterboxdImportForm uploadHref={routes.profile.import.upload.href()} />
+              <LetterboxdImportForm uploadHref={routes.profile.import.upload.href()} error={error} />
             </>
           )}
         </main>

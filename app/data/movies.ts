@@ -84,6 +84,12 @@ export async function logInteraction(
 ) {
   const now = Date.now()
   const consumedAt = input.consumedAt ?? now
+  // updated_at drives both the "What I've watched" sort order and the
+  // "logged on" date shown per row (watched-list-item.tsx) — when a caller
+  // backdates via consumedAt (the Letterboxd import), that backdate should
+  // win here too, or every imported movie would show up as "logged today."
+  // created_at stays as the true insert time regardless, for bookkeeping.
+  const activityAt = input.consumedAt ?? now
 
   const values: Partial<UserMediaInteraction> = {
     user_id: userId,
@@ -92,7 +98,7 @@ export async function logInteraction(
     rating: input.rating ?? undefined,
     notes: input.notes ?? undefined,
     created_at: now,
-    updated_at: now,
+    updated_at: activityAt,
   }
   // Only touched when actively marking something consumed — omitting the
   // key from `update` (rather than setting it) leaves an existing
@@ -101,7 +107,7 @@ export async function logInteraction(
     status: input.status,
     rating: input.rating ?? undefined,
     notes: input.notes ?? undefined,
-    updated_at: now,
+    updated_at: activityAt,
   }
   if (input.status === 'consumed') {
     values.consumed_at = consumedAt

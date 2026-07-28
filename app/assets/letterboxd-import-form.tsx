@@ -4,6 +4,7 @@ import { space } from './lib/spacing.ts'
 
 export type LetterboxdImportFormProps = {
   uploadHref: string
+  error?: string
 }
 
 function FileUploadIcon() {
@@ -100,7 +101,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
     }
 
     return () => {
-      const { uploadHref } = handle.props
+      const { uploadHref, error } = handle.props
 
       return (
         <form
@@ -115,6 +116,8 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
             }),
           ]}
         >
+          {error && !submitting && <p mix={css({ margin: 0, color: '#b91c1c' })}>{error}</p>}
+
           <label
             mix={[
               css({
@@ -165,7 +168,6 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
               name="ratings"
               accept=".csv"
               required
-              disabled={submitting}
               mix={[
                 css({ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }),
                 ref((node) => {
