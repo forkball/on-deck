@@ -5,7 +5,7 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { updateInteraction, type LogInteractionInput } from '../../../data/movies.ts'
+import { deleteInteraction, updateInteraction, type LogInteractionInput } from '../../../data/movies.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import type { User } from '../../../data/schema.ts'
 import { routes } from '../../../routes.ts'
@@ -51,6 +51,24 @@ export default createController(routes.movies.interactions, {
       }
 
       return redirect(parsed.value.return_to || `${routes.profile.index.href()}?saved=1`, 303)
+    },
+
+    async destroy(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const interactionId = Number(context.params.interactionId)
+      const formData = context.get(FormData)
+      const returnTo = String(formData.get('return_to') || '')
+
+      const db = context.get(Database)
+      const deleted = await deleteInteraction(db, interactionId, auth.identity.id)
+
+      if (!deleted) {
+        return new Response('Not Found', { status: 404 })
+      }
+
+      return redirect(returnTo || `${routes.profile.index.href()}?saved=1`, 303)
     },
   },
 })

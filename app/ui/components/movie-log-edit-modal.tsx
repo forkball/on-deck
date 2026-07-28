@@ -49,6 +49,15 @@ export function MovieLogEditModal(handle: Handle<MovieLogEditModalProps>) {
           </div>
           <button type="submit">Save</button>
         </form>
+        <form
+          method="post"
+          action={routes.movies.interactions.destroy.href({ interactionId: String(interaction.id) })}
+          mix={css({ marginTop: '12px' })}
+        >
+          <input type="hidden" name="_method" value="DELETE" />
+          <input type="hidden" name="return_to" value={returnTo} />
+          <button type="submit">Delete log</button>
+        </form>
       </Modal>
     )
   }

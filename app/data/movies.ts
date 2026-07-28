@@ -6,7 +6,7 @@ import {
   type MediaItem,
   type UserMediaInteraction,
 } from './schema.ts'
-import { searchMovies as searchTmdbMovies, type TmdbSearchResult } from './tmdb.ts'
+import { getMovieById, searchMovies as searchTmdbMovies, type TmdbSearchResult } from './tmdb.ts'
 
 export interface MovieResult {
   item: MediaItem
@@ -60,6 +60,61 @@ export async function upsertMovie(db: Db, result: TmdbSearchResult): Promise<Med
   }
 
   return item
+}
+
+export type RematchMovieResult = { ok: true; item: MediaItem } | { ok: false; error: string }
+
+// Re-points an existing media item at a different TMDB movie — the fix for a
+// bad title/year match (from search, autosuggest, or the Letterboxd import
+// all silently picking a plausible-but-wrong TMDB entry). Updates the item
+// in place (interactions stay attached to the same id) rather than creating
+// a new item, and fully replaces its tags since the old ones described the
+// wrong movie. Refuses if the target TMDB id is already a different item in
+// the catalog — merging two items isn't supported.
+export async function rematchMovie(
+  db: Db,
+  mediaItemId: number,
+  tmdbId: string,
+): Promise<RematchMovieResult> {
+  const existing = await db.find(mediaItems, mediaItemId)
+  if (!existing) return { ok: false, error: 'Movie not found.' }
+
+  if (existing.external_source === 'tmdb' && existing.external_id === tmdbId) {
+    return { ok: false, error: "That's already the match for this movie." }
+  }
+
+  const collision = await db.findOne(mediaItems, {
+    where: { type: 'movie', external_source: 'tmdb', external_id: tmdbId },
+  })
+  if (collision) {
+    return {
+      ok: false,
+      error: `That movie is already in the catalog as "${collision.title}" — merging isn't supported yet.`,
+    }
+  }
+
+  const result = await getMovieById(tmdbId)
+  if (!result) return { ok: false, error: "Couldn't find that movie on TMDB — check the link." }
+
+  const metadata = JSON.stringify({
+    releaseYear: result.releaseYear,
+    posterUrl: result.posterUrl,
+    overview: result.overview,
+  })
+
+  const item = await db.update(mediaItems, mediaItemId, {
+    external_id: result.externalId,
+    title: result.title,
+    metadata,
+    popularity_score: result.popularity,
+  })
+
+  await db.deleteMany(mediaItemTags, { where: { media_item_id: mediaItemId } })
+  for (const tag of result.tags) {
+    await db.create(mediaItemTags, { media_item_id: mediaItemId, tag })
+  }
+
+  return { ok: true, item }
 }
 
 export interface LogInteractionInput {
@@ -141,6 +196,15 @@ export async function updateInteraction(
     consumed_at: input.status === 'consumed' ? (existing.consumed_at ?? now) : (existing.consumed_at ?? undefined),
     updated_at: now,
   })
+}
+
+// Returns false (rather than throwing) if the interaction doesn't exist or
+// doesn't belong to this user, matching updateInteraction's ownership check.
+export async function deleteInteraction(db: Db, interactionId: number, userId: number): Promise<boolean> {
+  const existing = await db.find(userMediaInteractions, interactionId)
+  if (!existing || existing.user_id !== userId) return false
+
+  return db.delete(userMediaInteractions, interactionId)
 }
 
 export async function getMovieDetail(db: Db, mediaItemId: number) {
