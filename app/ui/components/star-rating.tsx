@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css, Fragment } from 'remix/ui'
 
-const STAR_SIZE = 20
+const STAR_SIZE = 24
 
 function StarIcon(handle: Handle<{ variant: 'outline' | 'filled' }>) {
   return () => {
