@@ -129,6 +129,7 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
                   fab
                 >
                   <form
+                    id={`edit-movie-form-${item.id}`}
                     method="post"
                     action={
                       interaction
@@ -163,19 +164,32 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
                         />
                       </label>
                     </div>
-                    <button type="submit">{interaction ? 'Update' : 'Save'}</button>
                   </form>
-                  {interaction && (
-                    <form
-                      method="post"
-                      action={routes.movies.interactions.destroy.href({ interactionId: String(interaction.id) })}
-                      mix={css({ marginTop: '12px' })}
-                    >
-                      <input type="hidden" name="_method" value="DELETE" />
-                      <input type="hidden" name="return_to" value={returnTo} />
-                      <button type="submit">Delete log</button>
-                    </form>
-                  )}
+                  <div
+                    mix={css({
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '12px',
+                      marginTop: '12px',
+                    })}
+                  >
+                    <button type="submit" form={`edit-movie-form-${item.id}`}>
+                      {interaction ? 'Update' : 'Save'}
+                    </button>
+                    {interaction && (
+                      <form
+                        method="post"
+                        action={routes.movies.interactions.destroy.href({ interactionId: String(interaction.id) })}
+                      >
+                        <input type="hidden" name="_method" value="DELETE" />
+                        <input type="hidden" name="return_to" value={returnTo} />
+                        <button type="submit" class="danger">
+                          Delete log
+                        </button>
+                      </form>
+                    )}
+                  </div>
                 </Modal>
               </div>
             </div>

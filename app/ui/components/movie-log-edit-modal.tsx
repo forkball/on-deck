@@ -23,6 +23,7 @@ export function MovieLogEditModal(handle: Handle<MovieLogEditModalProps>) {
     return (
       <Modal id={`edit-log-${interaction.id}`} triggerLabel="Edit" title={title}>
         <form
+          id={`edit-log-form-${interaction.id}`}
           method="post"
           action={routes.movies.interactions.update.href({ interactionId: String(interaction.id) })}
           mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
@@ -47,17 +48,22 @@ export function MovieLogEditModal(handle: Handle<MovieLogEditModalProps>) {
               <textarea name="notes" rows={3} defaultValue={interaction.notes ?? ''} placeholder="What did you think?" />
             </label>
           </div>
-          <button type="submit">Save</button>
         </form>
-        <form
-          method="post"
-          action={routes.movies.interactions.destroy.href({ interactionId: String(interaction.id) })}
-          mix={css({ marginTop: '12px' })}
-        >
-          <input type="hidden" name="_method" value="DELETE" />
-          <input type="hidden" name="return_to" value={returnTo} />
-          <button type="submit">Delete log</button>
-        </form>
+        <div mix={css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '12px' })}>
+          <button type="submit" form={`edit-log-form-${interaction.id}`}>
+            Save
+          </button>
+          <form
+            method="post"
+            action={routes.movies.interactions.destroy.href({ interactionId: String(interaction.id) })}
+          >
+            <input type="hidden" name="_method" value="DELETE" />
+            <input type="hidden" name="return_to" value={returnTo} />
+            <button type="submit" class="danger">
+              Delete log
+            </button>
+          </form>
+        </div>
       </Modal>
     )
   }
