@@ -1,5 +1,5 @@
 import { createCookie } from 'remix/cookie'
-import { createFsSessionStorage } from 'remix/session-storage/fs'
+import { createCookieSessionStorage } from 'remix/session-storage/cookie'
 
 const sessionSecret = process.env.SESSION_SECRET
 if (!sessionSecret && process.env.NODE_ENV !== 'test') {
@@ -15,4 +15,9 @@ export const sessionCookie = createCookie('session', {
   path: '/',
 })
 
-export const sessionStorage = createFsSessionStorage('./tmp/sessions')
+// Session data (just { userId }) lives entirely in the signed cookie itself
+// — no server-side store to keep in sync, so this works correctly no matter
+// how many machines are running. The previous fs-backed storage wrote
+// session files to local disk, which only one machine could ever see;
+// running more than one caused requests to randomly appear logged out.
+export const sessionStorage = createCookieSessionStorage()
