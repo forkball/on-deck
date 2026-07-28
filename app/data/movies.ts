@@ -1,5 +1,11 @@
 import type { Db } from './db.ts'
-import { mediaItems, mediaItemTags, userMediaInteractions, type MediaItem } from './schema.ts'
+import {
+  mediaItems,
+  mediaItemTags,
+  userMediaInteractions,
+  type MediaItem,
+  type UserMediaInteraction,
+} from './schema.ts'
 import { searchMovies as searchTmdbMovies, type TmdbSearchResult } from './tmdb.ts'
 
 export interface MovieResult {
@@ -65,43 +71,48 @@ export interface LogInteractionInput {
   consumedAt?: number
 }
 
+// Atomic upsert on (user_id, media_item_id) — a plain findOne-then-write
+// here would race under concurrent callers (the Letterboxd import runs 8 of
+// these in parallel; two rows resolving to the same movie could both see "no
+// existing row" and both insert). The DB-level unique constraint is what
+// makes ON CONFLICT possible at all; see the matching migration.
 export async function logInteraction(
   db: Db,
   userId: number,
   mediaItemId: number,
   input: LogInteractionInput,
 ) {
-  const existing = await db.findOne(userMediaInteractions, {
-    where: { user_id: userId, media_item_id: mediaItemId },
-  })
-
   const now = Date.now()
   const consumedAt = input.consumedAt ?? now
 
-  if (existing) {
-    return db.update(userMediaInteractions, existing.id, {
-      status: input.status,
-      rating: input.rating ?? undefined,
-      notes: input.notes ?? undefined,
-      consumed_at: input.status === 'consumed' ? consumedAt : (existing.consumed_at ?? undefined),
-      updated_at: now,
-    })
+  const values: Partial<UserMediaInteraction> = {
+    user_id: userId,
+    media_item_id: mediaItemId,
+    status: input.status,
+    rating: input.rating ?? undefined,
+    notes: input.notes ?? undefined,
+    created_at: now,
+    updated_at: now,
+  }
+  // Only touched when actively marking something consumed — omitting the
+  // key from `update` (rather than setting it) leaves an existing
+  // consumed_at alone when just editing status/rating/notes later.
+  const update: Partial<UserMediaInteraction> = {
+    status: input.status,
+    rating: input.rating ?? undefined,
+    notes: input.notes ?? undefined,
+    updated_at: now,
+  }
+  if (input.status === 'consumed') {
+    values.consumed_at = consumedAt
+    update.consumed_at = consumedAt
   }
 
-  return db.create(
-    userMediaInteractions,
-    {
-      user_id: userId,
-      media_item_id: mediaItemId,
-      status: input.status,
-      rating: input.rating ?? undefined,
-      notes: input.notes ?? undefined,
-      consumed_at: input.status === 'consumed' ? consumedAt : undefined,
-      created_at: now,
-      updated_at: now,
-    },
-    { returnRow: true },
-  )
+  return db.query(userMediaInteractions).upsert(values, {
+    conflictTarget: ['user_id', 'media_item_id'],
+    update,
+    returning: '*',
+  })
 }
 
 // Updates an existing interaction directly by id (the editable-log flow on the

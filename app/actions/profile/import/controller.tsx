@@ -2,14 +2,14 @@ import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 
-import { importLetterboxdRatings } from '../../data/letterboxdImport.ts'
-import type { User } from '../../data/schema.ts'
-import { requireAuth } from '../../middleware/auth.ts'
-import { displayLabel } from '../../data/users.ts'
-import { routes } from '../../routes.ts'
+import { importLetterboxdRatings } from '../../../data/letterboxdImport.ts'
+import type { User } from '../../../data/schema.ts'
+import { requireAuth } from '../../../middleware/auth.ts'
+import { displayLabel } from '../../../data/users.ts'
+import { routes } from '../../../routes.ts'
 import { LetterboxdImportPage } from './page.tsx'
 
-export default createController(routes.letterboxd, {
+export default createController(routes.profile.import, {
   middleware: [requireAuth<User>()],
   actions: {
     index(context) {

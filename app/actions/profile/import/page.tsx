@@ -1,11 +1,11 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { LetterboxdImportResult } from '../../data/letterboxdImport.ts'
-import { routes } from '../../routes.ts'
-import { LetterboxdImportForm } from '../../assets/letterboxd-import-form.tsx'
-import { Document } from '../../ui/components/document.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
+import type { LetterboxdImportResult } from '../../../data/letterboxdImport.ts'
+import { routes } from '../../../routes.ts'
+import { LetterboxdImportForm } from '../../../assets/letterboxd-import-form.tsx'
+import { Document } from '../../../ui/components/document.tsx'
+import { Nav } from '../../../ui/components/nav.tsx'
 
 export interface LetterboxdImportPageProps {
   displayName: string
@@ -56,7 +56,7 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
                 <code>ratings.csv</code> from the zip.
               </p>
               {error && <p mix={css({ color: '#b91c1c' })}>{error}</p>}
-              <LetterboxdImportForm uploadHref={routes.letterboxd.upload.href()} />
+              <LetterboxdImportForm uploadHref={routes.profile.import.upload.href()} />
             </>
           )}
         </main>
