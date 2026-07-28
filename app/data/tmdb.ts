@@ -118,3 +118,15 @@ export async function getMovieById(externalId: string): Promise<TmdbSearchResult
     overview: r.overview?.trim() || null,
   }
 }
+
+// Accepts a bare TMDB movie id or a full URL like
+// themoviedb.org/movie/27205-inception — used by the "wrong movie? fix it"
+// form on the detail page, where pasting the URL straight from TMDB's site
+// is the natural thing to do.
+export function parseTmdbMovieId(input: string): string | null {
+  const trimmed = input.trim()
+  if (/^\d+$/.test(trimmed)) return trimmed
+
+  const match = trimmed.match(/themoviedb\.org\/movie\/(\d+)/)
+  return match ? match[1] : null
+}

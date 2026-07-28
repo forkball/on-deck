@@ -18,11 +18,13 @@ export interface MovieDetailPageProps {
   interaction: UserMediaInteraction | null
   from?: string
   displayName: string
+  rematchError?: string
+  rematched?: boolean
 }
 
 export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
   return () => {
-    const { item, tags, interaction, from, displayName } = handle.props
+    const { item, tags, interaction, from, displayName, rematchError, rematched } = handle.props
     const { releaseYear, posterUrl, overview } = parseMovieMetadata(item.metadata)
     const showHref = routes.movies.show.href({ mediaItemId: String(item.id) })
     const returnTo = from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref
@@ -34,6 +36,7 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
           <p>
             <a href={from || routes.movies.search.href()}>← Back</a>
           </p>
+          {rematched && <p mix={css({ color: '#2a7' })}>Updated to match the correct movie on TMDB.</p>}
           <div mix={css({ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' })}>
             {posterUrl ? (
               <img
@@ -69,6 +72,25 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
                 <p mix={css({ color: '#555' })}>{tags.map((t) => t.replace(/^./, (c) => c.toUpperCase())).join(', ')}</p>
               )}
               <p>{overview ?? 'No description available.'}</p>
+
+              <details mix={css({ marginBottom: '16px', color: '#555' })}>
+                <summary mix={css({ cursor: 'pointer' })}>Wrong movie?</summary>
+                <form
+                  method="post"
+                  action={routes.movies.rematch.href({ mediaItemId: String(item.id) })}
+                  mix={css({ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap', alignItems: 'center' })}
+                >
+                  <input type="hidden" name="return_to" value={returnTo} />
+                  <input
+                    type="text"
+                    name="tmdb_link"
+                    placeholder="Paste a themoviedb.org link or id"
+                    mix={css({ flex: '1 1 240px' })}
+                  />
+                  <button type="submit">Fix match</button>
+                </form>
+                {rematchError && <p mix={css({ color: '#c33', margin: '8px 0 0' })}>{rematchError}</p>}
+              </details>
 
               <div
                 mix={css({
@@ -143,6 +165,17 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
                     </div>
                     <button type="submit">{interaction ? 'Update' : 'Save'}</button>
                   </form>
+                  {interaction && (
+                    <form
+                      method="post"
+                      action={routes.movies.interactions.destroy.href({ interactionId: String(interaction.id) })}
+                      mix={css({ marginTop: '12px' })}
+                    >
+                      <input type="hidden" name="_method" value="DELETE" />
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <button type="submit">Delete log</button>
+                    </form>
+                  )}
                 </Modal>
               </div>
             </div>

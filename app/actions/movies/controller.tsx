@@ -9,12 +9,13 @@ import {
   getMovieDetail,
   getUserInteractionForItem,
   logInteraction,
+  rematchMovie,
   searchAndImportMovies,
   upsertMovie,
   type LogInteractionInput,
   type MovieResult,
 } from '../../data/movies.ts'
-import { getMovieById, searchMovies } from '../../data/tmdb.ts'
+import { getMovieById, parseTmdbMovieId, searchMovies } from '../../data/tmdb.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
@@ -127,8 +128,37 @@ export default createController(routes.movies, {
           interaction={interaction}
           from={from}
           displayName={displayLabel(auth.identity)}
+          rematchError={context.url.searchParams.get('rematchError') || undefined}
+          rematched={context.url.searchParams.get('rematched') === '1'}
         />,
       )
+    },
+
+    // Manual fix for a bad title/year match — re-points this item at a
+    // different TMDB movie by id/link rather than trying to auto-detect
+    // low-confidence matches, since there's no reliable signal for that yet.
+    async rematch(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const mediaItemId = Number(context.params.mediaItemId)
+      const formData = context.get(FormData)
+      const link = String(formData.get('tmdb_link') || '')
+      const returnTo =
+        String(formData.get('return_to') || '') || routes.movies.show.href({ mediaItemId: String(mediaItemId) })
+      const separator = returnTo.includes('?') ? '&' : '?'
+
+      const db = context.get(Database)
+      const tmdbId = parseTmdbMovieId(link)
+      const outcome = tmdbId
+        ? await rematchMovie(db, mediaItemId, tmdbId)
+        : { ok: false as const, error: 'Paste a TMDB movie link or id.' }
+
+      if (!outcome.ok) {
+        return redirect(`${returnTo}${separator}rematchError=${encodeURIComponent(outcome.error)}`, 303)
+      }
+
+      return redirect(`${returnTo}${separator}rematched=1`, 303)
     },
 
     async log(context) {
