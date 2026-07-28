@@ -24,12 +24,12 @@ export default createController(routes.letterboxd, {
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const formData = context.get(FormData)
-      const file = formData.get('export')
+      const file = formData.get('ratings')
 
       if (!(file instanceof File) || file.size === 0) {
         return context.render(
           <LetterboxdImportPage
-            error="Choose your Letterboxd export .zip first."
+            error="Choose your ratings.csv file first."
             displayName={displayLabel(auth.identity)}
           />,
           { status: 400 },
@@ -37,10 +37,10 @@ export default createController(routes.letterboxd, {
       }
 
       const db = context.get(Database)
-      const buffer = Buffer.from(await file.arrayBuffer())
+      const csvText = await file.text()
 
       try {
-        const result = await importLetterboxdRatings(db, auth.identity.id, buffer)
+        const result = await importLetterboxdRatings(db, auth.identity.id, csvText)
         return context.render(
           <LetterboxdImportPage result={result} displayName={displayLabel(auth.identity)} />,
         )
