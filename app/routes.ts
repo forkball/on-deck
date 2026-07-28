@@ -12,10 +12,6 @@ export const routes = route({
     index: get('/'),
     unreadCount: get('unread-count'),
   }),
-  letterboxd: route('letterboxd', {
-    index: get('/'),
-    upload: post('/'),
-  }),
   movies: route('movies', {
     search: get('search'),
     suggest: get('suggest'),
@@ -31,6 +27,10 @@ export const routes = route({
     watched: get('watched'),
     following: get('following'),
     followers: get('followers'),
+    import: route('import', {
+      index: get('/'),
+      upload: post('/'),
+    }),
   }),
   recommendations: route('recommendations', {
     index: get('/'),

@@ -8,11 +8,11 @@ import controller from './actions/controller.tsx'
 import authController from './actions/auth/controller.tsx'
 import authLoginController from './actions/auth/login/controller.tsx'
 import authSignupController from './actions/auth/signup/controller.tsx'
-import letterboxdController from './actions/letterboxd/controller.tsx'
 import moviesController from './actions/movies/controller.tsx'
 import moviesInteractionsController from './actions/movies/interactions/controller.tsx'
 import notificationsController from './actions/notifications/controller.tsx'
 import profileController from './actions/profile/controller.tsx'
+import profileImportController from './actions/profile/import/controller.tsx'
 import recommendationsController from './actions/recommendations/controller.tsx'
 import usersController from './actions/users/controller.tsx'
 import { loadDatabase } from './data/db.ts'
@@ -41,8 +41,7 @@ export const router = createRouter<AppContext>({
   middleware: [
     staticFiles('./public', { index: false }),
     render(),
-    // Default max file size (2 MiB) is too small for a Letterboxd export
-    // zip once reviews/lists are included, not just ratings.
+    // Default max file size (2 MiB) is too small for some ratings.csv exports.
     formData({ maxFileSize: 25 * 1024 * 1024 }),
     methodOverride(),
     session(sessionCookie, sessionStorage),
@@ -55,10 +54,10 @@ router.map(routes, controller)
 router.map(routes.auth, authController)
 router.map(routes.auth.login, authLoginController)
 router.map(routes.auth.signup, authSignupController)
-router.map(routes.letterboxd, letterboxdController)
 router.map(routes.movies, moviesController)
 router.map(routes.movies.interactions, moviesInteractionsController)
 router.map(routes.notifications, notificationsController)
 router.map(routes.profile, profileController)
+router.map(routes.profile.import, profileImportController)
 router.map(routes.recommendations, recommendationsController)
 router.map(routes.users, usersController)

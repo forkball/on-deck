@@ -57,7 +57,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           <section mix={css({ marginTop: '40px' })}>
             <div mix={css({ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px' })}>
               <h2>What I've watched</h2>
-              <a href={routes.letterboxd.index.href()} mix={css({ fontSize: '13px' })}>
+              <a href={routes.profile.import.index.href()} mix={css({ fontSize: '13px' })}>
                 Import from Letterboxd
               </a>
             </div>
