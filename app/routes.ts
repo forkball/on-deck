@@ -12,6 +12,10 @@ export const routes = route({
     index: get('/'),
     unreadCount: get('unread-count'),
   }),
+  letterboxd: route('letterboxd', {
+    index: get('/'),
+    upload: post('/'),
+  }),
   movies: route('movies', {
     search: get('search'),
     suggest: get('suggest'),
