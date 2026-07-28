@@ -50,3 +50,13 @@
 form:has(select[name='status'] option[value='consumed']:checked) .watched-only-fields {
   display: flex;
 }
+
+/* Destructive actions (delete log). Needs the element selector to outrank
+   DoodleCSS's own `.doodle button { color: #3c3c3c }`. */
+.doodle button.danger {
+  color: #c33;
+}
+
+.doodle button.danger:hover:not(:disabled) {
+  color: #a11;
+}
