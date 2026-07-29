@@ -26,6 +26,10 @@ const GENRE_ID_TO_NAME: Record<number, string> = {
   37: 'western',
 }
 
+// Sorted list of every genre this app knows about — used to build the
+// recommendation genre filter's dropdown without a second API round trip.
+export const MOVIE_GENRES: string[] = Object.values(GENRE_ID_TO_NAME).sort()
+
 export interface TmdbSearchResult {
   externalId: string
   title: string
@@ -34,6 +38,9 @@ export interface TmdbSearchResult {
   posterUrl: string | null
   popularity: number
   overview: string | null
+  // Only ever populated via getMovieById — TMDB's search endpoint doesn't
+  // return runtime, only the per-movie detail endpoint does.
+  runtimeMinutes: number | null
 }
 
 interface TmdbSearchResponse {
@@ -75,6 +82,7 @@ export async function searchMovies(query: string): Promise<TmdbSearchResult[]> {
     posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
     popularity: r.popularity,
     overview: r.overview?.trim() || null,
+    runtimeMinutes: null,
   }))
 }
 
@@ -86,6 +94,7 @@ interface TmdbMovieDetailResponse {
   poster_path: string | null
   popularity: number
   overview: string
+  runtime: number | null
 }
 
 // Looks a movie up by its known TMDB id — used when the autosuggest dropdown
@@ -116,6 +125,7 @@ export async function getMovieById(externalId: string): Promise<TmdbSearchResult
     posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
     popularity: r.popularity,
     overview: r.overview?.trim() || null,
+    runtimeMinutes: r.runtime ?? null,
   }
 }
 

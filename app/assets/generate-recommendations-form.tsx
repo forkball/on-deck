@@ -7,9 +7,12 @@ export type FriendOption = {
 
 export type GenerateRecommendationsFormProps = {
   friends: FriendOption[]
+  genres: string[]
   generateHref: string
   findPeopleHref: string
 }
+
+const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
 
 // Cycled through on the submit button while a run is generating, so the wait
 // reads as progress rather than a stall.
@@ -48,7 +51,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let page = 1
 
     return () => {
-      const { friends, generateHref, findPeopleHref } = handle.props
+      const { friends, genres, generateHref, findPeopleHref } = handle.props
 
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
@@ -173,6 +176,40 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               )}
             </div>
           )}
+
+          <div mix={css({ display: 'flex', gap: '8px', flexWrap: 'wrap' })}>
+            <label>
+              Genre{' '}
+              <select name="genre" defaultValue="">
+                <option value="">Any</option>
+                {genres.map((genre) => (
+                  <option key={genre} value={genre}>
+                    {genre.replace(/^./, (c) => c.toUpperCase())}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Decade{' '}
+              <select name="decade" defaultValue="">
+                <option value="">Any</option>
+                {DECADES.map((decade) => (
+                  <option key={decade} value={String(decade)}>
+                    {decade}s
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Length{' '}
+              <select name="length" defaultValue="">
+                <option value="">Any</option>
+                <option value="short">Under 90 min</option>
+                <option value="medium">90–150 min</option>
+                <option value="long">Over 150 min</option>
+              </select>
+            </label>
+          </div>
 
           <button type="submit" disabled={submitting}>
             {submitting ? THINKING_MESSAGES[thinkingIndex] : 'Get recommendations'}
