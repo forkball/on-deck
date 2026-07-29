@@ -53,3 +53,15 @@ export function countUnreadNotifications(db: Db, userId: number): Promise<number
 export async function markAllNotificationsRead(db: Db, userId: number): Promise<void> {
   await db.updateMany(notifications, { read_at: Date.now() }, { where: { user_id: userId, read_at: null } })
 }
+
+// Returns false (rather than throwing) if the notification doesn't exist or
+// doesn't belong to this user. Already-read notifications are left alone
+// (read_at keeps its original timestamp) rather than bumped to now.
+export async function markNotificationRead(db: Db, notificationId: number, userId: number): Promise<boolean> {
+  const existing = await db.find(notifications, notificationId)
+  if (!existing || existing.user_id !== userId) return false
+  if (existing.read_at != null) return true
+
+  await db.update(notifications, notificationId, { read_at: Date.now() })
+  return true
+}

@@ -46,7 +46,7 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
                       backgroundColor: notification.read ? 'transparent' : 'rgba(21, 128, 61, 0.06)',
                     })}
                   >
-                    <a href={routes.recommendations.show.href({ runId: String(notification.runId) })}>
+                    <a href={routes.notifications.read.href({ notificationId: String(notification.id) })}>
                       <strong>{notification.actorLabel}</strong> ran recommendations you can view — {date}
                     </a>
                     {!notification.read && (
