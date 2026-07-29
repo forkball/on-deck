@@ -8,7 +8,12 @@ import { redirect } from 'remix/response/redirect'
 import { listFollowedUsers } from '../../data/follows.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
-import { generateRecommendations, getRecommendationRun, listRecommendationRuns } from '../../data/recommendations.ts'
+import {
+  generateRecommendations,
+  getRecommendationRun,
+  listRecommendationRuns,
+  listRecommendationRunsFromOthers,
+} from '../../data/recommendations.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { RecommendationsPage } from './page.tsx'
@@ -27,10 +32,16 @@ export default createController(routes.recommendations, {
 
       const db = context.get(Database)
       const runs = await listRecommendationRuns(db, auth.identity.id)
+      const runsFromOthers = await listRecommendationRunsFromOthers(db, auth.identity.id)
       const friends = await listFollowedUsers(db, auth.identity.id)
 
       return context.render(
-        <RecommendationsPage runs={runs} friends={friends} displayName={displayLabel(auth.identity)} />,
+        <RecommendationsPage
+          runs={runs}
+          runsFromOthers={runsFromOthers}
+          friends={friends}
+          displayName={displayLabel(auth.identity)}
+        />,
       )
     },
 

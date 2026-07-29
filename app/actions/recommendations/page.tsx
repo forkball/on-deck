@@ -11,13 +11,50 @@ import { Nav } from '../../ui/components/nav.tsx'
 
 export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
+  runsFromOthers: RecommendationRunSummary[]
   friends: User[]
   displayName: string
 }
 
+function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
+  return () => {
+    const { runs } = handle.props
+
+    return (
+      <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' })}>
+        {runs.map((run) => {
+          const date = new Date(run.createdAt).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })
+          return (
+            <li
+              key={run.id}
+              mix={css({
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                padding: '12px 16px',
+              })}
+            >
+              <a href={routes.recommendations.show.href({ runId: String(run.id) })}>
+                <strong>{date}</strong> — {run.groupLabel}
+              </a>
+            </li>
+          )
+        })}
+      </ul>
+    )
+  }
+}
+
 export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
-    const { runs, friends, displayName } = handle.props
+    const { runs, runsFromOthers, friends, displayName } = handle.props
 
     return (
       <Document title="Recommendations | On Deck">
@@ -34,6 +71,16 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             findPeopleHref={routes.users.search.href()}
           />
 
+          {runsFromOthers.length > 0 && (
+            <section mix={css({ marginTop: '40px' })}>
+              <h2>Recommendations from others</h2>
+              <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
+                Group runs friends generated that included you — only shown here once you both follow each other.
+              </p>
+              <RunList runs={runsFromOthers} />
+            </section>
+          )}
+
           <section mix={css({ marginTop: '40px' })}>
             <h2>Past recommendations</h2>
             {runs.length > 0 && (
@@ -47,33 +94,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
                 <a href={routes.profile.index.href()}>profile page</a>, then get recommendations above.
               </p>
             ) : (
-              <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' })}>
-                {runs.map((run) => {
-                  const date = new Date(run.createdAt).toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })
-                  return (
-                    <li
-                      key={run.id}
-                      mix={css({
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '12px',
-                        border: '1px solid #ddd',
-                        borderRadius: '8px',
-                        padding: '12px 16px',
-                      })}
-                    >
-                      <a href={routes.recommendations.show.href({ runId: String(run.id) })}>
-                        <strong>{date}</strong> — {run.groupLabel}
-                      </a>
-                    </li>
-                  )
-                })}
-              </ul>
+              <RunList runs={runs} />
             )}
           </section>
         </main>

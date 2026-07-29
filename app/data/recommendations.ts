@@ -278,6 +278,45 @@ export async function listRecommendationRuns(db: Db, userId: number): Promise<Re
   )
 }
 
+// Group runs someone else requested that included this user as a member —
+// e.g. a friend generated picks "for" a group they added this user to.
+// Restricted to mutual follows (same bar as notifyMutualFollowers): being
+// added to someone's run isn't itself consent to show up on their page, so
+// this only surfaces if the requester also follows this user back.
+export async function listRecommendationRunsFromOthers(db: Db, userId: number): Promise<RecommendationRunSummary[]> {
+  const memberships = await db.findMany(recommendationRunMembers, { where: { user_id: userId } })
+  if (memberships.length === 0) return []
+
+  const runs = await db.findMany(recommendationRuns, { where: inList('id', memberships.map((m) => m.run_id)) })
+  const runsFromOthers = runs.filter((run) => run.user_id !== userId)
+  if (runsFromOthers.length === 0) return []
+
+  const requesterIds = [...new Set(runsFromOthers.map((run) => run.user_id))]
+  const mutualByRequesterId = new Map(
+    await Promise.all(
+      requesterIds.map(async (requesterId): Promise<[number, boolean]> => {
+        const [requesterFollowsUser, userFollowsRequester] = await Promise.all([
+          isFollowing(db, requesterId, userId),
+          isFollowing(db, userId, requesterId),
+        ])
+        return [requesterId, requesterFollowsUser && userFollowsRequester]
+      }),
+    ),
+  )
+
+  const eligibleRuns = runsFromOthers
+    .filter((run) => mutualByRequesterId.get(run.user_id))
+    .sort((a, b) => b.created_at - a.created_at)
+
+  return Promise.all(
+    eligibleRuns.map(async (run) => ({
+      id: run.id,
+      createdAt: run.created_at,
+      groupLabel: await buildGroupLabel(db, userId, run),
+    })),
+  )
+}
+
 // Returns null if the run doesn't exist or userId wasn't part of it (the
 // requester or one of the invited members) — the dedicated
 // /recommendations/:id page treats that as 404. Membership, not just
