@@ -13,6 +13,7 @@ export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
   runsFromOthers: RecommendationRunSummary[]
   friends: User[]
+  genres: string[]
   displayName: string
 }
 
@@ -54,7 +55,7 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
 
 export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
-    const { runs, runsFromOthers, friends, displayName } = handle.props
+    const { runs, runsFromOthers, friends, genres, displayName } = handle.props
 
     return (
       <Document title="Recommendations | On Deck">
@@ -67,6 +68,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
 
           <GenerateRecommendationsForm
             friends={friends.map((friend) => ({ id: friend.id, label: displayLabel(friend) }))}
+            genres={genres}
             generateHref={routes.recommendations.generate.href()}
             findPeopleHref={routes.users.search.href()}
           />

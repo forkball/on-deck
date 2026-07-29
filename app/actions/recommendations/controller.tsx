@@ -13,7 +13,9 @@ import {
   getRecommendationRun,
   listRecommendationRuns,
   listRecommendationRunsFromOthers,
+  type RecommendationFilters,
 } from '../../data/recommendations.ts'
+import { MOVIE_GENRES } from '../../data/tmdb.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { RecommendationsPage } from './page.tsx'
@@ -21,6 +23,9 @@ import { RecommendationRunPage } from './run-page.tsx'
 
 const generateSchema = f.object({
   mode: f.field(s.union([s.literal('self'), s.literal('group')])),
+  genre: f.field(s.defaulted(s.string(), '')),
+  decade: f.field(s.defaulted(s.string(), '')),
+  length: f.field(s.defaulted(s.string(), '')),
 })
 
 export default createController(routes.recommendations, {
@@ -40,6 +45,7 @@ export default createController(routes.recommendations, {
           runs={runs}
           runsFromOthers={runsFromOthers}
           friends={friends}
+          genres={MOVIE_GENRES}
           displayName={displayLabel(auth.identity)}
         />,
       )
@@ -63,11 +69,20 @@ export default createController(routes.recommendations, {
               .filter((id) => Number.isInteger(id))
           : []
 
+      const filters: RecommendationFilters = {}
+      if (parsed.value.genre) filters.genre = parsed.value.genre
+      if (parsed.value.decade) filters.decade = Number(parsed.value.decade)
+      if (parsed.value.length === 'short' || parsed.value.length === 'medium' || parsed.value.length === 'long') {
+        filters.length = parsed.value.length
+      }
+
       const db = context.get(Database)
-      const { runId, prunedOldestRun } = await generateRecommendations(db, auth.identity.id, [
+      const { runId, prunedOldestRun } = await generateRecommendations(
+        db,
         auth.identity.id,
-        ...friendIds,
-      ])
+        [auth.identity.id, ...friendIds],
+        filters,
+      )
 
       const href = routes.recommendations.show.href({ runId: String(runId) })
       return redirect(prunedOldestRun ? `${href}?prunedOldest=1` : href, 303)

@@ -16,7 +16,7 @@ import {
   type MediaItem,
   type RecommendationRun,
 } from './schema.ts'
-import { searchMovies } from './tmdb.ts'
+import { getMovieById, searchMovies } from './tmdb.ts'
 import { regenerateTasteProfile } from './tasteProfile.ts'
 import { displayLabel } from './users.ts'
 
@@ -70,6 +70,31 @@ export interface RecommendationResult {
   status: string | null
 }
 
+export type RecommendationLength = 'short' | 'medium' | 'long'
+
+// Optional "levers" on generation. All hard-filter the final picks (not just
+// prompt hints) — genre/decade come for free off the search results already
+// fetched for matching; length needs an extra per-candidate TMDB lookup
+// (search doesn't return runtime), so that only happens when a length filter
+// is actually set.
+export interface RecommendationFilters {
+  genre?: string
+  // Decade start year, e.g. 1990 for "the 1990s".
+  decade?: number
+  length?: RecommendationLength
+}
+
+function matchesDecade(releaseYear: number | null, decade: number): boolean {
+  return releaseYear != null && releaseYear >= decade && releaseYear < decade + 10
+}
+
+function matchesLength(runtimeMinutes: number | null, length: RecommendationLength): boolean {
+  if (runtimeMinutes == null) return false
+  if (length === 'short') return runtimeMinutes < 90
+  if (length === 'long') return runtimeMinutes > 150
+  return runtimeMinutes >= 90 && runtimeMinutes <= 150
+}
+
 export interface RecommendationRunSummary {
   id: number
   createdAt: number
@@ -113,6 +138,7 @@ export async function generateRecommendations(
   db: Db,
   requestingUserId: number,
   memberUserIds: number[],
+  filters: RecommendationFilters = {},
 ): Promise<GenerateRecommendationsOutcome> {
   // Independent per member — regenerate every profile (and fetch their name) concurrently.
   const members = await Promise.all(
@@ -134,7 +160,7 @@ export async function generateRecommendations(
     }
   }
 
-  const picks = await requestPicks(profiles, excludedTitles)
+  const picks = await requestPicks(profiles, excludedTitles, filters)
 
   // Independent lookups — resolve every pick against TMDB concurrently, then
   // apply the same dedup/target-count selection over the results in order.
@@ -156,6 +182,17 @@ export async function generateRecommendations(
       )[0]
 
     if (excludedExternalIds.has(match.externalId) || seenExternalIds.has(match.externalId)) continue
+    if (filters.genre && !match.tags.includes(filters.genre)) continue
+    if (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade)) continue
+
+    // Runtime isn't in search results — only fetched (and only filtered on)
+    // when a length lever is actually set, so picks that don't need it never
+    // pay for the extra TMDB round trip.
+    if (filters.length) {
+      const detail = await getMovieById(match.externalId)
+      if (!detail || !matchesLength(detail.runtimeMinutes, filters.length)) continue
+    }
+
     seenExternalIds.add(match.externalId)
 
     const item = await upsertMovie(db, match)
@@ -227,25 +264,45 @@ async function pruneOldRuns(db: Db, userId: number): Promise<boolean> {
   return true
 }
 
-async function requestPicks(profiles: MemberProfile[], excludedTitles: string[]): Promise<Pick[]> {
+function buildFilterInstructions(filters: RecommendationFilters): string {
+  const clauses: string[] = []
+  if (filters.genre) clauses.push(`Only suggest movies in the "${filters.genre}" genre.`)
+  if (filters.decade != null) clauses.push(`Only suggest movies originally released in the ${filters.decade}s.`)
+  if (filters.length === 'short') clauses.push(`Only suggest movies with a runtime under 90 minutes.`)
+  if (filters.length === 'medium') clauses.push(`Only suggest movies with a runtime between 90 and 150 minutes.`)
+  if (filters.length === 'long') clauses.push(`Only suggest movies with a runtime over 150 minutes.`)
+  return clauses.length > 0 ? ` ${clauses.join(' ')}` : ''
+}
+
+async function requestPicks(
+  profiles: MemberProfile[],
+  excludedTitles: string[],
+  filters: RecommendationFilters = {},
+): Promise<Pick[]> {
   const isGroup = profiles.length > 1
+  // Hard filters (see generateRecommendations) drop some picks after the
+  // fact, so ask for more up front to still land near TARGET_COUNT.
+  const hasFilters = filters.genre != null || filters.decade != null || filters.length != null
+  const requestedCount = hasFilters ? REQUESTED_COUNT + 10 : REQUESTED_COUNT
+  const filterInstructions = buildFilterInstructions(filters)
 
   const prompt = isGroup
     ? `Group of ${profiles.length} people, each with their own taste profile:\n${JSON.stringify(profiles, null, 2)}\n\n` +
-      `Suggest ${REQUESTED_COUNT} real movies (not from any fixed list — use your own knowledge) this group ` +
-      `should watch together. Reason explicitly about tradeoffs: avoid picks only one person would like; ` +
-      `prefer broad appeal; where genuinely interesting, surface a pick that bridges members' different tastes ` +
-      `rather than only the bland common denominator. Do not just average genre tags — reason per-person about ` +
-      `how each candidate would land for them specifically. For each pick, give your best-guess release year ` +
-      `(used only to disambiguate remakes/same-titled films) and a reason noting which member(s) it serves and why.`
+      `Suggest ${requestedCount} real movies (not from any fixed list — use your own knowledge) this group ` +
+      `should watch together.${filterInstructions} Reason explicitly about tradeoffs: avoid picks only one ` +
+      `person would like; prefer broad appeal; where genuinely interesting, surface a pick that bridges ` +
+      `members' different tastes rather than only the bland common denominator. Do not just average genre ` +
+      `tags — reason per-person about how each candidate would land for them specifically. For each pick, give ` +
+      `your best-guess release year (used only to disambiguate remakes/same-titled films) and a reason noting ` +
+      `which member(s) it serves and why.`
     : `A person's movie taste profile:\n${JSON.stringify(profiles[0], null, 2)}\n\n` +
-      `Suggest ${REQUESTED_COUNT} real movies (not from any fixed list — use your own knowledge) that match ` +
-      `this taste profile. For each, give your best-guess release year (used only to disambiguate ` +
-      `remakes/same-titled films) and a one-sentence reason tied to their profile.`
+      `Suggest ${requestedCount} real movies (not from any fixed list — use your own knowledge) that match ` +
+      `this taste profile.${filterInstructions} For each, give your best-guess release year (used only to ` +
+      `disambiguate remakes/same-titled films) and a one-sentence reason tied to their profile.`
 
   const response = await claude.messages.create({
     model: 'claude-sonnet-5',
-    max_tokens: isGroup ? 8000 : 4000,
+    max_tokens: (isGroup ? 8000 : 4000) + (hasFilters ? 2000 : 0),
     output_config: {
       effort: isGroup ? 'high' : 'medium',
       format: { type: 'json_schema', schema: PICKS_SCHEMA },
