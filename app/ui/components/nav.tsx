@@ -41,10 +41,10 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
             />
           </div>
         ) : (
-          <>
+          <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: 'auto' })}>
             <a href={routes.auth.login.index.href()}>Log in</a>
             <a href={routes.auth.signup.index.href()}>Sign up</a>
-          </>
+          </div>
         )}
       </nav>
     )
