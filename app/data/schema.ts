@@ -8,6 +8,10 @@ export const users = table({
     email: c.text().notNull().unique(),
     password_hash: c.text().notNull(),
     display_name: c.text(),
+    // Free-text, user-authored — shown on their profile for other people to
+    // read. Deliberately never fed into regenerateTasteProfile/recommendations;
+    // only the movie log drives those.
+    bio: c.text(),
     created_at: c.integer().notNull(),
   },
 })

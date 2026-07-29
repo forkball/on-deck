@@ -14,3 +14,9 @@ export async function searchUsers(db: Db, query: string, excludeUserId: number):
     limit: 20,
   })
 }
+
+// User-authored, shown on their profile — see the `bio` column comment in
+// schema.ts for why this is kept separate from the AI-written taste profile.
+export async function updateUserBio(db: Db, userId: number, bio: string): Promise<void> {
+  await db.update(users, userId, { bio: bio || undefined })
+}
