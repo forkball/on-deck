@@ -6,10 +6,12 @@ import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { MovieLogEditModal } from '../../ui/components/movie-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
+import { stackedLabel } from '../../ui/components/styles.ts'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 
 export interface ProfilePageProps {
   summary: string
+  bio: string
   movieLog: Awaited<ReturnType<typeof listUserMovieLog>>
   totalWatched: number
   followingCount: number
@@ -20,7 +22,7 @@ export interface ProfilePageProps {
 
 export function ProfilePage(handle: Handle<ProfilePageProps>) {
   return () => {
-    const { summary, movieLog, totalWatched, followingCount, followersCount, saved, displayName } = handle.props
+    const { summary, bio, movieLog, totalWatched, followingCount, followersCount, saved, displayName } = handle.props
     const profileHref = routes.profile.index.href()
 
     return (
@@ -34,25 +36,48 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
               {followersCount} follower{followersCount === 1 ? '' : 's'}
             </a>
           </p>
-          <h2>My taste profile</h2>
           {saved && <p mix={css({ color: '#15803d' })}>Saved.</p>}
 
-          <div
-            mix={css({
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              padding: '16px',
-            })}
+          <h2>Bio</h2>
+          <p mix={css({ margin: '-8px 0 12px', fontSize: '13px', color: '#888' })}>
+            Just for other people to read — it has no effect on your recommendations.
+          </p>
+          <form
+            method="post"
+            action={routes.profile.updateBio.href()}
+            mix={css({ display: 'flex', flexDirection: 'column', gap: '8px' })}
           >
-            {summary ? (
-              <p mix={css({ margin: 0 })}>{summary}</p>
-            ) : (
-              <p mix={css({ margin: 0, color: '#555' })}>
-                Nothing yet — <a href={routes.recommendations.index.href()}>get recommendations</a> to have
-                one written from what you've logged.
-              </p>
-            )}
-          </div>
+            <input type="hidden" name="_method" value="PUT" />
+            <label mix={stackedLabel}>
+              <textarea name="bio" rows={3} defaultValue={bio} placeholder="Tell people a bit about yourself…" />
+            </label>
+            <button type="submit" mix={css({ alignSelf: 'flex-start' })}>
+              Save bio
+            </button>
+          </form>
+
+          <details open mix={css({ marginTop: '24px' })}>
+            <summary mix={css({ cursor: 'pointer' })}>
+              <h2 mix={css({ display: 'inline' })}>My taste profile</h2>
+            </summary>
+            <div
+              mix={css({
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                padding: '16px',
+                marginTop: '12px',
+              })}
+            >
+              {summary ? (
+                <p mix={css({ margin: 0 })}>{summary}</p>
+              ) : (
+                <p mix={css({ margin: 0, color: '#555' })}>
+                  Nothing yet — <a href={routes.recommendations.index.href()}>get recommendations</a> to have
+                  one written from what you've logged.
+                </p>
+              )}
+            </div>
+          </details>
 
           <section mix={css({ marginTop: '40px' })}>
             <div mix={css({ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px' })}>

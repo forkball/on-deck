@@ -12,6 +12,7 @@ import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 export interface UserProfilePageProps {
   user: User
   summary: string
+  bio: string
   movieLog: Awaited<ReturnType<typeof listUserMovieLog>>
   totalWatched: number
   followingCount: number
@@ -21,7 +22,7 @@ export interface UserProfilePageProps {
 
 export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
   return () => {
-    const { user, summary, movieLog, totalWatched, followingCount, followersCount, displayName } = handle.props
+    const { user, summary, bio, movieLog, totalWatched, followingCount, followersCount, displayName } = handle.props
     const label = displayLabel(user)
     const returnTo = routes.users.show.href({ userId: String(user.id) })
 
@@ -39,21 +40,28 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
               {followersCount} follower{followersCount === 1 ? '' : 's'}
             </a>
           </p>
-          <h2>{label}'s taste profile</h2>
 
-          <div
-            mix={css({
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              padding: '16px',
-            })}
-          >
-            {summary ? (
-              <p mix={css({ margin: 0 })}>{summary}</p>
-            ) : (
-              <p mix={css({ margin: 0, color: '#555' })}>Nothing written yet.</p>
-            )}
-          </div>
+          {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
+
+          <details open mix={css({ marginTop: '24px' })}>
+            <summary mix={css({ cursor: 'pointer' })}>
+              <h2 mix={css({ display: 'inline' })}>{label}'s taste profile</h2>
+            </summary>
+            <div
+              mix={css({
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                padding: '16px',
+                marginTop: '12px',
+              })}
+            >
+              {summary ? (
+                <p mix={css({ margin: 0 })}>{summary}</p>
+              ) : (
+                <p mix={css({ margin: 0, color: '#555' })}>Nothing written yet.</p>
+              )}
+            </div>
+          </details>
 
           <section mix={css({ marginTop: '40px' })}>
             <h2>What {label} has watched</h2>

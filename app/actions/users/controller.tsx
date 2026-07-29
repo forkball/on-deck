@@ -100,6 +100,7 @@ export default createController(routes.users, {
         <UserProfilePage
           user={target}
           summary={row?.summary ?? ''}
+          bio={target.bio ?? ''}
           movieLog={movieLog}
           totalWatched={totalWatched}
           followingCount={followingCount}
