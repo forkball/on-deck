@@ -11,6 +11,7 @@ export const routes = route({
   notifications: route('notifications', {
     index: get('/'),
     unreadCount: get('unread-count'),
+    read: get(':notificationId/read'),
   }),
   movies: route('movies', {
     search: get('search'),
@@ -29,6 +30,7 @@ export const routes = route({
     watched: get('watched'),
     following: get('following'),
     followers: get('followers'),
+    updateBio: put('bio'),
     import: route('import', {
       index: get('/'),
       upload: post('/'),
