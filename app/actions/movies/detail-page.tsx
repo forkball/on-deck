@@ -20,11 +20,12 @@ export interface MovieDetailPageProps {
   displayName: string
   rematchError?: string
   rematched?: boolean
+  merged?: boolean
 }
 
 export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
   return () => {
-    const { item, tags, interaction, from, displayName, rematchError, rematched } = handle.props
+    const { item, tags, interaction, from, displayName, rematchError, rematched, merged } = handle.props
     const { releaseYear, posterUrl, overview } = parseMovieMetadata(item.metadata)
     const showHref = routes.movies.show.href({ mediaItemId: String(item.id) })
     const returnTo = from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref
@@ -36,7 +37,13 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
           <p>
             <a href={from || routes.movies.search.href()}>← Back</a>
           </p>
-          {rematched && <p mix={css({ color: '#2a7' })}>Updated to match the correct movie on TMDB.</p>}
+          {rematched && (
+            <p mix={css({ color: '#2a7' })}>
+              {merged
+                ? 'Merged into the existing correct entry for this movie — logs from everyone who had it under the wrong entry now live here too.'
+                : 'Updated to match the correct movie on TMDB.'}
+            </p>
+          )}
           <div mix={css({ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' })}>
             {posterUrl ? (
               <img
