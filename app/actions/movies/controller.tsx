@@ -130,6 +130,7 @@ export default createController(routes.movies, {
           displayName={displayLabel(auth.identity)}
           rematchError={context.url.searchParams.get('rematchError') || undefined}
           rematched={context.url.searchParams.get('rematched') === '1'}
+          merged={context.url.searchParams.get('merged') === '1'}
         />,
       )
     },
@@ -158,7 +159,16 @@ export default createController(routes.movies, {
         return redirect(`${returnTo}${separator}rematchError=${encodeURIComponent(outcome.error)}`, 303)
       }
 
-      return redirect(`${returnTo}${separator}rematched=1`, 303)
+      // A merge deletes the original item, so `returnTo` (which points at
+      // mediaItemId's own page) is only still valid when nothing merged —
+      // otherwise land on the item everything just got merged into.
+      const from = new URL(returnTo, context.url.origin).searchParams.get('from')
+      const successPath = routes.movies.show.href({ mediaItemId: String(outcome.item.id) })
+      const query = new URLSearchParams({ rematched: '1' })
+      if (outcome.merged) query.set('merged', '1')
+      if (from) query.set('from', from)
+
+      return redirect(`${successPath}?${query.toString()}`, 303)
     },
 
     async log(context) {

@@ -62,15 +62,43 @@ export async function upsertMovie(db: Db, result: TmdbSearchResult): Promise<Med
   return item
 }
 
-export type RematchMovieResult = { ok: true; item: MediaItem } | { ok: false; error: string }
+export type RematchMovieResult = { ok: true; item: MediaItem; merged: boolean } | { ok: false; error: string }
+
+// The catalog is shared across users (media_items isn't per-user), so a bad
+// title/year match can end up with two or more people's logs scattered
+// across a wrong item and the real one. Moves every interaction on the wrong
+// item onto the real one. If a given user already has a log on both (rare —
+// they logged the wrong item, then separately found and logged the right
+// one), keeps whichever was updated more recently and drops the other,
+// since the unique (user_id, media_item_id) constraint won't allow both.
+async function mergeInteractionsInto(db: Db, fromMediaItemId: number, toMediaItemId: number): Promise<void> {
+  const interactions = await db.findMany(userMediaInteractions, { where: { media_item_id: fromMediaItemId } })
+
+  for (const interaction of interactions) {
+    const existingOnTarget = await db.findOne(userMediaInteractions, {
+      where: { user_id: interaction.user_id, media_item_id: toMediaItemId },
+    })
+
+    if (!existingOnTarget) {
+      await db.update(userMediaInteractions, interaction.id, { media_item_id: toMediaItemId })
+    } else if (interaction.updated_at > existingOnTarget.updated_at) {
+      await db.delete(userMediaInteractions, existingOnTarget.id)
+      await db.update(userMediaInteractions, interaction.id, { media_item_id: toMediaItemId })
+    }
+    // else: the target's own log is newer — leave interaction where it is,
+    // it'll be cascade-deleted along with the rest of the wrong item.
+  }
+}
 
 // Re-points an existing media item at a different TMDB movie — the fix for a
 // bad title/year match (from search, autosuggest, or the Letterboxd import
 // all silently picking a plausible-but-wrong TMDB entry). Updates the item
 // in place (interactions stay attached to the same id) rather than creating
 // a new item, and fully replaces its tags since the old ones described the
-// wrong movie. Refuses if the target TMDB id is already a different item in
-// the catalog — merging two items isn't supported.
+// wrong movie. If the target TMDB id is already a different item in the
+// catalog, merges into it instead (see mergeInteractionsInto) and deletes
+// the wrong item — ON DELETE CASCADE takes care of its now-orphaned tags
+// and any interactions that weren't moved.
 export async function rematchMovie(
   db: Db,
   mediaItemId: number,
@@ -87,10 +115,9 @@ export async function rematchMovie(
     where: { type: 'movie', external_source: 'tmdb', external_id: tmdbId },
   })
   if (collision) {
-    return {
-      ok: false,
-      error: `That movie is already in the catalog as "${collision.title}" — merging isn't supported yet.`,
-    }
+    await mergeInteractionsInto(db, mediaItemId, collision.id)
+    await db.delete(mediaItems, mediaItemId)
+    return { ok: true, item: collision, merged: true }
   }
 
   const result = await getMovieById(tmdbId)
@@ -114,7 +141,7 @@ export async function rematchMovie(
     await db.create(mediaItemTags, { media_item_id: mediaItemId, tag })
   }
 
-  return { ok: true, item }
+  return { ok: true, item, merged: false }
 }
 
 export interface LogInteractionInput {
