@@ -7,8 +7,11 @@ export type FriendOption = {
 
 export type GenerateRecommendationsFormProps = {
   friends: FriendOption[]
-  movieGenres: string[]
-  tvGenres: string[]
+  // Which media type this run generates for — set by the page (via the
+  // media-type FAB), not chosen in this form, so it's just carried through
+  // as a hidden field.
+  mediaType: 'movie' | 'tv'
+  genres: string[]
   generateHref: string
   findPeopleHref: string
 }
@@ -48,13 +51,11 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let submitting = false
     let thinkingIndex = 0
     let mode: 'self' | 'group' = 'self'
-    let mediaType: 'movie' | 'tv' = 'movie'
     let search = ''
     let page = 1
 
     return () => {
-      const { friends, movieGenres, tvGenres, generateHref, findPeopleHref } = handle.props
-      const genres = mediaType === 'tv' ? tvGenres : movieGenres
+      const { friends, mediaType, genres, generateHref, findPeopleHref } = handle.props
 
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
@@ -213,33 +214,13 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
           <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
             <p mix={sectionLabel}>What are you getting picks for?</p>
-            <div mix={css({ display: 'flex', gap: '20px' })}>
-              <label>
-                <input
-                  type="radio"
-                  name="mediaType"
-                  value="movie"
-                  defaultChecked
-                  mix={on('change', () => {
-                    mediaType = 'movie'
-                    handle.update()
-                  })}
-                />{' '}
-                Movies
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="mediaType"
-                  value="tv"
-                  mix={on('change', () => {
-                    mediaType = 'tv'
-                    handle.update()
-                  })}
-                />{' '}
-                TV
-              </label>
-            </div>
+            <input type="hidden" name="mediaType" value={mediaType} />
+            <p mix={css({ margin: 0, fontSize: '14px' })}>
+              {mediaType === 'tv' ? 'TV' : 'Movies'}{' '}
+              <span mix={css({ fontSize: '13px', color: '#888' })}>
+                — switch with the picker in the bottom-right corner.
+              </span>
+            </p>
             <label mix={css({ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '13px', color: '#aaa' })}>
               <input type="checkbox" disabled />
               Mix movies + TV in one run <span mix={css({ fontStyle: 'italic' })}>(coming soon)</span>

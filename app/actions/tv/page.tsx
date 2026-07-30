@@ -36,7 +36,11 @@ export function TvSearchPage(handle: Handle<TvSearchPageProps>) {
       <Document title="Search TV | On Deck">
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          <MediaTypeFab />
+          <MediaTypeFab
+            current="tv"
+            movieHref={query ? `${routes.movies.search.href()}?q=${encodeURIComponent(query)}` : routes.movies.search.href()}
+            tvHref={routes.tv.search.href()}
+          />
           <h1 mix={css({ margin: '0 0 16px' })}>Search TV</h1>
           {message && <p mix={css({ color: '#15803d' })}>{message}</p>}
           <MovieSearchForm

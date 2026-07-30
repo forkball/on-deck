@@ -36,18 +36,30 @@ export default createController(routes.recommendations, {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
+      // Which media type this page is for comes from the URL (set by the
+      // media-type FAB, a plain navigation link) rather than client-side
+      // form state — so the right genre list is just server-rendered for
+      // that type instead of needing JS to swap it.
+      const mediaType = context.url.searchParams.get('mediaType') === 'tv' ? 'tv' : 'movie'
+
       const db = context.get(Database)
-      const runs = await listRecommendationRuns(db, auth.identity.id)
-      const runsFromOthers = await listRecommendationRunsFromOthers(db, auth.identity.id)
+      const allRuns = await listRecommendationRuns(db, auth.identity.id)
+      const allRunsFromOthers = await listRecommendationRunsFromOthers(db, auth.identity.id)
       const friends = await listFollowedUsers(db, auth.identity.id)
+
+      // Filtered to match the FAB's current type — otherwise a TV run would
+      // show up in the list while the form above it is set to generate
+      // movies, which reads as inconsistent.
+      const runs = allRuns.filter((run) => run.mediaType === mediaType)
+      const runsFromOthers = allRunsFromOthers.filter((run) => run.mediaType === mediaType)
 
       return context.render(
         <RecommendationsPage
           runs={runs}
           runsFromOthers={runsFromOthers}
           friends={friends}
-          movieGenres={MOVIE_GENRES}
-          tvGenres={TV_GENRES}
+          mediaType={mediaType}
+          genres={mediaType === 'tv' ? TV_GENRES : MOVIE_GENRES}
           displayName={displayLabel(auth.identity)}
         />,
       )
