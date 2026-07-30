@@ -16,7 +16,7 @@ import {
   type MediaItem,
   type RecommendationRun,
 } from './schema.ts'
-import { getMovieById, searchMovies } from './tmdb.ts'
+import { getMovieById, searchMovies, type TmdbSearchResult } from './tmdb.ts'
 import { regenerateTasteProfile } from './tasteProfile.ts'
 import { displayLabel } from './users.ts'
 
@@ -95,6 +95,98 @@ function matchesLength(runtimeMinutes: number | null, length: RecommendationLeng
   return runtimeMinutes >= 90 && runtimeMinutes <= 150
 }
 
+function normalizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0))
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+    }
+  }
+  return dp[a.length][b.length]
+}
+
+// Cheap first-pass guard against TMDB search returning something with
+// little resemblance to what Claude actually asked for — deliberately
+// lenient (normalized edit distance, not exact match) since real TMDB
+// titles routinely differ from a natural-language ask in punctuation,
+// "the"/no "the", or a translated title. Catches "wrong movie entirely";
+// see verifyPicksAgainstOverviews for the case this can't catch — same
+// title, same year, different film.
+const TITLE_SIMILARITY_THRESHOLD = 0.5
+
+function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolean {
+  const a = normalizeTitle(pickTitle)
+  const b = normalizeTitle(foundTitle)
+  if (!a || !b) return false
+  if (a === b) return true
+
+  const distance = levenshteinDistance(a, b)
+  const similarity = 1 - distance / Math.max(a.length, b.length)
+  return similarity >= TITLE_SIMILARITY_THRESHOLD
+}
+
+const VERIFY_SCHEMA = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    verdicts: { type: 'array' as const, items: { type: 'boolean' as const } },
+  },
+  required: ['verdicts'],
+}
+
+// Second-pass guard: a same-titled, same-year-but-different film would
+// sail right through titlesLikelyMatch (and even the year check), since a
+// title string can't distinguish two different movies that happen to share
+// both. Only the plot itself can — so this asks Claude, which already knows
+// what it meant by each pick, to confirm against the actual TMDB overview.
+// One batched call for the whole list rather than one per pick.
+async function verifyPicksAgainstOverviews(
+  candidates: { pick: Pick; match: TmdbSearchResult }[],
+): Promise<{ pick: Pick; match: TmdbSearchResult }[]> {
+  if (candidates.length === 0) return []
+
+  const items = candidates.map(({ pick, match }, index) => ({
+    index,
+    you_suggested: { title: pick.title, year: pick.year, your_reason: pick.reason },
+    tmdb_found: { title: match.title, year: match.releaseYear, overview: match.overview },
+  }))
+
+  const response = await claude.messages.create({
+    model: 'claude-sonnet-5',
+    max_tokens: 2000,
+    output_config: {
+      effort: 'low',
+      format: { type: 'json_schema', schema: VERIFY_SCHEMA },
+    },
+    messages: [
+      {
+        role: 'user',
+        content:
+          `You previously suggested some movies by title/year. For each one, we looked it up on TMDB and found ` +
+          `a specific movie — here's what TMDB returned, described by its own title, year, and plot overview. ` +
+          `Confirm whether the TMDB movie found is truly the same film you meant, not just a similarly- or ` +
+          `identically-titled different one. Small title differences (translation, punctuation, "the" vs no ` +
+          `"the") are fine as long as it's the same film.\n\n${JSON.stringify(items, null, 2)}\n\n` +
+          `Return one boolean per entry, in the same order as given, true only if the TMDB movie found is ` +
+          `genuinely the film you meant.`,
+      },
+    ],
+  })
+
+  const { verdicts } = parseStructuredResponse<{ verdicts: boolean[] }>(response)
+  return candidates.filter((_, index) => verdicts[index] === true)
+}
+
 export interface RecommendationRunSummary {
   id: number
   createdAt: number
@@ -163,15 +255,18 @@ export async function generateRecommendations(
   const picks = await requestPicks(profiles, excludedTitles, filters)
 
   // Independent lookups — resolve every pick against TMDB concurrently, then
-  // apply the same dedup/target-count selection over the results in order.
+  // apply dedup/matching/verification over the results in order.
   const matchesByPick = await Promise.all(picks.map((pick) => searchMovies(pick.title)))
 
-  const results: RecommendationResult[] = []
+  // Deliberately not capped at TARGET_COUNT here — verifyPicksAgainstOverviews
+  // below drops some of these too, so the same over-request slack that
+  // covers dedup/filter misses needs to reach verification as well, or a
+  // verification drop would under-fill the run instead of just consuming
+  // slack that was already budgeted for exactly this.
+  const candidates: { pick: Pick; match: TmdbSearchResult }[] = []
   const seenExternalIds = new Set<string>()
 
   for (const [i, pick] of picks.entries()) {
-    if (results.length >= TARGET_COUNT) break
-
     const matches = matchesByPick[i]
     if (matches.length === 0) continue
 
@@ -182,6 +277,7 @@ export async function generateRecommendations(
       )[0]
 
     if (excludedExternalIds.has(match.externalId) || seenExternalIds.has(match.externalId)) continue
+    if (!titlesLikelyMatch(pick.title, match.title)) continue
     if (filters.genre && !match.tags.includes(filters.genre)) continue
     if (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade)) continue
 
@@ -194,7 +290,16 @@ export async function generateRecommendations(
     }
 
     seenExternalIds.add(match.externalId)
+    candidates.push({ pick, match })
+  }
 
+  // Title similarity can't tell two different films apart when they share
+  // both title and year — only content can, so this is a second, semantic
+  // pass over the survivors before anything gets written to the catalog.
+  const verified = await verifyPicksAgainstOverviews(candidates)
+
+  const results: RecommendationResult[] = []
+  for (const { pick, match } of verified.slice(0, TARGET_COUNT)) {
     const item = await upsertMovie(db, match)
     results.push({ item, tags: match.tags, reason: pick.reason, status: null })
   }
