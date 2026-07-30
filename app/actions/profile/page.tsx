@@ -10,21 +10,110 @@ import { MovieLogEditModal } from '../../ui/components/movie-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 
+type MediaLog = Awaited<ReturnType<typeof listUserMovieLog>>
+
 export interface ProfilePageProps {
-  summary: string
+  movieSummary: string
   bio: string
-  movieLog: Awaited<ReturnType<typeof listUserMovieLog>>
+  movieLog: MediaLog
   totalWatched: number
+  tvSummary: string
+  tvLog: MediaLog
+  totalTv: number
   followingCount: number
   followersCount: number
   saved?: boolean
   displayName: string
 }
 
+function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>) {
+  return () => {
+    const { label, summary } = handle.props
+
+    return (
+      <details mix={css({ marginBottom: '24px' })}>
+        <summary mix={css({ cursor: 'pointer' })}>
+          <h2 mix={css({ display: 'inline' })}>{label}</h2>
+        </summary>
+        <div mix={css({ border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginTop: '12px' })}>
+          {summary ? (
+            <p mix={css({ margin: 0 })}>{summary}</p>
+          ) : (
+            <p mix={css({ margin: 0, color: '#555' })}>
+              Nothing yet — <a href={routes.recommendations.index.href()}>get recommendations</a> to have one
+              written from what you've logged.
+            </p>
+          )}
+        </div>
+      </details>
+    )
+  }
+}
+
+function LoggedList(
+  handle: Handle<{
+    log: MediaLog
+    total: number
+    detailHref: (mediaItemId: number) => string
+    seeAllHref?: string
+    emptyHref: string
+    emptyLabel: string
+    returnTo: string
+  }>,
+) {
+  return () => {
+    const { log, total, detailHref, seeAllHref, emptyHref, emptyLabel, returnTo } = handle.props
+
+    if (log.length === 0) {
+      return (
+        <p>
+          Nothing logged yet — <a href={emptyHref}>{emptyLabel}</a> to get started.
+        </p>
+      )
+    }
+
+    return (
+      <>
+        <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
+          {log.map(({ interaction, item }) => (
+            <WatchedListItem
+              key={interaction.id}
+              interaction={interaction}
+              item={item}
+              detailHref={item ? detailHref(item.id) : '#'}
+              actions={
+                <MovieLogEditModal interaction={interaction} title={item?.title ?? 'Unknown title'} returnTo={returnTo} />
+              }
+            />
+          ))}
+        </ul>
+        {seeAllHref && total > log.length && (
+          <p mix={css({ marginTop: '16px' })}>
+            <a href={seeAllHref}>See all {total} →</a>
+          </p>
+        )}
+      </>
+    )
+  }
+}
+
 export function ProfilePage(handle: Handle<ProfilePageProps>) {
   return () => {
-    const { summary, bio, movieLog, totalWatched, followingCount, followersCount, saved, displayName } = handle.props
+    const {
+      movieSummary,
+      bio,
+      movieLog,
+      totalWatched,
+      tvSummary,
+      tvLog,
+      totalTv,
+      followingCount,
+      followersCount,
+      saved,
+      displayName,
+    } = handle.props
     const profileHref = routes.profile.index.href()
+    const savedReturnTo = `${profileHref}?saved=1`
 
     return (
       <Document title="My profile | On Deck">
@@ -74,74 +163,43 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             </Modal>
           </div>
 
-          <MediaTabs idPrefix="profile">
-            <details mix={css({ marginBottom: '24px' })}>
-              <summary mix={css({ cursor: 'pointer' })}>
-                <h2 mix={css({ display: 'inline' })}>My taste profile</h2>
-              </summary>
-              <div
-                mix={css({
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  marginTop: '12px',
-                })}
-              >
-                {summary ? (
-                  <p mix={css({ margin: 0 })}>{summary}</p>
-                ) : (
-                  <p mix={css({ margin: 0, color: '#555' })}>
-                    Nothing yet — <a href={routes.recommendations.index.href()}>get recommendations</a> to have
-                    one written from what you've logged.
-                  </p>
-                )}
-              </div>
-            </details>
-
-            <div mix={css({ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px' })}>
-              <h2>What I've watched</h2>
-              <a href={routes.profile.import.index.href()} mix={css({ fontSize: '13px' })}>
-                Import from Letterboxd
-              </a>
-            </div>
-            {movieLog.length === 0 ? (
-              <p>
-                Nothing logged yet — <a href={routes.movies.search.href()}>search for a movie</a> to
-                get started.
-              </p>
-            ) : (
+          <MediaTabs
+            idPrefix="profile"
+            movies={
               <>
-                <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
-                  {movieLog.map(({ interaction, item }) => {
-                    const detailHref = item
-                      ? `${routes.movies.show.href({ mediaItemId: String(item.id) })}?from=${encodeURIComponent(profileHref)}`
-                      : '#'
-
-                    return (
-                      <WatchedListItem
-                        key={interaction.id}
-                        interaction={interaction}
-                        item={item}
-                        detailHref={detailHref}
-                        actions={
-                          <MovieLogEditModal
-                            interaction={interaction}
-                            title={item?.title ?? 'Unknown title'}
-                            returnTo={`${profileHref}?saved=1`}
-                          />
-                        }
-                      />
-                    )
-                  })}
-                </ul>
-                {totalWatched > movieLog.length && (
-                  <p mix={css({ marginTop: '16px' })}>
-                    <a href={routes.profile.watched.href()}>See all {totalWatched} →</a>
-                  </p>
-                )}
+                <TasteProfileSummary label="My movie taste profile" summary={movieSummary} />
+                <div mix={css({ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px' })}>
+                  <h2>What I've watched</h2>
+                  <a href={routes.profile.import.index.href()} mix={css({ fontSize: '13px' })}>
+                    Import from Letterboxd
+                  </a>
+                </div>
+                <LoggedList
+                  log={movieLog}
+                  total={totalWatched}
+                  detailHref={(id) => `${routes.movies.show.href({ mediaItemId: String(id) })}?from=${encodeURIComponent(profileHref)}`}
+                  seeAllHref={routes.profile.watched.href()}
+                  emptyHref={routes.movies.search.href()}
+                  emptyLabel="search for a movie"
+                  returnTo={savedReturnTo}
+                />
               </>
-            )}
-          </MediaTabs>
+            }
+            tv={
+              <>
+                <TasteProfileSummary label="My TV taste profile" summary={tvSummary} />
+                <h2>What I've watched</h2>
+                <LoggedList
+                  log={tvLog}
+                  total={totalTv}
+                  detailHref={(id) => `${routes.tv.show.href({ mediaItemId: String(id) })}?from=${encodeURIComponent(profileHref)}`}
+                  emptyHref={routes.tv.search.href()}
+                  emptyLabel="search for a TV show"
+                  returnTo={savedReturnTo}
+                />
+              </>
+            }
+          />
         </main>
       </Document>
     )

@@ -51,7 +51,8 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
           >
             {run.results.map(({ item, tags, reason, status }) => {
               const { releaseYear, posterUrl } = parseMovieMetadata(item.metadata)
-              const detailHref = `${routes.movies.show.href({ mediaItemId: String(item.id) })}?from=${encodeURIComponent(routes.recommendations.show.href({ runId: String(run.id) }))}`
+              const showRoute = item.type === 'tv' ? routes.tv.show : routes.movies.show
+              const detailHref = `${showRoute.href({ mediaItemId: String(item.id) })}?from=${encodeURIComponent(routes.recommendations.show.href({ runId: String(run.id) }))}`
 
               return (
                 <li

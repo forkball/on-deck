@@ -60,9 +60,13 @@ export const userMediaInteractions = table({
 // interaction log above. See app/data/tasteProfile.ts.
 export const userTasteProfiles = table({
   name: 'user_taste_profiles',
-  primaryKey: ['user_id'],
+  primaryKey: ['user_id', 'media_type'],
   columns: {
     user_id: c.integer().notNull().references('users', 'id'),
+    // One row per (user, media_type) — movies and TV get independently
+    // regenerated/persisted profiles, since cross-media taste mixing is an
+    // explicit opt-in (not yet built) rather than the default.
+    media_type: c.enum(['movie', 'tv', 'book', 'comic', 'game']).notNull(),
     profile: c.text().notNull().default('{}'), // JSON string: { liked_tags: string[], disliked_tags: string[] }
     summary: c.text(),
     updated_at: c.integer().notNull(),
@@ -77,6 +81,10 @@ export const recommendationRuns = table({
   columns: {
     id: c.integer().primaryKey().autoIncrement(),
     user_id: c.integer().notNull().references('users', 'id'), // the requester
+    // Which catalog this run's picks were matched against — the MAX_RUNS_PER_USER
+    // cap (see recommendations.ts) is scoped per media_type, so generating a
+    // TV run never prunes an older movie run and vice versa.
+    media_type: c.enum(['movie', 'tv', 'book', 'comic', 'game']).notNull(),
     created_at: c.integer().notNull(),
   },
 })

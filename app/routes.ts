@@ -20,10 +20,22 @@ export const routes = route({
     show: get(':mediaItemId'),
     log: post(':mediaItemId/log'),
     rematch: post(':mediaItemId/rematch'),
-    interactions: route('interactions', {
-      update: put(':interactionId'),
-      destroy: del(':interactionId'),
-    }),
+  }),
+  tv: route('tv', {
+    search: get('search'),
+    suggest: get('suggest'),
+    import: get('import'),
+    show: get(':mediaItemId'),
+    log: post(':mediaItemId/log'),
+    rematch: post(':mediaItemId/rematch'),
+  }),
+  // Not media-type-specific — a logged interaction is just a (user, media
+  // item) row regardless of whether that item is a movie or a TV show, so
+  // both the movie and TV detail/edit UIs post here rather than each having
+  // their own copy.
+  interactions: route('interactions', {
+    update: put(':interactionId'),
+    destroy: del(':interactionId'),
   }),
   profile: route('profile', {
     index: get('/'),

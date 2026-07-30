@@ -5,6 +5,7 @@ import { redirect } from 'remix/response/redirect'
 
 import type { Db } from '../../data/db.ts'
 import { countUserMovieLog, listUserMovieLog } from '../../data/movies.ts'
+import { countUserMediaLog, listUserMediaLog } from '../../data/mediaCatalog.ts'
 import {
   countFollowers,
   countFollowing,
@@ -90,19 +91,27 @@ export default createController(routes.users, {
       const target = await requireFollowedUser(db, auth.identity.id, userId)
       if (target instanceof Response) return target
 
-      const row = await getTasteProfile(db, userId)
-      const movieLog = await listUserMovieLog(db, userId, { limit: RECENT_COUNT })
-      const totalWatched = await countUserMovieLog(db, userId)
+      const movieProfile = await getTasteProfile(db, userId, 'movie')
+      const movieLog = await listUserMovieLog(db, userId, { limit: RECENT_COUNT, type: 'movie' })
+      const totalWatched = await countUserMovieLog(db, userId, 'movie')
+
+      const tvProfile = await getTasteProfile(db, userId, 'tv')
+      const tvLog = await listUserMediaLog(db, userId, { type: 'tv' })
+      const totalTv = await countUserMediaLog(db, userId, 'tv')
+
       const followingCount = await countFollowing(db, userId)
       const followersCount = await countFollowers(db, userId)
 
       return context.render(
         <UserProfilePage
           user={target}
-          summary={row?.summary ?? ''}
+          movieSummary={movieProfile?.summary ?? ''}
           bio={target.bio ?? ''}
           movieLog={movieLog}
           totalWatched={totalWatched}
+          tvSummary={tvProfile?.summary ?? ''}
+          tvLog={tvLog}
+          totalTv={totalTv}
           followingCount={followingCount}
           followersCount={followersCount}
           displayName={displayLabel(auth.identity)}
@@ -120,10 +129,11 @@ export default createController(routes.users, {
       if (target instanceof Response) return target
 
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
-      const totalWatched = await countUserMovieLog(db, userId)
+      const totalWatched = await countUserMovieLog(db, userId, 'movie')
       const movieLog = await listUserMovieLog(db, userId, {
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
+        type: 'movie',
       })
 
       return context.render(

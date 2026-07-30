@@ -3,7 +3,7 @@ import { and, eq, inList } from 'remix/data-table'
 import { claude, parseStructuredResponse } from './claude.ts'
 import type { Db } from './db.ts'
 import { isFollowing } from './follows.ts'
-import { upsertMovie } from './movies.ts'
+import { upsertMediaItem, type MediaType } from './mediaCatalog.ts'
 import { createNotification } from './notifications.ts'
 import {
   mediaItems,
@@ -16,9 +16,25 @@ import {
   type MediaItem,
   type RecommendationRun,
 } from './schema.ts'
-import { getMovieById, searchMovies, type TmdbSearchResult } from './tmdb.ts'
+import { getMovieById, getTvShowById, searchMovies, searchTv, type TmdbSearchResult } from './tmdb.ts'
 import { regenerateTasteProfile } from './tasteProfile.ts'
 import { displayLabel } from './users.ts'
+
+const MEDIA_NOUNS: Record<MediaType, string> = {
+  movie: 'movies',
+  tv: 'TV shows',
+  book: 'books',
+  comic: 'comics',
+  game: 'games',
+}
+
+function searchForType(mediaType: MediaType, query: string): Promise<TmdbSearchResult[]> {
+  return mediaType === 'tv' ? searchTv(query) : searchMovies(query)
+}
+
+function lookupForType(mediaType: MediaType, externalId: string): Promise<TmdbSearchResult | null> {
+  return mediaType === 'tv' ? getTvShowById(externalId) : getMovieById(externalId)
+}
 
 interface MemberProfile {
   label: string
@@ -152,8 +168,12 @@ const VERIFY_SCHEMA = {
 // One batched call for the whole list rather than one per pick.
 async function verifyPicksAgainstOverviews(
   candidates: { pick: Pick; match: TmdbSearchResult }[],
+  mediaType: MediaType = 'movie',
 ): Promise<{ pick: Pick; match: TmdbSearchResult }[]> {
   if (candidates.length === 0) return []
+
+  const noun = MEDIA_NOUNS[mediaType]
+  const entryNoun = mediaType === 'tv' ? 'show' : 'entry'
 
   const items = candidates.map(({ pick, match }, index) => ({
     index,
@@ -172,13 +192,13 @@ async function verifyPicksAgainstOverviews(
       {
         role: 'user',
         content:
-          `You previously suggested some movies by title/year. For each one, we looked it up on TMDB and found ` +
-          `a specific movie — here's what TMDB returned, described by its own title, year, and plot overview. ` +
-          `Confirm whether the TMDB movie found is truly the same film you meant, not just a similarly- or ` +
-          `identically-titled different one. Small title differences (translation, punctuation, "the" vs no ` +
-          `"the") are fine as long as it's the same film.\n\n${JSON.stringify(items, null, 2)}\n\n` +
-          `Return one boolean per entry, in the same order as given, true only if the TMDB movie found is ` +
-          `genuinely the film you meant.`,
+          `You previously suggested some ${noun} by title/year. For each one, we looked it up on TMDB and found ` +
+          `a specific ${entryNoun} — here's what TMDB returned, described by its own title, year, and plot ` +
+          `overview. Confirm whether the TMDB ${entryNoun} found is truly the same one you meant, not just a ` +
+          `similarly- or identically-titled different one. Small title differences (translation, punctuation, ` +
+          `"the" vs no "the") are fine as long as it's the same ${entryNoun}.\n\n${JSON.stringify(items, null, 2)}\n\n` +
+          `Return one boolean per entry, in the same order as given, true only if the TMDB ${entryNoun} found is ` +
+          `genuinely the one you meant.`,
       },
     ],
   })
@@ -191,6 +211,7 @@ export interface RecommendationRunSummary {
   id: number
   createdAt: number
   groupLabel: string
+  mediaType: MediaType
 }
 
 export interface RecommendationRunDetail extends RecommendationRunSummary {
@@ -231,11 +252,18 @@ export async function generateRecommendations(
   requestingUserId: number,
   memberUserIds: number[],
   filters: RecommendationFilters = {},
+  mediaType: MediaType = 'movie',
 ): Promise<GenerateRecommendationsOutcome> {
   // Independent per member — regenerate every profile (and fetch their name) concurrently.
+  // Scoped to mediaType: cross-media taste mixing is an explicit, not-yet-
+  // built opt-in (see the disabled "Mix" checkbox on the generate form), so
+  // a movie run only ever sees this member's movie log/profile, never TV.
   const members = await Promise.all(
     memberUserIds.map(async (memberId) => {
-      const [profile, user] = await Promise.all([regenerateTasteProfile(db, memberId), db.find(users, memberId)])
+      const [profile, user] = await Promise.all([
+        regenerateTasteProfile(db, memberId, mediaType),
+        db.find(users, memberId),
+      ])
       return { profile, label: user ? displayLabel(user) : `User ${memberId}` }
     }),
   )
@@ -252,11 +280,11 @@ export async function generateRecommendations(
     }
   }
 
-  const picks = await requestPicks(profiles, excludedTitles, filters)
+  const picks = await requestPicks(profiles, excludedTitles, filters, mediaType)
 
   // Independent lookups — resolve every pick against TMDB concurrently, then
   // apply dedup/matching/verification over the results in order.
-  const matchesByPick = await Promise.all(picks.map((pick) => searchMovies(pick.title)))
+  const matchesByPick = await Promise.all(picks.map((pick) => searchForType(mediaType, pick.title)))
 
   // Deliberately not capped at TARGET_COUNT here — verifyPicksAgainstOverviews
   // below drops some of these too, so the same over-request slack that
@@ -285,7 +313,7 @@ export async function generateRecommendations(
     // when a length lever is actually set, so picks that don't need it never
     // pay for the extra TMDB round trip.
     if (filters.length) {
-      const detail = await getMovieById(match.externalId)
+      const detail = await lookupForType(mediaType, match.externalId)
       if (!detail || !matchesLength(detail.runtimeMinutes, filters.length)) continue
     }
 
@@ -296,17 +324,17 @@ export async function generateRecommendations(
   // Title similarity can't tell two different films apart when they share
   // both title and year — only content can, so this is a second, semantic
   // pass over the survivors before anything gets written to the catalog.
-  const verified = await verifyPicksAgainstOverviews(candidates)
+  const verified = await verifyPicksAgainstOverviews(candidates, mediaType)
 
   const results: RecommendationResult[] = []
   for (const { pick, match } of verified.slice(0, TARGET_COUNT)) {
-    const item = await upsertMovie(db, match)
+    const item = await upsertMediaItem(db, mediaType, match)
     results.push({ item, tags: match.tags, reason: pick.reason, status: null })
   }
 
   const run = await db.create(
     recommendationRuns,
-    { user_id: requestingUserId, created_at: Date.now() },
+    { user_id: requestingUserId, media_type: mediaType, created_at: Date.now() },
     { returnRow: true },
   )
 
@@ -325,7 +353,7 @@ export async function generateRecommendations(
 
   await notifyMutualFollowers(db, requestingUserId, memberUserIds, run.id)
 
-  const prunedOldestRun = await pruneOldRuns(db, requestingUserId)
+  const prunedOldestRun = await pruneOldRuns(db, requestingUserId, mediaType)
 
   return { runId: run.id, prunedOldestRun }
 }
@@ -354,12 +382,14 @@ async function notifyMutualFollowers(
   )
 }
 
-// Deletes the oldest run(s) for a user beyond MAX_RUNS_PER_USER. Returns
-// whether anything was deleted. Relies on recommendation_run_members and
-// user_recommendations cascading on delete of the run row.
-async function pruneOldRuns(db: Db, userId: number): Promise<boolean> {
+// Deletes the oldest run(s) for a user beyond MAX_RUNS_PER_USER, scoped to
+// one media type — a TV run should never prune an older movie run just
+// because the combined total crossed the cap. Returns whether anything was
+// deleted. Relies on recommendation_run_members and user_recommendations
+// cascading on delete of the run row.
+async function pruneOldRuns(db: Db, userId: number, mediaType: MediaType): Promise<boolean> {
   const runs = await db.findMany(recommendationRuns, {
-    where: { user_id: userId },
+    where: { user_id: userId, media_type: mediaType },
     orderBy: ['created_at', 'asc'],
   })
   if (runs.length <= MAX_RUNS_PER_USER) return false
@@ -369,13 +399,13 @@ async function pruneOldRuns(db: Db, userId: number): Promise<boolean> {
   return true
 }
 
-function buildFilterInstructions(filters: RecommendationFilters): string {
+function buildFilterInstructions(filters: RecommendationFilters, noun: string): string {
   const clauses: string[] = []
-  if (filters.genre) clauses.push(`Only suggest movies in the "${filters.genre}" genre.`)
-  if (filters.decade != null) clauses.push(`Only suggest movies originally released in the ${filters.decade}s.`)
-  if (filters.length === 'short') clauses.push(`Only suggest movies with a runtime under 90 minutes.`)
-  if (filters.length === 'medium') clauses.push(`Only suggest movies with a runtime between 90 and 150 minutes.`)
-  if (filters.length === 'long') clauses.push(`Only suggest movies with a runtime over 150 minutes.`)
+  if (filters.genre) clauses.push(`Only suggest ${noun} in the "${filters.genre}" genre.`)
+  if (filters.decade != null) clauses.push(`Only suggest ${noun} originally released in the ${filters.decade}s.`)
+  if (filters.length === 'short') clauses.push(`Only suggest ${noun} with a runtime under 90 minutes.`)
+  if (filters.length === 'medium') clauses.push(`Only suggest ${noun} with a runtime between 90 and 150 minutes.`)
+  if (filters.length === 'long') clauses.push(`Only suggest ${noun} with a runtime over 150 minutes.`)
   return clauses.length > 0 ? ` ${clauses.join(' ')}` : ''
 }
 
@@ -383,27 +413,29 @@ async function requestPicks(
   profiles: MemberProfile[],
   excludedTitles: string[],
   filters: RecommendationFilters = {},
+  mediaType: MediaType = 'movie',
 ): Promise<Pick[]> {
   const isGroup = profiles.length > 1
+  const noun = MEDIA_NOUNS[mediaType]
   // Hard filters (see generateRecommendations) drop some picks after the
   // fact, so ask for more up front to still land near TARGET_COUNT.
   const hasFilters = filters.genre != null || filters.decade != null || filters.length != null
   const requestedCount = hasFilters ? REQUESTED_COUNT + 10 : REQUESTED_COUNT
-  const filterInstructions = buildFilterInstructions(filters)
+  const filterInstructions = buildFilterInstructions(filters, noun)
 
   const prompt = isGroup
-    ? `Group of ${profiles.length} people, each with their own taste profile:\n${JSON.stringify(profiles, null, 2)}\n\n` +
-      `Suggest ${requestedCount} real movies (not from any fixed list — use your own knowledge) this group ` +
+    ? `Group of ${profiles.length} people, each with their own ${noun} taste profile:\n${JSON.stringify(profiles, null, 2)}\n\n` +
+      `Suggest ${requestedCount} real ${noun} (not from any fixed list — use your own knowledge) this group ` +
       `should watch together.${filterInstructions} Reason explicitly about tradeoffs: avoid picks only one ` +
       `person would like; prefer broad appeal; where genuinely interesting, surface a pick that bridges ` +
       `members' different tastes rather than only the bland common denominator. Do not just average genre ` +
       `tags — reason per-person about how each candidate would land for them specifically. For each pick, give ` +
-      `your best-guess release year (used only to disambiguate remakes/same-titled films) and a reason noting ` +
-      `which member(s) it serves and why.`
-    : `A person's movie taste profile:\n${JSON.stringify(profiles[0], null, 2)}\n\n` +
-      `Suggest ${requestedCount} real movies (not from any fixed list — use your own knowledge) that match ` +
+      `your best-guess release year (used only to disambiguate remakes/same-titled entries) and a reason ` +
+      `noting which member(s) it serves and why.`
+    : `A person's ${noun} taste profile:\n${JSON.stringify(profiles[0], null, 2)}\n\n` +
+      `Suggest ${requestedCount} real ${noun} (not from any fixed list — use your own knowledge) that match ` +
       `this taste profile.${filterInstructions} For each, give your best-guess release year (used only to ` +
-      `disambiguate remakes/same-titled films) and a one-sentence reason tied to their profile.`
+      `disambiguate remakes/same-titled entries) and a one-sentence reason tied to their profile.`
 
   const response = await claude.messages.create({
     model: 'claude-sonnet-5',
@@ -436,6 +468,7 @@ export async function listRecommendationRuns(db: Db, userId: number): Promise<Re
       id: run.id,
       createdAt: run.created_at,
       groupLabel: await buildGroupLabel(db, userId, run),
+      mediaType: run.media_type,
     })),
   )
 }
@@ -475,6 +508,7 @@ export async function listRecommendationRunsFromOthers(db: Db, userId: number): 
       id: run.id,
       createdAt: run.created_at,
       groupLabel: await buildGroupLabel(db, userId, run),
+      mediaType: run.media_type,
     })),
   )
 }
@@ -500,7 +534,7 @@ export async function getRecommendationRun(
   const otherMemberLabels = await listOtherMemberLabels(db, userId, run)
   const rows = await db.findMany(userRecommendations, { where: { run_id: runId }, orderBy: ['rank', 'asc'] })
   if (rows.length === 0) {
-    return { id: run.id, createdAt: run.created_at, groupLabel, otherMemberLabels, results: [] }
+    return { id: run.id, createdAt: run.created_at, groupLabel, mediaType: run.media_type, otherMemberLabels, results: [] }
   }
 
   const mediaItemIds = rows.map((row) => row.media_item_id)
@@ -534,5 +568,5 @@ export async function getRecommendationRun(
     })
   }
 
-  return { id: run.id, createdAt: run.created_at, groupLabel, otherMemberLabels, results }
+  return { id: run.id, createdAt: run.created_at, groupLabel, mediaType: run.media_type, otherMemberLabels, results }
 }

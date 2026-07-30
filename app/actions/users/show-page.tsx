@@ -10,20 +10,93 @@ import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 
+type MediaLog = Awaited<ReturnType<typeof listUserMovieLog>>
+
 export interface UserProfilePageProps {
   user: User
-  summary: string
+  movieSummary: string
   bio: string
-  movieLog: Awaited<ReturnType<typeof listUserMovieLog>>
+  movieLog: MediaLog
   totalWatched: number
+  tvSummary: string
+  tvLog: MediaLog
+  totalTv: number
   followingCount: number
   followersCount: number
   displayName: string
 }
 
+function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>) {
+  return () => {
+    const { label, summary } = handle.props
+
+    return (
+      <details mix={css({ marginBottom: '24px' })}>
+        <summary mix={css({ cursor: 'pointer' })}>
+          <h2 mix={css({ display: 'inline' })}>{label}</h2>
+        </summary>
+        <div mix={css({ border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginTop: '12px' })}>
+          {summary ? (
+            <p mix={css({ margin: 0 })}>{summary}</p>
+          ) : (
+            <p mix={css({ margin: 0, color: '#555' })}>Nothing written yet.</p>
+          )}
+        </div>
+      </details>
+    )
+  }
+}
+
+function LoggedList(
+  handle: Handle<{
+    log: MediaLog
+    total: number
+    detailHref: (mediaItemId: number) => string
+    seeAllHref?: string
+  }>,
+) {
+  return () => {
+    const { log, total, detailHref, seeAllHref } = handle.props
+
+    if (log.length === 0) return <p>Nothing logged yet.</p>
+
+    return (
+      <>
+        <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
+          {log.map(({ interaction, item }) => (
+            <WatchedListItem
+              key={interaction.id}
+              interaction={interaction}
+              item={item}
+              detailHref={item ? detailHref(item.id) : '#'}
+            />
+          ))}
+        </ul>
+        {seeAllHref && total > log.length && (
+          <p mix={css({ marginTop: '16px' })}>
+            <a href={seeAllHref}>See all {total} →</a>
+          </p>
+        )}
+      </>
+    )
+  }
+}
+
 export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
   return () => {
-    const { user, summary, bio, movieLog, totalWatched, followingCount, followersCount, displayName } = handle.props
+    const {
+      user,
+      movieSummary,
+      bio,
+      movieLog,
+      totalWatched,
+      tvSummary,
+      tvLog,
+      totalTv,
+      followingCount,
+      followersCount,
+      displayName,
+    } = handle.props
     const label = displayLabel(user)
     const returnTo = routes.users.show.href({ userId: String(user.id) })
 
@@ -44,58 +117,32 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
 
           {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
 
-          <MediaTabs idPrefix="user-profile">
-            <details mix={css({ marginBottom: '24px' })}>
-              <summary mix={css({ cursor: 'pointer' })}>
-                <h2 mix={css({ display: 'inline' })}>{label}'s taste profile</h2>
-              </summary>
-              <div
-                mix={css({
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  marginTop: '12px',
-                })}
-              >
-                {summary ? (
-                  <p mix={css({ margin: 0 })}>{summary}</p>
-                ) : (
-                  <p mix={css({ margin: 0, color: '#555' })}>Nothing written yet.</p>
-                )}
-              </div>
-            </details>
-
-            <h2>What {label} has watched</h2>
-            {movieLog.length === 0 ? (
-              <p>Nothing logged yet.</p>
-            ) : (
+          <MediaTabs
+            idPrefix="user-profile"
+            movies={
               <>
-                <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
-                  {movieLog.map(({ interaction, item }) => {
-                    const detailHref = item
-                      ? `${routes.movies.show.href({ mediaItemId: String(item.id) })}?from=${encodeURIComponent(returnTo)}`
-                      : '#'
-
-                    return (
-                      <WatchedListItem
-                        key={interaction.id}
-                        interaction={interaction}
-                        item={item}
-                        detailHref={detailHref}
-                      />
-                    )
-                  })}
-                </ul>
-                {totalWatched > movieLog.length && (
-                  <p mix={css({ marginTop: '16px' })}>
-                    <a href={routes.users.watched.href({ userId: String(user.id) })}>
-                      See all {totalWatched} →
-                    </a>
-                  </p>
-                )}
+                <TasteProfileSummary label={`${label}'s movie taste profile`} summary={movieSummary} />
+                <h2>What {label} has watched</h2>
+                <LoggedList
+                  log={movieLog}
+                  total={totalWatched}
+                  detailHref={(id) => `${routes.movies.show.href({ mediaItemId: String(id) })}?from=${encodeURIComponent(returnTo)}`}
+                  seeAllHref={routes.users.watched.href({ userId: String(user.id) })}
+                />
               </>
-            )}
-          </MediaTabs>
+            }
+            tv={
+              <>
+                <TasteProfileSummary label={`${label}'s TV taste profile`} summary={tvSummary} />
+                <h2>What {label} has watched</h2>
+                <LoggedList
+                  log={tvLog}
+                  total={totalTv}
+                  detailHref={(id) => `${routes.tv.show.href({ mediaItemId: String(id) })}?from=${encodeURIComponent(returnTo)}`}
+                />
+              </>
+            }
+          />
         </main>
       </Document>
     )

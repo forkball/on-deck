@@ -5,11 +5,11 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { deleteInteraction, updateInteraction, type LogInteractionInput } from '../../../data/movies.ts'
-import { requireAuth } from '../../../middleware/auth.ts'
-import type { User } from '../../../data/schema.ts'
-import { routes } from '../../../routes.ts'
-import { parseRatingInput } from '../../../utils/stars.ts'
+import { deleteInteraction, updateInteraction, type LogInteractionInput } from '../../data/mediaCatalog.ts'
+import { requireAuth } from '../../middleware/auth.ts'
+import type { User } from '../../data/schema.ts'
+import { routes } from '../../routes.ts'
+import { parseRatingInput } from '../../utils/stars.ts'
 
 const updateSchema = f.object({
   status: f.field(
@@ -24,7 +24,7 @@ const updateSchema = f.object({
   return_to: f.field(s.defaulted(s.string(), '')),
 })
 
-export default createController(routes.movies.interactions, {
+export default createController(routes.interactions, {
   middleware: [requireAuth<User>()],
   actions: {
     async update(context) {
