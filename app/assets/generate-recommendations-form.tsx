@@ -7,7 +7,8 @@ export type FriendOption = {
 
 export type GenerateRecommendationsFormProps = {
   friends: FriendOption[]
-  genres: string[]
+  movieGenres: string[]
+  tvGenres: string[]
   generateHref: string
   findPeopleHref: string
 }
@@ -20,7 +21,7 @@ const THINKING_MESSAGES = [
   'Generating…',
   'Reading taste profiles…',
   'Asking Claude for picks…',
-  'Matching movies…',
+  'Matching results…',
   'Almost there…',
 ]
 
@@ -47,11 +48,13 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let submitting = false
     let thinkingIndex = 0
     let mode: 'self' | 'group' = 'self'
+    let mediaType: 'movie' | 'tv' = 'movie'
     let search = ''
     let page = 1
 
     return () => {
-      const { friends, genres, generateHref, findPeopleHref } = handle.props
+      const { friends, movieGenres, tvGenres, generateHref, findPeopleHref } = handle.props
+      const genres = mediaType === 'tv' ? tvGenres : movieGenres
 
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
@@ -209,6 +212,41 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
           </div>
 
           <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
+            <p mix={sectionLabel}>What are you getting picks for?</p>
+            <div mix={css({ display: 'flex', gap: '20px' })}>
+              <label>
+                <input
+                  type="radio"
+                  name="mediaType"
+                  value="movie"
+                  defaultChecked
+                  mix={on('change', () => {
+                    mediaType = 'movie'
+                    handle.update()
+                  })}
+                />{' '}
+                Movies
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="mediaType"
+                  value="tv"
+                  mix={on('change', () => {
+                    mediaType = 'tv'
+                    handle.update()
+                  })}
+                />{' '}
+                TV
+              </label>
+            </div>
+            <label mix={css({ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '13px', color: '#aaa' })}>
+              <input type="checkbox" disabled />
+              Mix movies + TV in one run <span mix={css({ fontStyle: 'italic' })}>(coming soon)</span>
+            </label>
+          </div>
+
+          <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
             <p mix={sectionLabel}>Filters (optional)</p>
             <div
               mix={css({
@@ -222,9 +260,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 <select name="genre" defaultValue="">
                   <option value="">Any</option>
                   {genres.map((genre) => (
-                    <option key={genre} value={genre}>
-                      {genre.replace(/^./, (c) => c.toUpperCase())}
-                    </option>
+                    <option value={genre}>{genre.replace(/^./, (c) => c.toUpperCase())}</option>
                   ))}
                 </select>
               </label>

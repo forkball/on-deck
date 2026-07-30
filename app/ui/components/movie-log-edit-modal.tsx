@@ -25,7 +25,7 @@ export function MovieLogEditModal(handle: Handle<MovieLogEditModalProps>) {
         <form
           id={`edit-log-form-${interaction.id}`}
           method="post"
-          action={routes.movies.interactions.update.href({ interactionId: String(interaction.id) })}
+          action={routes.interactions.update.href({ interactionId: String(interaction.id) })}
           mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
         >
           <input type="hidden" name="_method" value="PUT" />
@@ -55,7 +55,7 @@ export function MovieLogEditModal(handle: Handle<MovieLogEditModalProps>) {
           </button>
           <form
             method="post"
-            action={routes.movies.interactions.destroy.href({ interactionId: String(interaction.id) })}
+            action={routes.interactions.destroy.href({ interactionId: String(interaction.id) })}
           >
             <input type="hidden" name="_method" value="DELETE" />
             <input type="hidden" name="return_to" value={returnTo} />

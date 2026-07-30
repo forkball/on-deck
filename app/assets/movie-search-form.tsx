@@ -8,6 +8,7 @@ export type MovieSearchFormProps = {
   searchHref: string
   suggestHref: string
   importHref: string
+  placeholder?: string
 }
 
 // Client-hydrated (see generate-recommendations-form.tsx for the pattern):
@@ -46,7 +47,7 @@ export const MovieSearchForm = clientEntry<MovieSearchFormProps>(
     }
 
     return () => {
-      const { searchHref } = handle.props
+      const { searchHref, placeholder = 'Search TMDB for a movie…' } = handle.props
 
       return (
         <form
@@ -81,7 +82,7 @@ export const MovieSearchForm = clientEntry<MovieSearchFormProps>(
               name="q"
               value={query}
               autocomplete="off"
-              placeholder="Search TMDB for a movie…"
+              placeholder={placeholder}
               mix={[
                 css({ display: 'block', width: '100%' }),
                 on('input', (event) => {

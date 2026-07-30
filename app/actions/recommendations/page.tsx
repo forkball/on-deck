@@ -14,7 +14,8 @@ export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
   runsFromOthers: RecommendationRunSummary[]
   friends: User[]
-  genres: string[]
+  movieGenres: string[]
+  tvGenres: string[]
   displayName: string
 }
 
@@ -44,7 +45,8 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
               })}
             >
               <a href={routes.recommendations.show.href({ runId: String(run.id) })}>
-                <strong>{date}</strong> — {run.groupLabel}
+                <strong>{date}</strong> — {run.groupLabel}{' '}
+                <span mix={css({ fontSize: '12px', color: '#888' })}>({run.mediaType === 'tv' ? 'TV' : 'Movies'})</span>
               </a>
             </li>
           )
@@ -56,7 +58,7 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
 
 export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
-    const { runs, runsFromOthers, friends, genres, displayName } = handle.props
+    const { runs, runsFromOthers, friends, movieGenres, tvGenres, displayName } = handle.props
 
     return (
       <Document title="Recommendations | On Deck">
@@ -65,12 +67,13 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
           <MediaTypeFab />
           <h1>Recommendations</h1>
           <p mix={css({ color: '#555' })}>
-            Rewrites your taste profile from what you've logged, then asks Claude for movies to try next.
+            Rewrites your taste profile from what you've logged, then asks Claude for picks to try next.
           </p>
 
           <GenerateRecommendationsForm
             friends={friends.map((friend) => ({ id: friend.id, label: displayLabel(friend) }))}
-            genres={genres}
+            movieGenres={movieGenres}
+            tvGenres={tvGenres}
             generateHref={routes.recommendations.generate.href()}
             findPeopleHref={routes.users.search.href()}
           />
@@ -89,7 +92,8 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             <h2>Past recommendations</h2>
             {runs.length > 0 && (
               <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
-                Only your {MAX_RUNS_PER_USER} most recent runs are kept — generating a new one removes the oldest.
+                Only your {MAX_RUNS_PER_USER} most recent runs are kept per media type — generating a new movie run
+                only removes the oldest movie run, and likewise for TV.
               </p>
             )}
             {runs.length === 0 ? (

@@ -15,7 +15,7 @@ import {
   listRecommendationRunsFromOthers,
   type RecommendationFilters,
 } from '../../data/recommendations.ts'
-import { MOVIE_GENRES } from '../../data/tmdb.ts'
+import { MOVIE_GENRES, TV_GENRES } from '../../data/tmdb.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { RecommendationsPage } from './page.tsx'
@@ -23,6 +23,7 @@ import { RecommendationRunPage } from './run-page.tsx'
 
 const generateSchema = f.object({
   mode: f.field(s.union([s.literal('self'), s.literal('group')])),
+  mediaType: f.field(s.defaulted(s.union([s.literal('movie'), s.literal('tv')]), 'movie')),
   genre: f.field(s.defaulted(s.string(), '')),
   decade: f.field(s.defaulted(s.string(), '')),
   length: f.field(s.defaulted(s.string(), '')),
@@ -45,7 +46,8 @@ export default createController(routes.recommendations, {
           runs={runs}
           runsFromOthers={runsFromOthers}
           friends={friends}
-          genres={MOVIE_GENRES}
+          movieGenres={MOVIE_GENRES}
+          tvGenres={TV_GENRES}
           displayName={displayLabel(auth.identity)}
         />,
       )
@@ -82,6 +84,7 @@ export default createController(routes.recommendations, {
         auth.identity.id,
         [auth.identity.id, ...friendIds],
         filters,
+        parsed.value.mediaType,
       )
 
       const href = routes.recommendations.show.href({ runId: String(runId) })

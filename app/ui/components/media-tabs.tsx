@@ -1,11 +1,11 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-// Mirrors the media types offered in media-type-fab.tsx — only movies are
-// wired up today, the rest are placeholders so this reads as "more coming"
-// rather than movies being the only media type the app will ever support.
-const OTHER_MEDIA_TYPES = ['tv', 'games', 'books', 'comics'] as const
-const TYPES = ['movies', ...OTHER_MEDIA_TYPES] as const
+// Mirrors the media types offered in media-type-fab.tsx — movies and TV are
+// wired up, the rest are placeholders so this reads as "more coming" rather
+// than movies+TV being the only media types the app will ever support.
+const PLACEHOLDER_MEDIA_TYPES = ['games', 'books', 'comics'] as const
+const TYPES = ['movies', 'tv', ...PLACEHOLDER_MEDIA_TYPES] as const
 
 function capitalize(type: string): string {
   return type === 'tv' ? 'TV' : type.replace(/^./, (c) => c.toUpperCase())
@@ -62,13 +62,13 @@ export interface MediaTabsProps {
   // Distinguishes this instance's radio group/ids from any other MediaTabs
   // on the same page — not needed today (one per page), but cheap insurance.
   idPrefix: string
-  // Content for the one media type with real data.
-  children?: RemixNode
+  movies?: RemixNode
+  tv?: RemixNode
 }
 
 export function MediaTabs(handle: Handle<MediaTabsProps>) {
   return () => {
-    const { idPrefix, children } = handle.props
+    const { idPrefix, movies, tv } = handle.props
 
     return (
       <div mix={css(tabsStyle(idPrefix))}>
@@ -97,8 +97,9 @@ export function MediaTabs(handle: Handle<MediaTabsProps>) {
           ))}
         </div>
 
-        <div class="panel-movies">{children}</div>
-        {OTHER_MEDIA_TYPES.map((type) => (
+        <div class="panel-movies">{movies}</div>
+        <div class="panel-tv">{tv}</div>
+        {PLACEHOLDER_MEDIA_TYPES.map((type) => (
           <div key={type} class={`panel-${type}`}>
             <p mix={css({ color: '#888' })}>{capitalize(type)} logging is coming soon.</p>
           </div>

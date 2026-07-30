@@ -6,23 +6,20 @@ import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import {
-  getMovieDetail,
+  getMediaItemDetail,
   getUserInteractionForItem,
   logInteraction,
-  rematchMovie,
-  searchAndImportMovies,
-  upsertMovie,
   type LogInteractionInput,
-  type MovieResult,
-} from '../../data/movies.ts'
-import { getMovieById, parseTmdbId, searchMovies } from '../../data/tmdb.ts'
+} from '../../data/mediaCatalog.ts'
+import { rematchTvShow, searchAndImportTv, upsertTvShow } from '../../data/tv.ts'
+import { getTvShowById, parseTmdbId, searchTv } from '../../data/tmdb.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { parseRatingInput } from '../../utils/stars.ts'
-import { MovieDetailPage } from './detail-page.tsx'
-import { MoviesSearchPage } from './page.tsx'
+import { TvDetailPage } from './detail-page.tsx'
+import { TvSearchPage } from './page.tsx'
 
 const SUGGESTION_LIMIT = 6
 
@@ -39,7 +36,7 @@ const logSchema = f.object({
   return_to: f.field(s.defaulted(s.string(), '')),
 })
 
-export default createController(routes.movies, {
+export default createController(routes.tv, {
   middleware: [requireAuth<User>()],
   actions: {
     async search(context) {
@@ -49,7 +46,7 @@ export default createController(routes.movies, {
 
       const query = context.url.searchParams.get('q')?.trim() ?? ''
 
-      const results = query ? await searchAndImportMovies(db, query) : []
+      const results = query ? await searchAndImportTv(db, query) : []
 
       const interactionsByItemId = new Map<number, Awaited<ReturnType<typeof getUserInteractionForItem>>>()
       for (const { item } of results) {
@@ -57,7 +54,7 @@ export default createController(routes.movies, {
       }
 
       return context.render(
-        <MoviesSearchPage
+        <TvSearchPage
           query={query}
           results={results}
           interactionsByItemId={interactionsByItemId}
@@ -66,9 +63,7 @@ export default createController(routes.movies, {
       )
     },
 
-    // Live TMDB search for the autosuggest dropdown — deliberately doesn't
-    // import/upsert anything, unlike `search`, since most keystrokes never
-    // turn into a pick. Import only happens once you submit an actual search.
+    // Live TMDB search for the autosuggest dropdown — see movies/controller.tsx.
     async suggest(context) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -76,7 +71,7 @@ export default createController(routes.movies, {
       const query = context.url.searchParams.get('q')?.trim() ?? ''
       if (query.length < 2) return Response.json({ suggestions: [] })
 
-      const results = await searchMovies(query)
+      const results = await searchTv(query)
       const suggestions = results.slice(0, SUGGESTION_LIMIT).map((result) => ({
         key: result.externalId,
         label: result.title,
@@ -87,25 +82,21 @@ export default createController(routes.movies, {
       return Response.json({ suggestions })
     },
 
-    // Where picking an autosuggest option lands — imports the exact TMDB
-    // movie the suggestion already resolved (by id) and goes straight to it,
-    // instead of resubmitting a title search that could in principle turn up
-    // something else and definitely re-hits TMDB for no reason.
     async import(context) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const externalId = context.url.searchParams.get('externalId')?.trim() ?? ''
-      if (!externalId) return redirect(routes.movies.search.href(), 303)
+      if (!externalId) return redirect(routes.tv.search.href(), 303)
 
-      const result = await getMovieById(externalId)
-      if (!result) return redirect(routes.movies.search.href(), 303)
+      const result = await getTvShowById(externalId)
+      if (!result) return redirect(routes.tv.search.href(), 303)
 
       const db = context.get(Database)
-      const item = await upsertMovie(db, result)
+      const item = await upsertTvShow(db, result)
 
       const from = context.url.searchParams.get('from') || undefined
-      const showHref = routes.movies.show.href({ mediaItemId: String(item.id) })
+      const showHref = routes.tv.show.href({ mediaItemId: String(item.id) })
       return redirect(from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref, 303)
     },
 
@@ -115,14 +106,14 @@ export default createController(routes.movies, {
 
       const mediaItemId = Number(context.params.mediaItemId)
       const db = context.get(Database)
-      const detail = await getMovieDetail(db, mediaItemId)
+      const detail = await getMediaItemDetail(db, mediaItemId)
       if (!detail) return new Response('Not Found', { status: 404 })
 
       const interaction = await getUserInteractionForItem(db, auth.identity.id, mediaItemId)
       const from = context.url.searchParams.get('from') || undefined
 
       return context.render(
-        <MovieDetailPage
+        <TvDetailPage
           item={detail.item}
           tags={detail.tags}
           interaction={interaction}
@@ -135,9 +126,6 @@ export default createController(routes.movies, {
       )
     },
 
-    // Manual fix for a bad title/year match — re-points this item at a
-    // different TMDB movie by id/link rather than trying to auto-detect
-    // low-confidence matches, since there's no reliable signal for that yet.
     async rematch(context) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -146,24 +134,21 @@ export default createController(routes.movies, {
       const formData = context.get(FormData)
       const link = String(formData.get('tmdb_link') || '')
       const returnTo =
-        String(formData.get('return_to') || '') || routes.movies.show.href({ mediaItemId: String(mediaItemId) })
+        String(formData.get('return_to') || '') || routes.tv.show.href({ mediaItemId: String(mediaItemId) })
       const separator = returnTo.includes('?') ? '&' : '?'
 
       const db = context.get(Database)
-      const tmdbId = parseTmdbId(link, 'movie')
+      const tmdbId = parseTmdbId(link, 'tv')
       const outcome = tmdbId
-        ? await rematchMovie(db, mediaItemId, tmdbId)
-        : { ok: false as const, error: 'Paste a TMDB movie link or id.' }
+        ? await rematchTvShow(db, mediaItemId, tmdbId)
+        : { ok: false as const, error: 'Paste a TMDB show link or id.' }
 
       if (!outcome.ok) {
         return redirect(`${returnTo}${separator}rematchError=${encodeURIComponent(outcome.error)}`, 303)
       }
 
-      // A merge deletes the original item, so `returnTo` (which points at
-      // mediaItemId's own page) is only still valid when nothing merged —
-      // otherwise land on the item everything just got merged into.
       const from = new URL(returnTo, context.url.origin).searchParams.get('from')
-      const successPath = routes.movies.show.href({ mediaItemId: String(outcome.item.id) })
+      const successPath = routes.tv.show.href({ mediaItemId: String(outcome.item.id) })
       const query = new URLSearchParams({ rematched: '1' })
       if (outcome.merged) query.set('merged', '1')
       if (from) query.set('from', from)
@@ -192,7 +177,7 @@ export default createController(routes.movies, {
         notes: parsed.value.notes || null,
       })
 
-      return redirect(parsed.value.return_to || routes.movies.search.href(), 303)
+      return redirect(parsed.value.return_to || routes.tv.search.href(), 303)
     },
   },
 })

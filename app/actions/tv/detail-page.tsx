@@ -12,7 +12,7 @@ import { parseMovieMetadata } from '../../utils/mediaMetadata.ts'
 import { StarRatingDisplay, StarRatingInput } from '../../ui/components/star-rating.tsx'
 import { STATUS_LABELS } from '../../utils/status.ts'
 
-export interface MovieDetailPageProps {
+export interface TvDetailPageProps {
   item: MediaItem
   tags: string[]
   interaction: UserMediaInteraction | null
@@ -23,11 +23,11 @@ export interface MovieDetailPageProps {
   merged?: boolean
 }
 
-export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
+export function TvDetailPage(handle: Handle<TvDetailPageProps>) {
   return () => {
     const { item, tags, interaction, from, displayName, rematchError, rematched, merged } = handle.props
     const { releaseYear, posterUrl, overview } = parseMovieMetadata(item.metadata)
-    const showHref = routes.movies.show.href({ mediaItemId: String(item.id) })
+    const showHref = routes.tv.show.href({ mediaItemId: String(item.id) })
     const returnTo = from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref
 
     return (
@@ -35,13 +35,13 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
           <p>
-            <a href={from || routes.movies.search.href()}>← Back</a>
+            <a href={from || routes.tv.search.href()}>← Back</a>
           </p>
           {rematched && (
             <p mix={css({ color: '#2a7' })}>
               {merged
-                ? 'Merged into the existing correct entry for this movie — logs from everyone who had it under the wrong entry now live here too.'
-                : 'Updated to match the correct movie on TMDB.'}
+                ? 'Merged into the existing correct entry for this show — logs from everyone who had it under the wrong entry now live here too.'
+                : 'Updated to match the correct show on TMDB.'}
             </p>
           )}
           <div mix={css({ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' })}>
@@ -81,10 +81,10 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
               <p>{overview ?? 'No description available.'}</p>
 
               <details mix={css({ marginBottom: '16px', color: '#555' })}>
-                <summary mix={css({ cursor: 'pointer' })}>Wrong movie?</summary>
+                <summary mix={css({ cursor: 'pointer' })}>Wrong show?</summary>
                 <form
                   method="post"
-                  action={routes.movies.rematch.href({ mediaItemId: String(item.id) })}
+                  action={routes.tv.rematch.href({ mediaItemId: String(item.id) })}
                   mix={css({ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap', alignItems: 'center' })}
                 >
                   <input type="hidden" name="return_to" value={returnTo} />
@@ -130,18 +130,18 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
                 </div>
 
                 <Modal
-                  id={`edit-movie-${item.id}`}
-                  triggerLabel={interaction ? 'Edit' : 'Log this movie'}
+                  id={`edit-tv-${item.id}`}
+                  triggerLabel={interaction ? 'Edit' : 'Log this show'}
                   title={item.title}
                   fab
                 >
                   <form
-                    id={`edit-movie-form-${item.id}`}
+                    id={`edit-tv-form-${item.id}`}
                     method="post"
                     action={
                       interaction
                         ? routes.interactions.update.href({ interactionId: String(interaction.id) })
-                        : routes.movies.log.href({ mediaItemId: String(item.id) })
+                        : routes.tv.log.href({ mediaItemId: String(item.id) })
                     }
                     mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
                   >
@@ -181,7 +181,7 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
                       marginTop: '12px',
                     })}
                   >
-                    <button type="submit" form={`edit-movie-form-${item.id}`}>
+                    <button type="submit" form={`edit-tv-form-${item.id}`}>
                       {interaction ? 'Update' : 'Save'}
                     </button>
                     {interaction && (

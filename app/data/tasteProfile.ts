@@ -1,6 +1,6 @@
 import { claude, parseStructuredResponse } from './claude.ts'
 import type { Db } from './db.ts'
-import { listUserMovieLog } from './movies.ts'
+import { listUserMediaLog, type MediaType } from './mediaCatalog.ts'
 import { userTasteProfiles, type UserTasteProfile } from './schema.ts'
 
 export interface TasteProfileData {
@@ -8,8 +8,8 @@ export interface TasteProfileData {
   disliked_tags: string[]
 }
 
-export async function getTasteProfile(db: Db, userId: number) {
-  return db.findOne(userTasteProfiles, { where: { user_id: userId } })
+export async function getTasteProfile(db: Db, userId: number, mediaType: MediaType) {
+  return db.findOne(userTasteProfiles, { where: { user_id: userId, media_type: mediaType } })
 }
 
 export interface UpsertTasteProfileInput extends TasteProfileData {
@@ -19,9 +19,10 @@ export interface UpsertTasteProfileInput extends TasteProfileData {
 export async function upsertTasteProfile(
   db: Db,
   userId: number,
+  mediaType: MediaType,
   data: UpsertTasteProfileInput,
 ): Promise<UserTasteProfile> {
-  const existing = await getTasteProfile(db, userId)
+  const existing = await getTasteProfile(db, userId, mediaType)
   const payload = {
     profile: JSON.stringify({ liked_tags: data.liked_tags, disliked_tags: data.disliked_tags }),
     summary: data.summary,
@@ -29,11 +30,11 @@ export async function upsertTasteProfile(
   }
 
   if (existing) {
-    await db.updateMany(userTasteProfiles, payload, { where: { user_id: userId } })
-    return (await getTasteProfile(db, userId))!
+    await db.updateMany(userTasteProfiles, payload, { where: { user_id: userId, media_type: mediaType } })
+    return (await getTasteProfile(db, userId, mediaType))!
   }
 
-  return db.create(userTasteProfiles, { user_id: userId, ...payload }, { returnRow: true })
+  return db.create(userTasteProfiles, { user_id: userId, media_type: mediaType, ...payload }, { returnRow: true })
 }
 
 const PROFILE_SCHEMA = {
@@ -48,25 +49,39 @@ const PROFILE_SCHEMA = {
 }
 
 export interface RegeneratedTasteProfile extends UpsertTasteProfileInput {
-  log: Awaited<ReturnType<typeof listUserMovieLog>>
+  log: Awaited<ReturnType<typeof listUserMediaLog>>
 }
 
-// Regenerates the taste profile from the user's movie log via Claude, persists
-// it, and returns the fresh value (plus the log it was built from, so callers
-// that also need the log — e.g. to compute already-seen titles — don't have
-// to re-fetch it). The sole write path for the profile now that manual
-// editing is gone. See app/data/recommendations.ts, which calls this before
-// generating picks.
-export async function regenerateTasteProfile(db: Db, userId: number): Promise<RegeneratedTasteProfile> {
-  const log = await listUserMovieLog(db, userId)
+const MEDIA_NOUNS: Record<MediaType, string> = {
+  movie: 'movie',
+  tv: 'TV show',
+  book: 'book',
+  comic: 'comic',
+  game: 'game',
+}
+
+// Regenerates the taste profile from the user's log (scoped to one media
+// type — see the media_type column on user_taste_profiles) via Claude,
+// persists it, and returns the fresh value (plus the log it was built from,
+// so callers that also need the log — e.g. to compute already-seen titles —
+// don't have to re-fetch it). The sole write path for the profile now that
+// manual editing is gone. See app/data/recommendations.ts, which calls this
+// before generating picks.
+export async function regenerateTasteProfile(
+  db: Db,
+  userId: number,
+  mediaType: MediaType,
+): Promise<RegeneratedTasteProfile> {
+  const log = await listUserMediaLog(db, userId, { type: mediaType })
 
   if (log.length === 0) {
     const empty = { summary: '', liked_tags: [], disliked_tags: [] }
-    await upsertTasteProfile(db, userId, empty)
+    await upsertTasteProfile(db, userId, mediaType, empty)
     return { ...empty, log }
   }
 
-  const loggedMovies = log.map(({ interaction, item }) => ({
+  const noun = MEDIA_NOUNS[mediaType]
+  const loggedItems = log.map(({ interaction, item }) => ({
     title: item?.title ?? 'Unknown title',
     status: interaction.status,
     rating: interaction.rating,
@@ -84,8 +99,8 @@ export async function regenerateTasteProfile(db: Db, userId: number): Promise<Re
       {
         role: 'user',
         content:
-          `Here is a person's movie log (status, rating out of 5, and any notes they left):\n` +
-          `${JSON.stringify(loggedMovies, null, 2)}\n\n` +
+          `Here is a person's ${noun} log (status, rating out of 5, and any notes they left):\n` +
+          `${JSON.stringify(loggedItems, null, 2)}\n\n` +
           `Write a short (2-4 sentence) natural-language summary of their taste, grounded only ` +
           `in what's above — no invented facts. Also derive liked_tags and disliked_tags: short, ` +
           `lowercase genre/mood/style tags (e.g. "slow-burn", "dystopian", "feel-good") inferred ` +
@@ -95,6 +110,6 @@ export async function regenerateTasteProfile(db: Db, userId: number): Promise<Re
   })
 
   const parsed = parseStructuredResponse<UpsertTasteProfileInput>(response)
-  await upsertTasteProfile(db, userId, parsed)
+  await upsertTasteProfile(db, userId, mediaType, parsed)
   return { ...parsed, log }
 }
