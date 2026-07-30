@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { listUserMovieLog } from '../../data/movies.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
+import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { Modal } from '../../ui/components/modal.tsx'
 import { MovieLogEditModal } from '../../ui/components/movie-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
@@ -73,30 +74,30 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             </Modal>
           </div>
 
-          <details mix={css({ marginTop: '24px' })}>
-            <summary mix={css({ cursor: 'pointer' })}>
-              <h2 mix={css({ display: 'inline' })}>My taste profile</h2>
-            </summary>
-            <div
-              mix={css({
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                padding: '16px',
-                marginTop: '12px',
-              })}
-            >
-              {summary ? (
-                <p mix={css({ margin: 0 })}>{summary}</p>
-              ) : (
-                <p mix={css({ margin: 0, color: '#555' })}>
-                  Nothing yet — <a href={routes.recommendations.index.href()}>get recommendations</a> to have
-                  one written from what you've logged.
-                </p>
-              )}
-            </div>
-          </details>
+          <MediaTabs idPrefix="profile">
+            <details mix={css({ marginBottom: '24px' })}>
+              <summary mix={css({ cursor: 'pointer' })}>
+                <h2 mix={css({ display: 'inline' })}>My taste profile</h2>
+              </summary>
+              <div
+                mix={css({
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  marginTop: '12px',
+                })}
+              >
+                {summary ? (
+                  <p mix={css({ margin: 0 })}>{summary}</p>
+                ) : (
+                  <p mix={css({ margin: 0, color: '#555' })}>
+                    Nothing yet — <a href={routes.recommendations.index.href()}>get recommendations</a> to have
+                    one written from what you've logged.
+                  </p>
+                )}
+              </div>
+            </details>
 
-          <section mix={css({ marginTop: '40px' })}>
             <div mix={css({ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px' })}>
               <h2>What I've watched</h2>
               <a href={routes.profile.import.index.href()} mix={css({ fontSize: '13px' })}>
@@ -140,7 +141,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                 )}
               </>
             )}
-          </section>
+          </MediaTabs>
         </main>
       </Document>
     )
