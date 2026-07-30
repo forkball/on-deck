@@ -87,7 +87,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               display: 'flex',
               flexDirection: 'column',
               gap: '20px',
-              maxWidth: '420px',
+              width: '100%',
               border: '1px solid #ddd',
               borderRadius: '8px',
               padding: '20px',
