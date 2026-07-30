@@ -60,12 +60,38 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       const start = (page - 1) * FRIENDS_PAGE_SIZE
       const visibleIds = new Set(filtered.slice(start, start + FRIENDS_PAGE_SIZE).map((friend) => friend.id))
 
+      const sectionLabel = css({
+        margin: '0 0 10px',
+        fontSize: '12px',
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        textTransform: 'uppercase',
+        color: '#888',
+      })
+
+      const stackedField = css({
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+        fontSize: '13px',
+        color: '#555',
+        '& select': { width: '100%' },
+      })
+
       return (
         <form
           method="post"
           action={generateHref}
           mix={[
-            css({ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '360px' }),
+            css({
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              maxWidth: '420px',
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              padding: '20px',
+            }),
             on('submit', () => {
               submitting = true
               handle.update()
@@ -81,134 +107,148 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             }),
           ]}
         >
-          <label>
-            <input
-              type="radio"
-              name="mode"
-              value="self"
-              defaultChecked
-              mix={on('change', () => {
-                mode = 'self'
-                handle.update()
-              })}
-            />{' '}
-            Just me
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="mode"
-              value="group"
-              disabled={friends.length === 0}
-              mix={on('change', () => {
-                mode = 'group'
-                handle.update()
-              })}
-            />{' '}
-            With friends
-          </label>
+          <div>
+            <p mix={sectionLabel}>Who's this for?</p>
+            <div mix={css({ display: 'flex', gap: '20px' })}>
+              <label>
+                <input
+                  type="radio"
+                  name="mode"
+                  value="self"
+                  defaultChecked
+                  mix={on('change', () => {
+                    mode = 'self'
+                    handle.update()
+                  })}
+                />{' '}
+                Just me
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="mode"
+                  value="group"
+                  disabled={friends.length === 0}
+                  mix={on('change', () => {
+                    mode = 'group'
+                    handle.update()
+                  })}
+                />{' '}
+                With friends
+              </label>
+            </div>
 
-          {friends.length === 0 ? (
-            <p mix={css({ margin: 0, paddingLeft: '24px', fontSize: '13px', color: '#888' })}>
-              <a href={findPeopleHref}>Find and follow people</a> to build a group.
-            </p>
-          ) : (
+            {friends.length === 0 ? (
+              <p mix={css({ margin: '8px 0 0', fontSize: '13px', color: '#888' })}>
+                <a href={findPeopleHref}>Find and follow people</a> to build a group.
+              </p>
+            ) : (
+              <div
+                mix={css({
+                  display: mode === 'group' ? 'flex' : 'none',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  marginTop: '12px',
+                })}
+              >
+                <input
+                  type="text"
+                  placeholder="Search friends…"
+                  value={search}
+                  mix={on('input', (event) => {
+                    search = (event.target as HTMLInputElement).value
+                    page = 1
+                    handle.update()
+                  })}
+                />
+
+                {filtered.length === 0 && (
+                  <p mix={css({ margin: 0, fontSize: '13px', color: '#888' })}>No friends match "{search}".</p>
+                )}
+
+                <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
+                  {friends.map((friend) => (
+                    <label
+                      key={friend.id}
+                      mix={css({ display: visibleIds.has(friend.id) ? 'block' : 'none' })}
+                    >
+                      <input type="checkbox" name="friend_ids" value={String(friend.id)} /> {friend.label}
+                    </label>
+                  ))}
+                </div>
+
+                {totalPages > 1 && (
+                  <div mix={css({ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' })}>
+                    <button
+                      type="button"
+                      disabled={page <= 1}
+                      mix={on('click', () => {
+                        page = Math.max(1, page - 1)
+                        handle.update()
+                      })}
+                    >
+                      ← Prev
+                    </button>
+                    <span mix={css({ color: '#888' })}>
+                      Page {page} of {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={page >= totalPages}
+                      mix={on('click', () => {
+                        page = Math.min(totalPages, page + 1)
+                        handle.update()
+                      })}
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
+            <p mix={sectionLabel}>Filters (optional)</p>
             <div
               mix={css({
-                display: mode === 'group' ? 'flex' : 'none',
-                flexDirection: 'column',
-                gap: '8px',
-                paddingLeft: '24px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+                gap: '12px',
               })}
             >
-              <input
-                type="text"
-                placeholder="Search friends…"
-                value={search}
-                mix={on('input', (event) => {
-                  search = (event.target as HTMLInputElement).value
-                  page = 1
-                  handle.update()
-                })}
-              />
-
-              {filtered.length === 0 && (
-                <p mix={css({ margin: 0, fontSize: '13px', color: '#888' })}>No friends match "{search}".</p>
-              )}
-
-              <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
-                {friends.map((friend) => (
-                  <label
-                    key={friend.id}
-                    mix={css({ display: visibleIds.has(friend.id) ? 'block' : 'none' })}
-                  >
-                    <input type="checkbox" name="friend_ids" value={String(friend.id)} /> {friend.label}
-                  </label>
-                ))}
-              </div>
-
-              {totalPages > 1 && (
-                <div mix={css({ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' })}>
-                  <button
-                    type="button"
-                    disabled={page <= 1}
-                    mix={on('click', () => {
-                      page = Math.max(1, page - 1)
-                      handle.update()
-                    })}
-                  >
-                    ← Prev
-                  </button>
-                  <span mix={css({ color: '#888' })}>
-                    Page {page} of {totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={page >= totalPages}
-                    mix={on('click', () => {
-                      page = Math.min(totalPages, page + 1)
-                      handle.update()
-                    })}
-                  >
-                    Next →
-                  </button>
-                </div>
-              )}
+              <label mix={stackedField}>
+                Genre
+                <select name="genre" defaultValue="">
+                  <option value="">Any</option>
+                  {genres.map((genre) => (
+                    <option key={genre} value={genre}>
+                      {genre.replace(/^./, (c) => c.toUpperCase())}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label mix={stackedField}>
+                Decade
+                <select name="decade" defaultValue="">
+                  <option value="">Any</option>
+                  {DECADES.map((decade) => (
+                    <option key={decade} value={String(decade)}>
+                      {decade}s
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label mix={stackedField}>
+                Length
+                <select name="length" defaultValue="">
+                  <option value="">Any</option>
+                  <option value="short">Under 90 min</option>
+                  <option value="medium">90–150 min</option>
+                  <option value="long">Over 150 min</option>
+                </select>
+              </label>
             </div>
-          )}
-
-          <div mix={css({ display: 'flex', gap: '8px', flexWrap: 'wrap' })}>
-            <label>
-              Genre{' '}
-              <select name="genre" defaultValue="">
-                <option value="">Any</option>
-                {genres.map((genre) => (
-                  <option key={genre} value={genre}>
-                    {genre.replace(/^./, (c) => c.toUpperCase())}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Decade{' '}
-              <select name="decade" defaultValue="">
-                <option value="">Any</option>
-                {DECADES.map((decade) => (
-                  <option key={decade} value={String(decade)}>
-                    {decade}s
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Length{' '}
-              <select name="length" defaultValue="">
-                <option value="">Any</option>
-                <option value="short">Under 90 min</option>
-                <option value="medium">90–150 min</option>
-                <option value="long">Over 150 min</option>
-              </select>
-            </label>
           </div>
 
           <button type="submit" disabled={submitting}>
