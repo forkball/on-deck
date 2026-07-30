@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { GenerateRecommendationsForm } from '../../assets/generate-recommendations-form.tsx'
+import { MediaTypeFab } from '../../assets/media-type-fab.tsx'
 import { MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
@@ -61,6 +62,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       <Document title="Recommendations | On Deck">
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
+          <MediaTypeFab />
           <h1>Recommendations</h1>
           <p mix={css({ color: '#555' })}>
             Rewrites your taste profile from what you've logged, then asks Claude for movies to try next.
