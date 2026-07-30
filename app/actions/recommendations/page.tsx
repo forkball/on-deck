@@ -14,8 +14,8 @@ export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
   runsFromOthers: RecommendationRunSummary[]
   friends: User[]
-  movieGenres: string[]
-  tvGenres: string[]
+  mediaType: 'movie' | 'tv'
+  genres: string[]
   displayName: string
 }
 
@@ -45,8 +45,7 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
               })}
             >
               <a href={routes.recommendations.show.href({ runId: String(run.id) })}>
-                <strong>{date}</strong> — {run.groupLabel}{' '}
-                <span mix={css({ fontSize: '12px', color: '#888' })}>({run.mediaType === 'tv' ? 'TV' : 'Movies'})</span>
+                <strong>{date}</strong> — {run.groupLabel}
               </a>
             </li>
           )
@@ -58,22 +57,28 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
 
 export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
-    const { runs, runsFromOthers, friends, movieGenres, tvGenres, displayName } = handle.props
+    const { runs, runsFromOthers, friends, mediaType, genres, displayName } = handle.props
+    const recsHref = routes.recommendations.index.href()
 
     return (
       <Document title="Recommendations | On Deck">
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          <MediaTypeFab />
+          <MediaTypeFab
+            current={mediaType}
+            movieHref={`${recsHref}?mediaType=movie`}
+            tvHref={`${recsHref}?mediaType=tv`}
+          />
           <h1>Recommendations</h1>
           <p mix={css({ color: '#555' })}>
-            Rewrites your taste profile from what you've logged, then asks Claude for picks to try next.
+            Rewrites your {mediaType === 'tv' ? 'TV' : 'movie'} taste profile from what you've logged, then asks
+            Claude for picks to try next.
           </p>
 
           <GenerateRecommendationsForm
             friends={friends.map((friend) => ({ id: friend.id, label: displayLabel(friend) }))}
-            movieGenres={movieGenres}
-            tvGenres={tvGenres}
+            mediaType={mediaType}
+            genres={genres}
             generateHref={routes.recommendations.generate.href()}
             findPeopleHref={routes.users.search.href()}
           />
@@ -92,13 +97,13 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             <h2>Past recommendations</h2>
             {runs.length > 0 && (
               <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
-                Only your {MAX_RUNS_PER_USER} most recent runs are kept per media type — generating a new movie run
-                only removes the oldest movie run, and likewise for TV.
+                Only your {MAX_RUNS_PER_USER} most recent {mediaType === 'tv' ? 'TV' : 'movie'} runs are kept —
+                generating a new one removes the oldest.
               </p>
             )}
             {runs.length === 0 ? (
               <p>
-                Nothing yet — log a few movies on your{' '}
+                Nothing yet — log a few {mediaType === 'tv' ? 'TV shows' : 'movies'} on your{' '}
                 <a href={routes.profile.index.href()}>profile page</a>, then get recommendations above.
               </p>
             ) : (

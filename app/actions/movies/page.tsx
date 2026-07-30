@@ -51,7 +51,11 @@ export function MoviesSearchPage(handle: Handle<MoviesSearchPageProps>) {
             padding: "32px 24px",
           })}
         >
-          <MediaTypeFab />
+          <MediaTypeFab
+            current="movie"
+            movieHref={routes.movies.search.href()}
+            tvHref={query ? `${routes.tv.search.href()}?q=${encodeURIComponent(query)}` : routes.tv.search.href()}
+          />
           <h1 mix={css({ margin: "0 0 16px" })}>Search movies</h1>
           {message && <p mix={css({ color: "#15803d" })}>{message}</p>}
           <MovieSearchForm
