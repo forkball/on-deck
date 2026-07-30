@@ -4,9 +4,9 @@ import { css } from 'remix/ui'
 import type { listUserMovieLog } from '../../data/movies.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
+import { Modal } from '../../ui/components/modal.tsx'
 import { MovieLogEditModal } from '../../ui/components/movie-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
-import { stackedLabel } from '../../ui/components/styles.ts'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 
 export interface ProfilePageProps {
@@ -39,24 +39,41 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           {saved && <p mix={css({ color: '#15803d' })}>Saved.</p>}
 
           <h2>Bio</h2>
-          <p mix={css({ margin: '-8px 0 12px', fontSize: '13px', color: '#888' })}>
-            Just for other people to read — it has no effect on your recommendations.
-          </p>
-          <form
-            method="post"
-            action={routes.profile.updateBio.href()}
-            mix={css({ display: 'flex', flexDirection: 'column', gap: '8px' })}
+          <div
+            mix={css({
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              gap: '16px',
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              padding: '16px',
+            })}
           >
-            <input type="hidden" name="_method" value="PUT" />
-            <label mix={stackedLabel}>
-              <textarea name="bio" rows={3} defaultValue={bio} placeholder="Tell people a bit about yourself…" />
-            </label>
-            <button type="submit" mix={css({ alignSelf: 'flex-start' })}>
-              Save bio
-            </button>
-          </form>
+            {bio ? (
+              <p mix={css({ margin: 0, whiteSpace: 'pre-wrap' })}>{bio}</p>
+            ) : (
+              <p mix={css({ margin: 0, color: '#555' })}>
+                Nothing yet — just for other people to read, it has no effect on your recommendations.
+              </p>
+            )}
+            <Modal id="edit-bio" triggerLabel="Edit" title="Edit your bio">
+              <form
+                method="post"
+                action={routes.profile.updateBio.href()}
+                mix={css({ display: 'flex', flexDirection: 'column', gap: '8px' })}
+              >
+                <input type="hidden" name="_method" value="PUT" />
+                <textarea name="bio" rows={4} defaultValue={bio} placeholder="Tell people a bit about yourself…" />
+                <p mix={css({ margin: 0, fontSize: '12px', color: '#888' })}>
+                  Just for other people to read — it has no effect on your recommendations.
+                </p>
+                <button type="submit">Save bio</button>
+              </form>
+            </Modal>
+          </div>
 
-          <details open mix={css({ marginTop: '24px' })}>
+          <details mix={css({ marginTop: '24px' })}>
             <summary mix={css({ cursor: 'pointer' })}>
               <h2 mix={css({ display: 'inline' })}>My taste profile</h2>
             </summary>
