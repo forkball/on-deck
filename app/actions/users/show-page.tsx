@@ -6,6 +6,7 @@ import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
+import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 
@@ -43,27 +44,27 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
 
           {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
 
-          <details open mix={css({ marginTop: '24px' })}>
-            <summary mix={css({ cursor: 'pointer' })}>
-              <h2 mix={css({ display: 'inline' })}>{label}'s taste profile</h2>
-            </summary>
-            <div
-              mix={css({
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                padding: '16px',
-                marginTop: '12px',
-              })}
-            >
-              {summary ? (
-                <p mix={css({ margin: 0 })}>{summary}</p>
-              ) : (
-                <p mix={css({ margin: 0, color: '#555' })}>Nothing written yet.</p>
-              )}
-            </div>
-          </details>
+          <MediaTabs idPrefix="user-profile">
+            <details mix={css({ marginBottom: '24px' })}>
+              <summary mix={css({ cursor: 'pointer' })}>
+                <h2 mix={css({ display: 'inline' })}>{label}'s taste profile</h2>
+              </summary>
+              <div
+                mix={css({
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  marginTop: '12px',
+                })}
+              >
+                {summary ? (
+                  <p mix={css({ margin: 0 })}>{summary}</p>
+                ) : (
+                  <p mix={css({ margin: 0, color: '#555' })}>Nothing written yet.</p>
+                )}
+              </div>
+            </details>
 
-          <section mix={css({ marginTop: '40px' })}>
             <h2>What {label} has watched</h2>
             {movieLog.length === 0 ? (
               <p>Nothing logged yet.</p>
@@ -94,7 +95,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
                 )}
               </>
             )}
-          </section>
+          </MediaTabs>
         </main>
       </Document>
     )
