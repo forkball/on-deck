@@ -212,18 +212,9 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             )}
           </div>
 
-          <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
-            <p mix={sectionLabel}>What are you getting picks for?</p>
-            <input type="hidden" name="mediaType" value={mediaType} />
-            <p mix={css({ margin: 0, fontSize: '14px' })}>
-              {mediaType === 'tv' ? 'TV' : 'Movies'}{' '}
-              <span mix={css({ fontSize: '13px', color: '#888' })}>— switch with the tabs above.</span>
-            </p>
-            <label mix={css({ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '13px', color: '#aaa' })}>
-              <input type="checkbox" disabled />
-              Mix movies + TV in one run <span mix={css({ fontStyle: 'italic' })}>(coming soon)</span>
-            </label>
-          </div>
+          {/* Which type this run is for is set by the page's tabs, not here
+              — carried through as a hidden field so the POST still says so. */}
+          <input type="hidden" name="mediaType" value={mediaType} />
 
           <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
             <p mix={sectionLabel}>Filters (optional)</p>
@@ -264,6 +255,19 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 </select>
               </label>
             </div>
+            <label
+              mix={css({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                marginTop: '12px',
+                fontSize: '13px',
+                color: '#aaa',
+              })}
+            >
+              <input type="checkbox" disabled />
+              Mix movies + TV in one run <span mix={css({ fontStyle: 'italic' })}>(coming soon)</span>
+            </label>
           </div>
 
           <button type="submit" disabled={submitting}>
