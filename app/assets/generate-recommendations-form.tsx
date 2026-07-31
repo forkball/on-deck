@@ -12,11 +12,6 @@ export type GenerateRecommendationsFormProps = {
   // as a hidden field.
   mediaType: 'movie' | 'tv'
   genres: string[]
-  // Genres that exist for both movies and TV — used while "Mix" is on, so
-  // a chosen genre can actually match either type. (Movie "science fiction"
-  // and TV "sci-fi & fantasy" are different strings on TMDB, so the union
-  // would silently make a mixed run single-type.)
-  mixedGenres: string[]
   generateHref: string
   findPeopleHref: string
 }
@@ -60,13 +55,11 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let submitting = false
     let thinkingIndex = 0
     let mode: 'self' | 'group' = 'self'
-    let mixed = false
     let search = ''
     let page = 1
 
     return () => {
-      const { friends, mediaType, genres: singleTypeGenres, mixedGenres, generateHref, findPeopleHref } = handle.props
-      const genres = mixed ? mixedGenres : singleTypeGenres
+      const { friends, mediaType, genres, generateHref, findPeopleHref } = handle.props
 
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
@@ -245,7 +238,8 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               ))}
             </div>
             <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
-              Defaults to the type you're on. Pick another to cross over — e.g. movies chosen from your TV taste.
+              You'll still get {mediaType === 'tv' ? 'TV' : 'movie'} picks — this only changes which taste they're
+              drawn from. Liked Breaking Bad? Base movie picks on your TV taste.
             </p>
           </div>
 
@@ -288,32 +282,6 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 </select>
               </label>
             </div>
-            <label
-              mix={css({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                marginTop: '12px',
-                fontSize: '13px',
-                color: '#555',
-              })}
-            >
-              <input
-                type="checkbox"
-                name="mix"
-                value="1"
-                mix={on('change', (event) => {
-                  mixed = (event.target as HTMLInputElement).checked
-                  handle.update()
-                })}
-              />
-              Mix movies + TV in one run
-            </label>
-            {mixed && (
-              <p mix={css({ margin: '6px 0 0', fontSize: '12px', color: '#888' })}>
-                Genres are limited to ones that exist for both movies and TV.
-              </p>
-            )}
           </div>
 
           <button type="submit" disabled={submitting}>

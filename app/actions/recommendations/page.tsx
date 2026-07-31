@@ -16,8 +16,6 @@ export interface RecommendationsPageProps {
   friends: User[]
   mediaType: 'movie' | 'tv'
   genres: string[]
-  // Genres valid for both movies and TV, used when the "Mix" filter is on.
-  mixedGenres: string[]
   displayName: string
 }
 
@@ -48,9 +46,6 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
             >
               <a href={routes.recommendations.show.href({ runId: String(run.id) })}>
                 <strong>{date}</strong> — {run.groupLabel}
-                {run.mediaType === 'mixed' && (
-                  <span mix={css({ fontSize: '12px', color: '#888' })}> · Movies + TV</span>
-                )}
               </a>
             </li>
           )
@@ -62,7 +57,7 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
 
 export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
-    const { runs, runsFromOthers, friends, mediaType, genres, mixedGenres, displayName } = handle.props
+    const { runs, runsFromOthers, friends, mediaType, genres, displayName } = handle.props
     const recsHref = routes.recommendations.index.href()
 
     return (
@@ -84,7 +79,6 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             friends={friends.map((friend) => ({ id: friend.id, label: displayLabel(friend) }))}
             mediaType={mediaType}
             genres={genres}
-            mixedGenres={mixedGenres}
             generateHref={routes.recommendations.generate.href()}
             findPeopleHref={routes.users.search.href()}
           />

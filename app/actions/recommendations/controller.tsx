@@ -26,7 +26,6 @@ import { RecommendationRunPage } from './run-page.tsx'
 const generateSchema = f.object({
   mode: f.field(s.union([s.literal('self'), s.literal('group')])),
   mediaType: f.field(s.defaulted(s.union([s.literal('movie'), s.literal('tv')]), 'movie')),
-  mix: f.field(s.defaulted(s.string(), '')),
   genre: f.field(s.defaulted(s.string(), '')),
   decade: f.field(s.defaulted(s.string(), '')),
   length: f.field(s.defaulted(s.string(), '')),
@@ -60,11 +59,8 @@ export default createController(routes.recommendations, {
       // Filtered to match the FAB's current type — otherwise a TV run would
       // show up in the list while the form above it is set to generate
       // movies, which reads as inconsistent.
-      // Mixed runs contain both types, so they belong in either tab's list
-      // rather than being hidden from both.
-      const matchesTab = (type: string) => type === mediaType || type === 'mixed'
-      const runs = allRuns.filter((run) => matchesTab(run.mediaType))
-      const runsFromOthers = allRunsFromOthers.filter((run) => matchesTab(run.mediaType))
+      const runs = allRuns.filter((run) => run.mediaType === mediaType)
+      const runsFromOthers = allRunsFromOthers.filter((run) => run.mediaType === mediaType)
 
       return context.render(
         <RecommendationsPage
@@ -73,7 +69,6 @@ export default createController(routes.recommendations, {
           friends={friends}
           mediaType={mediaType}
           genres={mediaType === 'tv' ? TV_GENRES : MOVIE_GENRES}
-          mixedGenres={MOVIE_GENRES.filter((genre) => TV_GENRES.includes(genre))}
           displayName={displayLabel(auth.identity)}
         />,
       )
@@ -117,9 +112,7 @@ export default createController(routes.recommendations, {
         auth.identity.id,
         [auth.identity.id, ...friendIds],
         filters,
-        // The "Mix movies + TV" checkbox overrides the tab's type — the run
-        // spans both, and each pick carries its own type.
-        parsed.value.mix ? 'mixed' : parsed.value.mediaType,
+        parsed.value.mediaType,
         sourceTypes,
       )
 
