@@ -17,6 +17,7 @@ export interface RecommendationsPageProps {
   mediaType: 'movie' | 'tv'
   genres: string[]
   displayName: string
+  error?: string
 }
 
 function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
@@ -65,7 +66,7 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
 
 export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
-    const { runs, runsFromOthers, friends, mediaType, genres, displayName } = handle.props
+    const { runs, runsFromOthers, friends, mediaType, genres, displayName, error } = handle.props
     const recsHref = routes.recommendations.index.href()
 
     return (
@@ -82,6 +83,20 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             Rewrites your {mediaType === 'tv' ? 'TV' : 'movie'} taste profile from what you've logged, then asks
             Claude for picks to try next.
           </p>
+
+          {error && (
+            <p
+              mix={css({
+                margin: '0 0 16px',
+                padding: '12px 16px',
+                border: '1px solid #b91c1c',
+                borderRadius: '8px',
+                color: '#b91c1c',
+              })}
+            >
+              {error}
+            </p>
+          )}
 
           <GenerateRecommendationsForm
             friends={friends.map((friend) => ({ id: friend.id, label: displayLabel(friend) }))}

@@ -6,15 +6,18 @@ import { Session } from 'remix/session'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
+import type { Db } from '../../data/db.ts'
 import { listFollowedUsers } from '../../data/follows.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { getRememberedMediaType } from '../../middleware/mediaType.ts'
 import {
+  findMembersMissingSourceLogs,
   generateRecommendations,
   getRecommendationRun,
   listRecommendationRuns,
   listRecommendationRunsFromOthers,
+  MEDIA_NOUNS,
   type RecommendationFilters,
 } from '../../data/recommendations.ts'
 import { MOVIE_GENRES, TV_GENRES } from '../../data/tmdb.ts'
@@ -31,6 +34,28 @@ const generateSchema = f.object({
   length: f.field(s.defaulted(s.string(), '')),
   name: f.field(s.defaulted(s.string(), '')),
 })
+
+// Everything the index page needs, fetched from plain (db, user) rather than
+// a request context so the generate action can re-render that same page when
+// it rejects a run — see the missing-logs guard below.
+async function loadIndexData(db: Db, user: User, mediaType: 'movie' | 'tv') {
+  const [allRuns, allRunsFromOthers, friends] = await Promise.all([
+    listRecommendationRuns(db, user.id),
+    listRecommendationRunsFromOthers(db, user.id),
+    listFollowedUsers(db, user.id),
+  ])
+
+  return {
+    // Filtered to match the current tab — otherwise a TV run would show up
+    // in the list while the form above it is set to generate movies, which
+    // reads as inconsistent.
+    runs: allRuns.filter((run) => run.mediaType === mediaType),
+    runsFromOthers: allRunsFromOthers.filter((run) => run.mediaType === mediaType),
+    friends,
+    genres: mediaType === 'tv' ? TV_GENRES : MOVIE_GENRES,
+    displayName: displayLabel(user),
+  }
+}
 
 export default createController(routes.recommendations, {
   middleware: [requireAuth<User>()],
@@ -53,24 +78,16 @@ export default createController(routes.recommendations, {
       context.get(Session).set('mediaType', mediaType)
 
       const db = context.get(Database)
-      const allRuns = await listRecommendationRuns(db, auth.identity.id)
-      const allRunsFromOthers = await listRecommendationRunsFromOthers(db, auth.identity.id)
-      const friends = await listFollowedUsers(db, auth.identity.id)
-
-      // Filtered to match the FAB's current type — otherwise a TV run would
-      // show up in the list while the form above it is set to generate
-      // movies, which reads as inconsistent.
-      const runs = allRuns.filter((run) => run.mediaType === mediaType)
-      const runsFromOthers = allRunsFromOthers.filter((run) => run.mediaType === mediaType)
+      const data = await loadIndexData(db, auth.identity, mediaType)
 
       return context.render(
         <RecommendationsPage
-          runs={runs}
-          runsFromOthers={runsFromOthers}
-          friends={friends}
+          runs={data.runs}
+          runsFromOthers={data.runsFromOthers}
+          friends={data.friends}
           mediaType={mediaType}
-          genres={mediaType === 'tv' ? TV_GENRES : MOVIE_GENRES}
-          displayName={displayLabel(auth.identity)}
+          genres={data.genres}
+          displayName={data.displayName}
         />,
       )
     },
@@ -108,12 +125,48 @@ export default createController(routes.recommendations, {
         .filter((value): value is 'movie' | 'tv' => value === 'movie' || value === 'tv')
 
       const db = context.get(Database)
+      const memberIds = [auth.identity.id, ...friendIds]
+      // MediaType widens to string through the table row types, so narrow
+      // once here rather than at each use below.
+      const mediaType: 'movie' | 'tv' = parsed.value.mediaType === 'tv' ? 'tv' : 'movie'
+      // Mirrors the default inside generateRecommendations, so the guard
+      // below checks the same profiles the run would actually be built from.
+      const profileTypes = sourceTypes.length > 0 ? sourceTypes : [mediaType]
+
+      // An empty log yields an empty taste profile, which generates picks
+      // that silently ignore that person. Refuse the run instead.
+      const missing = await findMembersMissingSourceLogs(db, memberIds, profileTypes)
+      if (missing.length > 0) {
+        const detail = missing
+          .map(({ userId, label, missing: types }) => {
+            const nouns = types.map((type) => MEDIA_NOUNS[type]).join(' or ')
+            return userId === auth.identity.id
+              ? `you have no ${nouns} logged`
+              : `${label} has no ${nouns} logged`
+          })
+          .join(', and ')
+        const data = await loadIndexData(db, auth.identity, mediaType)
+
+        return context.render(
+          <RecommendationsPage
+            runs={data.runs}
+            runsFromOthers={data.runsFromOthers}
+            friends={data.friends}
+            mediaType={mediaType}
+            genres={data.genres}
+            displayName={data.displayName}
+            error={`Can't generate this run — ${detail}. Everyone included needs something logged for each taste you're basing picks on.`}
+          />,
+          { status: 400 },
+        )
+      }
+
       const { runId, prunedOldestRun } = await generateRecommendations(
         db,
         auth.identity.id,
-        [auth.identity.id, ...friendIds],
+        memberIds,
         filters,
-        parsed.value.mediaType,
+        mediaType,
         sourceTypes,
         parsed.value.name,
       )

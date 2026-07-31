@@ -3,7 +3,7 @@ import { and, eq, inList } from 'remix/data-table'
 import { claude, parseStructuredResponse } from './claude.ts'
 import type { Db } from './db.ts'
 import { isFollowing } from './follows.ts'
-import { upsertMediaItem, type MediaType } from './mediaCatalog.ts'
+import { countUserMediaLog, upsertMediaItem, type MediaType } from './mediaCatalog.ts'
 import { createNotification } from './notifications.ts'
 import {
   mediaItems,
@@ -20,7 +20,9 @@ import { getMovieById, getTvShowById, searchMovies, searchTv, type TmdbSearchRes
 import { regenerateTasteProfile } from './tasteProfile.ts'
 import { displayLabel } from './users.ts'
 
-const MEDIA_NOUNS: Record<MediaType, string> = {
+// Exported so callers can name a media type in user-facing copy (e.g. the
+// "nothing logged" error) without keeping a second list in sync.
+export const MEDIA_NOUNS: Record<MediaType, string> = {
   movie: 'movies',
   tv: 'TV shows',
   book: 'books',
@@ -283,6 +285,41 @@ export interface GenerateRecommendationsOutcome {
   // Whether generating this run pushed the user over MAX_RUNS_PER_USER and
   // caused their oldest run to be deleted.
   prunedOldestRun: boolean
+}
+
+export interface MissingSourceLogs {
+  userId: number
+  label: string
+  // The requested source types this person has nothing logged under.
+  missing: MediaType[]
+}
+
+// Finds anyone in a proposed run who has an empty log for one of the taste
+// profiles the run would be based on. regenerateTasteProfile happily returns
+// an empty profile in that case, so without this the run still generates —
+// it just quietly ignores that person, and a "group" pick ends up reflecting
+// only whoever actually had logs. Callers block generation on a non-empty
+// result rather than producing something that only looks personalized.
+export async function findMembersMissingSourceLogs(
+  db: Db,
+  memberUserIds: number[],
+  sourceTypes: MediaType[],
+): Promise<MissingSourceLogs[]> {
+  const checked = await Promise.all(
+    memberUserIds.map(async (memberId) => {
+      const [user, counts] = await Promise.all([
+        db.find(users, memberId),
+        Promise.all(sourceTypes.map((type) => countUserMediaLog(db, memberId, type))),
+      ])
+      return {
+        userId: memberId,
+        label: user ? displayLabel(user) : `User ${memberId}`,
+        missing: sourceTypes.filter((_, index) => counts[index] === 0),
+      }
+    }),
+  )
+
+  return checked.filter((entry) => entry.missing.length > 0)
 }
 
 // Generates one indexed, dated run of picks and returns its id — history is
