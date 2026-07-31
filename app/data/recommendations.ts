@@ -228,11 +228,37 @@ export interface RecommendationRunSummary {
   createdAt: number
   groupLabel: string
   mediaType: MediaType
+  name: string | null
+}
+
+// The levers used to generate a run, as shown back on its detail page.
+// sourceTypes always has at least one entry — old runs (generated before
+// this was tracked) fall back to [mediaType] in parseParams below.
+export interface GenerationParams {
+  genre?: string
+  decade?: number
+  length?: RecommendationLength
+  sourceTypes: MediaType[]
 }
 
 export interface RecommendationRunDetail extends RecommendationRunSummary {
   otherMemberLabels: string[]
   results: RecommendationResult[]
+  params: GenerationParams
+}
+
+function parseParams(run: RecommendationRun): GenerationParams {
+  try {
+    const parsed = JSON.parse(run.params) as Partial<GenerationParams>
+    return {
+      genre: parsed.genre,
+      decade: parsed.decade,
+      length: parsed.length,
+      sourceTypes: parsed.sourceTypes && parsed.sourceTypes.length > 0 ? parsed.sourceTypes : [run.media_type],
+    }
+  } catch {
+    return { sourceTypes: [run.media_type] }
+  }
 }
 
 // Every other member's display label, relative to `viewerId` — not
@@ -273,6 +299,8 @@ export async function generateRecommendations(
   // being generated — "recommend me movies based on my TV taste" is a
   // legitimate ask. Defaults to matching the output type.
   sourceTypes?: MediaType[],
+  // Optional user-given label for the run, e.g. "Cozy weekend picks".
+  name?: string,
 ): Promise<GenerateRecommendationsOutcome> {
   const profileTypes: MediaType[] = sourceTypes && sourceTypes.length > 0 ? sourceTypes : [mediaType]
 
@@ -363,7 +391,18 @@ export async function generateRecommendations(
 
   const run = await db.create(
     recommendationRuns,
-    { user_id: requestingUserId, media_type: mediaType, created_at: Date.now() },
+    {
+      user_id: requestingUserId,
+      media_type: mediaType,
+      created_at: Date.now(),
+      name: name?.trim() || undefined,
+      params: JSON.stringify({
+        genre: filters.genre,
+        decade: filters.decade,
+        length: filters.length,
+        sourceTypes: profileTypes,
+      } satisfies GenerationParams),
+    },
     { returnRow: true },
   )
 
@@ -511,6 +550,7 @@ export async function listRecommendationRuns(db: Db, userId: number): Promise<Re
       createdAt: run.created_at,
       groupLabel: await buildGroupLabel(db, userId, run),
       mediaType: run.media_type,
+      name: run.name,
     })),
   )
 }
@@ -551,6 +591,7 @@ export async function listRecommendationRunsFromOthers(db: Db, userId: number): 
       createdAt: run.created_at,
       groupLabel: await buildGroupLabel(db, userId, run),
       mediaType: run.media_type,
+      name: run.name,
     })),
   )
 }
@@ -574,9 +615,19 @@ export async function getRecommendationRun(
 
   const groupLabel = await buildGroupLabel(db, userId, run)
   const otherMemberLabels = await listOtherMemberLabels(db, userId, run)
+  const params = parseParams(run)
   const rows = await db.findMany(userRecommendations, { where: { run_id: runId }, orderBy: ['rank', 'asc'] })
   if (rows.length === 0) {
-    return { id: run.id, createdAt: run.created_at, groupLabel, mediaType: run.media_type, otherMemberLabels, results: [] }
+    return {
+      id: run.id,
+      createdAt: run.created_at,
+      groupLabel,
+      mediaType: run.media_type,
+      name: run.name,
+      otherMemberLabels,
+      results: [],
+      params,
+    }
   }
 
   const mediaItemIds = rows.map((row) => row.media_item_id)
@@ -610,5 +661,14 @@ export async function getRecommendationRun(
     })
   }
 
-  return { id: run.id, createdAt: run.created_at, groupLabel, mediaType: run.media_type, otherMemberLabels, results }
+  return {
+    id: run.id,
+    createdAt: run.created_at,
+    groupLabel,
+    mediaType: run.media_type,
+    name: run.name,
+    otherMemberLabels,
+    results,
+    params,
+  }
 }

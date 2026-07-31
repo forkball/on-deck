@@ -45,7 +45,15 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
               })}
             >
               <a href={routes.recommendations.show.href({ runId: String(run.id) })}>
-                <strong>{date}</strong> — {run.groupLabel}
+                {run.name ? (
+                  <>
+                    <strong>{run.name}</strong> — {date}
+                  </>
+                ) : (
+                  <>
+                    <strong>{date}</strong> — {run.groupLabel}
+                  </>
+                )}
               </a>
             </li>
           )

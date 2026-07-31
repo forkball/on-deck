@@ -29,6 +29,7 @@ const generateSchema = f.object({
   genre: f.field(s.defaulted(s.string(), '')),
   decade: f.field(s.defaulted(s.string(), '')),
   length: f.field(s.defaulted(s.string(), '')),
+  name: f.field(s.defaulted(s.string(), '')),
 })
 
 export default createController(routes.recommendations, {
@@ -114,6 +115,7 @@ export default createController(routes.recommendations, {
         filters,
         parsed.value.mediaType,
         sourceTypes,
+        parsed.value.name,
       )
 
       const href = routes.recommendations.show.href({ runId: String(runId) })

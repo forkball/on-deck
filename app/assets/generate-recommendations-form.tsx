@@ -118,6 +118,11 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             }),
           ]}
         >
+          <label mix={stackedField}>
+            Name this run (optional)
+            <input type="text" name="name" placeholder="e.g. Cozy weekend picks" />
+          </label>
+
           <div>
             <p mix={sectionLabel}>Who's this for?</p>
             <div mix={css({ display: 'flex', gap: '20px' })}>

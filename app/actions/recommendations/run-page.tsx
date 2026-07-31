@@ -1,12 +1,35 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { RecommendationRunDetail } from '../../data/recommendations.ts'
+import type { GenerationParams, RecommendationRunDetail } from '../../data/recommendations.ts'
+import type { MediaType } from '../../data/mediaCatalog.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { parseMovieMetadata } from '../../utils/mediaMetadata.ts'
 import { STATUS_LABELS } from '../../utils/status.ts'
+
+const SOURCE_LABELS: Record<MediaType, string> = {
+  movie: 'Movie taste',
+  tv: 'TV taste',
+  book: 'Book taste',
+  comic: 'Comic taste',
+  game: 'Game taste',
+}
+
+const LENGTH_LABELS: Record<NonNullable<GenerationParams['length']>, string> = {
+  short: 'Under 90 min',
+  medium: '90–150 min',
+  long: 'Over 150 min',
+}
+
+function describeParams(params: GenerationParams): string[] {
+  const lines: string[] = [`Based on: ${params.sourceTypes.map((type) => SOURCE_LABELS[type]).join(', ')}`]
+  if (params.genre) lines.push(`Genre: ${params.genre.replace(/^./, (c) => c.toUpperCase())}`)
+  if (params.decade != null) lines.push(`Decade: ${params.decade}s`)
+  if (params.length) lines.push(`Length: ${LENGTH_LABELS[params.length]}`)
+  return lines
+}
 
 export interface RecommendationRunPageProps {
   run: RecommendationRunDetail
@@ -23,9 +46,10 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
       day: 'numeric',
     })
     const forLabel = ['you', ...run.otherMemberLabels].join(', ')
+    const paramLines = describeParams(run.params)
 
     return (
-      <Document title={`Recommendations for ${forLabel} | On Deck`}>
+      <Document title={`${run.name || `Recommendations for ${forLabel}`} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
           <p>
@@ -36,8 +60,12 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
               You can keep up to 3 recommendation runs at a time, so your oldest one was removed.
             </p>
           )}
-          <h1>Recommendations for {forLabel}</h1>
-          <p mix={css({ color: '#555' })}>{date}</p>
+          <h1>{run.name || `Recommendations for ${forLabel}`}</h1>
+          <p mix={css({ color: '#555' })}>
+            {date}
+            {run.name && ` — Recommendations for ${forLabel}`}
+          </p>
+          <p mix={css({ color: '#888', fontSize: '13px' })}>{paramLines.join(' · ')}</p>
 
           <ul
             mix={css({

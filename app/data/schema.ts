@@ -89,6 +89,15 @@ export const recommendationRuns = table({
     // recommendations.ts.
     media_type: c.enum(['movie', 'tv', 'book', 'comic', 'game']).notNull(),
     created_at: c.integer().notNull(),
+    // Optional user-given label (e.g. "Cozy weekend picks") — falls back to
+    // the date in the UI when unset.
+    name: c.text(),
+    // JSON string of the levers used to generate this run: { genre?, decade?,
+    // length?, sourceTypes }. Kept alongside the run so its detail page can
+    // show exactly what was asked for, even after taste profiles/filters
+    // used elsewhere have since changed. See GenerationParams in
+    // recommendations.ts.
+    params: c.text().notNull().default('{}'),
   },
 })
 
