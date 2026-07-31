@@ -10,8 +10,6 @@ import { Nav } from '../components/nav.tsx'
 export interface FollowListPageProps {
   title: string
   heading: string
-  backHref: string
-  backLabel: string
   users: User[]
   // The viewer's own follow-state for each listed user — gates whether their
   // name links to a profile (you can only view profiles of people you
@@ -27,16 +25,12 @@ export interface FollowListPageProps {
 // results, just sourced from a follow list instead of a name search.
 export function FollowListPage(handle: Handle<FollowListPageProps>) {
   return () => {
-    const { title, heading, backHref, backLabel, users, followingByUserId, emptyMessage, returnTo, displayName } =
-      handle.props
+    const { title, heading, users, followingByUserId, emptyMessage, returnTo, displayName } = handle.props
 
     return (
       <Document title={`${title} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <p>
-            <a href={backHref}>{backLabel}</a>
-          </p>
           <h1>{heading}</h1>
 
           {users.length === 0 ? (

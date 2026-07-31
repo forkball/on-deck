@@ -110,8 +110,6 @@ export default createController(routes.profile, {
         <FollowListPage
           title="Following"
           heading="Following"
-          backHref={routes.profile.index.href()}
-          backLabel="← My profile"
           users={users}
           followingByUserId={new Map(users.map((u) => [u.id, followingIds.has(u.id)]))}
           emptyMessage="You're not following anyone yet."
@@ -133,8 +131,6 @@ export default createController(routes.profile, {
         <FollowListPage
           title="Followers"
           heading="Followers"
-          backHref={routes.profile.index.href()}
-          backLabel="← My profile"
           users={users}
           followingByUserId={new Map(users.map((u) => [u.id, followingIds.has(u.id)]))}
           emptyMessage="No one follows you yet."

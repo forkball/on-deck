@@ -104,9 +104,6 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
       <Document title={`${label} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <p>
-            <a href={routes.users.search.href()}>← Back to search</a>
-          </p>
           <h1>{label}</h1>
           <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
             <a href={routes.users.following.href({ userId: String(user.id) })}>{followingCount} following</a> ·{' '}

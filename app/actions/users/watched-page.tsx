@@ -33,9 +33,6 @@ export function UserWatchedPage(handle: Handle<UserWatchedPageProps>) {
       <Document title={`What ${label} has watched (${noun}) | On Deck`}>
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <p>
-            <a href={routes.users.show.href({ userId: String(user.id) })}>← Back to {label}'s profile</a>
-          </p>
           <h1>
             What {label} has watched ({noun})
           </h1>

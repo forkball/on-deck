@@ -52,9 +52,6 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
       <Document title={`${run.name || `Recommendations for ${forLabel}`} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          <p>
-            <a href={routes.recommendations.index.href()}>← All recommendations</a>
-          </p>
           {prunedOldestRun && (
             <p mix={css({ color: '#15803d' })}>
               You can keep up to 3 recommendation runs at a time, so your oldest one was removed.

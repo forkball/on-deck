@@ -29,9 +29,6 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
       <Document title={`${heading} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <p>
-            <a href={routes.profile.index.href()}>← Back to profile</a>
-          </p>
           <h1>{heading}</h1>
 
           <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>

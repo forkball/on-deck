@@ -34,9 +34,6 @@ export function MovieDetailPage(handle: Handle<MovieDetailPageProps>) {
       <Document title={`${item.title} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          <p>
-            <a href={from || routes.movies.search.href()}>← Back</a>
-          </p>
           {rematched && (
             <p mix={css({ color: '#2a7' })}>
               {merged

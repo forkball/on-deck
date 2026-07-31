@@ -21,9 +21,6 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
       <Document title="Import from Letterboxd | On Deck">
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <p>
-            <a href={routes.profile.index.href()}>← My profile</a>
-          </p>
           <h1>Import from Letterboxd</h1>
 
           {result ? (
