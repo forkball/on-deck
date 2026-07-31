@@ -239,7 +239,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             </div>
             <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
               You'll still get {mediaType === 'tv' ? 'TV' : 'movie'} picks — this only changes which taste they're
-              drawn from. Liked Breaking Bad? Base movie picks on your TV taste.
+              drawn from.
             </p>
           </div>
 
