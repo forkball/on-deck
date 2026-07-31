@@ -80,13 +80,21 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         color: '#888',
       })
 
+      // DoodleCSS sets `.doodle label { display: inline-block }` outside any
+      // @layer, which always outranks a mix-generated class regardless of
+      // its own specificity — so `display: flex` on the label itself gets
+      // silently ignored. Target the field directly instead: a block-level
+      // child always starts on its own line after preceding text, no matter
+      // what the label's own display is. See stackedLabel in
+      // ui/components/styles.ts for the same fix (can't import it here —
+      // the asset server only bundles files under app/assets/**).
       const stackedField = css({
         display: 'flex',
         flexDirection: 'column',
         gap: '4px',
         fontSize: '13px',
         color: '#555',
-        '& select': { width: '100%' },
+        '& select, & input': { display: 'block', width: '100%' },
       })
 
       return (
