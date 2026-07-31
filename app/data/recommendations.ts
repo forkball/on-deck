@@ -20,12 +20,21 @@ import { getMovieById, getTvShowById, searchMovies, searchTv, type TmdbSearchRes
 import { regenerateTasteProfile } from './tasteProfile.ts'
 import { displayLabel } from './users.ts'
 
-const MEDIA_NOUNS: Record<MediaType, string> = {
+// A run can target one media type, or deliberately span movies + TV
+// ('mixed'), where every pick carries its own type.
+export type RunMediaType = MediaType | 'mixed'
+
+const MEDIA_NOUNS: Record<RunMediaType, string> = {
   movie: 'movies',
   tv: 'TV shows',
   book: 'books',
   comic: 'comics',
   game: 'games',
+  mixed: 'movies and TV shows',
+}
+
+function toTasteSummary(profile: { summary: string; liked_tags: string[]; disliked_tags: string[] }): TasteSummary {
+  return { summary: profile.summary, liked_tags: profile.liked_tags, disliked_tags: profile.disliked_tags }
 }
 
 function searchForType(mediaType: MediaType, query: string): Promise<TmdbSearchResult[]> {
@@ -36,38 +45,62 @@ function lookupForType(mediaType: MediaType, externalId: string): Promise<TmdbSe
   return mediaType === 'tv' ? getTvShowById(externalId) : getMovieById(externalId)
 }
 
-interface MemberProfile {
-  label: string
+interface TasteSummary {
   summary: string
   liked_tags: string[]
   disliked_tags: string[]
 }
 
-const PICKS_SCHEMA = {
-  type: 'object' as const,
-  additionalProperties: false,
-  properties: {
-    picks: {
-      type: 'array' as const,
-      items: {
-        type: 'object' as const,
-        additionalProperties: false,
-        properties: {
-          title: { type: 'string' as const },
-          year: { type: 'number' as const },
-          reason: { type: 'string' as const },
-        },
-        required: ['title', 'year', 'reason'],
+interface MemberProfile extends TasteSummary {
+  label: string
+}
+
+// When picks are based on more than one taste profile, each member's
+// profiles stay separate and labeled by type, so Claude can reason about
+// "this person's movie taste vs their TV taste" rather than being handed
+// one blurred-together profile.
+interface MultiSourceMemberProfile {
+  label: string
+  [sourceLabel: string]: TasteSummary | string
+}
+
+// Built per-run rather than fixed: a mixed run additionally requires each
+// pick to declare whether it's a movie or a TV show, since that decides
+// which TMDB endpoint resolves it. Structured-output schemas are strict
+// (additionalProperties: false), so the field can't just be optional —
+// it's present and required only when it's actually meaningful.
+function buildPicksSchema(mixed: boolean) {
+  const properties: Record<string, unknown> = {
+    title: { type: 'string' as const },
+    year: { type: 'number' as const },
+    reason: { type: 'string' as const },
+  }
+  const required = ['title', 'year', 'reason']
+
+  if (mixed) {
+    properties.type = { type: 'string' as const, enum: ['movie', 'tv'] }
+    required.push('type')
+  }
+
+  return {
+    type: 'object' as const,
+    additionalProperties: false,
+    properties: {
+      picks: {
+        type: 'array' as const,
+        items: { type: 'object' as const, additionalProperties: false, properties, required },
       },
     },
-  },
-  required: ['picks'],
+    required: ['picks'],
+  }
 }
 
 interface Pick {
   title: string
   year: number
   reason: string
+  // Only present on mixed runs — see buildPicksSchema.
+  type?: 'movie' | 'tv'
 }
 
 const TARGET_COUNT = 10
@@ -166,18 +199,23 @@ const VERIFY_SCHEMA = {
 // both. Only the plot itself can — so this asks Claude, which already knows
 // what it meant by each pick, to confirm against the actual TMDB overview.
 // One batched call for the whole list rather than one per pick.
-async function verifyPicksAgainstOverviews(
-  candidates: { pick: Pick; match: TmdbSearchResult }[],
-  mediaType: MediaType = 'movie',
-): Promise<{ pick: Pick; match: TmdbSearchResult }[]> {
+async function verifyPicksAgainstOverviews<candidate extends { pick: Pick; match: TmdbSearchResult; type: MediaType }>(
+  candidates: candidate[],
+  mediaType: RunMediaType = 'movie',
+): Promise<candidate[]> {
   if (candidates.length === 0) return []
 
   const noun = MEDIA_NOUNS[mediaType]
   const entryNoun = mediaType === 'tv' ? 'show' : 'entry'
 
-  const items = candidates.map(({ pick, match }, index) => ({
+  const items = candidates.map(({ pick, match, type }, index) => ({
     index,
-    you_suggested: { title: pick.title, year: pick.year, your_reason: pick.reason },
+    you_suggested: {
+      title: pick.title,
+      year: pick.year,
+      your_reason: pick.reason,
+      ...(mediaType === 'mixed' ? { kind: type === 'tv' ? 'TV show' : 'movie' } : {}),
+    },
     tmdb_found: { title: match.title, year: match.releaseYear, overview: match.overview },
   }))
 
@@ -211,7 +249,7 @@ export interface RecommendationRunSummary {
   id: number
   createdAt: number
   groupLabel: string
-  mediaType: MediaType
+  mediaType: RunMediaType
 }
 
 export interface RecommendationRunDetail extends RecommendationRunSummary {
@@ -252,49 +290,69 @@ export async function generateRecommendations(
   requestingUserId: number,
   memberUserIds: number[],
   filters: RecommendationFilters = {},
-  mediaType: MediaType = 'movie',
+  mediaType: RunMediaType = 'movie',
+  // Which taste profile(s) the picks are based on. Independent of what's
+  // being generated — "recommend me movies based on my TV taste" is a
+  // legitimate ask. Defaults to matching the output type.
+  sourceTypes?: MediaType[],
 ): Promise<GenerateRecommendationsOutcome> {
+  const isMixed = mediaType === 'mixed'
+  const profileTypes: MediaType[] =
+    sourceTypes && sourceTypes.length > 0 ? sourceTypes : isMixed ? ['movie', 'tv'] : [mediaType]
+
   // Independent per member — regenerate every profile (and fetch their name) concurrently.
-  // Scoped to mediaType: cross-media taste mixing is an explicit, not-yet-
-  // built opt-in (see the disabled "Mix" checkbox on the generate form), so
-  // a movie run only ever sees this member's movie log/profile, never TV.
   const members = await Promise.all(
     memberUserIds.map(async (memberId) => {
-      const [profile, user] = await Promise.all([
-        regenerateTasteProfile(db, memberId, mediaType),
+      const [regenerated, user] = await Promise.all([
+        Promise.all(profileTypes.map((type) => regenerateTasteProfile(db, memberId, type))),
         db.find(users, memberId),
       ])
-      return { profile, label: user ? displayLabel(user) : `User ${memberId}` }
+      return { regenerated, label: user ? displayLabel(user) : `User ${memberId}` }
     }),
   )
 
-  const profiles: MemberProfile[] = members.map(({ profile, label }) => ({ label, ...profile }))
+  const profiles: MemberProfile[] | MultiSourceMemberProfile[] =
+    profileTypes.length === 1
+      ? members.map(({ regenerated, label }) => ({ label, ...toTasteSummary(regenerated[0]) }))
+      : members.map(({ regenerated, label }) => ({
+          label,
+          ...Object.fromEntries(
+            profileTypes.map((type, i) => [`${MEDIA_NOUNS[type]}_taste`, toTasteSummary(regenerated[i])]),
+          ),
+        }))
 
   const excludedTitles: string[] = []
   const excludedExternalIds = new Set<string>()
-  for (const { profile } of members) {
-    for (const { interaction, item } of profile.log) {
-      if (interaction.status !== 'consumed') continue
-      if (item?.title) excludedTitles.push(item.title)
-      if (item?.external_id) excludedExternalIds.add(item.external_id)
+  for (const { regenerated } of members) {
+    for (const profile of regenerated) {
+      for (const { interaction, item } of profile.log) {
+        if (interaction.status !== 'consumed') continue
+        if (item?.title) excludedTitles.push(item.title)
+        if (item?.external_id) excludedExternalIds.add(item.external_id)
+      }
     }
   }
 
-  const picks = await requestPicks(profiles, excludedTitles, filters, mediaType)
+  const picks = await requestPicks(profiles, excludedTitles, filters, mediaType, profileTypes)
+
+  // On a mixed run each pick says whether it's a movie or a show, which
+  // decides the TMDB endpoint; on a single-type run they're all that type.
+  const pickTypes: MediaType[] = picks.map((pick) => (isMixed ? (pick.type === 'tv' ? 'tv' : 'movie') : mediaType))
 
   // Independent lookups — resolve every pick against TMDB concurrently, then
   // apply dedup/matching/verification over the results in order.
-  const matchesByPick = await Promise.all(picks.map((pick) => searchForType(mediaType, pick.title)))
+  const matchesByPick = await Promise.all(picks.map((pick, i) => searchForType(pickTypes[i], pick.title)))
 
   // Deliberately not capped at TARGET_COUNT here — verifyPicksAgainstOverviews
   // below drops some of these too, so the same over-request slack that
   // covers dedup/filter misses needs to reach verification as well, or a
   // verification drop would under-fill the run instead of just consuming
   // slack that was already budgeted for exactly this.
-  const candidates: { pick: Pick; match: TmdbSearchResult }[] = []
+  const candidates: { pick: Pick; match: TmdbSearchResult; type: MediaType }[] = []
   const seenExternalIds = new Set<string>()
 
   for (const [i, pick] of picks.entries()) {
+    const pickType = pickTypes[i]
     const matches = matchesByPick[i]
     if (matches.length === 0) continue
 
@@ -304,7 +362,10 @@ export async function generateRecommendations(
         (a, b) => Math.abs((a.releaseYear ?? 0) - pick.year) - Math.abs((b.releaseYear ?? 0) - pick.year),
       )[0]
 
-    if (excludedExternalIds.has(match.externalId) || seenExternalIds.has(match.externalId)) continue
+    // Keyed by type too — TMDB ids are only unique within an endpoint, so
+    // a movie and a show can legitimately share one.
+    const dedupKey = `${pickType}:${match.externalId}`
+    if (excludedExternalIds.has(match.externalId) || seenExternalIds.has(dedupKey)) continue
     if (!titlesLikelyMatch(pick.title, match.title)) continue
     if (filters.genre && !match.tags.includes(filters.genre)) continue
     if (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade)) continue
@@ -313,12 +374,12 @@ export async function generateRecommendations(
     // when a length lever is actually set, so picks that don't need it never
     // pay for the extra TMDB round trip.
     if (filters.length) {
-      const detail = await lookupForType(mediaType, match.externalId)
+      const detail = await lookupForType(pickType, match.externalId)
       if (!detail || !matchesLength(detail.runtimeMinutes, filters.length)) continue
     }
 
-    seenExternalIds.add(match.externalId)
-    candidates.push({ pick, match })
+    seenExternalIds.add(dedupKey)
+    candidates.push({ pick, match, type: pickType })
   }
 
   // Title similarity can't tell two different films apart when they share
@@ -327,8 +388,8 @@ export async function generateRecommendations(
   const verified = await verifyPicksAgainstOverviews(candidates, mediaType)
 
   const results: RecommendationResult[] = []
-  for (const { pick, match } of verified.slice(0, TARGET_COUNT)) {
-    const item = await upsertMediaItem(db, mediaType, match)
+  for (const { pick, match, type } of verified.slice(0, TARGET_COUNT)) {
+    const item = await upsertMediaItem(db, type, match)
     results.push({ item, tags: match.tags, reason: pick.reason, status: null })
   }
 
@@ -387,7 +448,7 @@ async function notifyMutualFollowers(
 // because the combined total crossed the cap. Returns whether anything was
 // deleted. Relies on recommendation_run_members and user_recommendations
 // cascading on delete of the run row.
-async function pruneOldRuns(db: Db, userId: number, mediaType: MediaType): Promise<boolean> {
+async function pruneOldRuns(db: Db, userId: number, mediaType: RunMediaType): Promise<boolean> {
   const runs = await db.findMany(recommendationRuns, {
     where: { user_id: userId, media_type: mediaType },
     orderBy: ['created_at', 'asc'],
@@ -410,18 +471,38 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string): 
 }
 
 async function requestPicks(
-  profiles: MemberProfile[],
+  profiles: MemberProfile[] | MultiSourceMemberProfile[],
   excludedTitles: string[],
   filters: RecommendationFilters = {},
-  mediaType: MediaType = 'movie',
+  mediaType: RunMediaType = 'movie',
+  sourceTypes: MediaType[] = ['movie'],
 ): Promise<Pick[]> {
   const isGroup = profiles.length > 1
+  const isMixed = mediaType === 'mixed'
   const noun = MEDIA_NOUNS[mediaType]
+  // Mixed runs need each pick tagged, and shouldn't quietly collapse into
+  // one type — the whole point is a slate spanning both.
+  const mixedInstructions = isMixed
+    ? ` Return a genuine mix of movies and TV shows rather than leaning entirely on one, and tag every pick ` +
+      `with its "type" ("movie" or "tv").`
+    : ''
+  // Spelled out only when the source profiles aren't simply "the thing
+  // being recommended" — otherwise it's noise.
+  const sourceNouns = sourceTypes.map((type) => MEDIA_NOUNS[type])
+  const sourcesDifferFromOutput = isMixed
+    ? sourceTypes.length !== 2
+    : sourceTypes.length !== 1 || sourceTypes[0] !== mediaType
+  const sourceInstructions = sourcesDifferFromOutput
+    ? ` Base these on their ${sourceNouns.join(' and ')} taste profile(s) above — that's deliberate, so carry ` +
+      `the sensibility across even though you're recommending ${noun}.`
+    : sourceTypes.length > 1
+      ? ` Each person has a separate profile per type above; weigh all of them.`
+      : ''
   // Hard filters (see generateRecommendations) drop some picks after the
   // fact, so ask for more up front to still land near TARGET_COUNT.
   const hasFilters = filters.genre != null || filters.decade != null || filters.length != null
   const requestedCount = hasFilters ? REQUESTED_COUNT + 10 : REQUESTED_COUNT
-  const filterInstructions = buildFilterInstructions(filters, noun)
+  const filterInstructions = buildFilterInstructions(filters, noun) + mixedInstructions + sourceInstructions
 
   const prompt = isGroup
     ? `Group of ${profiles.length} people, each with their own ${noun} taste profile:\n${JSON.stringify(profiles, null, 2)}\n\n` +
@@ -442,7 +523,7 @@ async function requestPicks(
     max_tokens: (isGroup ? 8000 : 4000) + (hasFilters ? 2000 : 0),
     output_config: {
       effort: isGroup ? 'high' : 'medium',
-      format: { type: 'json_schema', schema: PICKS_SCHEMA },
+      format: { type: 'json_schema', schema: buildPicksSchema(isMixed) },
     },
     messages: [
       {

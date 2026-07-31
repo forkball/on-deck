@@ -83,8 +83,11 @@ export const recommendationRuns = table({
     user_id: c.integer().notNull().references('users', 'id'), // the requester
     // Which catalog this run's picks were matched against — the MAX_RUNS_PER_USER
     // cap (see recommendations.ts) is scoped per media_type, so generating a
-    // TV run never prunes an older movie run and vice versa.
-    media_type: c.enum(['movie', 'tv', 'book', 'comic', 'game']).notNull(),
+    // TV run never prunes an older movie run and vice versa. 'mixed' is its
+    // own bucket: a run that deliberately spans movies + TV, where each pick
+    // carries its own type. The column is plain text in Postgres (no CHECK),
+    // so widening this enum needs no migration.
+    media_type: c.enum(['movie', 'tv', 'book', 'comic', 'game', 'mixed']).notNull(),
     created_at: c.integer().notNull(),
   },
 })

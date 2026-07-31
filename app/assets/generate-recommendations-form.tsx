@@ -12,11 +12,20 @@ export type GenerateRecommendationsFormProps = {
   // as a hidden field.
   mediaType: 'movie' | 'tv'
   genres: string[]
+  // Genres that exist for both movies and TV — used while "Mix" is on, so
+  // a chosen genre can actually match either type. (Movie "science fiction"
+  // and TV "sci-fi & fantasy" are different strings on TMDB, so the union
+  // would silently make a mixed run single-type.)
+  mixedGenres: string[]
   generateHref: string
   findPeopleHref: string
 }
 
 const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
+
+// Taste profiles that don't exist yet — shown so the picker reads as
+// "more coming" rather than movies/TV being the permanent ceiling.
+const PLACEHOLDER_SOURCES = ['Games', 'Books', 'Comics']
 
 // Cycled through on the submit button while a run is generating, so the wait
 // reads as progress rather than a stall.
@@ -51,11 +60,13 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let submitting = false
     let thinkingIndex = 0
     let mode: 'self' | 'group' = 'self'
+    let mixed = false
     let search = ''
     let page = 1
 
     return () => {
-      const { friends, mediaType, genres, generateHref, findPeopleHref } = handle.props
+      const { friends, mediaType, genres: singleTypeGenres, mixedGenres, generateHref, findPeopleHref } = handle.props
+      const genres = mixed ? mixedGenres : singleTypeGenres
 
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
@@ -217,6 +228,28 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
           <input type="hidden" name="mediaType" value={mediaType} />
 
           <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
+            <p mix={sectionLabel}>Base picks on</p>
+            <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
+              <label>
+                <input type="checkbox" name="source" value="movie" defaultChecked={mediaType === 'movie'} /> Movie
+                taste
+              </label>
+              <label>
+                <input type="checkbox" name="source" value="tv" defaultChecked={mediaType === 'tv'} /> TV taste
+              </label>
+              {PLACEHOLDER_SOURCES.map((label) => (
+                <label key={label} mix={css({ color: '#aaa' })}>
+                  <input type="checkbox" disabled /> {label}{' '}
+                  <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
+                </label>
+              ))}
+            </div>
+            <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
+              Defaults to the type you're on. Pick another to cross over — e.g. movies chosen from your TV taste.
+            </p>
+          </div>
+
+          <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
             <p mix={sectionLabel}>Filters (optional)</p>
             <div
               mix={css({
@@ -262,12 +295,25 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 gap: '6px',
                 marginTop: '12px',
                 fontSize: '13px',
-                color: '#aaa',
+                color: '#555',
               })}
             >
-              <input type="checkbox" disabled />
-              Mix movies + TV in one run <span mix={css({ fontStyle: 'italic' })}>(coming soon)</span>
+              <input
+                type="checkbox"
+                name="mix"
+                value="1"
+                mix={on('change', (event) => {
+                  mixed = (event.target as HTMLInputElement).checked
+                  handle.update()
+                })}
+              />
+              Mix movies + TV in one run
             </label>
+            {mixed && (
+              <p mix={css({ margin: '6px 0 0', fontSize: '12px', color: '#888' })}>
+                Genres are limited to ones that exist for both movies and TV.
+              </p>
+            )}
           </div>
 
           <button type="submit" disabled={submitting}>
