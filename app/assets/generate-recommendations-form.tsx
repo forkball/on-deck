@@ -217,9 +217,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             <input type="hidden" name="mediaType" value={mediaType} />
             <p mix={css({ margin: 0, fontSize: '14px' })}>
               {mediaType === 'tv' ? 'TV' : 'Movies'}{' '}
-              <span mix={css({ fontSize: '13px', color: '#888' })}>
-                — switch with the picker in the bottom-right corner.
-              </span>
+              <span mix={css({ fontSize: '13px', color: '#888' })}>— switch with the tabs above.</span>
             </p>
             <label mix={css({ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '13px', color: '#aaa' })}>
               <input type="checkbox" disabled />

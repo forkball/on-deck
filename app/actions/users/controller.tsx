@@ -96,7 +96,7 @@ export default createController(routes.users, {
       const totalWatched = await countUserMovieLog(db, userId, 'movie')
 
       const tvProfile = await getTasteProfile(db, userId, 'tv')
-      const tvLog = await listUserMediaLog(db, userId, { type: 'tv' })
+      const tvLog = await listUserMediaLog(db, userId, { limit: RECENT_COUNT, type: 'tv' })
       const totalTv = await countUserMediaLog(db, userId, 'tv')
 
       const followingCount = await countFollowing(db, userId)
@@ -129,17 +129,19 @@ export default createController(routes.users, {
       if (target instanceof Response) return target
 
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
-      const totalWatched = await countUserMovieLog(db, userId, 'movie')
-      const movieLog = await listUserMovieLog(db, userId, {
+      const mediaType = context.url.searchParams.get('type') === 'tv' ? 'tv' : 'movie'
+      const totalWatched = await countUserMediaLog(db, userId, mediaType)
+      const movieLog = await listUserMediaLog(db, userId, {
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
-        type: 'movie',
+        type: mediaType,
       })
 
       return context.render(
         <UserWatchedPage
           user={target}
           movieLog={movieLog}
+          mediaType={mediaType}
           page={page}
           totalPages={Math.max(1, Math.ceil(totalWatched / PAGE_SIZE))}
           displayName={displayLabel(auth.identity)}

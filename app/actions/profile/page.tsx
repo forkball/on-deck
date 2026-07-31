@@ -193,6 +193,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                   log={tvLog}
                   total={totalTv}
                   detailHref={(id) => `${routes.tv.show.href({ mediaItemId: String(id) })}?from=${encodeURIComponent(profileHref)}`}
+                  seeAllHref={`${routes.profile.watched.href()}?type=tv`}
                   emptyHref={routes.tv.search.href()}
                   emptyLabel="search for a TV show"
                   returnTo={savedReturnTo}

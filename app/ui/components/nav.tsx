@@ -32,7 +32,7 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
             <ProfileMenu
               displayName={displayName || 'My Profile'}
               links={[
-                { href: routes.movies.search.href(), label: 'Media' },
+                { href: routes.media.href(), label: 'Media' },
                 { href: routes.users.search.href(), label: 'People' },
                 { href: routes.recommendations.index.href(), label: 'Recommendations' },
                 { href: routes.profile.index.href(), label: 'Profile' },

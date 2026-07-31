@@ -6,7 +6,7 @@ import type {
   MovieResult,
 } from "../../data/movies.ts";
 import { routes } from "../../routes.ts";
-import { MediaTypeFab } from "../../assets/media-type-fab.tsx";
+import { MediaTabLinks } from "../../ui/components/media-tab-links.tsx";
 import { MovieSearchForm } from "../../assets/movie-search-form.tsx";
 import { Document } from "../../ui/components/document.tsx";
 import { FloatingDropdown } from "../../ui/components/floating-dropdown.tsx";
@@ -51,7 +51,7 @@ export function MoviesSearchPage(handle: Handle<MoviesSearchPageProps>) {
             padding: "32px 24px",
           })}
         >
-          <MediaTypeFab
+          <MediaTabLinks
             current="movie"
             movieHref={routes.movies.search.href()}
             tvHref={query ? `${routes.tv.search.href()}?q=${encodeURIComponent(query)}` : routes.tv.search.href()}

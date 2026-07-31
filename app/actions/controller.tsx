@@ -1,8 +1,10 @@
 import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
+import { redirect } from 'remix/response/redirect'
 
 import { assetServer } from '../assets.ts'
 import { displayLabel } from '../data/users.ts'
+import { getRememberedMediaType } from '../middleware/mediaType.ts'
 import { routes } from '../routes.ts'
 import { HomePage } from '../ui/pages/home-page.tsx'
 
@@ -21,6 +23,10 @@ export default createController(routes, {
           displayName={auth.ok ? displayLabel(auth.identity) : undefined}
         />,
       )
+    },
+    media(context) {
+      const mediaType = getRememberedMediaType(context)
+      return redirect(mediaType === 'tv' ? routes.tv.search.href() : routes.movies.search.href(), 303)
     },
   },
 })
