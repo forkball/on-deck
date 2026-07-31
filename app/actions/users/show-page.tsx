@@ -31,7 +31,7 @@ function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>)
     const { label, summary } = handle.props
 
     return (
-      <details mix={css({ marginBottom: '24px' })}>
+      <details>
         <summary mix={css({ cursor: 'pointer' })}>
           <h2 mix={css({ display: 'inline' })}>{label}</h2>
         </summary>
