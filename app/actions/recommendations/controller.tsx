@@ -2,12 +2,14 @@ import * as s from 'remix/data-schema'
 import * as f from 'remix/data-schema/form-data'
 import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
+import { Session } from 'remix/session'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import { listFollowedUsers } from '../../data/follows.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
+import { getRememberedMediaType } from '../../middleware/mediaType.ts'
 import {
   generateRecommendations,
   getRecommendationRun,
@@ -36,11 +38,18 @@ export default createController(routes.recommendations, {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
-      // Which media type this page is for comes from the URL (set by the
-      // media-type FAB, a plain navigation link) rather than client-side
-      // form state — so the right genre list is just server-rendered for
-      // that type instead of needing JS to swap it.
-      const mediaType = context.url.searchParams.get('mediaType') === 'tv' ? 'tv' : 'movie'
+      // Which media type this page is for: an explicit ?mediaType= (set by
+      // the FAB, a plain navigation link) wins; otherwise fall back to
+      // whichever type was last remembered from visiting Media, so landing
+      // here via the nav link (no query string) stays on the same type
+      // instead of always defaulting back to movies. Either way, remember
+      // it — so if you *did* pick a type here, the Media link picks it back
+      // up too. Server-rendered, not client state, so the right genre list
+      // just comes out right without needing JS to swap it.
+      const explicitMediaType = context.url.searchParams.get('mediaType')
+      const mediaType =
+        explicitMediaType === 'tv' || explicitMediaType === 'movie' ? explicitMediaType : getRememberedMediaType(context)
+      context.get(Session).set('mediaType', mediaType)
 
       const db = context.get(Database)
       const allRuns = await listRecommendationRuns(db, auth.identity.id)

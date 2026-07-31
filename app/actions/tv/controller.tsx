@@ -15,6 +15,7 @@ import { rematchTvShow, searchAndImportTv, upsertTvShow } from '../../data/tv.ts
 import { getTvShowById, parseTmdbId, searchTv } from '../../data/tmdb.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
+import { rememberMediaType } from '../../middleware/mediaType.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { parseRatingInput } from '../../utils/stars.ts'
@@ -37,7 +38,7 @@ const logSchema = f.object({
 })
 
 export default createController(routes.tv, {
-  middleware: [requireAuth<User>()],
+  middleware: [requireAuth<User>(), rememberMediaType('tv')],
   actions: {
     async search(context) {
       const db = context.get(Database)

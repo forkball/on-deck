@@ -139,6 +139,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
                   log={tvLog}
                   total={totalTv}
                   detailHref={(id) => `${routes.tv.show.href({ mediaItemId: String(id) })}?from=${encodeURIComponent(returnTo)}`}
+                  seeAllHref={`${routes.users.watched.href({ userId: String(user.id) })}?type=tv`}
                 />
               </>
             }

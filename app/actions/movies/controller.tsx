@@ -18,6 +18,7 @@ import {
 import { getMovieById, parseTmdbId, searchMovies } from '../../data/tmdb.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
+import { rememberMediaType } from '../../middleware/mediaType.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { parseRatingInput } from '../../utils/stars.ts'
@@ -40,7 +41,7 @@ const logSchema = f.object({
 })
 
 export default createController(routes.movies, {
-  middleware: [requireAuth<User>()],
+  middleware: [requireAuth<User>(), rememberMediaType('movie')],
   actions: {
     async search(context) {
       const db = context.get(Database)

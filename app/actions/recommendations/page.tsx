@@ -2,7 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { GenerateRecommendationsForm } from '../../assets/generate-recommendations-form.tsx'
-import { MediaTypeFab } from '../../assets/media-type-fab.tsx'
+import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
@@ -64,7 +64,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       <Document title="Recommendations | On Deck">
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          <MediaTypeFab
+          <MediaTabLinks
             current={mediaType}
             movieHref={`${recsHref}?mediaType=movie`}
             tvHref={`${recsHref}?mediaType=tv`}

@@ -1,7 +1,7 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-// Mirrors the media types offered in media-type-fab.tsx — movies and TV are
+// Mirrors the media types offered in media-tab-links.tsx — movies and TV are
 // wired up, the rest are placeholders so this reads as "more coming" rather
 // than movies+TV being the only media types the app will ever support.
 const PLACEHOLDER_MEDIA_TYPES = ['games', 'books', 'comics'] as const

@@ -3,6 +3,10 @@ import { del, form, get, put, post, route } from 'remix/routes'
 export const routes = route({
   assets: get('/assets/*path'),
   home: '/',
+  // The nav's "Media" link — redirects to /movies/search or /tv/search
+  // based on whichever type the user was last looking at (see
+  // middleware/mediaType.ts), so it doesn't always bounce back to movies.
+  media: get('media'),
   auth: route('auth', {
     signup: form('signup'),
     login: form('login'),

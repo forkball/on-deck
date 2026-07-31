@@ -36,11 +36,8 @@ export default createController(routes.profile, {
       const movieLog = await listUserMovieLog(db, auth.identity.id, { limit: RECENT_COUNT, type: 'movie' })
       const totalWatched = await countUserMovieLog(db, auth.identity.id, 'movie')
 
-      // No dedicated "see all TV" page yet (unlike movies' /profile/watched),
-      // so this shows the whole log rather than a capped preview with no way
-      // to see the rest.
       const tvProfile = await getTasteProfile(db, auth.identity.id, 'tv')
-      const tvLog = await listUserMediaLog(db, auth.identity.id, { type: 'tv' })
+      const tvLog = await listUserMediaLog(db, auth.identity.id, { limit: RECENT_COUNT, type: 'tv' })
       const totalTv = await countUserMediaLog(db, auth.identity.id, 'tv')
 
       const followingCount = await countFollowing(db, auth.identity.id)
@@ -82,16 +79,18 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
-      const totalWatched = await countUserMovieLog(db, auth.identity.id, 'movie')
-      const movieLog = await listUserMovieLog(db, auth.identity.id, {
+      const mediaType = context.url.searchParams.get('type') === 'tv' ? 'tv' : 'movie'
+      const totalWatched = await countUserMediaLog(db, auth.identity.id, mediaType)
+      const movieLog = await listUserMediaLog(db, auth.identity.id, {
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
-        type: 'movie',
+        type: mediaType,
       })
 
       return context.render(
         <ProfileWatchedPage
           movieLog={movieLog}
+          mediaType={mediaType}
           page={page}
           totalPages={Math.max(1, Math.ceil(totalWatched / PAGE_SIZE))}
           displayName={displayLabel(auth.identity)}

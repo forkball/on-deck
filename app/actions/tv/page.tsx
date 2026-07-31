@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import type { getUserInteractionForItem } from '../../data/mediaCatalog.ts'
 import type { TvResult } from '../../data/tv.ts'
 import { routes } from '../../routes.ts'
-import { MediaTypeFab } from '../../assets/media-type-fab.tsx'
+import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { MovieSearchForm } from '../../assets/movie-search-form.tsx'
 import { Document } from '../../ui/components/document.tsx'
 import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
@@ -36,7 +36,7 @@ export function TvSearchPage(handle: Handle<TvSearchPageProps>) {
       <Document title="Search TV | On Deck">
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          <MediaTypeFab
+          <MediaTabLinks
             current="tv"
             movieHref={query ? `${routes.movies.search.href()}?q=${encodeURIComponent(query)}` : routes.movies.search.href()}
             tvHref={routes.tv.search.href()}
