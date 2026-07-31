@@ -57,9 +57,12 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let mode: 'self' | 'group' = 'self'
     let search = ''
     let page = 1
+    let movieSource = handle.props.mediaType === 'movie'
+    let tvSource = handle.props.mediaType === 'tv'
 
     return () => {
       const { friends, mediaType, genres, generateHref, findPeopleHref } = handle.props
+      const hasSource = movieSource || tvSource
 
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
@@ -224,11 +227,30 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             <p mix={sectionLabel}>Base picks on</p>
             <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
               <label>
-                <input type="checkbox" name="source" value="movie" defaultChecked={mediaType === 'movie'} /> Movie
-                taste
+                <input
+                  type="checkbox"
+                  name="source"
+                  value="movie"
+                  checked={movieSource}
+                  mix={on('change', (event) => {
+                    movieSource = (event.target as HTMLInputElement).checked
+                    handle.update()
+                  })}
+                />{' '}
+                Movie taste
               </label>
               <label>
-                <input type="checkbox" name="source" value="tv" defaultChecked={mediaType === 'tv'} /> TV taste
+                <input
+                  type="checkbox"
+                  name="source"
+                  value="tv"
+                  checked={tvSource}
+                  mix={on('change', (event) => {
+                    tvSource = (event.target as HTMLInputElement).checked
+                    handle.update()
+                  })}
+                />{' '}
+                TV taste
               </label>
               {PLACEHOLDER_SOURCES.map((label) => (
                 <label key={label} mix={css({ color: '#aaa' })}>
@@ -237,10 +259,16 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 </label>
               ))}
             </div>
-            <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
-              You'll still get {mediaType === 'tv' ? 'TV' : 'movie'} picks — this only changes which taste they're
-              drawn from.
-            </p>
+            {hasSource ? (
+              <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
+                You'll still get {mediaType === 'tv' ? 'TV' : 'movie'} picks — this only changes which taste they're
+                drawn from.
+              </p>
+            ) : (
+              <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#b91c1c' })}>
+                Pick at least one taste to base picks on.
+              </p>
+            )}
           </div>
 
           <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
@@ -284,7 +312,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             </div>
           </div>
 
-          <button type="submit" disabled={submitting}>
+          <button type="submit" disabled={submitting || !hasSource}>
             {submitting ? THINKING_MESSAGES[thinkingIndex] : 'Get recommendations'}
           </button>
         </form>
