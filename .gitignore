@@ -4,3 +4,6 @@ db/app.db
 tmp/
 .DS_Store
 .env*
+# ...but the template carries no values and is the only record of which
+# variables the app needs, so it has to be tracked.
+!.env.example
