@@ -14,6 +14,11 @@ export async function getTasteProfile(db: Db, userId: number, mediaType: MediaTy
 
 export interface UpsertTasteProfileInput extends TasteProfileData {
   summary: string
+  // How many log entries the profile was written from. Stored so a later run
+  // can tell whether the log has changed without re-reading the model's work
+  // — see isProfileStale. Lives inside the existing JSON blob rather than a
+  // new column, which keeps this migration-free.
+  logCount?: number
 }
 
 export async function upsertTasteProfile(
@@ -24,7 +29,11 @@ export async function upsertTasteProfile(
 ): Promise<UserTasteProfile> {
   const existing = await getTasteProfile(db, userId, mediaType)
   const payload = {
-    profile: JSON.stringify({ liked_tags: data.liked_tags, disliked_tags: data.disliked_tags }),
+    profile: JSON.stringify({
+      liked_tags: data.liked_tags,
+      disliked_tags: data.disliked_tags,
+      logCount: data.logCount ?? 0,
+    }),
     summary: data.summary,
     updated_at: Date.now(),
   }
@@ -109,6 +118,85 @@ export async function regenerateTasteProfile(
   })
 
   const parsed = parseStructuredResponse<UpsertTasteProfileInput>(response)
-  await upsertTasteProfile(db, userId, mediaType, parsed)
+  await upsertTasteProfile(db, userId, mediaType, { ...parsed, logCount: log.length })
   return { ...parsed, log }
+}
+
+interface StoredProfile extends TasteProfileData {
+  logCount?: number
+}
+
+function parseStoredProfile(profile: UserTasteProfile): StoredProfile {
+  try {
+    const parsed = JSON.parse(profile.profile) as Partial<StoredProfile>
+    return {
+      liked_tags: parsed.liked_tags ?? [],
+      disliked_tags: parsed.disliked_tags ?? [],
+      logCount: parsed.logCount,
+    }
+  } catch {
+    return { liked_tags: [], disliked_tags: [] }
+  }
+}
+
+type LogEntry = Awaited<ReturnType<typeof listUserMediaLog>>[number]
+
+// Whether the log has moved since the profile was written.
+//
+// Two signals, because neither catches everything on its own. A timestamp
+// newer than the profile means something was logged or edited after it. A
+// different entry count means something was removed — deleting a row leaves
+// the remaining timestamps untouched, so a count is the only cheap way to
+// notice, and a profile describing fifty games you no longer have is exactly
+// as wrong as one missing your latest.
+//
+// Profiles written before logCount existed report undefined, which reads as
+// stale and regenerates once, filling it in.
+function isProfileStale(profile: UserTasteProfile | null, log: LogEntry[]): boolean {
+  if (!profile) return true
+
+  const stored = parseStoredProfile(profile)
+  if (stored.logCount !== log.length) return true
+
+  const generatedAt = Number(profile.updated_at)
+  return log.some((entry) => Number(entry.interaction.updated_at) > generatedAt)
+}
+
+export interface EnsuredTasteProfile extends RegeneratedTasteProfile {
+  // False when the stored profile was reused — the caller can report how much
+  // work it actually did.
+  regenerated: boolean
+}
+
+// The profile a recommendation run should use.
+//
+// Regenerating is a model call per member per source type, and a run repeats
+// it every single time even when nothing has been logged since — so the same
+// answer gets paid for again. This returns the stored profile untouched
+// unless the log has actually moved.
+//
+// The log itself is always read: it's a plain query, and the caller needs it
+// to exclude things already logged from the picks.
+export async function ensureTasteProfile(
+  db: Db,
+  userId: number,
+  mediaType: MediaType,
+): Promise<EnsuredTasteProfile> {
+  const [profile, log] = await Promise.all([
+    getTasteProfile(db, userId, mediaType),
+    listUserMediaLog(db, userId, { type: mediaType }),
+  ])
+
+  if (!isProfileStale(profile, log)) {
+    const stored = parseStoredProfile(profile!)
+    return {
+      summary: profile!.summary,
+      liked_tags: stored.liked_tags,
+      disliked_tags: stored.disliked_tags,
+      log,
+      regenerated: false,
+    }
+  }
+
+  return { ...(await regenerateTasteProfile(db, userId, mediaType)), regenerated: true }
 }

@@ -19,7 +19,7 @@ import {
   type RecommendationRun,
   type UserMediaInteraction,
 } from './schema.ts'
-import { regenerateTasteProfile } from './tasteProfile.ts'
+import { ensureTasteProfile } from './tasteProfile.ts'
 import { displayLabel } from './users.ts'
 
 // Exported so callers can name a media type in user-facing copy (e.g. the
@@ -473,12 +473,14 @@ export async function generateRecommendations(
 ): Promise<GenerateRecommendationsOutcome> {
   const profileTypes: MediaType[] = sourceTypes && sourceTypes.length > 0 ? sourceTypes : [mediaType]
 
-  // Independent per member — regenerate every profile (and fetch their name) concurrently.
+  // Independent per member — refresh every profile (and fetch their name)
+  // concurrently. Each one only costs a model call if that member's log has
+  // changed since it was last written; otherwise the stored profile is reused.
   onPhase('profiles')
   const members = await Promise.all(
     memberUserIds.map(async (memberId) => {
       const [regenerated, user] = await Promise.all([
-        Promise.all(profileTypes.map((type) => regenerateTasteProfile(db, memberId, type))),
+        Promise.all(profileTypes.map((type) => ensureTasteProfile(db, memberId, type))),
         db.find(users, memberId),
       ])
       return { regenerated, label: user ? displayLabel(user) : `User ${memberId}` }

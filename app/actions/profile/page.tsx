@@ -35,9 +35,11 @@ export interface ProfilePageProps {
   displayName: string
 }
 
-function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>) {
+function TasteProfileSummary(
+  handle: Handle<{ label: string; summary: string; updatedAt: number | null }>,
+) {
   return () => {
-    const { label, summary } = handle.props
+    const { label, summary, updatedAt } = handle.props
 
     return (
       <details>
@@ -46,7 +48,15 @@ function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>)
         </summary>
         <div mix={css({ border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginTop: '12px' })}>
           {summary ? (
-            <p mix={css({ margin: 0 })}>{summary}</p>
+            <>
+              <p mix={css({ margin: 0 })}>{summary}</p>
+              {updatedAt && (
+                <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
+                  Written from your log as it stood on {new Date(updatedAt).toLocaleDateString()}. It's
+                  rewritten next time you generate, if you've logged anything since.
+                </p>
+              )}
+            </>
           ) : (
             <p mix={css({ margin: 0, color: '#555' })}>
               Nothing yet — <a href={routes.recommendations.index.href()}>get recommendations</a> to have one
@@ -174,7 +184,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             panels={Object.fromEntries(
               enabledMediaTypes().map((type) => {
                 const ui = MEDIA_TYPE_UI[type]
-                const { summary, log, total } = media[type]
+                const { summary, profileUpdatedAt, log, total } = media[type]
                 const seeAllHref =
                   type === 'movie'
                     ? routes.profile.watched.href()
@@ -183,7 +193,11 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                 return [
                   type,
                   <>
-                    <TasteProfileSummary label={`My ${ui.attributive} taste profile`} summary={summary} />
+                    <TasteProfileSummary
+                      label={`My ${ui.attributive} taste profile`}
+                      summary={summary}
+                      updatedAt={profileUpdatedAt}
+                    />
                     {/* Each importer only understands one medium, so the
                         entry point lives on that medium's tab. */}
                     {IMPORT_LINKS[type] ? (

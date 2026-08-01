@@ -5,6 +5,11 @@ import { ACTIVE_MEDIA_TYPES, type ActiveMediaType } from '../utils/mediaTypes.ts
 
 export interface MediaTypeSummary {
   summary: string
+  // When the taste profile was last written, or null if there isn't one yet.
+  // Surfaced because profiles are no longer rewritten on every run — they're
+  // only refreshed when the log has moved, so how current one is stops being
+  // obvious from the fact that you just generated something.
+  profileUpdatedAt: number | null
   log: Awaited<ReturnType<typeof listUserMediaLog>>
   total: number
 }
@@ -33,7 +38,12 @@ export async function loadMediaSummaries(db: Db, userId: number, recentCount: nu
     const forType = logEntries.filter(({ item }) => item?.type === type)
     return [
       type,
-      { summary: profiles[index]?.summary ?? '', log: forType.slice(0, recentCount), total: forType.length },
+      {
+        summary: profiles[index]?.summary ?? '',
+        profileUpdatedAt: profiles[index] ? Number(profiles[index]!.updated_at) : null,
+        log: forType.slice(0, recentCount),
+        total: forType.length,
+      },
     ] as const
   })
 
