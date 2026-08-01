@@ -26,7 +26,6 @@ export const MEDIA_NOUNS: Record<MediaType, string> = {
   movie: 'movies',
   tv: 'TV shows',
   book: 'books',
-  comic: 'comics',
   game: 'games',
 }
 

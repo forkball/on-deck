@@ -23,8 +23,8 @@ export function HomePage(
         >
           <h1>On Deck</h1>
           <p>
-            A media taste profile for you (and your group) — movies, TV, comics,
-            books, and games — with a Claude-powered recommender that knows what
+            A media taste profile for you (and your group) — movies, TV, books,
+            and games — with a Claude-powered recommender that knows what
             you actually like.
           </p>
           {authed ? (

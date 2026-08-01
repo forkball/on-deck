@@ -7,7 +7,7 @@ export interface MediaMetadata {
   overview: string | null
   // Films and episodes. Null for media measured some other way.
   runtimeMinutes: number | null
-  // Books/comics — the length dimension that stands in for runtime.
+  // Books — the length dimension that stands in for runtime.
   pageCount: number | null
   // The person most associated with the work: director for film, creator
   // for TV, author for a book. One field rather than three, since only one

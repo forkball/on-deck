@@ -5,7 +5,7 @@ import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../u
 
 // Only movies and TV are wired up — the rest match the placeholders shown
 // in media-tabs.tsx (the profile page's tabs) so the two read the same.
-const PLACEHOLDER_TYPES = ['Games', 'Comics']
+const PLACEHOLDER_TYPES = ['Games']
 
 export interface MediaTabLinksProps {
   current: ActiveMediaType

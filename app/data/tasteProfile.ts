@@ -56,7 +56,6 @@ const MEDIA_NOUNS: Record<MediaType, string> = {
   movie: 'movie',
   tv: 'TV show',
   book: 'book',
-  comic: 'comic',
   game: 'game',
 }
 

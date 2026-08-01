@@ -42,7 +42,7 @@ export interface CatalogProvider {
 
 // Keyed by MediaType. Note MediaType widens to `string` through the table row
 // types, so this is deliberately a partial lookup — a type with no provider
-// (games, and books/comics until their provider lands) resolves to undefined
+// (games, until a provider lands) resolves to undefined
 // and callers are expected to fail loudly rather than silently substitute
 // movies, which is what the old `=== 'tv' ? tv : movie` dispatch did.
 const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {

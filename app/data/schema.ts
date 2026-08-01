@@ -20,7 +20,7 @@ export const mediaItems = table({
   name: 'media_items',
   columns: {
     id: c.integer().primaryKey().autoIncrement(),
-    type: c.enum(['movie', 'tv', 'book', 'comic', 'game']).notNull(),
+    type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
     external_source: c.text().notNull(),
     external_id: c.text().notNull(),
     title: c.text().notNull(),
@@ -66,7 +66,7 @@ export const userTasteProfiles = table({
     // One row per (user, media_type) — movies and TV get independently
     // regenerated/persisted profiles, since cross-media taste mixing is an
     // explicit opt-in (not yet built) rather than the default.
-    media_type: c.enum(['movie', 'tv', 'book', 'comic', 'game']).notNull(),
+    media_type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
     profile: c.text().notNull().default('{}'), // JSON string: { liked_tags: string[], disliked_tags: string[] }
     summary: c.text(),
     updated_at: c.integer().notNull(),
@@ -87,7 +87,7 @@ export const recommendationRuns = table({
     // the type of thing being recommended, which is independent of which
     // taste profile(s) the picks were based on — see sourceTypes in
     // recommendations.ts.
-    media_type: c.enum(['movie', 'tv', 'book', 'comic', 'game']).notNull(),
+    media_type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
     created_at: c.integer().notNull(),
     // Optional user-given label (e.g. "Cozy weekend picks") — falls back to
     // the date in the UI when unset.

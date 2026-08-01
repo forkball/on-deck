@@ -67,7 +67,7 @@ export interface TmdbSearchResult {
   // return runtime, only the per-movie detail endpoint does.
   runtimeMinutes: number | null
   // Populated by non-film providers (Open Library) — the length dimension
-  // and credit that stand in for runtime on books/comics.
+  // and credit that stand in for runtime on books.
   pageCount?: number | null
   creator?: string | null
 }
