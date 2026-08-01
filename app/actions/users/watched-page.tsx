@@ -29,14 +29,14 @@ export function UserWatchedPage(handle: Handle<UserWatchedPageProps>) {
     const typeQuery = mediaType === 'movie' ? '' : `&type=${mediaType}`
     const returnTo = `${watchedHref}?page=${page}${typeQuery}`
     const noun = ui.tabLabel
+    // See the profile copy of this page — the verb is per medium.
+    const heading = `What ${label} has ${ui.pastParticiple} (${noun})`
 
     return (
-      <Document title={`What ${label} has watched (${noun}) | On Deck`}>
+      <Document title={`${heading} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>
-            What {label} has watched ({noun})
-          </h1>
+          <h1>{heading}</h1>
 
           <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
             {movieLog.map(({ interaction, item }) => {

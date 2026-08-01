@@ -213,18 +213,19 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                       </Field>
                     </div>
                   </form>
+                  {/* Delete left, save right — see media-log-edit-modal.tsx.
+                      Delete only exists once something is logged, which is why
+                      Save is pushed right with a margin rather than by
+                      space-between: with nothing to delete it would otherwise
+                      slide back to the left edge. */}
                   <div
                     mix={css({
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
                       gap: '12px',
                       marginTop: '12px',
                     })}
                   >
-                    <button type="submit" form={`edit-${mediaType}-form-${item.id}`}>
-                      {interaction ? 'Update' : 'Save'}
-                    </button>
                     {interaction && (
                       <form
                         method="post"
@@ -237,6 +238,13 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                         </button>
                       </form>
                     )}
+                    <button
+                      type="submit"
+                      form={`edit-${mediaType}-form-${item.id}`}
+                      mix={css({ marginLeft: 'auto' })}
+                    >
+                      {interaction ? 'Update' : 'Save'}
+                    </button>
                   </div>
                 </Modal>
               </div>

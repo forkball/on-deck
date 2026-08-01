@@ -51,10 +51,12 @@ export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
             </Field>
           </div>
         </form>
-        <div mix={css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '12px' })}>
-          <button type="submit" form={`edit-log-form-${interaction.id}`}>
-            Save
-          </button>
+        {/* Destructive action on the left, confirming action on the right,
+            so the button under the cursor after filling the form is the one
+            that saves. `marginLeft: auto` rather than space-between: the
+            delete form isn't always present, and Save has to stay right
+            either way. */}
+        <div mix={css({ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' })}>
           <form
             method="post"
             action={routes.interactions.destroy.href({ interactionId: String(interaction.id) })}
@@ -65,6 +67,9 @@ export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
               Delete log
             </button>
           </form>
+          <button type="submit" form={`edit-log-form-${interaction.id}`} mix={css({ marginLeft: 'auto' })}>
+            Save
+          </button>
         </div>
       </Modal>
     )
