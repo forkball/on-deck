@@ -23,15 +23,20 @@ export function parseMediaType(value: unknown): ActiveMediaType | null {
 
 // Types that exist in the vocabulary but aren't ready to be shown.
 //
-// They stay in ACTIVE_MEDIA_TYPES on purpose: that tuple is what makes
-// `satisfies Record<ActiveMediaType, …>` force every consumer to have an
-// answer, and dropping a type from it to hide it would silently delete that
-// guarantee. Gating is a separate, runtime question.
+// Empty today — games shipped. The mechanism stays because board games are
+// the next candidate and will want it, and because it costs nothing while
+// unused: with no type listed, isMediaTypeEnabled is always true and
+// parseEnabledMediaType behaves exactly like parseMediaType.
+//
+// A gated type stays in ACTIVE_MEDIA_TYPES on purpose. That tuple is what
+// makes `satisfies Record<ActiveMediaType, …>` force every consumer to have
+// an answer, and dropping a type from it to hide it would silently delete
+// that guarantee — so gating is a separate, runtime question.
 //
 // Opt-in rather than opt-out, so nothing has to be configured in production
 // for a half-finished type to stay hidden — forgetting to set a variable
 // hides it, rather than shipping it.
-const EXPERIMENTAL_MEDIA_TYPES: readonly ActiveMediaType[] = ['game']
+const EXPERIMENTAL_MEDIA_TYPES: readonly ActiveMediaType[] = []
 
 function experimentalEnabled(): Set<string> {
   return new Set(
