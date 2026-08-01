@@ -19,11 +19,20 @@ const TWITCH_TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
 export const IGDB_MAX_CONCURRENCY = 4
 
 // game_type values worth treating as "a game someone played", from
-// /v4/game_types. Deliberately excludes DLC (1), expansions (2), bundles (3),
-// mods (5), episodes (6), seasons (7) and packs (13): searching "hollow
-// knight" without this returns an unofficial Vita port (a mod) above the real
-// thing, the same junk problem RAWG had in a different form.
-const REAL_GAME_TYPES = '(0,8,9)' // Main Game, Remake, Remaster
+// /v4/game_types.
+//
+// The exclusions are what matter: mods (5), DLC (1), expansions (2),
+// episodes (6), seasons (7), packs (13) and updates (14) aren't things you
+// own and play on their own. Without this, searching "hollow knight" returns
+// an unofficial Vita port — catalogued as a mod — above the real game, the
+// same junk problem RAWG had in different clothes.
+//
+// Bundles, standalone expansions, expanded games and ports are included
+// because people genuinely own them under those names: "Devil May Cry HD
+// Collection", "Tony Hawk's Pro Skater 1+2" and "Deus Ex: Human Revolution -
+// Director's Cut" are all catalogued that way and were unmatchable while this
+// was narrower. Verified that widening doesn't bring the mod back.
+const REAL_GAME_TYPES = '(0,3,4,8,9,10,11)'
 
 const SEARCH_LIMIT = 20
 
@@ -279,6 +288,17 @@ export async function getGameById(externalId: string): Promise<CatalogSearchResu
 
 function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+// IGDB's own slug form of a title, for the fallback above: its fuzzy search
+// misses exact titles surprisingly often — "For the King" and "We Who Are
+// About to Die" both return unrelated games — while `where slug = …` finds
+// them immediately.
+export function slugifyTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 // Pulls a game reference out of whatever someone pasted.
