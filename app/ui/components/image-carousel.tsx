@@ -41,6 +41,15 @@ const slideStyle = css({
   background: '#eee',
 })
 
+// IGDB returns whatever a game happens to have — 5 is typical, some carry 20
+// — and showing all of them turned the strip into a long scroll for no gain.
+// Three is enough to convey what a game looks like.
+//
+// Capped at display rather than on the way in: the full set arrives free with
+// the search response, costs about 76 kB across the whole catalog, and
+// keeping it means changing this number never needs a re-fetch or a backfill.
+const MAX_STILLS = 3
+
 export interface ImageCarouselProps {
   images: string[]
   title: string
@@ -52,7 +61,7 @@ export function ImageCarousel(handle: Handle<ImageCarouselProps>) {
 
     return (
       <div mix={trackStyle}>
-        {images.map((image, index) => (
+        {images.slice(0, MAX_STILLS).map((image, index) => (
           <img
             key={image}
             src={image}
