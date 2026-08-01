@@ -29,10 +29,7 @@ export function HomePage(
           </p>
           {authed ? (
             <p>
-              <a href={routes.media.href()}>
-                Search for a movie or show to log
-              </a>{" "}
-              or{" "}
+              <a href={routes.media.href()}>Search for media to log</a> or{" "}
               <a href={routes.recommendations.index.href()}>
                 get recommendations
               </a>

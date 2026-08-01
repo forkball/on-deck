@@ -16,7 +16,11 @@ types.setTypeParser(types.builtins.INT8, (value) => parseInt(value, 10))
 // equality checks like the star-rating input's `defaultValue === step`.
 types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value))
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+// A single search page fans out ~20 concurrent upserts; the pg default of
+// 10 connections made half of them queue behind the others for no reason.
+// Round-trips to the hosted database are ~45ms, so queueing is the dominant
+// cost, not query time.
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 20 })
 
 export const db = createDatabase(createPostgresDatabaseAdapter(pool))
 export type Db = typeof db

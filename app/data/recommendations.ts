@@ -1,9 +1,10 @@
 import { and, eq, inList } from 'remix/data-table'
 
+import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from './catalog.ts'
 import { claude, parseStructuredResponse } from './claude.ts'
 import type { Db } from './db.ts'
 import { isFollowing } from './follows.ts'
-import { countUserMediaLog, upsertMediaItem, type MediaType } from './mediaCatalog.ts'
+import { countUserMediaLog, type MediaType } from './mediaCatalog.ts'
 import { createNotification } from './notifications.ts'
 import {
   mediaItems,
@@ -16,7 +17,6 @@ import {
   type MediaItem,
   type RecommendationRun,
 } from './schema.ts'
-import { getMovieById, getTvShowById, searchMovies, searchTv, type TmdbSearchResult } from './tmdb.ts'
 import { regenerateTasteProfile } from './tasteProfile.ts'
 import { displayLabel } from './users.ts'
 
@@ -34,12 +34,16 @@ function toTasteSummary(profile: { summary: string; liked_tags: string[]; dislik
   return { summary: profile.summary, liked_tags: profile.liked_tags, disliked_tags: profile.disliked_tags }
 }
 
-function searchForType(mediaType: MediaType, query: string): Promise<TmdbSearchResult[]> {
-  return mediaType === 'tv' ? searchTv(query) : searchMovies(query)
+// Dispatch to whichever catalog serves this media type. Previously a
+// `=== 'tv' ? … : …` binary that silently fell back to movies; going through
+// the registry means an unserved type throws instead of quietly returning
+// film results for, say, a book request.
+function searchForType(mediaType: MediaType, query: string): Promise<CatalogSearchResult[]> {
+  return getCatalogProvider(mediaType).search(query)
 }
 
-function lookupForType(mediaType: MediaType, externalId: string): Promise<TmdbSearchResult | null> {
-  return mediaType === 'tv' ? getTvShowById(externalId) : getMovieById(externalId)
+function lookupForType(mediaType: MediaType, externalId: string): Promise<CatalogSearchResult | null> {
+  return getCatalogProvider(mediaType).getById(externalId)
 }
 
 interface TasteSummary {
@@ -158,11 +162,27 @@ function levenshteinDistance(a: string, b: string): number {
 // title, same year, different film.
 const TITLE_SIMILARITY_THRESHOLD = 0.5
 
+// Catalog titles frequently carry a subtitle the recommendation didn't ask
+// for — "The Dispossessed" vs "The Dispossessed: An Ambiguous Utopia", which
+// scores 0.44 on edit distance and was being dropped despite being an exact
+// match. Books hit this constantly because the Open Library provider joins
+// title and subtitle (needed to tell "Saga: Volume Two" from "Volume Four").
+//
+// Deliberately strips at the subtitle separator rather than allowing a plain
+// prefix match: "Foundation" is a prefix of "Foundation and Empire", a
+// different novel entirely, and prefix matching would silently accept it.
+// A colon is a structural marker; a space isn't.
+function withoutSubtitle(title: string): string {
+  const [main] = title.split(/\s*[:–—]\s*/)
+  return normalizeTitle(main ?? title)
+}
+
 function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolean {
   const a = normalizeTitle(pickTitle)
   const b = normalizeTitle(foundTitle)
   if (!a || !b) return false
   if (a === b) return true
+  if (a === withoutSubtitle(foundTitle) || withoutSubtitle(pickTitle) === b) return true
 
   const distance = levenshteinDistance(a, b)
   const similarity = 1 - distance / Math.max(a.length, b.length)
@@ -185,9 +205,9 @@ const VERIFY_SCHEMA = {
 // what it meant by each pick, to confirm against the actual TMDB overview.
 // One batched call for the whole list rather than one per pick.
 async function verifyPicksAgainstOverviews(
-  candidates: { pick: Pick; match: TmdbSearchResult }[],
+  candidates: { pick: Pick; match: CatalogSearchResult }[],
   mediaType: MediaType = 'movie',
-): Promise<{ pick: Pick; match: TmdbSearchResult }[]> {
+): Promise<{ pick: Pick; match: CatalogSearchResult }[]> {
   if (candidates.length === 0) return []
 
   const noun = MEDIA_NOUNS[mediaType]
@@ -322,6 +342,35 @@ export async function findMembersMissingSourceLogs(
   return checked.filter((entry) => entry.missing.length > 0)
 }
 
+// How many catalog lookups to run at once when backfilling descriptions —
+// same bound (and reason) as the Letterboxd importer's.
+const OVERVIEW_CONCURRENCY = 8
+
+// Some catalogs return descriptions on search, some don't: TMDB does, Open
+// Library only exposes them on the per-work record. Since
+// verifyPicksAgainstOverviews is precisely the guard that reads them, a
+// missing description would make it rubber-stamp every book. Backfill the
+// gaps before verifying rather than letting the check run blind.
+async function withOverviews(
+  candidates: { pick: Pick; match: CatalogSearchResult }[],
+  mediaType: MediaType,
+): Promise<{ pick: Pick; match: CatalogSearchResult }[]> {
+  const missing = candidates.filter(({ match }) => !match.overview)
+  if (missing.length === 0) return candidates
+
+  let next = 0
+  async function worker() {
+    while (next < missing.length) {
+      const entry = missing[next++]
+      const detail = await lookupForType(mediaType, entry.match.externalId)
+      if (detail?.overview) entry.match = { ...entry.match, overview: detail.overview }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(OVERVIEW_CONCURRENCY, missing.length) }, worker))
+
+  return candidates
+}
+
 // Generates one indexed, dated run of picks and returns its id — history is
 // kept (never replaced), so every run stays browsable at /recommendations/:id.
 // Runs are capped at MAX_RUNS_PER_USER per user; generating past the cap
@@ -385,7 +434,7 @@ export async function generateRecommendations(
   // covers dedup/filter misses needs to reach verification as well, or a
   // verification drop would under-fill the run instead of just consuming
   // slack that was already budgeted for exactly this.
-  const candidates: { pick: Pick; match: TmdbSearchResult }[] = []
+  const candidates: { pick: Pick; match: CatalogSearchResult }[] = []
   const seenExternalIds = new Set<string>()
 
   for (const [i, pick] of picks.entries()) {
@@ -418,11 +467,11 @@ export async function generateRecommendations(
   // Title similarity can't tell two different films apart when they share
   // both title and year — only content can, so this is a second, semantic
   // pass over the survivors before anything gets written to the catalog.
-  const verified = await verifyPicksAgainstOverviews(candidates, mediaType)
+  const verified = await verifyPicksAgainstOverviews(await withOverviews(candidates, mediaType), mediaType)
 
   const results: RecommendationResult[] = []
   for (const { pick, match } of verified.slice(0, TARGET_COUNT)) {
-    const item = await upsertMediaItem(db, mediaType, match)
+    const item = await upsertCatalogItem(db, mediaType, match)
     results.push({ item, tags: match.tags, reason: pick.reason, status: null })
   }
 

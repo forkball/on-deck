@@ -6,6 +6,7 @@ import { Session } from 'remix/session'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
+import { getCatalogProvider } from '../../data/catalog.ts'
 import type { Db } from '../../data/db.ts'
 import { listFollowedUsers } from '../../data/follows.ts'
 import type { User } from '../../data/schema.ts'
@@ -20,15 +21,19 @@ import {
   MEDIA_NOUNS,
   type RecommendationFilters,
 } from '../../data/recommendations.ts'
-import { MOVIE_GENRES, TV_GENRES } from '../../data/tmdb.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
+import { DEFAULT_MEDIA_TYPE, parseMediaType, type ActiveMediaType } from '../../utils/mediaTypes.ts'
 import { RecommendationsPage } from './page.tsx'
 import { RecommendationRunPage } from './run-page.tsx'
 
 const generateSchema = f.object({
   mode: f.field(s.union([s.literal('self'), s.literal('group')])),
-  mediaType: f.field(s.defaulted(s.union([s.literal('movie'), s.literal('tv')]), 'movie')),
+  // Deliberately a plain string, validated against the media-type registry
+  // below rather than a literal union here: a union would silently reject any
+  // newly-wired-up type until someone remembered to edit this schema, and
+  // being a runtime schema, TypeScript can't flag the omission.
+  mediaType: f.field(s.defaulted(s.string(), 'movie')),
   genre: f.field(s.defaulted(s.string(), '')),
   decade: f.field(s.defaulted(s.string(), '')),
   length: f.field(s.defaulted(s.string(), '')),
@@ -38,7 +43,7 @@ const generateSchema = f.object({
 // Everything the index page needs, fetched from plain (db, user) rather than
 // a request context so the generate action can re-render that same page when
 // it rejects a run — see the missing-logs guard below.
-async function loadIndexData(db: Db, user: User, mediaType: 'movie' | 'tv') {
+async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
   const [allRuns, allRunsFromOthers, friends] = await Promise.all([
     listRecommendationRuns(db, user.id),
     listRecommendationRunsFromOthers(db, user.id),
@@ -52,7 +57,7 @@ async function loadIndexData(db: Db, user: User, mediaType: 'movie' | 'tv') {
     runs: allRuns.filter((run) => run.mediaType === mediaType),
     runsFromOthers: allRunsFromOthers.filter((run) => run.mediaType === mediaType),
     friends,
-    genres: mediaType === 'tv' ? TV_GENRES : MOVIE_GENRES,
+    genres: getCatalogProvider(mediaType).genres,
     displayName: displayLabel(user),
   }
 }
@@ -72,9 +77,8 @@ export default createController(routes.recommendations, {
       // it — so if you *did* pick a type here, the Media link picks it back
       // up too. Server-rendered, not client state, so the right genre list
       // just comes out right without needing JS to swap it.
-      const explicitMediaType = context.url.searchParams.get('mediaType')
       const mediaType =
-        explicitMediaType === 'tv' || explicitMediaType === 'movie' ? explicitMediaType : getRememberedMediaType(context)
+        parseMediaType(context.url.searchParams.get('mediaType')) ?? getRememberedMediaType(context)
       context.get(Session).set('mediaType', mediaType)
 
       const db = context.get(Database)
@@ -122,13 +126,14 @@ export default createController(routes.recommendations, {
       const sourceTypes = formData
         .getAll('source')
         .map((value) => String(value))
-        .filter((value): value is 'movie' | 'tv' => value === 'movie' || value === 'tv')
+        .map((value) => parseMediaType(value))
+        .filter((value): value is ActiveMediaType => value !== null)
 
       const db = context.get(Database)
       const memberIds = [auth.identity.id, ...friendIds]
       // MediaType widens to string through the table row types, so narrow
       // once here rather than at each use below.
-      const mediaType: 'movie' | 'tv' = parsed.value.mediaType === 'tv' ? 'tv' : 'movie'
+      const mediaType = parseMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
       // Mirrors the default inside generateRecommendations, so the guard
       // below checks the same profiles the run would actually be built from.
       const profileTypes = sourceTypes.length > 0 ? sourceTypes : [mediaType]

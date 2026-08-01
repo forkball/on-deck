@@ -7,10 +7,18 @@ export type FriendOption = {
 
 export type GenerateRecommendationsFormProps = {
   friends: FriendOption[]
-  // Which media type this run generates for — set by the page (via the
-  // media-type FAB), not chosen in this form, so it's just carried through
-  // as a hidden field.
-  mediaType: 'movie' | 'tv'
+  // Which media type this run generates for — set by the page's tabs, not
+  // chosen in this form, so it's just carried through as a hidden field.
+  // Plain strings rather than the shared media-type registry: this file is a
+  // clientEntry island, and the asset server only bundles app/assets/**, so
+  // anything outside that has to arrive as a serializable prop.
+  mediaType: string
+  // e.g. "movie" / "TV" — used attributively in "you'll still get X picks".
+  mediaTypeLabel: string
+  // Taste profiles that can feed a run, computed server-side from the media
+  // type registry — the island can't import it (asset bundle boundary), so
+  // they arrive as plain data.
+  sources: { value: string; label: string }[]
   genres: string[]
   generateHref: string
   findPeopleHref: string
@@ -20,7 +28,7 @@ const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
 
 // Taste profiles that don't exist yet — shown so the picker reads as
 // "more coming" rather than movies/TV being the permanent ceiling.
-const PLACEHOLDER_SOURCES = ['Games', 'Books', 'Comics']
+const PLACEHOLDER_SOURCES = ['Games', 'Comics']
 
 // Cycled through on the submit button while a run is generating, so the wait
 // reads as progress rather than a stall.
@@ -57,12 +65,13 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let mode: 'self' | 'group' = 'self'
     let search = ''
     let page = 1
-    let movieSource = handle.props.mediaType === 'movie'
-    let tvSource = handle.props.mediaType === 'tv'
+    // Defaults to the type being generated: the common case is "books from
+    // my book taste", with cross-media sourcing as the deliberate opt-in.
+    const selectedSources = new Set<string>([handle.props.mediaType])
 
     return () => {
-      const { friends, mediaType, genres, generateHref, findPeopleHref } = handle.props
-      const hasSource = movieSource || tvSource
+      const { friends, mediaType, mediaTypeLabel, sources, genres, generateHref, findPeopleHref } = handle.props
+      const hasSource = selectedSources.size > 0
 
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
@@ -239,32 +248,22 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
           <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
             <p mix={sectionLabel}>Base picks on</p>
             <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
-              <label>
-                <input
-                  type="checkbox"
-                  name="source"
-                  value="movie"
-                  checked={movieSource}
-                  mix={on('change', (event) => {
-                    movieSource = (event.target as HTMLInputElement).checked
-                    handle.update()
-                  })}
-                />{' '}
-                Movie taste
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  name="source"
-                  value="tv"
-                  checked={tvSource}
-                  mix={on('change', (event) => {
-                    tvSource = (event.target as HTMLInputElement).checked
-                    handle.update()
-                  })}
-                />{' '}
-                TV taste
-              </label>
+              {sources.map((source) => (
+                <label key={source.value}>
+                  <input
+                    type="checkbox"
+                    name="source"
+                    value={source.value}
+                    checked={selectedSources.has(source.value)}
+                    mix={on('change', (event) => {
+                      if ((event.target as HTMLInputElement).checked) selectedSources.add(source.value)
+                      else selectedSources.delete(source.value)
+                      handle.update()
+                    })}
+                  />{' '}
+                  {source.label}
+                </label>
+              ))}
               {PLACEHOLDER_SOURCES.map((label) => (
                 <label key={label} mix={css({ color: '#aaa' })}>
                   <input type="checkbox" disabled /> {label}{' '}
@@ -274,7 +273,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             </div>
             {hasSource ? (
               <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
-                You'll still get {mediaType === 'tv' ? 'TV' : 'movie'} picks — this only changes which taste they're
+                You'll still get {mediaTypeLabel} picks — this only changes which taste they're
                 drawn from.
               </p>
             ) : (

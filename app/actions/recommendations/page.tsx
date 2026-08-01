@@ -9,12 +9,13 @@ import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
+import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
 
 export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
   runsFromOthers: RecommendationRunSummary[]
   friends: User[]
-  mediaType: 'movie' | 'tv'
+  mediaType: ActiveMediaType
   genres: string[]
   displayName: string
   error?: string
@@ -68,6 +69,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
     const { runs, runsFromOthers, friends, mediaType, genres, displayName, error } = handle.props
     const recsHref = routes.recommendations.index.href()
+    const ui = MEDIA_TYPE_UI[mediaType]
 
     return (
       <Document title="Recommendations | On Deck">
@@ -75,12 +77,11 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
           <MediaTabLinks
             current={mediaType}
-            movieHref={`${recsHref}?mediaType=movie`}
-            tvHref={`${recsHref}?mediaType=tv`}
+            hrefFor={(type) => `${recsHref}?mediaType=${type}`}
           />
           <h1>Recommendations</h1>
           <p mix={css({ color: '#555' })}>
-            Rewrites your {mediaType === 'tv' ? 'TV' : 'movie'} taste profile from what you've logged, then asks
+            Rewrites your {ui.attributive} taste profile from what you've logged, then asks
             Claude for picks to try next.
           </p>
 
@@ -101,6 +102,11 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
           <GenerateRecommendationsForm
             friends={friends.map((friend) => ({ id: friend.id, label: displayLabel(friend) }))}
             mediaType={mediaType}
+            mediaTypeLabel={ui.attributive}
+            sources={ACTIVE_MEDIA_TYPES.map((type) => ({
+              value: type,
+              label: `${MEDIA_TYPE_UI[type].attributive} taste`,
+            }))}
             genres={genres}
             generateHref={routes.recommendations.generate.href()}
             findPeopleHref={routes.users.search.href()}
@@ -120,13 +126,13 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             <h2>Past recommendations</h2>
             {runs.length > 0 && (
               <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
-                Only your {MAX_RUNS_PER_USER} most recent {mediaType === 'tv' ? 'TV' : 'movie'} runs are kept —
+                Only your {MAX_RUNS_PER_USER} most recent {ui.attributive} runs are kept —
                 generating a new one removes the oldest.
               </p>
             )}
             {runs.length === 0 ? (
               <p>
-                Nothing yet — log a few {mediaType === 'tv' ? 'TV shows' : 'movies'} on your{' '}
+                Nothing yet — log a few {ui.plural} on your{' '}
                 <a href={routes.profile.index.href()}>profile page</a>, then get recommendations above.
               </p>
             ) : (
