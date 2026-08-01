@@ -112,7 +112,10 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                   in a Read more toggle, which carries no bottom margin of
                   its own — without this the two sit flush together. */}
               <div mix={css({ marginTop: '20px', marginBottom: '16px', color: '#555' })}>
-                <Collapsible summary={`Wrong ${ui.itemNoun}?`}>
+                {/* Held open when the last attempt failed: collapsing would hide
+                    both the error and the field it refers to, leaving the page
+                    looking like nothing happened. */}
+                <Collapsible summary={`Wrong ${ui.itemNoun}?`} open={Boolean(rematchError)}>
                 <form
                   method="post"
                   action={ui.hrefs.rematch(item.id)}

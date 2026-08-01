@@ -223,7 +223,7 @@ export const MEDIA_TYPE_UI = {
     entryNoun: 'game',
     itemNoun: 'game',
     catalogName: 'IGDB',
-    rematchPlaceholder: 'Paste an IGDB game id',
+    rematchPlaceholder: 'Paste an igdb.com link',
     catalogSearchUrl: (title) => `https://www.igdb.com/search?type=1&q=${encodeURIComponent(title)}`,
     searchPlaceholder: 'Search for a game…',
     searchHeading: 'Search games',

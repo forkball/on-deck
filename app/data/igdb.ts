@@ -251,12 +251,22 @@ export async function searchGames(query: string): Promise<CatalogSearchResult[]>
   return ranked.map((game) => toResult(game, hours.get(game.id) ?? null))
 }
 
+// Accepts either the numeric id or the slug from a game's igdb.com URL —
+// whichever parseIgdbId pulled out of what was pasted. Either way the stored
+// external_id comes from the response, so a slug never ends up in the
+// database.
 export async function getGameById(externalId: string): Promise<CatalogSearchResult | null> {
-  const id = externalId.trim()
-  if (!/^\d+$/.test(id)) return null
+  const value = externalId.trim()
+  if (!value) return null
+
+  const selector = /^\d+$/.test(value)
+    ? `where id = ${value};`
+    : // Quotes are stripped by parseIgdbId's character class, so this can't
+      // break out of the string literal.
+      `where slug = "${value}";`
 
   try {
-    const games = await igdbQuery<IgdbGame>('games', `${GAME_FIELDS} where id = ${id}; limit 1;`)
+    const games = await igdbQuery<IgdbGame>('games', `${GAME_FIELDS} ${selector} limit 1;`)
     const game = games[0]
     if (!game) return null
 
@@ -271,13 +281,25 @@ function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
-// IGDB game pages are igdb.com/games/<slug>, which the API can't resolve by
-// slug — so the "wrong game?" form takes the numeric id, as RAWG's did.
-// Accepts a bare id, or one embedded in an api.igdb.com URL.
+// Pulls a game reference out of whatever someone pasted.
+//
+// The thing a person actually has is the page URL —
+// igdb.com/games/hollow-knight — so that's what this takes. It resolves,
+// contrary to an earlier comment here: `where slug = "hollow-knight"` returns
+// the game, verified against all of Hollow Knight, Elden Ring and Tears of
+// the Kingdom. That assumption came from RAWG, whose slug lookups 502'd.
+//
+// A bare numeric id still works for anyone who has one, and the character
+// class keeps quotes out of the APICalypse string literal built from it.
 export function parseIgdbId(input: string): string | null {
   const trimmed = input.trim()
   if (/^\d+$/.test(trimmed)) return trimmed
 
-  const match = trimmed.match(/igdb\.com\/(?:api\/)?games\/(\d+)/i)
-  return match ? match[1] : null
+  // Only /games/ — a link to a company or franchise page isn't a game.
+  const slug = trimmed.match(/igdb\.com\/games\/([a-z0-9-]+)/i)
+  if (slug) return slug[1].toLowerCase()
+
+  // The API form, in case anyone is working from the docs.
+  const apiId = trimmed.match(/api\.igdb\.com\/v\d+\/games\/(\d+)/i)
+  return apiId ? apiId[1] : null
 }

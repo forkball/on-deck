@@ -106,8 +106,8 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
     getById: getGameById,
     genres: GAME_GENRES,
     parseExternalId: parseIgdbId,
-    matchHint: 'Paste an IGDB game id.',
-    lookupFailedError: "Couldn't find that on IGDB — check the id.",
+    matchHint: 'Paste an IGDB game link.',
+    lookupFailedError: "Couldn't find that on IGDB — check the link.",
     matchesLength: (result, length) => {
       const hours = result.playtimeHours
       if (hours == null || hours === 0) return false
