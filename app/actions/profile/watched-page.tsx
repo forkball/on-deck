@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import type { listUserMediaLog } from '../../data/mediaCatalog.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
-import { MovieLogEditModal } from '../../ui/components/movie-log-edit-modal.tsx'
+import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
@@ -45,7 +45,8 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
                   item={item}
                   detailHref={detailHref}
                   actions={
-                    <MovieLogEditModal
+                    <MediaLogEditModal
+                      mediaType={mediaType}
                       interaction={interaction}
                       title={item?.title ?? 'Unknown title'}
                       returnTo={returnTo}

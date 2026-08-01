@@ -7,14 +7,13 @@ import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { parseMediaMetadata } from '../../utils/mediaMetadata.ts'
-import { STATUS_LABELS } from '../../utils/status.ts'
+import { statusLabelsFor } from '../../utils/status.ts'
 import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, parseMediaType } from '../../utils/mediaTypes.ts'
 
 const SOURCE_LABELS: Record<MediaType, string> = {
   movie: 'Movie taste',
   tv: 'TV taste',
   book: 'Book taste',
-  comic: 'Comic taste',
   game: 'Game taste',
 }
 
@@ -77,7 +76,8 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
           >
             {run.results.map(({ item, tags, reason, status }) => {
               const { releaseYear, posterUrl } = parseMediaMetadata(item.metadata)
-              const itemUi = MEDIA_TYPE_UI[parseMediaType(item.type) ?? DEFAULT_MEDIA_TYPE]
+              const itemType = parseMediaType(item.type) ?? DEFAULT_MEDIA_TYPE
+              const itemUi = MEDIA_TYPE_UI[itemType]
               const detailHref = `${itemUi.hrefs.show(item.id)}?from=${encodeURIComponent(routes.recommendations.show.href({ runId: String(run.id) }))}`
 
               return (
@@ -127,7 +127,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                           color: '#15803d',
                         })}
                       >
-                        {STATUS_LABELS[status] ?? status}
+                        {statusLabelsFor(itemType)[status] ?? status}
                       </span>
                     )}
                     {tags.length > 0 && (

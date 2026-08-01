@@ -2,23 +2,27 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { UserMediaInteraction } from '../../data/schema.ts'
+import type { ActiveMediaType } from '../../utils/mediaTypes.ts'
 import { routes } from '../../routes.ts'
 import { Modal } from './modal.tsx'
 import { StarRatingInput } from './star-rating.tsx'
 import { StatusSelect } from './status-select.tsx'
-import { stackedLabel } from './styles.ts'
+import { Field } from '../../assets/lib/field.tsx'
 
-export interface MovieLogEditModalProps {
+export interface MediaLogEditModalProps {
   interaction: UserMediaInteraction
   title: string
   returnTo: string
+  // Drives the status verbs — "Want to read" for a book, "Want to watch"
+  // for a film. Without it every row defaulted to watch verbs.
+  mediaType: ActiveMediaType
 }
 
-// The "Edit" modal on a logged movie row — shared by the profile page and its
+// The "Edit" modal on a logged row — shared by the profile page and its
 // paginated "see more" view, both of which render the same watched-list rows.
-export function MovieLogEditModal(handle: Handle<MovieLogEditModalProps>) {
+export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
   return () => {
-    const { interaction, title, returnTo } = handle.props
+    const { interaction, title, returnTo, mediaType } = handle.props
 
     return (
       <Modal id={`edit-log-${interaction.id}`} triggerLabel="Edit" title={title}>
@@ -30,10 +34,9 @@ export function MovieLogEditModal(handle: Handle<MovieLogEditModalProps>) {
         >
           <input type="hidden" name="_method" value="PUT" />
           <input type="hidden" name="return_to" value={returnTo} />
-          <label mix={stackedLabel}>
-            Status
-            <StatusSelect name="status" defaultValue={interaction.status} />
-          </label>
+          <Field label="Status">
+            <StatusSelect mediaType={mediaType} name="status" defaultValue={interaction.status} />
+          </Field>
           <div class="watched-only-fields" mix={css({ flexDirection: 'column', gap: '12px' })}>
             <div>
               <p mix={css({ margin: '0 0 4px' })}>Rating</p>
@@ -43,10 +46,9 @@ export function MovieLogEditModal(handle: Handle<MovieLogEditModalProps>) {
                 defaultValue={interaction.rating ?? null}
               />
             </div>
-            <label mix={stackedLabel}>
-              Notes
+            <Field label="Notes">
               <textarea name="notes" rows={3} defaultValue={interaction.notes ?? ''} placeholder="What did you think?" />
-            </label>
+            </Field>
           </div>
         </form>
         <div mix={css({ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '12px' })}>

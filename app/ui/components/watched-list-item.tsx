@@ -3,7 +3,8 @@ import { css } from 'remix/ui'
 
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
 import { parseMediaMetadata } from '../../utils/mediaMetadata.ts'
-import { STATUS_LABELS } from '../../utils/status.ts'
+import { statusLabelsFor } from '../../utils/status.ts'
+import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../utils/mediaTypes.ts'
 import { StarRatingDisplay } from './star-rating.tsx'
 
 export interface WatchedListItemProps {
@@ -17,6 +18,9 @@ export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
   return () => {
     const { interaction, item, detailHref, actions } = handle.props
     const { posterUrl } = item ? parseMediaMetadata(item.metadata) : { posterUrl: null }
+    // Derived from the row's own item rather than threaded in: a logged
+    // book must read "Read", not "Watched".
+    const statusLabels = statusLabelsFor(parseMediaType(item?.type) ?? DEFAULT_MEDIA_TYPE)
     const loggedDate = new Date(interaction.updated_at).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
@@ -65,7 +69,7 @@ export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
             <a href={detailHref}>
               <strong>{item?.title ?? 'Unknown title'}</strong>
             </a>
-            <p mix={css({ margin: '4px 0 0' })}>{STATUS_LABELS[interaction.status] ?? interaction.status}</p>
+            <p mix={css({ margin: '4px 0 0' })}>{statusLabels[interaction.status] ?? interaction.status}</p>
             {interaction.rating != null && (
               <p mix={css({ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0 0' })}>
                 <StarRatingDisplay value={interaction.rating} /> ({interaction.rating})
