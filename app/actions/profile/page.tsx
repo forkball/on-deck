@@ -15,11 +15,13 @@ import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
-// Bulk-import entry points, per media type. Movies come from Letterboxd,
-// books from a Goodreads export; TV has no equivalent worth importing.
+// Bulk-import entry points, per media type. Movies come from a Letterboxd
+// export, books from a Goodreads one, games from a linked Steam account; TV
+// has no equivalent worth importing.
 const IMPORT_LINKS: Partial<Record<ActiveMediaType, { href: string; label: string }>> = {
   movie: { href: routes.profile.importMovies.index.href(), label: 'Import from Letterboxd' },
   book: { href: routes.profile.importBooks.index.href(), label: 'Import from Goodreads' },
+  game: { href: routes.profile.importGames.index.href(), label: 'Import from Steam' },
 }
 
 export interface ProfilePageProps {

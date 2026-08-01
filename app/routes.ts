@@ -71,6 +71,18 @@ export const routes = route({
       index: get('/'),
       upload: post('/'),
     }),
+    importGames: route('import-games', {
+      index: get('/'),
+      upload: post('/'),
+    }),
+    // Linking a Steam account. `connect` redirects out to Steam, `callback`
+    // is where Steam redirects back — a GET, because that's what OpenID
+    // does, which is why its parameters are verified rather than trusted.
+    steam: route('steam', {
+      connect: get('connect'),
+      callback: get('callback'),
+      disconnect: post('disconnect'),
+    }),
   }),
   recommendations: route('recommendations', {
     index: get('/'),

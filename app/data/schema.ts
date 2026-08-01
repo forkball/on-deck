@@ -12,6 +12,9 @@ export const users = table({
     // read. Deliberately never fed into regenerateTasteProfile/recommendations;
     // only the movie log drives those.
     bio: c.text(),
+    // SteamID64 of a linked Steam account, set by the OpenID flow (see
+    // data/steam.ts). Null until someone connects one.
+    steam_id: c.text(),
     created_at: c.integer().notNull(),
   },
 })
