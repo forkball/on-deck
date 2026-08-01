@@ -2,17 +2,21 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
+import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
 import { routes } from '../../routes.ts'
-import { Document } from '../../ui/components/document.tsx'
-import { Modal } from '../../ui/components/modal.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
-import { StatusSelect } from '../../ui/components/status-select.tsx'
-import { stackedLabel } from '../../ui/components/styles.ts'
-import { parseMovieMetadata } from '../../utils/mediaMetadata.ts'
-import { StarRatingDisplay, StarRatingInput } from '../../ui/components/star-rating.tsx'
-import { STATUS_LABELS } from '../../utils/status.ts'
+import { Document } from '../components/document.tsx'
+import { ExpandableText } from '../components/expandable-text.tsx'
+import { Modal } from '../components/modal.tsx'
+import { Nav } from '../components/nav.tsx'
+import { StatusSelect } from '../components/status-select.tsx'
+import { stackedLabel } from '../components/styles.ts'
+import { parseMediaMetadata } from '../../utils/mediaMetadata.ts'
+import { StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
+import { statusLabelsFor } from '../../utils/status.ts'
+import { backLinkFrom } from '../../utils/backLink.ts'
 
-export interface TvDetailPageProps {
+export interface MediaDetailPageProps {
+  mediaType: ActiveMediaType
   item: MediaItem
   tags: string[]
   interaction: UserMediaInteraction | null
@@ -23,22 +27,33 @@ export interface TvDetailPageProps {
   merged?: boolean
 }
 
-export function TvDetailPage(handle: Handle<TvDetailPageProps>) {
+// Shared by the movie and TV detail routes (and books, once wired up).
+// Everything type-specific comes from MEDIA_TYPE_UI — the two former
+// per-type copies differed only in six strings and their route namespace.
+export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
   return () => {
-    const { item, tags, interaction, from, displayName, rematchError, rematched, merged } = handle.props
-    const { releaseYear, posterUrl, overview } = parseMovieMetadata(item.metadata)
-    const showHref = routes.tv.show.href({ mediaItemId: String(item.id) })
+    const { mediaType, item, tags, interaction, from, displayName, rematchError, rematched, merged } =
+      handle.props
+    const ui = MEDIA_TYPE_UI[mediaType]
+    const { releaseYear, posterUrl, overview, creator } = parseMediaMetadata(item.metadata)
+    const showHref = ui.hrefs.show(item.id)
     const returnTo = from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref
+    const backLink = backLinkFrom(from)
 
     return (
       <Document title={`${item.title} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
+          {backLink && (
+            <p mix={css({ margin: '0 0 16px' })}>
+              <a href={backLink.href}>{backLink.label}</a>
+            </p>
+          )}
           {rematched && (
             <p mix={css({ color: '#2a7' })}>
               {merged
-                ? 'Merged into the existing correct entry for this show — logs from everyone who had it under the wrong entry now live here too.'
-                : 'Updated to match the correct show on TMDB.'}
+                ? `Merged into the existing correct entry for this ${ui.itemNoun} — logs from everyone who had it under the wrong entry now live here too.`
+                : `Updated to match the correct ${ui.itemNoun} on ${ui.catalogName}.`}
             </p>
           )}
           <div mix={css({ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' })}>
@@ -72,27 +87,44 @@ export function TvDetailPage(handle: Handle<TvDetailPageProps>) {
                 {item.title}
                 {releaseYear ? ` (${releaseYear})` : ''}
               </h1>
+              {creator && (
+                <p mix={css({ margin: '0 0 8px', color: '#555' })}>
+                  {ui.creditLabel}: <strong>{creator}</strong>
+                </p>
+              )}
               {tags.length > 0 && (
                 <p mix={css({ color: '#555' })}>{tags.map((t) => t.replace(/^./, (c) => c.toUpperCase())).join(', ')}</p>
               )}
-              <p>{overview ?? 'No description available.'}</p>
+              {overview ? (
+                <ExpandableText text={overview} id={`overview-${item.id}`} />
+              ) : (
+                <p>No description available.</p>
+              )}
 
-              <details mix={css({ marginBottom: '16px', color: '#555' })}>
-                <summary mix={css({ cursor: 'pointer' })}>Wrong show?</summary>
+              {/* Top margin matters now that the description above may end
+                  in a Read more toggle, which carries no bottom margin of
+                  its own — without this the two sit flush together. */}
+              <details mix={css({ marginTop: '20px', marginBottom: '16px', color: '#555' })}>
+                <summary mix={css({ cursor: 'pointer' })}>Wrong {ui.itemNoun}?</summary>
                 <form
                   method="post"
-                  action={routes.tv.rematch.href({ mediaItemId: String(item.id) })}
+                  action={ui.hrefs.rematch(item.id)}
                   mix={css({ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap', alignItems: 'center' })}
                 >
                   <input type="hidden" name="return_to" value={returnTo} />
                   <input
                     type="text"
                     name="tmdb_link"
-                    placeholder="Paste a themoviedb.org link or id"
+                    placeholder={ui.rematchPlaceholder}
                     mix={css({ flex: '1 1 240px' })}
                   />
                   <button type="submit">Fix match</button>
                 </form>
+                <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
+                  <a href={ui.catalogSearchUrl(item.title, releaseYear)} target="_blank" rel="noopener noreferrer">
+                    Look up "{item.title}" on {ui.catalogName}
+                  </a>
+                </p>
                 {rematchError && <p mix={css({ color: '#c33', margin: '8px 0 0' })}>{rematchError}</p>}
               </details>
 
@@ -112,7 +144,7 @@ export function TvDetailPage(handle: Handle<TvDetailPageProps>) {
                   {interaction ? (
                     <>
                       <p mix={css({ margin: 0 })}>
-                        <strong>{STATUS_LABELS[interaction.status] ?? interaction.status}</strong>
+                        <strong>{statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}</strong>
                       </p>
                       {interaction.rating != null && (
                         <p mix={css({ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0 0' })}>
@@ -126,19 +158,22 @@ export function TvDetailPage(handle: Handle<TvDetailPageProps>) {
                   )}
                 </div>
 
+                {/* Deliberately not `fab`: the trigger belongs with the log
+                    it acts on, rather than floating over unrelated content in
+                    the viewport corner. The surrounding box is already
+                    space-between for exactly this. */}
                 <Modal
-                  id={`edit-tv-${item.id}`}
-                  triggerLabel={interaction ? 'Edit' : 'Log this show'}
+                  id={`edit-${mediaType}-${item.id}`}
+                  triggerLabel={interaction ? 'Edit' : 'Log'}
                   title={item.title}
-                  fab
                 >
                   <form
-                    id={`edit-tv-form-${item.id}`}
+                    id={`edit-${mediaType}-form-${item.id}`}
                     method="post"
                     action={
                       interaction
                         ? routes.interactions.update.href({ interactionId: String(interaction.id) })
-                        : routes.tv.log.href({ mediaItemId: String(item.id) })
+                        : ui.hrefs.log(item.id)
                     }
                     mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
                   >
@@ -146,7 +181,7 @@ export function TvDetailPage(handle: Handle<TvDetailPageProps>) {
                     <input type="hidden" name="return_to" value={returnTo} />
                     <label mix={stackedLabel}>
                       Status
-                      <StatusSelect name="status" defaultValue={interaction?.status ?? 'want_to_consume'} />
+                      <StatusSelect mediaType={mediaType} name="status" defaultValue={interaction?.status ?? 'want_to_consume'} />
                     </label>
                     <div class="watched-only-fields" mix={css({ flexDirection: 'column', gap: '12px' })}>
                       <div>
@@ -178,7 +213,7 @@ export function TvDetailPage(handle: Handle<TvDetailPageProps>) {
                       marginTop: '12px',
                     })}
                   >
-                    <button type="submit" form={`edit-tv-form-${item.id}`}>
+                    <button type="submit" form={`edit-${mediaType}-form-${item.id}`}>
                       {interaction ? 'Update' : 'Save'}
                     </button>
                     {interaction && (

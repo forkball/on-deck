@@ -7,6 +7,7 @@ import { displayLabel } from '../data/users.ts'
 import { getRememberedMediaType } from '../middleware/mediaType.ts'
 import { routes } from '../routes.ts'
 import { HomePage } from '../ui/pages/home-page.tsx'
+import { MEDIA_TYPE_UI } from '../utils/mediaTypes.ts'
 
 export default createController(routes, {
   actions: {
@@ -25,8 +26,7 @@ export default createController(routes, {
       )
     },
     media(context) {
-      const mediaType = getRememberedMediaType(context)
-      return redirect(mediaType === 'tv' ? routes.tv.search.href() : routes.movies.search.href(), 303)
+      return redirect(MEDIA_TYPE_UI[getRememberedMediaType(context)].hrefs.search(), 303)
     },
   },
 })

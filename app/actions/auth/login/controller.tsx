@@ -7,6 +7,7 @@ import { redirect } from 'remix/response/redirect'
 import { db } from '../../../data/db.ts'
 import { users, type User } from '../../../data/schema.ts'
 import { routes } from '../../../routes.ts'
+import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI } from '../../../utils/mediaTypes.ts'
 import { verifyPassword } from '../../../utils/password.ts'
 import { LoginPage } from './page.tsx'
 
@@ -54,7 +55,7 @@ export default createController(routes.auth.login, {
 
       const formData = context.get(FormData)
       const returnTo = safeReturnTo(String(formData.get('return_to') || ''))
-      return redirect(returnTo || routes.movies.search.href(), 303)
+      return redirect(returnTo || MEDIA_TYPE_UI[DEFAULT_MEDIA_TYPE].hrefs.search(), 303)
     },
   },
 })

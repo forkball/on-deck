@@ -66,6 +66,10 @@ export interface TmdbSearchResult {
   // Only ever populated via getMovieById — TMDB's search endpoint doesn't
   // return runtime, only the per-movie detail endpoint does.
   runtimeMinutes: number | null
+  // Populated by non-film providers (Open Library) — the length dimension
+  // and credit that stand in for runtime on books/comics.
+  pageCount?: number | null
+  creator?: string | null
 }
 
 interface TmdbSearchResponse {
@@ -164,6 +168,9 @@ interface TmdbMovieDetailResponse {
   popularity: number
   overview: string
   runtime: number | null
+  // Present because of append_to_response=credits below — folded into the
+  // same request rather than costing a second round trip.
+  credits?: { crew?: { job?: string; name?: string }[] }
 }
 
 // Looks a movie up by its known TMDB id — used when the autosuggest dropdown
@@ -177,6 +184,9 @@ export async function getMovieById(externalId: string): Promise<TmdbSearchResult
 
   const url = new URL(`${TMDB_API_BASE}/movie/${encodeURIComponent(externalId)}`)
   url.searchParams.set('api_key', apiKey)
+  // Credits ride along on the same request; the search endpoint has no
+  // director at all, which is why this only appears on a by-id lookup.
+  url.searchParams.set('append_to_response', 'credits')
 
   const response = await fetch(url)
   if (response.status === 404) return null
@@ -195,6 +205,7 @@ export async function getMovieById(externalId: string): Promise<TmdbSearchResult
     popularity: r.popularity,
     overview: r.overview?.trim() || null,
     runtimeMinutes: r.runtime ?? null,
+    creator: r.credits?.crew?.find((member) => member.job === 'Director')?.name ?? null,
   }
 }
 
@@ -211,6 +222,7 @@ interface TmdbTvDetailResponse {
   // since it's still present on some older/legacy entries.
   episode_run_time: number[]
   last_episode_to_air: { runtime: number | null } | null
+  created_by: { name?: string }[]
 }
 
 // Mirrors getMovieById for TV shows.
@@ -240,6 +252,7 @@ export async function getTvShowById(externalId: string): Promise<TmdbSearchResul
     popularity: r.popularity,
     overview: r.overview?.trim() || null,
     runtimeMinutes: r.episode_run_time[0] ?? r.last_episode_to_air?.runtime ?? null,
+    creator: r.created_by?.[0]?.name ?? null,
   }
 }
 

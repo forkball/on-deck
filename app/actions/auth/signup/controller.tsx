@@ -8,6 +8,7 @@ import { redirect } from 'remix/response/redirect'
 
 import { users } from '../../../data/schema.ts'
 import { routes } from '../../../routes.ts'
+import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI } from '../../../utils/mediaTypes.ts'
 import { hashPassword } from '../../../utils/password.ts'
 import { SignupPage } from './page.tsx'
 
@@ -63,7 +64,7 @@ export default createController(routes.auth.signup, {
       const session = completeAuth(context)
       session.set('auth', { userId: user.id })
 
-      return redirect(routes.movies.search.href(), 303)
+      return redirect(MEDIA_TYPE_UI[DEFAULT_MEDIA_TYPE].hrefs.search(), 303)
     },
   },
 })

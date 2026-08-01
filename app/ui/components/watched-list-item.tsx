@@ -2,7 +2,7 @@ import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
-import { parseMovieMetadata } from '../../utils/mediaMetadata.ts'
+import { parseMediaMetadata } from '../../utils/mediaMetadata.ts'
 import { STATUS_LABELS } from '../../utils/status.ts'
 import { StarRatingDisplay } from './star-rating.tsx'
 
@@ -16,7 +16,7 @@ export interface WatchedListItemProps {
 export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
   return () => {
     const { interaction, item, detailHref, actions } = handle.props
-    const { posterUrl } = item ? parseMovieMetadata(item.metadata) : { posterUrl: null }
+    const { posterUrl } = item ? parseMediaMetadata(item.metadata) : { posterUrl: null }
     const loggedDate = new Date(interaction.updated_at).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',

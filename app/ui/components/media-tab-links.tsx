@@ -1,14 +1,18 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+
 // Only movies and TV are wired up — the rest match the placeholders shown
 // in media-tabs.tsx (the profile page's tabs) so the two read the same.
-const PLACEHOLDER_TYPES = ['Games', 'Books', 'Comics']
+const PLACEHOLDER_TYPES = ['Games', 'Comics']
 
 export interface MediaTabLinksProps {
-  current: 'movie' | 'tv'
-  movieHref: string
-  tvHref: string
+  current: ActiveMediaType
+  // Builds the link for each wired-up type. A callback rather than fixed
+  // movieHref/tvHref props because callers need to preserve their own query
+  // string (?q=, ?mediaType=) across the switch.
+  hrefFor: (type: ActiveMediaType) => string
 }
 
 // The navigation counterpart to media-tabs.tsx: that one is a CSS-only
@@ -26,7 +30,7 @@ export interface MediaTabLinksProps {
 // navigation re-hydrates everything against the new page.
 export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
   return () => {
-    const { current, movieHref, tvHref } = handle.props
+    const { current, hrefFor } = handle.props
 
     const tab = css({
       padding: '0 0 8px',
@@ -51,12 +55,11 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
           marginBottom: '20px',
         })}
       >
-        <a href={movieHref} rmx-document="" mix={current === 'movie' ? activeTab : tab}>
-          Movies
-        </a>
-        <a href={tvHref} rmx-document="" mix={current === 'tv' ? activeTab : tab}>
-          TV
-        </a>
+        {ACTIVE_MEDIA_TYPES.map((type) => (
+          <a key={type} href={hrefFor(type)} rmx-document="" mix={current === type ? activeTab : tab}>
+            {MEDIA_TYPE_UI[type].tabLabel}
+          </a>
+        ))}
         {PLACEHOLDER_TYPES.map((label) => (
           <span key={label} mix={css({ padding: '0 0 8px', color: '#ccc' })} title="Coming soon">
             {label}
