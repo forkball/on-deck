@@ -2,7 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
-import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaCatalog.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
@@ -172,7 +172,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             idPrefix="profile"
             active={activeTab}
             panels={Object.fromEntries(
-              ACTIVE_MEDIA_TYPES.map((type) => {
+              enabledMediaTypes().map((type) => {
                 const ui = MEDIA_TYPE_UI[type]
                 const { summary, log, total } = media[type]
                 const seeAllHref =

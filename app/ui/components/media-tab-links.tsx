@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
 
 // Only movies and TV are wired up — the rest match the placeholders shown
 // in media-tabs.tsx (the profile page's tabs) so the two read the same.
@@ -55,7 +55,7 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
           marginBottom: '20px',
         })}
       >
-        {ACTIVE_MEDIA_TYPES.map((type) => (
+        {enabledMediaTypes().map((type) => (
           <a key={type} href={hrefFor(type)} rmx-document="" mix={current === type ? activeTab : tab}>
             {MEDIA_TYPE_UI[type].tabLabel}
           </a>

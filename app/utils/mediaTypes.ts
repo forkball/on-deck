@@ -21,6 +21,48 @@ export function parseMediaType(value: unknown): ActiveMediaType | null {
   return ACTIVE_MEDIA_TYPES.includes(value as ActiveMediaType) ? (value as ActiveMediaType) : null
 }
 
+// Types that exist in the vocabulary but aren't ready to be shown.
+//
+// They stay in ACTIVE_MEDIA_TYPES on purpose: that tuple is what makes
+// `satisfies Record<ActiveMediaType, …>` force every consumer to have an
+// answer, and dropping a type from it to hide it would silently delete that
+// guarantee. Gating is a separate, runtime question.
+//
+// Opt-in rather than opt-out, so nothing has to be configured in production
+// for a half-finished type to stay hidden — forgetting to set a variable
+// hides it, rather than shipping it.
+const EXPERIMENTAL_MEDIA_TYPES: readonly ActiveMediaType[] = ['game']
+
+function experimentalEnabled(): Set<string> {
+  return new Set(
+    (process.env.EXPERIMENTAL_MEDIA_TYPES ?? '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+  )
+}
+
+export function isMediaTypeEnabled(type: ActiveMediaType): boolean {
+  if (!EXPERIMENTAL_MEDIA_TYPES.includes(type)) return true
+  return experimentalEnabled().has(type)
+}
+
+// The types to actually show, in the registry's order. Read at call time
+// rather than module load so the environment can differ per deployment
+// without a rebuild.
+export function enabledMediaTypes(): ActiveMediaType[] {
+  return ACTIVE_MEDIA_TYPES.filter(isMediaTypeEnabled)
+}
+
+// For anything a visitor supplies — a ?tab=, a form field, a saved
+// preference. Distinct from parseMediaType, which stays ungated because it
+// also reads back rows already in the database: a logged game still needs
+// its own status verbs on a shared list, whether or not the tab is showing.
+export function parseEnabledMediaType(value: unknown): ActiveMediaType | null {
+  const type = parseMediaType(value)
+  return type && isMediaTypeEnabled(type) ? type : null
+}
+
 interface StatusVerbs {
   want: string
   inProgress: string

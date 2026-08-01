@@ -16,7 +16,7 @@ import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, updateUserBio } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../utils/mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType } from '../../utils/mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { ProfilePage } from './page.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
@@ -34,7 +34,7 @@ export default createController(routes.profile, {
       const db = context.get(Database)
       const media = await loadMediaSummaries(db, auth.identity.id, RECENT_COUNT)
       // Which tab to open on — set when returning from a detail page.
-      const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
+      const activeTab = parseEnabledMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
       const followingCount = await countFollowing(db, auth.identity.id)
       const followersCount = await countFollowers(db, auth.identity.id)
@@ -71,7 +71,7 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
-      const mediaType = parseMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
+      const mediaType = parseEnabledMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
       const totalWatched = await countUserMediaLog(db, auth.identity.id, mediaType)
       const movieLog = await listUserMediaLog(db, auth.identity.id, {
         limit: PAGE_SIZE,

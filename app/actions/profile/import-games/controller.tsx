@@ -5,14 +5,15 @@ import { createController } from 'remix/router'
 import type { User } from '../../../data/schema.ts'
 import { importSteamLibrary } from '../../../data/steamImport.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
+import { requireEnabledMediaType } from '../../../middleware/gatedMediaType.ts'
 import { displayLabel } from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
 import { SteamImportPage } from './page.tsx'
 
-// Mirrors profile/import-movies (Letterboxd) and profile/import-books (Goodreads).
-// The import itself lands in the next phase; for now this page owns the
-// connection state, which is what the other importers replace with a file
-// picker.
+// Mirrors profile/import-movies (Letterboxd) and profile/import-books
+// (Goodreads). The difference is the source: a linked account rather than an
+// uploaded file, so this page owns the connection state that the other two
+// replace with a file picker.
 // The OpenID callback can only redirect with a code in the query string, so
 // the wording lives here rather than travelling through the URL. Anything
 // unrecognised is treated as a failed sign-in, since `error` is only ever set
@@ -24,7 +25,8 @@ function connectError(code: string | null): string | undefined {
 }
 
 export default createController(routes.profile.importGames, {
-  middleware: [requireAuth<User>()],
+  // Steam exists only to feed the games library, so it is gated with it.
+  middleware: [requireEnabledMediaType('game'), requireAuth<User>()],
   actions: {
     index(context) {
       const auth = context.get(Auth)

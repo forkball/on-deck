@@ -9,7 +9,7 @@ import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
-import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
 
 export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
@@ -104,7 +104,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             friends={friends.map((friend) => ({ id: friend.id, label: displayLabel(friend) }))}
             mediaType={mediaType}
             mediaTypeLabel={ui.attributive}
-            sources={ACTIVE_MEDIA_TYPES.map((type) => ({
+            sources={enabledMediaTypes().map((type) => ({
               value: type,
               label: `${MEDIA_TYPE_UI[type].attributive} taste`,
             }))}

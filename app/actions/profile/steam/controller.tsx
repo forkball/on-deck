@@ -6,6 +6,7 @@ import { redirect } from 'remix/response/redirect'
 import { buildSteamLoginUrl, verifySteamCallback } from '../../../data/steam.ts'
 import { users, type User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
+import { requireEnabledMediaType } from '../../../middleware/gatedMediaType.ts'
 import { routes } from '../../../routes.ts'
 import { externalOrigin } from '../../../utils/requestOrigin.ts'
 
@@ -13,7 +14,8 @@ import { externalOrigin } from '../../../utils/requestOrigin.ts'
 // the password auth is untouched; this only records which Steam account to
 // read a library from.
 export default createController(routes.profile.steam, {
-  middleware: [requireAuth<User>()],
+  // Steam exists only to feed the games library, so it is gated with it.
+  middleware: [requireEnabledMediaType('game'), requireAuth<User>()],
   actions: {
     connect(context) {
       const auth = context.get(Auth)

@@ -2,6 +2,7 @@ import { createController } from 'remix/router'
 
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
+import { requireEnabledMediaType } from '../../middleware/gatedMediaType.ts'
 import { rememberMediaType } from '../../middleware/mediaType.ts'
 import { routes } from '../../routes.ts'
 import { createMediaActions } from '../mediaActions.tsx'
@@ -10,6 +11,6 @@ import { createMediaActions } from '../mediaActions.tsx'
 // and the media type differ. Games resolve against RAWG rather than TMDB,
 // which is a provider detail (see data/catalog.ts), not a controller one.
 export default createController(routes.games, {
-  middleware: [requireAuth<User>(), rememberMediaType('game')],
+  middleware: [requireEnabledMediaType('game'), requireAuth<User>(), rememberMediaType('game')],
   actions: createMediaActions('game'),
 })

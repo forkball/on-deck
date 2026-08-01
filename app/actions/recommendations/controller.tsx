@@ -23,7 +23,7 @@ import {
 } from '../../data/recommendations.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, parseMediaType, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType, type ActiveMediaType } from '../../utils/mediaTypes.ts'
 import { RecommendationsPage } from './page.tsx'
 import { RecommendationRunPage } from './run-page.tsx'
 
@@ -79,7 +79,7 @@ export default createController(routes.recommendations, {
       // up too. Server-rendered, not client state, so the right genre list
       // just comes out right without needing JS to swap it.
       const mediaType =
-        parseMediaType(context.url.searchParams.get('mediaType')) ?? getRememberedMediaType(context)
+        parseEnabledMediaType(context.url.searchParams.get('mediaType')) ?? getRememberedMediaType(context)
       context.get(Session).set('mediaType', mediaType)
 
       const db = context.get(Database)
@@ -128,14 +128,14 @@ export default createController(routes.recommendations, {
       const sourceTypes = formData
         .getAll('source')
         .map((value) => String(value))
-        .map((value) => parseMediaType(value))
+        .map((value) => parseEnabledMediaType(value))
         .filter((value): value is ActiveMediaType => value !== null)
 
       const db = context.get(Database)
       const memberIds = [auth.identity.id, ...friendIds]
       // MediaType widens to string through the table row types, so narrow
       // once here rather than at each use below.
-      const mediaType = parseMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
+      const mediaType = parseEnabledMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
       // Mirrors the default inside generateRecommendations, so the guard
       // below checks the same profiles the run would actually be built from.
       const profileTypes = sourceTypes.length > 0 ? sourceTypes : [mediaType]
