@@ -4,6 +4,9 @@ import { space } from './lib/spacing.ts'
 
 export type LetterboxdImportFormProps = {
   uploadHref: string
+  // Which form field the CSV arrives under. Defaults to Letterboxd's
+  // `ratings`; the Goodreads importer posts `library` to its own endpoint.
+  fieldName?: string
   error?: string
 }
 
@@ -101,7 +104,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
     }
 
     return () => {
-      const { uploadHref, error } = handle.props
+      const { uploadHref, fieldName = 'ratings', error } = handle.props
 
       return (
         <form
@@ -165,7 +168,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
             </span>
             <input
               type="file"
-              name="ratings"
+              name={fieldName}
               accept=".csv"
               required
               mix={[

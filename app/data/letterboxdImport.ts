@@ -1,6 +1,7 @@
 import type { Db } from './db.ts'
-import { logInteraction, upsertMovie } from './movies.ts'
-import { searchMovies, type TmdbSearchResult } from './tmdb.ts'
+import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from './catalog.ts'
+import { logInteraction } from './mediaCatalog.ts'
+import { headerIndex, parseCsv, runBounded } from './csvImport.ts'
 
 interface RatingRow {
   title: string
@@ -31,35 +32,29 @@ export async function importLetterboxdRatings(
   const rows = parseRatingsCsv(csvText)
   const notFound: LetterboxdImportResult['notFound'] = []
   let imported = 0
-  let nextIndex = 0
 
-  async function worker() {
-    while (nextIndex < rows.length) {
-      const row = rows[nextIndex++]
-      const match = await matchMovie(row.title, row.year)
-      if (!match) {
-        notFound.push({ title: row.title, year: row.year })
-        continue
-      }
-
-      const item = await upsertMovie(db, match)
-      await logInteraction(db, userId, item.id, {
-        status: 'consumed',
-        rating: row.rating,
-        notes: null,
-        consumedAt: row.watchedAt,
-      })
-      imported++
+  await runBounded(rows, CONCURRENCY, async (row) => {
+    const match = await matchMovie(row.title, row.year)
+    if (!match) {
+      notFound.push({ title: row.title, year: row.year })
+      return
     }
-  }
 
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, rows.length) }, worker))
+    const item = await upsertCatalogItem(db, 'movie', match)
+    await logInteraction(db, userId, item.id, {
+      status: 'consumed',
+      rating: row.rating,
+      notes: null,
+      consumedAt: row.watchedAt,
+    })
+    imported++
+  })
 
   return { totalRows: rows.length, imported, notFound }
 }
 
-async function matchMovie(title: string, year: number | null): Promise<TmdbSearchResult | null> {
-  const matches = await searchMovies(title)
+async function matchMovie(title: string, year: number | null): Promise<CatalogSearchResult | null> {
+  const matches = await getCatalogProvider('movie').search(title)
   if (matches.length === 0) return null
   if (year == null) return matches[0]
 
@@ -78,11 +73,11 @@ function parseRatingsCsv(text: string): RatingRow[] {
   const table = parseCsv(text)
   if (table.length === 0) return []
 
-  const header = table[0].map((column) => column.trim().toLowerCase())
-  const dateIndex = header.indexOf('date')
-  const nameIndex = header.indexOf('name')
-  const yearIndex = header.indexOf('year')
-  const ratingIndex = header.indexOf('rating')
+  const indexOf = headerIndex(table[0])
+  const dateIndex = indexOf('date')
+  const nameIndex = indexOf('name')
+  const yearIndex = indexOf('year')
+  const ratingIndex = indexOf('rating')
 
   if (dateIndex === -1 || nameIndex === -1 || ratingIndex === -1) {
     throw new Error('ratings.csv is missing expected columns (Date, Name, Rating).')
@@ -104,51 +99,3 @@ function parseRatingsCsv(text: string): RatingRow[] {
   return rows
 }
 
-// Minimal RFC 4180 CSV parser — handles quoted fields (including embedded
-// commas and escaped "" quotes), which Letterboxd uses for any title
-// containing a comma (e.g. "Synecdoche, New York").
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = []
-  let row: string[] = []
-  let field = ''
-  let inQuotes = false
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i]
-
-    if (inQuotes) {
-      if (char === '"' && text[i + 1] === '"') {
-        field += '"'
-        i++
-      } else if (char === '"') {
-        inQuotes = false
-      } else {
-        field += char
-      }
-      continue
-    }
-
-    if (char === '"') {
-      inQuotes = true
-    } else if (char === ',') {
-      row.push(field)
-      field = ''
-    } else if (char === '\r') {
-      // skip
-    } else if (char === '\n') {
-      row.push(field)
-      rows.push(row)
-      row = []
-      field = ''
-    } else {
-      field += char
-    }
-  }
-
-  if (field.length > 0 || row.length > 0) {
-    row.push(field)
-    rows.push(row)
-  }
-
-  return rows
-}
