@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import { claude, parseStructuredResponse } from './claude.ts'
 import type { Db } from './db.ts'
 import { listUserMediaLog, type MediaType } from './mediaCatalog.ts'
@@ -14,11 +16,10 @@ export async function getTasteProfile(db: Db, userId: number, mediaType: MediaTy
 
 export interface UpsertTasteProfileInput extends TasteProfileData {
   summary: string
-  // How many log entries the profile was written from. Stored so a later run
-  // can tell whether the log has changed without re-reading the model's work
-  // — see isProfileStale. Lives inside the existing JSON blob rather than a
-  // new column, which keeps this migration-free.
-  logCount?: number
+  // Fingerprint of the log this profile was written from — see logSignature.
+  // Lives inside the existing JSON blob rather than a new column, which keeps
+  // this migration-free.
+  logSignature?: string
 }
 
 export async function upsertTasteProfile(
@@ -32,7 +33,7 @@ export async function upsertTasteProfile(
     profile: JSON.stringify({
       liked_tags: data.liked_tags,
       disliked_tags: data.disliked_tags,
-      logCount: data.logCount ?? 0,
+      logSignature: data.logSignature ?? '',
     }),
     summary: data.summary,
     updated_at: Date.now(),
@@ -84,7 +85,9 @@ export async function regenerateTasteProfile(
 
   if (log.length === 0) {
     const empty = { summary: '', liked_tags: [], disliked_tags: [] }
-    await upsertTasteProfile(db, userId, mediaType, empty)
+    // Signed like any other, or an empty log would read as stale on every
+    // run and rewrite this row forever.
+    await upsertTasteProfile(db, userId, mediaType, { ...empty, logSignature: logSignature(log) })
     return { ...empty, log }
   }
 
@@ -118,12 +121,12 @@ export async function regenerateTasteProfile(
   })
 
   const parsed = parseStructuredResponse<UpsertTasteProfileInput>(response)
-  await upsertTasteProfile(db, userId, mediaType, { ...parsed, logCount: log.length })
+  await upsertTasteProfile(db, userId, mediaType, { ...parsed, logSignature: logSignature(log) })
   return { ...parsed, log }
 }
 
 interface StoredProfile extends TasteProfileData {
-  logCount?: number
+  logSignature?: string
 }
 
 function parseStoredProfile(profile: UserTasteProfile): StoredProfile {
@@ -132,7 +135,7 @@ function parseStoredProfile(profile: UserTasteProfile): StoredProfile {
     return {
       liked_tags: parsed.liked_tags ?? [],
       disliked_tags: parsed.disliked_tags ?? [],
-      logCount: parsed.logCount,
+      logSignature: parsed.logSignature,
     }
   } catch {
     return { liked_tags: [], disliked_tags: [] }
@@ -141,25 +144,46 @@ function parseStoredProfile(profile: UserTasteProfile): StoredProfile {
 
 type LogEntry = Awaited<ReturnType<typeof listUserMediaLog>>[number]
 
+// A fingerprint of everything about the log that reaches the model.
+//
+// Deliberately the exact fields the prompt is built from, and nothing else:
+// if this is unchanged the model would be handed a byte-identical prompt, so
+// the profile it produced is still the right answer. That equivalence is the
+// whole point — it makes "has anything changed?" answerable without deciding,
+// case by case, which kinds of change matter.
+//
+// Timestamps and a row count were the first attempt and were not enough. They
+// see additions, edits and deletions, but not a change to the item a log
+// points at: rematching a title rewrites what the model reads while every
+// interaction row, and every timestamp on it, stays exactly as it was. They
+// also quietly assume every write bumps updated_at, which is a property of
+// code elsewhere rather than anything guaranteed here.
+//
+// Sorted, so the order rows come back in can't register as a change.
+function logSignature(log: LogEntry[]): string {
+  const rows = log
+    .map(({ interaction, item }) =>
+      [
+        item?.id ?? 0,
+        item?.title ?? '',
+        interaction.status,
+        interaction.rating ?? '',
+        interaction.notes ?? '',
+      ].join('\u0001'),
+    )
+    .sort()
+    .join('\u0002')
+
+  return createHash('sha1').update(rows).digest('hex')
+}
+
 // Whether the log has moved since the profile was written.
 //
-// Two signals, because neither catches everything on its own. A timestamp
-// newer than the profile means something was logged or edited after it. A
-// different entry count means something was removed — deleting a row leaves
-// the remaining timestamps untouched, so a count is the only cheap way to
-// notice, and a profile describing fifty games you no longer have is exactly
-// as wrong as one missing your latest.
-//
-// Profiles written before logCount existed report undefined, which reads as
+// Profiles written before signatures existed report undefined, which reads as
 // stale and regenerates once, filling it in.
 function isProfileStale(profile: UserTasteProfile | null, log: LogEntry[]): boolean {
   if (!profile) return true
-
-  const stored = parseStoredProfile(profile)
-  if (stored.logCount !== log.length) return true
-
-  const generatedAt = Number(profile.updated_at)
-  return log.some((entry) => Number(entry.interaction.updated_at) > generatedAt)
+  return parseStoredProfile(profile).logSignature !== logSignature(log)
 }
 
 export interface EnsuredTasteProfile extends RegeneratedTasteProfile {
