@@ -6,9 +6,10 @@ import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../u
 import type { listUserMediaLog } from '../../data/mediaCatalog.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
+import { Field } from '../../assets/lib/field.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { Modal } from '../../ui/components/modal.tsx'
-import { MovieLogEditModal } from '../../ui/components/movie-log-edit-modal.tsx'
+import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 
@@ -65,10 +66,11 @@ function LoggedList(
     emptyHref: string
     emptyLabel: string
     returnTo: string
+    mediaType: ActiveMediaType
   }>,
 ) {
   return () => {
-    const { log, total, detailHref, seeAllHref, emptyHref, emptyLabel, returnTo } = handle.props
+    const { log, total, detailHref, seeAllHref, emptyHref, emptyLabel, returnTo, mediaType } = handle.props
 
     if (log.length === 0) {
       return (
@@ -88,7 +90,12 @@ function LoggedList(
               item={item}
               detailHref={item ? detailHref(item.id) : '#'}
               actions={
-                <MovieLogEditModal interaction={interaction} title={item?.title ?? 'Unknown title'} returnTo={returnTo} />
+                <MediaLogEditModal
+                  interaction={interaction}
+                  title={item?.title ?? 'Unknown title'}
+                  returnTo={returnTo}
+                  mediaType={mediaType}
+                />
               }
             />
           ))}
@@ -148,10 +155,12 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                 mix={css({ display: 'flex', flexDirection: 'column', gap: '8px' })}
               >
                 <input type="hidden" name="_method" value="PUT" />
-                <textarea name="bio" rows={4} defaultValue={bio} placeholder="Tell people a bit about yourself…" />
-                <p mix={css({ margin: 0, fontSize: '12px', color: '#888' })}>
-                  Just for other people to read — it has no effect on your recommendations.
-                </p>
+                <Field
+                  label="Bio"
+                  hint="Just for other people to read — it has no effect on your recommendations."
+                >
+                  <textarea name="bio" rows={4} defaultValue={bio} placeholder="Tell people a bit about yourself…" />
+                </Field>
                 <button type="submit">Save bio</button>
               </form>
             </Modal>
@@ -204,6 +213,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                       emptyHref={ui.hrefs.search()}
                       emptyLabel={`search for a ${ui.itemNoun}`}
                       returnTo={savedReturnTo}
+                      mediaType={type}
                     />
                   </>,
                 ]

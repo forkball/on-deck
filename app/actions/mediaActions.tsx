@@ -28,6 +28,7 @@ const SUGGESTION_LIMIT = 6
 // client-side so the page still works fully without JS.
 const SEARCH_INITIAL_VISIBLE = 10
 
+
 const logSchema = f.object({
   status: f.field(s.union([s.literal('want_to_consume'), s.literal('in_progress'), s.literal('consumed')])),
   rating: f.field(s.defaulted(s.string(), '')),

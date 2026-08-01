@@ -12,7 +12,7 @@ import { FloatingDropdown } from '../components/floating-dropdown.tsx'
 import { Nav } from '../components/nav.tsx'
 import { StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { StatusSelect } from '../components/status-select.tsx'
-import { stackedLabel } from '../components/styles.ts'
+import { Field } from '../../assets/lib/field.tsx'
 import { parseMediaMetadata } from '../../utils/mediaMetadata.ts'
 import { statusLabelsFor } from '../../utils/status.ts'
 
@@ -46,10 +46,11 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
           <MediaTabLinks
             current={mediaType}
-            hrefFor={(type) => {
-              const base = MEDIA_TYPE_UI[type].hrefs.search()
-              return type === mediaType || !query ? base : `${base}?q=${encodeURIComponent(query)}`
-            }}
+            // Switching type starts a fresh search rather than carrying the
+            // query across. A title rarely means the same thing in two
+            // catalogs, so the old behaviour usually just showed a page of
+            // irrelevant results under the new tab.
+            hrefFor={(type) => MEDIA_TYPE_UI[type].hrefs.search()}
           />
           <h1 mix={css({ margin: '0 0 16px' })}>{ui.searchHeading}</h1>
           {message && <p mix={css({ color: '#15803d' })}>{message}</p>}
@@ -60,6 +61,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
             importHref={ui.hrefs.import()}
             placeholder={ui.searchPlaceholder}
           />
+
 
           {results.length > 0 && (
             <section>
@@ -157,10 +159,13 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                               mix={css({ display: 'flex', flexDirection: 'column', gap: '10px' })}
                             >
                               <input type="hidden" name="return_to" value={returnTo} />
-                              <label mix={stackedLabel}>
-                                Add to watch list
-                                <StatusSelect mediaType={mediaType} name="status" defaultValue={interaction?.status ?? 'want_to_consume'} />
-                              </label>
+                              <Field label={`Add to ${ui.singular} list`}>
+                                <StatusSelect
+                                  mediaType={mediaType}
+                                  name="status"
+                                  defaultValue={interaction?.status ?? 'want_to_consume'}
+                                />
+                              </Field>
                               <div class="watched-only-fields" mix={css({ flexDirection: 'column', gap: '10px' })}>
                                 <div>
                                   <p mix={css({ margin: '0 0 4px' })}>Rating</p>
@@ -170,15 +175,14 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                                     defaultValue={interaction?.rating ?? null}
                                   />
                                 </div>
-                                <label mix={stackedLabel}>
-                                  Add thoughts
+                                <Field label="Add thoughts">
                                   <input
                                     type="text"
                                     name="notes"
                                     defaultValue={interaction?.notes ?? ''}
                                     placeholder="What did you think?"
                                   />
-                                </label>
+                                </Field>
                               </div>
                               <button type="submit">Save</button>
                             </form>

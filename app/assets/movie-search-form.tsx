@@ -100,6 +100,7 @@ export const MovieSearchForm = clientEntry<MovieSearchFormProps>(
             {suggestState.open && <SuggestionDropdown state={suggestState} onSelect={selectSuggestion} />}
           </div>
 
+
           <button
             type="submit"
             disabled={submitting}

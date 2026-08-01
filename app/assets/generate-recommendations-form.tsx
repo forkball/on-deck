@@ -1,5 +1,8 @@
 import { clientEntry, css, on } from 'remix/ui'
 
+import { Collapsible } from './lib/collapsible.tsx'
+import { Field } from './lib/field.tsx'
+
 export type FriendOption = {
   id: number
   label: string
@@ -28,7 +31,7 @@ const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
 
 // Taste profiles that don't exist yet — shown so the picker reads as
 // "more coming" rather than movies/TV being the permanent ceiling.
-const PLACEHOLDER_SOURCES = ['Games', 'Comics']
+const PLACEHOLDER_SOURCES = ['Games']
 
 // Cycled through on the submit button while a run is generating, so the wait
 // reads as progress rather than a stall.
@@ -89,23 +92,6 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         color: '#888',
       })
 
-      // DoodleCSS sets `.doodle label { display: inline-block }` outside any
-      // @layer, which always outranks a mix-generated class regardless of
-      // its own specificity — so `display: flex` on the label itself gets
-      // silently ignored. Target the field directly instead: a block-level
-      // child always starts on its own line after preceding text, no matter
-      // what the label's own display is. See stackedLabel in
-      // ui/components/styles.ts for the same fix (can't import it here —
-      // the asset server only bundles files under app/assets/**).
-      const stackedField = css({
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px',
-        fontSize: '13px',
-        color: '#555',
-        '& select, & input': { display: 'block', width: '100%' },
-      })
-
       return (
         <form
           method="post"
@@ -135,10 +121,9 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             }),
           ]}
         >
-          <label mix={stackedField}>
-            Name this run (optional)
+          <Field label="Name this run (optional)">
             <input type="text" name="name" placeholder="e.g. Cozy weekend picks" />
-          </label>
+          </Field>
 
           <div>
             <p mix={sectionLabel}>Who's this for?</p>
@@ -284,7 +269,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
           </div>
 
           <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
-            <p mix={sectionLabel}>Filters (optional)</p>
+            <Collapsible summary={<span mix={sectionLabel}>Filters (optional)</span>}>
             <div
               mix={css({
                 display: 'grid',
@@ -292,17 +277,15 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 gap: '12px',
               })}
             >
-              <label mix={stackedField}>
-                Genre
+              <Field label="Genre">
                 <select name="genre" defaultValue="">
                   <option value="">Any</option>
                   {genres.map((genre) => (
                     <option value={genre}>{genre.replace(/^./, (c) => c.toUpperCase())}</option>
                   ))}
                 </select>
-              </label>
-              <label mix={stackedField}>
-                Decade
+              </Field>
+              <Field label="Decade">
                 <select name="decade" defaultValue="">
                   <option value="">Any</option>
                   {DECADES.map((decade) => (
@@ -311,17 +294,17 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                     </option>
                   ))}
                 </select>
-              </label>
-              <label mix={stackedField}>
-                Length
+              </Field>
+              <Field label="Length">
                 <select name="length" defaultValue="">
                   <option value="">Any</option>
                   <option value="short">Under 90 min</option>
                   <option value="medium">90–150 min</option>
                   <option value="long">Over 150 min</option>
                 </select>
-              </label>
+              </Field>
             </div>
+            </Collapsible>
           </div>
 
           <button type="submit" disabled={submitting || !hasSource}>

@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
-import { stackedLabel } from '../../../ui/components/styles.ts'
+import { Field } from '../../../assets/lib/field.tsx'
 
 export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
   return () => {
@@ -22,14 +22,12 @@ export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
             mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
           >
             {next && <input type="hidden" name="return_to" value={next} />}
-            <label mix={stackedLabel}>
-              Email
+            <Field label="Email">
               <input type="email" name="email" required />
-            </label>
-            <label mix={stackedLabel}>
-              Password
+            </Field>
+            <Field label="Password">
               <input type="password" name="password" required />
-            </label>
+            </Field>
             <button type="submit">Log in</button>
           </form>
           <p>

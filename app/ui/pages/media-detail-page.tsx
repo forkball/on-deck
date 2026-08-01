@@ -9,7 +9,8 @@ import { ExpandableText } from '../components/expandable-text.tsx'
 import { Modal } from '../components/modal.tsx'
 import { Nav } from '../components/nav.tsx'
 import { StatusSelect } from '../components/status-select.tsx'
-import { stackedLabel } from '../components/styles.ts'
+import { Collapsible } from '../../assets/lib/collapsible.tsx'
+import { Field } from '../../assets/lib/field.tsx'
 import { parseMediaMetadata } from '../../utils/mediaMetadata.ts'
 import { StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { statusLabelsFor } from '../../utils/status.ts'
@@ -104,8 +105,8 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
               {/* Top margin matters now that the description above may end
                   in a Read more toggle, which carries no bottom margin of
                   its own — without this the two sit flush together. */}
-              <details mix={css({ marginTop: '20px', marginBottom: '16px', color: '#555' })}>
-                <summary mix={css({ cursor: 'pointer' })}>Wrong {ui.itemNoun}?</summary>
+              <div mix={css({ marginTop: '20px', marginBottom: '16px', color: '#555' })}>
+                <Collapsible summary={`Wrong ${ui.itemNoun}?`}>
                 <form
                   method="post"
                   action={ui.hrefs.rematch(item.id)}
@@ -126,7 +127,8 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                   </a>
                 </p>
                 {rematchError && <p mix={css({ color: '#c33', margin: '8px 0 0' })}>{rematchError}</p>}
-              </details>
+                </Collapsible>
+              </div>
 
               <div
                 mix={css({
@@ -179,10 +181,9 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                   >
                     {interaction && <input type="hidden" name="_method" value="PUT" />}
                     <input type="hidden" name="return_to" value={returnTo} />
-                    <label mix={stackedLabel}>
-                      Status
+                    <Field label="Status">
                       <StatusSelect mediaType={mediaType} name="status" defaultValue={interaction?.status ?? 'want_to_consume'} />
-                    </label>
+                    </Field>
                     <div class="watched-only-fields" mix={css({ flexDirection: 'column', gap: '12px' })}>
                       <div>
                         <p mix={css({ margin: '0 0 4px' })}>Rating</p>
@@ -192,8 +193,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                           defaultValue={interaction?.rating ?? null}
                         />
                       </div>
-                      <label mix={stackedLabel}>
-                        Notes
+                      <Field label="Notes">
                         <textarea
                           name="notes"
                           rows={3}
@@ -201,7 +201,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                           placeholder="What did you think?"
                           mix={css({ width: '100%' })}
                         />
-                      </label>
+                      </Field>
                     </div>
                   </form>
                   <div

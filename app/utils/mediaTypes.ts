@@ -2,7 +2,7 @@ import type { MediaType } from '../data/mediaCatalog.ts'
 import { routes } from '../routes.ts'
 
 // The media types that are actually searchable and loggable today. The DB
-// enum (see schema.ts) already allows book/comic/game; this is the narrower
+// enum (see schema.ts) also allows game; this is the narrower
 // "wired up end to end" list. Adding a type here makes TypeScript enumerate
 // every place that owes it an answer, via the `satisfies` below — which is
 // exactly the property the old `=== 'tv' ? … : 'movie'` checks lacked, since

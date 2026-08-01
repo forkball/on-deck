@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
-import { stackedLabel } from '../../../ui/components/styles.ts'
+import { Field } from '../../../assets/lib/field.tsx'
 
 export interface SignupPageProps {
   error?: string
@@ -26,18 +26,15 @@ export function SignupPage(handle: Handle<SignupPageProps>) {
             action={routes.auth.signup.action.href()}
             mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
           >
-            <label mix={stackedLabel}>
-              Email
+            <Field label="Email">
               <input type="email" name="email" required defaultValue={values?.email ?? ''} />
-            </label>
-            <label mix={stackedLabel}>
-              Password (min 8 characters)
+            </Field>
+            <Field label="Password (min 8 characters)">
               <input type="password" name="password" required minLength={8} />
-            </label>
-            <label mix={stackedLabel}>
-              Display name (optional)
+            </Field>
+            <Field label="Display name (optional)">
               <input type="text" name="display_name" defaultValue={values?.display_name ?? ''} />
-            </label>
+            </Field>
             <button type="submit">Create account</button>
           </form>
           <p>
