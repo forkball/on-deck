@@ -18,7 +18,7 @@ type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 // Bulk-import entry points, per media type. Movies come from Letterboxd,
 // books from a Goodreads export; TV has no equivalent worth importing.
 const IMPORT_LINKS: Partial<Record<ActiveMediaType, { href: string; label: string }>> = {
-  movie: { href: routes.profile.import.index.href(), label: 'Import from Letterboxd' },
+  movie: { href: routes.profile.importMovies.index.href(), label: 'Import from Letterboxd' },
   book: { href: routes.profile.importBooks.index.href(), label: 'Import from Goodreads' },
 }
 

@@ -52,7 +52,7 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
                 Export your data from Letterboxd (Settings → Data → Export) and upload{' '}
                 <code>ratings.csv</code> from the zip.
               </p>
-              <LetterboxdImportForm uploadHref={routes.profile.import.upload.href()} error={error} />
+              <LetterboxdImportForm uploadHref={routes.profile.importMovies.upload.href()} error={error} />
             </>
           )}
         </main>

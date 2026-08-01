@@ -9,7 +9,7 @@ import { displayLabel } from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
 import { LetterboxdImportPage } from './page.tsx'
 
-export default createController(routes.profile.import, {
+export default createController(routes.profile.importMovies, {
   middleware: [requireAuth<User>()],
   actions: {
     index(context) {

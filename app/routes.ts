@@ -63,7 +63,7 @@ export const routes = route({
     following: get('following'),
     followers: get('followers'),
     updateBio: put('bio'),
-    import: route('import', {
+    importMovies: route('import-movies', {
       index: get('/'),
       upload: post('/'),
     }),

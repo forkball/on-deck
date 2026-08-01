@@ -9,7 +9,7 @@ import { displayLabel } from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
 import { GoodreadsImportPage } from './page.tsx'
 
-// Mirrors profile/import (Letterboxd) — see that controller; the only
+// Mirrors profile/import-movies (Letterboxd) — see that controller; the only
 // differences are which importer runs and which page renders.
 export default createController(routes.profile.importBooks, {
   middleware: [requireAuth<User>()],
