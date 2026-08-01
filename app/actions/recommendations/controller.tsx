@@ -8,7 +8,16 @@ import { redirect } from 'remix/response/redirect'
 
 import { getCatalogProvider } from '../../data/catalog.ts'
 import type { Db } from '../../data/db.ts'
+import { db as sharedDb } from '../../data/db.ts'
 import { listFollowedUsers } from '../../data/follows.ts'
+import {
+  completeJob,
+  createJob,
+  failJob,
+  getJob,
+  setPhase,
+  PHASE_LABELS,
+} from '../../data/generationProgress.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { getRememberedMediaType } from '../../middleware/mediaType.ts'
@@ -25,6 +34,7 @@ import {
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import { GeneratingPage } from './generating-page.tsx'
 import { RecommendationsPage } from './page.tsx'
 import { RecommendationRunPage } from './run-page.tsx'
 
@@ -217,18 +227,84 @@ export default createController(routes.recommendations, {
         }
       }
 
-      const { runId, prunedOldestRun } = await generateRecommendations(
-        db,
+      // Generation takes tens of seconds and moves through several distinct
+      // stages, so the request no longer blocks for the whole thing. It
+      // starts the work, hands back a job id, and the wait page reports which
+      // stage the job is actually in.
+      //
+      // The background task deliberately uses the module-level `db` rather
+      // than the request's: it outlives the response, and anything scoped to
+      // a finished request is not safe to keep using.
+      const jobId = createJob(auth.identity.id, { withLengthCheck: filters.length != null })
+
+      void generateRecommendations(
+        sharedDb,
         auth.identity.id,
         memberIds,
         filters,
         mediaType,
         sourceTypes,
         parsed.value.name,
+        (phase) => setPhase(jobId, phase),
+      ).then(
+        ({ runId, prunedOldestRun }) => completeJob(jobId, runId, prunedOldestRun),
+        (error: unknown) => {
+          // Nothing is awaiting this, so an unrecorded rejection would leave
+          // the page waiting on a stage that will never advance.
+          failJob(jobId, error instanceof Error ? error.message : 'Generating failed. Try again.')
+        },
       )
 
-      const href = routes.recommendations.show.href({ runId: String(runId) })
-      return redirect(prunedOldestRun ? `${href}?prunedOldest=1` : href, 303)
+      return redirect(routes.recommendations.generating.href({ jobId }), 303)
+    },
+
+    // The wait page. Server-rendered with the current stage already filled
+    // in, so it says something true before any polling happens — and keeps
+    // working without JavaScript via the meta refresh it carries.
+    generating(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const job = getJob(context.params.jobId, auth.identity.id)
+      if (!job) return new Response('Not Found', { status: 404 })
+
+      if (job.runId != null) {
+        const href = routes.recommendations.show.href({ runId: String(job.runId) })
+        return redirect(job.prunedOldestRun ? `${href}?prunedOldest=1` : href, 303)
+      }
+
+      return context.render(
+        <GeneratingPage
+          jobId={context.params.jobId}
+          phase={job.phase}
+          phases={job.phases}
+          error={job.error}
+          statusHref={routes.recommendations.status.href({ jobId: context.params.jobId })}
+          displayName={displayLabel(auth.identity)}
+        />,
+      )
+    },
+
+    // Polled by the wait page. JSON rather than HTML because the island
+    // swaps a caption rather than a page.
+    status(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const job = getJob(context.params.jobId, auth.identity.id)
+      if (!job) return Response.json({ error: 'not_found' }, { status: 404 })
+
+      return Response.json({
+        phase: job.phase,
+        label: PHASE_LABELS[job.phase],
+        done: job.runId != null,
+        href:
+          job.runId == null
+            ? null
+            : routes.recommendations.show.href({ runId: String(job.runId) }) +
+              (job.prunedOldestRun ? '?prunedOldest=1' : ''),
+        error: job.error ?? null,
+      })
     },
 
     async show(context) {

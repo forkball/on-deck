@@ -5,6 +5,7 @@ import { claude, parseStructuredResponse } from './claude.ts'
 import type { Db } from './db.ts'
 import { isFollowing } from './follows.ts'
 import { countUserMediaLog, type MediaType } from './mediaCatalog.ts'
+import type { GenerationPhase } from './generationProgress.ts'
 import { createNotification } from './notifications.ts'
 import {
   mediaItems,
@@ -462,10 +463,15 @@ export async function generateRecommendations(
   sourceTypes?: MediaType[],
   // Optional user-given label for the run, e.g. "Cozy weekend picks".
   name?: string,
+  // Called as each stage begins, so a waiting page can say what's happening
+  // instead of guessing. Every call site here sits immediately before the
+  // await it describes.
+  onPhase: (phase: GenerationPhase) => void = () => {},
 ): Promise<GenerateRecommendationsOutcome> {
   const profileTypes: MediaType[] = sourceTypes && sourceTypes.length > 0 ? sourceTypes : [mediaType]
 
   // Independent per member — regenerate every profile (and fetch their name) concurrently.
+  onPhase('profiles')
   const members = await Promise.all(
     memberUserIds.map(async (memberId) => {
       const [regenerated, user] = await Promise.all([
@@ -498,11 +504,17 @@ export async function generateRecommendations(
     }
   }
 
+  onPhase('picks')
   const picks = await requestPicks(profiles, excludedTitles, filters, mediaType, profileTypes)
 
   // Independent lookups — resolve every pick against TMDB concurrently, then
   // apply dedup/matching/verification over the results in order.
+  onPhase('matching')
   const matchesByPick = await Promise.all(picks.map((pick) => searchForType(mediaType, pick.title)))
+
+  // Only reported when a length lever is set, because only then does the loop
+  // below make a second round of requests.
+  if (filters.length) onPhase('lengths')
 
   // Deliberately not capped at TARGET_COUNT here — verifyPicksAgainstOverviews
   // below drops some of these too, so the same over-request slack that
@@ -550,8 +562,10 @@ export async function generateRecommendations(
   // Title similarity can't tell two different films apart when they share
   // both title and year — only content can, so this is a second, semantic
   // pass over the survivors before anything gets written to the catalog.
+  onPhase('verifying')
   const verified = await verifyPicksAgainstOverviews(await withOverviews(candidates, mediaType), mediaType)
 
+  onPhase('saving')
   const results: RecommendationResult[] = []
   for (const { pick, match } of verified.slice(0, TARGET_COUNT)) {
     const item = await upsertCatalogItem(db, mediaType, match)

@@ -87,6 +87,10 @@ export const routes = route({
   recommendations: route('recommendations', {
     index: get('/'),
     generate: post('/'),
+    // The wait while a run is generating, and the endpoint it polls. Both
+    // keyed by an in-memory job id (see data/generationProgress.ts).
+    generating: get('generating/:jobId'),
+    status: get('status/:jobId'),
     show: get(':runId'),
   }),
   users: route('users', {

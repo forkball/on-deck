@@ -36,25 +36,18 @@ const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
 // "more coming" rather than movies/TV being the permanent ceiling.
 const PLACEHOLDER_SOURCES: string[] = []
 
-// Cycled through on the submit button while a run is generating, so the wait
-// reads as progress rather than a stall.
-const THINKING_MESSAGES = [
-  'Generating…',
-  'Reading taste profiles…',
-  'Finding picks…',
-  'Matching results…',
-  'Almost there…',
-]
-
 const FRIENDS_PAGE_SIZE = 8
 
-// A client-hydrated island — most of the app is CSS-only. Generating
-// recommendations is a genuine multi-second wait (a few model calls plus
-// catalog lookups), so this shows a "Generating…" state the instant you
-// submit, cycling through THINKING_MESSAGES for as long as the wait
-// continues. Comments here ship to the browser with the bundle, so this
-// names neither the model vendor nor the catalog. The <form> still works as a plain POST without JS; this
-// only adds feedback on top.
+// A client-hydrated island — most of the app is CSS-only. Submitting now
+// redirects almost immediately to a page that reports the real stage the run
+// is in, so this only needs to cover that hop: the button disables itself so
+// a second submit can't start a second run.
+//
+// It used to cycle invented captions on a 1.8s timer, which looped — so it
+// claimed to be "almost there" and then started over. Nothing here guesses at
+// progress any more. Comments here ship to the browser with the bundle, so
+// this names neither the model vendor nor the catalog. The <form> still works
+// as a plain POST without JS; this only adds feedback on top.
 //
 // The friend picker is search-filtered and paginated client-side (the
 // server hands over the full list once). Every friend's checkbox always
@@ -68,7 +61,6 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
   import.meta.url,
   function GenerateRecommendationsForm(handle) {
     let submitting = false
-    let thinkingIndex = 0
     let mode: 'self' | 'group' = 'self'
     let search = ''
     let page = 1
@@ -114,15 +106,6 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             on('submit', () => {
               submitting = true
               handle.update()
-
-              const interval = setInterval(() => {
-                if (handle.signal.aborted) {
-                  clearInterval(interval)
-                  return
-                }
-                thinkingIndex = (thinkingIndex + 1) % THINKING_MESSAGES.length
-                handle.update()
-              }, 1800)
             }),
           ]}
         >
@@ -315,7 +298,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
           </div>
 
           <button type="submit" disabled={submitting || !hasSource}>
-            {submitting ? THINKING_MESSAGES[thinkingIndex] : 'Get recommendations'}
+            {submitting ? 'Starting…' : 'Get recommendations'}
           </button>
         </form>
       )
