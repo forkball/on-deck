@@ -7,7 +7,7 @@ import { routes } from '../routes.ts'
 // every place that owes it an answer, via the `satisfies` below — which is
 // exactly the property the old `=== 'tv' ? … : 'movie'` checks lacked, since
 // those silently treated anything unrecognized as a movie.
-export const ACTIVE_MEDIA_TYPES = ['movie', 'tv', 'book'] as const
+export const ACTIVE_MEDIA_TYPES = ['movie', 'tv', 'book', 'game'] as const
 
 export type ActiveMediaType = (typeof ACTIVE_MEDIA_TYPES)[number]
 
@@ -54,6 +54,9 @@ interface MediaTypeUi {
   // where the id it's asking for actually lives. Whether the year is usable
   // is per-catalog and was measured, not assumed; see each entry.
   catalogSearchUrl: (title: string, year: number | null) => string
+  // Deliberately doesn't name the catalog: which service backs a search
+  // is an implementation detail, and it changes per type. The rematch
+  // form still names it, because there you're pasting a link from it.
   searchPlaceholder: string
   // Page heading and <title> on the search route.
   searchHeading: string
@@ -81,6 +84,7 @@ interface MediaTypeUi {
 
 const WATCH_VERBS: StatusVerbs = { want: 'Want to watch', inProgress: 'Watching', done: 'Watched' }
 const READ_VERBS: StatusVerbs = { want: 'Want to read', inProgress: 'Reading', done: 'Read' }
+const PLAY_VERBS: StatusVerbs = { want: 'Want to play', inProgress: 'Playing', done: 'Played' }
 
 export const MEDIA_TYPE_UI = {
   movie: {
@@ -97,7 +101,7 @@ export const MEDIA_TYPE_UI = {
     // for ?year=2010 and ?year=1994, so the param is ignored, and folding the
     // year into the query text instead measurably *worsens* matching.
     catalogSearchUrl: (title) => `https://www.themoviedb.org/search/movie?query=${encodeURIComponent(title)}`,
-    searchPlaceholder: 'Search TMDB for a movie…',
+    searchPlaceholder: 'Search for a movie…',
     searchHeading: 'Search movies',
     statusVerbs: WATCH_VERBS,
     pastParticiple: 'watched',
@@ -123,7 +127,7 @@ export const MEDIA_TYPE_UI = {
     rematchPlaceholder: 'Paste a themoviedb.org link or id',
     // See the movie entry — TMDB ignores the year on web search.
     catalogSearchUrl: (title) => `https://www.themoviedb.org/search/tv?query=${encodeURIComponent(title)}`,
-    searchPlaceholder: 'Search TMDB for a TV show…',
+    searchPlaceholder: 'Search for a TV show…',
     searchHeading: 'Search TV',
     statusVerbs: WATCH_VERBS,
     pastParticiple: 'watched',
@@ -154,7 +158,7 @@ export const MEDIA_TYPE_UI = {
       `https://openlibrary.org/search?q=${encodeURIComponent(
         year ? `${title} first_publish_year:${year}` : title,
       )}`,
-    searchPlaceholder: 'Search Open Library for a book…',
+    searchPlaceholder: 'Search for a book…',
     searchHeading: 'Search books',
     statusVerbs: READ_VERBS,
     pastParticiple: 'read',
@@ -166,6 +170,31 @@ export const MEDIA_TYPE_UI = {
       show: (id) => routes.books.show.href({ mediaItemId: String(id) }),
       log: (id) => routes.books.log.href({ mediaItemId: String(id) }),
       rematch: (id) => routes.books.rematch.href({ mediaItemId: String(id) }),
+    },
+  },
+  game: {
+    slug: 'games',
+    tabLabel: 'Games',
+    singular: 'game',
+    plural: 'games',
+    attributive: 'game',
+    entryNoun: 'game',
+    itemNoun: 'game',
+    catalogName: 'RAWG',
+    rematchPlaceholder: 'Paste a RAWG game id',
+    catalogSearchUrl: (title) => `https://rawg.io/search?query=${encodeURIComponent(title)}`,
+    searchPlaceholder: 'Search for a game…',
+    searchHeading: 'Search games',
+    statusVerbs: PLAY_VERBS,
+    pastParticiple: 'played',
+    creditLabel: 'Developer',
+    hrefs: {
+      search: () => routes.games.search.href(),
+      suggest: () => routes.games.suggest.href(),
+      import: () => routes.games.import.href(),
+      show: (id) => routes.games.show.href({ mediaItemId: String(id) }),
+      log: (id) => routes.games.log.href({ mediaItemId: String(id) }),
+      rematch: (id) => routes.games.rematch.href({ mediaItemId: String(id) }),
     },
   },
 } satisfies Record<ActiveMediaType, MediaTypeUi>

@@ -34,25 +34,26 @@ const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
 
 // Taste profiles that don't exist yet — shown so the picker reads as
 // "more coming" rather than movies/TV being the permanent ceiling.
-const PLACEHOLDER_SOURCES = ['Games']
+const PLACEHOLDER_SOURCES: string[] = []
 
 // Cycled through on the submit button while a run is generating, so the wait
 // reads as progress rather than a stall.
 const THINKING_MESSAGES = [
   'Generating…',
   'Reading taste profiles…',
-  'Asking Claude for picks…',
+  'Finding picks…',
   'Matching results…',
   'Almost there…',
 ]
 
 const FRIENDS_PAGE_SIZE = 8
 
-// The only client-hydrated component in the app — everything else is
-// CSS-only. Generating recommendations is a genuine multi-second wait (a few
-// Claude calls plus TMDB lookups), so this shows a "Generating…" state the
-// instant you submit, cycling through THINKING_MESSAGES for as long as the
-// wait continues. The <form> still works as a plain POST without JS; this
+// A client-hydrated island — most of the app is CSS-only. Generating
+// recommendations is a genuine multi-second wait (a few model calls plus
+// catalog lookups), so this shows a "Generating…" state the instant you
+// submit, cycling through THINKING_MESSAGES for as long as the wait
+// continues. Comments here ship to the browser with the bundle, so this
+// names neither the model vendor nor the catalog. The <form> still works as a plain POST without JS; this
 // only adds feedback on top.
 //
 // The friend picker is search-filtered and paginated client-side (the

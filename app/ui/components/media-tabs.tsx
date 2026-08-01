@@ -6,7 +6,7 @@ import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../u
 // Mirrors the media types offered in media-tab-links.tsx — movies and TV are
 // wired up, the rest are placeholders so this reads as "more coming" rather
 // than movies+TV being the only media types the app will ever support.
-const PLACEHOLDER_MEDIA_TYPES = ['games'] as const
+const PLACEHOLDER_MEDIA_TYPES = [] as const
 
 // Slugs are plural ('movies') while MediaType is singular ('movie') — the
 // registry's `slug` is the single place that mismatch is reconciled, and

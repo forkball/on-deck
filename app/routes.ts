@@ -33,6 +33,14 @@ export const routes = route({
     log: post(':mediaItemId/log'),
     rematch: post(':mediaItemId/rematch'),
   }),
+  games: route('games', {
+    search: get('search'),
+    suggest: get('suggest'),
+    import: get('import'),
+    show: get(':mediaItemId'),
+    log: post(':mediaItemId/log'),
+    rematch: post(':mediaItemId/rematch'),
+  }),
   tv: route('tv', {
     search: get('search'),
     suggest: get('suggest'),

@@ -9,6 +9,8 @@ export interface MediaMetadata {
   runtimeMinutes: number | null
   // Books — the length dimension that stands in for runtime.
   pageCount: number | null
+  // Games — median hours to finish, per RAWG.
+  playtimeHours: number | null
   // The person most associated with the work: director for film, creator
   // for TV, author for a book. One field rather than three, since only one
   // is ever meaningful per type — MEDIA_TYPE_UI.creditLabel names it.
@@ -32,6 +34,7 @@ export function parseMediaMetadata(metadata: string): MediaMetadata {
       overview: stringOrNull(parsed.overview),
       runtimeMinutes: numberOrNull(parsed.runtimeMinutes),
       pageCount: numberOrNull(parsed.pageCount),
+      playtimeHours: numberOrNull(parsed.playtimeHours),
       creator: stringOrNull(parsed.creator),
     }
   } catch {
@@ -41,6 +44,7 @@ export function parseMediaMetadata(metadata: string): MediaMetadata {
       overview: null,
       runtimeMinutes: null,
       pageCount: null,
+      playtimeHours: null,
       creator: null,
     }
   }

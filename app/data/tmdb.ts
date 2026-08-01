@@ -66,9 +66,10 @@ export interface TmdbSearchResult {
   // Only ever populated via getMovieById — TMDB's search endpoint doesn't
   // return runtime, only the per-movie detail endpoint does.
   runtimeMinutes: number | null
-  // Populated by non-film providers (Open Library) — the length dimension
-  // and credit that stand in for runtime on books.
+  // Populated by non-film providers — each medium's own length dimension,
+  // plus the credit that stands in for a director.
   pageCount?: number | null
+  playtimeHours?: number | null
   creator?: string | null
 }
 

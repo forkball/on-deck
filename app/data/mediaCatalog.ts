@@ -41,6 +41,7 @@ function buildMetadata(result: TmdbSearchResult, previous?: string): string {
     overview: result.overview ?? prev?.overview ?? null,
     runtimeMinutes: result.runtimeMinutes ?? prev?.runtimeMinutes ?? null,
     pageCount: result.pageCount ?? prev?.pageCount ?? null,
+    playtimeHours: result.playtimeHours ?? prev?.playtimeHours ?? null,
     creator: result.creator ?? prev?.creator ?? null,
   })
 }

@@ -9,6 +9,7 @@ import authController from './actions/auth/controller.tsx'
 import authLoginController from './actions/auth/login/controller.tsx'
 import authSignupController from './actions/auth/signup/controller.tsx'
 import booksController from './actions/books/controller.tsx'
+import gamesController from './actions/games/controller.tsx'
 import interactionsController from './actions/interactions/controller.tsx'
 import moviesController from './actions/movies/controller.tsx'
 import notificationsController from './actions/notifications/controller.tsx'
@@ -59,6 +60,7 @@ router.map(routes.auth.login, authLoginController)
 router.map(routes.auth.signup, authSignupController)
 router.map(routes.movies, moviesController)
 router.map(routes.books, booksController)
+router.map(routes.games, gamesController)
 router.map(routes.tv, tvController)
 router.map(routes.interactions, interactionsController)
 router.map(routes.notifications, notificationsController)

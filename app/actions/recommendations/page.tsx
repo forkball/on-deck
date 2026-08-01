@@ -82,8 +82,8 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
           />
           <h1>Recommendations</h1>
           <p mix={css({ color: '#555' })}>
-            Rewrites your {ui.attributive} taste profile from what you've logged, then asks
-            Claude for picks to try next.
+            Rewrites your {ui.attributive} taste profile from what you've logged, then finds
+            picks to try next.
           </p>
 
           {error && (
