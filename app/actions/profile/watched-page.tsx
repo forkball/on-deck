@@ -1,17 +1,18 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { listUserMovieLog } from '../../data/movies.ts'
+import type { listUserMediaLog } from '../../data/mediaCatalog.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { MovieLogEditModal } from '../../ui/components/movie-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
+import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
 
 export interface ProfileWatchedPageProps {
-  movieLog: Awaited<ReturnType<typeof listUserMovieLog>>
-  mediaType: 'movie' | 'tv'
+  movieLog: Awaited<ReturnType<typeof listUserMediaLog>>
+  mediaType: ActiveMediaType
   page: number
   totalPages: number
   displayName: string
@@ -20,10 +21,10 @@ export interface ProfileWatchedPageProps {
 export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
   return () => {
     const { movieLog, mediaType, page, totalPages, displayName } = handle.props
-    const typeQuery = mediaType === 'tv' ? '&type=tv' : ''
+    const ui = MEDIA_TYPE_UI[mediaType]
+    const typeQuery = mediaType === 'movie' ? '' : `&type=${mediaType}`
     const returnTo = `${routes.profile.watched.href()}?page=${page}${typeQuery}`
-    const showRoute = mediaType === 'tv' ? routes.tv.show : routes.movies.show
-    const heading = mediaType === 'tv' ? "What I've watched (TV)" : "What I've watched (Movies)"
+    const heading = `What I've watched (${ui.tabLabel})`
 
     return (
       <Document title={`${heading} | On Deck`}>
@@ -34,7 +35,7 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
           <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
             {movieLog.map(({ interaction, item }) => {
               const detailHref = item
-                ? `${showRoute.href({ mediaItemId: String(item.id) })}?from=${encodeURIComponent(returnTo)}`
+                ? `${ui.hrefs.show(item.id)}?from=${encodeURIComponent(returnTo)}`
                 : '#'
 
               return (

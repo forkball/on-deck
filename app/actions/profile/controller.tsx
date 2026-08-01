@@ -10,13 +10,13 @@ import {
   listFollowers,
   listFollowingIds,
 } from '../../data/follows.ts'
-import { countUserMovieLog, listUserMovieLog } from '../../data/movies.ts'
 import { countUserMediaLog, listUserMediaLog } from '../../data/mediaCatalog.ts'
-import { getTasteProfile } from '../../data/tasteProfile.ts'
+import { loadMediaSummaries } from '../../data/mediaSummary.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, updateUserBio } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
+import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../utils/mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { ProfilePage } from './page.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
@@ -32,26 +32,18 @@ export default createController(routes.profile, {
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
-      const movieProfile = await getTasteProfile(db, auth.identity.id, 'movie')
-      const movieLog = await listUserMovieLog(db, auth.identity.id, { limit: RECENT_COUNT, type: 'movie' })
-      const totalWatched = await countUserMovieLog(db, auth.identity.id, 'movie')
-
-      const tvProfile = await getTasteProfile(db, auth.identity.id, 'tv')
-      const tvLog = await listUserMediaLog(db, auth.identity.id, { limit: RECENT_COUNT, type: 'tv' })
-      const totalTv = await countUserMediaLog(db, auth.identity.id, 'tv')
+      const media = await loadMediaSummaries(db, auth.identity.id, RECENT_COUNT)
+      // Which tab to open on — set when returning from a detail page.
+      const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
       const followingCount = await countFollowing(db, auth.identity.id)
       const followersCount = await countFollowers(db, auth.identity.id)
 
       return context.render(
         <ProfilePage
-          movieSummary={movieProfile?.summary ?? ''}
+          media={media}
+          activeTab={activeTab}
           bio={auth.identity.bio ?? ''}
-          movieLog={movieLog}
-          totalWatched={totalWatched}
-          tvSummary={tvProfile?.summary ?? ''}
-          tvLog={tvLog}
-          totalTv={totalTv}
           followingCount={followingCount}
           followersCount={followersCount}
           saved={context.url.searchParams.get('saved') === '1'}
@@ -79,7 +71,7 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
-      const mediaType = context.url.searchParams.get('type') === 'tv' ? 'tv' : 'movie'
+      const mediaType = parseMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
       const totalWatched = await countUserMediaLog(db, auth.identity.id, mediaType)
       const movieLog = await listUserMediaLog(db, auth.identity.id, {
         limit: PAGE_SIZE,

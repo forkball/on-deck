@@ -4,7 +4,6 @@ import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import type { Db } from '../../data/db.ts'
-import { countUserMovieLog, listUserMovieLog } from '../../data/movies.ts'
 import { countUserMediaLog, listUserMediaLog } from '../../data/mediaCatalog.ts'
 import {
   countFollowers,
@@ -16,11 +15,12 @@ import {
   listFollowingIds,
   unfollowUser,
 } from '../../data/follows.ts'
-import { getTasteProfile } from '../../data/tasteProfile.ts'
+import { loadMediaSummaries } from '../../data/mediaSummary.ts'
 import { users, type User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, searchUsers } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
+import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../utils/mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { UserSearchPage } from './search-page.tsx'
 import { UserProfilePage } from './show-page.tsx'
@@ -91,13 +91,8 @@ export default createController(routes.users, {
       const target = await requireFollowedUser(db, auth.identity.id, userId)
       if (target instanceof Response) return target
 
-      const movieProfile = await getTasteProfile(db, userId, 'movie')
-      const movieLog = await listUserMovieLog(db, userId, { limit: RECENT_COUNT, type: 'movie' })
-      const totalWatched = await countUserMovieLog(db, userId, 'movie')
-
-      const tvProfile = await getTasteProfile(db, userId, 'tv')
-      const tvLog = await listUserMediaLog(db, userId, { limit: RECENT_COUNT, type: 'tv' })
-      const totalTv = await countUserMediaLog(db, userId, 'tv')
+      const media = await loadMediaSummaries(db, userId, RECENT_COUNT)
+      const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
       const followingCount = await countFollowing(db, userId)
       const followersCount = await countFollowers(db, userId)
@@ -105,13 +100,9 @@ export default createController(routes.users, {
       return context.render(
         <UserProfilePage
           user={target}
-          movieSummary={movieProfile?.summary ?? ''}
+          media={media}
+          activeTab={activeTab}
           bio={target.bio ?? ''}
-          movieLog={movieLog}
-          totalWatched={totalWatched}
-          tvSummary={tvProfile?.summary ?? ''}
-          tvLog={tvLog}
-          totalTv={totalTv}
           followingCount={followingCount}
           followersCount={followersCount}
           displayName={displayLabel(auth.identity)}
@@ -129,7 +120,7 @@ export default createController(routes.users, {
       if (target instanceof Response) return target
 
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
-      const mediaType = context.url.searchParams.get('type') === 'tv' ? 'tv' : 'movie'
+      const mediaType = parseMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
       const totalWatched = await countUserMediaLog(db, userId, mediaType)
       const movieLog = await listUserMediaLog(db, userId, {
         limit: PAGE_SIZE,

@@ -1,7 +1,9 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { listUserMovieLog } from '../../data/movies.ts'
+import type { MediaSummaries } from '../../data/mediaSummary.ts'
+import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import type { listUserMediaLog } from '../../data/mediaCatalog.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
@@ -10,17 +12,13 @@ import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 
-type MediaLog = Awaited<ReturnType<typeof listUserMovieLog>>
+type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
 export interface UserProfilePageProps {
   user: User
-  movieSummary: string
+  media: MediaSummaries
+  activeTab: ActiveMediaType
   bio: string
-  movieLog: MediaLog
-  totalWatched: number
-  tvSummary: string
-  tvLog: MediaLog
-  totalTv: number
   followingCount: number
   followersCount: number
   displayName: string
@@ -84,19 +82,7 @@ function LoggedList(
 
 export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
   return () => {
-    const {
-      user,
-      movieSummary,
-      bio,
-      movieLog,
-      totalWatched,
-      tvSummary,
-      tvLog,
-      totalTv,
-      followingCount,
-      followersCount,
-      displayName,
-    } = handle.props
+    const { user, media, activeTab, bio, followingCount, followersCount, displayName } = handle.props
     const label = displayLabel(user)
     const returnTo = routes.users.show.href({ userId: String(user.id) })
 
@@ -116,30 +102,32 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
 
           <MediaTabs
             idPrefix="user-profile"
-            movies={
-              <>
-                <TasteProfileSummary label={`${label}'s movie taste profile`} summary={movieSummary} />
-                <h2>What {label} has watched</h2>
-                <LoggedList
-                  log={movieLog}
-                  total={totalWatched}
-                  detailHref={(id) => `${routes.movies.show.href({ mediaItemId: String(id) })}?from=${encodeURIComponent(returnTo)}`}
-                  seeAllHref={routes.users.watched.href({ userId: String(user.id) })}
-                />
-              </>
-            }
-            tv={
-              <>
-                <TasteProfileSummary label={`${label}'s TV taste profile`} summary={tvSummary} />
-                <h2>What {label} has watched</h2>
-                <LoggedList
-                  log={tvLog}
-                  total={totalTv}
-                  detailHref={(id) => `${routes.tv.show.href({ mediaItemId: String(id) })}?from=${encodeURIComponent(returnTo)}`}
-                  seeAllHref={`${routes.users.watched.href({ userId: String(user.id) })}?type=tv`}
-                />
-              </>
-            }
+            active={activeTab}
+            panels={Object.fromEntries(
+              ACTIVE_MEDIA_TYPES.map((type) => {
+                const ui = MEDIA_TYPE_UI[type]
+                const { summary, log, total } = media[type]
+                const watchedHref = routes.users.watched.href({ userId: String(user.id) })
+
+                return [
+                  type,
+                  <>
+                    <TasteProfileSummary label={`${label}'s ${ui.attributive} taste profile`} summary={summary} />
+                    <h2>
+                      What {label} has {ui.pastParticiple}
+                    </h2>
+                    <LoggedList
+                      log={log}
+                      total={total}
+                      detailHref={(id) =>
+                        `${ui.hrefs.show(id)}?from=${encodeURIComponent(`${returnTo}?tab=${type}`)}`
+                      }
+                      seeAllHref={type === 'movie' ? watchedHref : `${watchedHref}?type=${type}`}
+                    />
+                  </>,
+                ]
+              }),
+            )}
           />
         </main>
       </Document>

@@ -1,7 +1,9 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { listUserMovieLog } from '../../data/movies.ts'
+import type { MediaSummaries } from '../../data/mediaSummary.ts'
+import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import type { listUserMediaLog } from '../../data/mediaCatalog.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
@@ -10,16 +12,20 @@ import { MovieLogEditModal } from '../../ui/components/movie-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 
-type MediaLog = Awaited<ReturnType<typeof listUserMovieLog>>
+type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
+
+// Bulk-import entry points, per media type. Movies come from Letterboxd,
+// books from a Goodreads export; TV has no equivalent worth importing.
+const IMPORT_LINKS: Partial<Record<ActiveMediaType, { href: string; label: string }>> = {
+  movie: { href: routes.profile.import.index.href(), label: 'Import from Letterboxd' },
+  book: { href: routes.profile.importBooks.index.href(), label: 'Import from Goodreads' },
+}
 
 export interface ProfilePageProps {
-  movieSummary: string
+  // Keyed by media type rather than a prop per type — see loadMediaSummaries.
+  media: MediaSummaries
+  activeTab: ActiveMediaType
   bio: string
-  movieLog: MediaLog
-  totalWatched: number
-  tvSummary: string
-  tvLog: MediaLog
-  totalTv: number
   followingCount: number
   followersCount: number
   saved?: boolean
@@ -99,19 +105,7 @@ function LoggedList(
 
 export function ProfilePage(handle: Handle<ProfilePageProps>) {
   return () => {
-    const {
-      movieSummary,
-      bio,
-      movieLog,
-      totalWatched,
-      tvSummary,
-      tvLog,
-      totalTv,
-      followingCount,
-      followersCount,
-      saved,
-      displayName,
-    } = handle.props
+    const { media, activeTab, bio, followingCount, followersCount, saved, displayName } = handle.props
     const profileHref = routes.profile.index.href()
     const savedReturnTo = `${profileHref}?saved=1`
 
@@ -165,41 +159,56 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
 
           <MediaTabs
             idPrefix="profile"
-            movies={
-              <>
-                <TasteProfileSummary label="My movie taste profile" summary={movieSummary} />
-                <div mix={css({ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px' })}>
-                  <h2>What I've watched</h2>
-                  <a href={routes.profile.import.index.href()} mix={css({ fontSize: '13px', textAlign: 'right' })}>
-                    Import from Letterboxd
-                  </a>
-                </div>
-                <LoggedList
-                  log={movieLog}
-                  total={totalWatched}
-                  detailHref={(id) => `${routes.movies.show.href({ mediaItemId: String(id) })}?from=${encodeURIComponent(profileHref)}`}
-                  seeAllHref={routes.profile.watched.href()}
-                  emptyHref={routes.movies.search.href()}
-                  emptyLabel="search for a movie"
-                  returnTo={savedReturnTo}
-                />
-              </>
-            }
-            tv={
-              <>
-                <TasteProfileSummary label="My TV taste profile" summary={tvSummary} />
-                <h2>What I've watched</h2>
-                <LoggedList
-                  log={tvLog}
-                  total={totalTv}
-                  detailHref={(id) => `${routes.tv.show.href({ mediaItemId: String(id) })}?from=${encodeURIComponent(profileHref)}`}
-                  seeAllHref={`${routes.profile.watched.href()}?type=tv`}
-                  emptyHref={routes.tv.search.href()}
-                  emptyLabel="search for a TV show"
-                  returnTo={savedReturnTo}
-                />
-              </>
-            }
+            active={activeTab}
+            panels={Object.fromEntries(
+              ACTIVE_MEDIA_TYPES.map((type) => {
+                const ui = MEDIA_TYPE_UI[type]
+                const { summary, log, total } = media[type]
+                const seeAllHref =
+                  type === 'movie'
+                    ? routes.profile.watched.href()
+                    : `${routes.profile.watched.href()}?type=${type}`
+
+                return [
+                  type,
+                  <>
+                    <TasteProfileSummary label={`My ${ui.attributive} taste profile`} summary={summary} />
+                    {/* Each importer only understands one medium, so the
+                        entry point lives on that medium's tab. */}
+                    {IMPORT_LINKS[type] ? (
+                      <div
+                        mix={css({
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'baseline',
+                          gap: '12px',
+                        })}
+                      >
+                        <h2>What I've {ui.pastParticiple}</h2>
+                        <a href={IMPORT_LINKS[type]!.href} mix={css({ fontSize: '13px', textAlign: 'right' })}>
+                          {IMPORT_LINKS[type]!.label}
+                        </a>
+                      </div>
+                    ) : (
+                      <h2>What I've {ui.pastParticiple}</h2>
+                    )}
+                    <LoggedList
+                      log={log}
+                      total={total}
+                      // Carries the tab, so "back to your profile" returns
+                      // to the tab you left rather than the first one.
+                      detailHref={(id) =>
+                        `${ui.hrefs.show(id)}?from=${encodeURIComponent(`${profileHref}?tab=${type}`)}`
+                      }
+                      seeAllHref={seeAllHref}
+                      emptyHref={ui.hrefs.search()}
+                      emptyLabel={`search for a ${ui.itemNoun}`}
+                      returnTo={savedReturnTo}
+                    />
+                  </>,
+                ]
+              }),
+            )}
           />
         </main>
       </Document>
