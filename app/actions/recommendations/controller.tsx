@@ -58,6 +58,7 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     runsFromOthers: allRunsFromOthers.filter((run) => run.mediaType === mediaType),
     friends,
     genres: getCatalogProvider(mediaType).genres,
+    lengthOptions: getCatalogProvider(mediaType).lengthOptions,
     displayName: displayLabel(user),
   }
 }
@@ -91,6 +92,7 @@ export default createController(routes.recommendations, {
           friends={data.friends}
           mediaType={mediaType}
           genres={data.genres}
+          lengthOptions={data.lengthOptions}
           displayName={data.displayName}
         />,
       )
@@ -159,6 +161,7 @@ export default createController(routes.recommendations, {
             friends={data.friends}
             mediaType={mediaType}
             genres={data.genres}
+          lengthOptions={data.lengthOptions}
             displayName={data.displayName}
             error={`Can't generate this run — ${detail}. Everyone included needs something logged for each taste you're basing picks on.`}
           />,

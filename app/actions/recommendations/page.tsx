@@ -17,6 +17,7 @@ export interface RecommendationsPageProps {
   friends: User[]
   mediaType: ActiveMediaType
   genres: string[]
+  lengthOptions: { value: string; label: string }[]
   displayName: string
   error?: string
 }
@@ -67,7 +68,7 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
 
 export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
-    const { runs, runsFromOthers, friends, mediaType, genres, displayName, error } = handle.props
+    const { runs, runsFromOthers, friends, mediaType, genres, lengthOptions, displayName, error } = handle.props
     const recsHref = routes.recommendations.index.href()
     const ui = MEDIA_TYPE_UI[mediaType]
 
@@ -108,6 +109,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
               label: `${MEDIA_TYPE_UI[type].attributive} taste`,
             }))}
             genres={genres}
+            lengthOptions={lengthOptions}
             generateHref={routes.recommendations.generate.href()}
             findPeopleHref={routes.users.search.href()}
           />

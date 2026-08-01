@@ -125,13 +125,6 @@ function matchesDecade(releaseYear: number | null, decade: number): boolean {
   return releaseYear != null && releaseYear >= decade && releaseYear < decade + 10
 }
 
-function matchesLength(runtimeMinutes: number | null, length: RecommendationLength): boolean {
-  if (runtimeMinutes == null) return false
-  if (length === 'short') return runtimeMinutes < 90
-  if (length === 'long') return runtimeMinutes > 150
-  return runtimeMinutes >= 90 && runtimeMinutes <= 150
-}
-
 function normalizeTitle(title: string): string {
   return title
     .toLowerCase()
@@ -451,16 +444,24 @@ export async function generateRecommendations(
     if (filters.genre && !match.tags.includes(filters.genre)) continue
     if (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade)) continue
 
-    // Runtime isn't in search results — only fetched (and only filtered on)
-    // when a length lever is actually set, so picks that don't need it never
-    // pay for the extra TMDB round trip.
+    // The length dimension isn't in search results for any provider — only
+    // the by-id lookup carries it — so this only pays for the extra round
+    // trip when a length lever is actually set. The provider decides what
+    // "short" means in its own units.
+    let resolved = match
     if (filters.length) {
       const detail = await lookupForType(mediaType, match.externalId)
-      if (!detail || !matchesLength(detail.runtimeMinutes, filters.length)) continue
+      if (!detail || !getCatalogProvider(mediaType).matchesLength(detail, filters.length)) continue
+      // Keep the detail rather than discarding it. We've already paid for the
+      // request, and it carries everything search omits — runtime/page count,
+      // the credit, and (for books) the description. Storing `match` instead
+      // meant a filtered run wrote rows with a null runtime it had just
+      // fetched, and left the detail page to re-request it later.
+      resolved = detail
     }
 
     seenExternalIds.add(match.externalId)
-    candidates.push({ pick, match })
+    candidates.push({ pick, match: resolved })
   }
 
   // Title similarity can't tell two different films apart when they share

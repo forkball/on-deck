@@ -1,6 +1,7 @@
 import type { Db } from './db.ts'
 import { upsertMediaItem, rematchMediaItem, type MediaType, type RematchMediaItemResult } from './mediaCatalog.ts'
 import type { MediaItem } from './schema.ts'
+import type { RecommendationLength } from './recommendations.ts'
 import { BOOK_GENRES, getBookById, parseOpenLibraryId, searchBooks } from './openLibrary.ts'
 import {
   getMovieById,
@@ -38,6 +39,15 @@ export interface CatalogProvider {
   matchHint: string
   // Shown when the id parsed fine but the catalog had no such entry.
   lookupFailedError: string
+  // Whether a result satisfies a length filter, in whatever unit this medium
+  // is actually measured in — minutes for film, pages for books, hours for
+  // games. Lives on the provider because a single global check can only be
+  // right for one of them: it read `runtimeMinutes` unconditionally, which is
+  // null for books, so every book candidate was silently dropped and any book
+  // run with a length filter returned nothing.
+  matchesLength(result: CatalogSearchResult, length: RecommendationLength): boolean
+  // Labels for that filter's options, so the form stops hardcoding minutes.
+  lengthOptions: { value: RecommendationLength; label: string }[]
 }
 
 // Keyed by MediaType. Note MediaType widens to `string` through the table row
@@ -54,6 +64,19 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
     parseExternalId: (input) => parseTmdbId(input, 'movie'),
     matchHint: 'Paste a TMDB movie link or id.',
     lookupFailedError: "Couldn't find that on TMDB — check the link.",
+    matchesLength: (result, length) => {
+      const minutes = result.runtimeMinutes
+      if (minutes == null) return false
+      if (length === 'short') return minutes < 90
+      if (length === 'long') return minutes > 150
+      return minutes >= 90 && minutes <= 150
+    },
+    lengthOptions: [
+      { value: 'short', label: 'Under 90 min' },
+      { value: 'medium', label: '90–150 min' },
+      { value: 'long', label: 'Over 150 min' },
+    ],
+
   },
   book: {
     sourceName: 'openlibrary',
@@ -63,6 +86,18 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
     parseExternalId: parseOpenLibraryId,
     matchHint: 'Paste an Open Library link or work id.',
     lookupFailedError: "Couldn't find that on Open Library — check the link.",
+    matchesLength: (result, length) => {
+      const pages = result.pageCount
+      if (pages == null) return false
+      if (length === 'short') return pages < 250
+      if (length === 'long') return pages > 500
+      return pages >= 250 && pages <= 500
+    },
+    lengthOptions: [
+      { value: 'short', label: 'Under 250 pages' },
+      { value: 'medium', label: '250–500 pages' },
+      { value: 'long', label: 'Over 500 pages' },
+    ],
   },
   tv: {
     sourceName: 'tmdb',
@@ -72,6 +107,19 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
     parseExternalId: (input) => parseTmdbId(input, 'tv'),
     matchHint: 'Paste a TMDB show link or id.',
     lookupFailedError: "Couldn't find that on TMDB — check the link.",
+    matchesLength: (result, length) => {
+      const minutes = result.runtimeMinutes
+      if (minutes == null) return false
+      if (length === 'short') return minutes < 90
+      if (length === 'long') return minutes > 150
+      return minutes >= 90 && minutes <= 150
+    },
+    lengthOptions: [
+      { value: 'short', label: 'Under 90 min' },
+      { value: 'medium', label: '90–150 min' },
+      { value: 'long', label: 'Over 150 min' },
+    ],
+
   },
 }
 

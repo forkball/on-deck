@@ -23,6 +23,9 @@ export type GenerateRecommendationsFormProps = {
   // they arrive as plain data.
   sources: { value: string; label: string }[]
   genres: string[]
+  // Supplied per media type — "short" means minutes for a film, pages for
+  // a book, hours for a game.
+  lengthOptions: { value: string; label: string }[]
   generateHref: string
   findPeopleHref: string
 }
@@ -73,7 +76,8 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     const selectedSources = new Set<string>([handle.props.mediaType])
 
     return () => {
-      const { friends, mediaType, mediaTypeLabel, sources, genres, generateHref, findPeopleHref } = handle.props
+      const { friends, mediaType, mediaTypeLabel, sources, genres, lengthOptions, generateHref, findPeopleHref } =
+        handle.props
       const hasSource = selectedSources.size > 0
 
       const query = search.trim().toLowerCase()
@@ -298,9 +302,11 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               <Field label="Length">
                 <select name="length" defaultValue="">
                   <option value="">Any</option>
-                  <option value="short">Under 90 min</option>
-                  <option value="medium">90–150 min</option>
-                  <option value="long">Over 150 min</option>
+                  {lengthOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </Field>
             </div>
