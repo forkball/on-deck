@@ -15,6 +15,14 @@ export interface MediaMetadata {
   // for TV, author for a book. One field rather than three, since only one
   // is ever meaningful per type — MEDIA_TYPE_UI.creditLabel names it.
   creator: string | null
+  // Additional artwork, in display order. Empty rather than null when
+  // absent, so callers can map it without a guard.
+  images: string[]
+}
+
+function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((entry): entry is string => typeof entry === 'string')
 }
 
 function numberOrNull(value: unknown): number | null {
@@ -36,6 +44,7 @@ export function parseMediaMetadata(metadata: string): MediaMetadata {
       pageCount: numberOrNull(parsed.pageCount),
       playtimeHours: numberOrNull(parsed.playtimeHours),
       creator: stringOrNull(parsed.creator),
+      images: stringArray(parsed.images),
     }
   } catch {
     return {
@@ -46,6 +55,7 @@ export function parseMediaMetadata(metadata: string): MediaMetadata {
       pageCount: null,
       playtimeHours: null,
       creator: null,
+      images: [],
     }
   }
 }

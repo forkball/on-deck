@@ -55,9 +55,20 @@ interface RawgGame {
   playtime?: number
   added?: number
   metacritic?: number | null
+  // Search-only, and free — the search response already carries the stills,
+  // so the carousel costs no extra request. The detail endpoint doesn't
+  // return them; getGameById asks /screenshots separately.
+  //
+  // The first entry has id -1 and repeats background_image, so it's dropped
+  // rather than shown twice.
+  short_screenshots?: { id: number; image: string }[]
   // Detail-only, like TMDB's credits and Open Library's description.
   developers?: { name: string }[]
   description_raw?: string | null
+}
+
+interface RawgScreenshotsResponse {
+  results?: { image: string }[]
 }
 
 interface RawgSearchResponse {
@@ -86,7 +97,20 @@ function toResult(game: RawgGame): CatalogSearchResult {
     // matchesLength can read it without another lookup.
     playtimeHours: game.playtime ?? null,
     creator: game.developers?.[0]?.name ?? null,
+    images: screenshotsOf(game),
   }
+}
+
+// Key art first, then the stills — so the carousel opens on the image that
+// would otherwise have been the poster.
+function screenshotsOf(game: RawgGame): string[] {
+  const stills = (game.short_screenshots ?? []).filter((shot) => shot.id !== -1).map((shot) => shot.image)
+
+  return dedupe([game.background_image, ...stills])
+}
+
+function dedupe(urls: (string | null | undefined)[]): string[] {
+  return [...new Set(urls.filter((url): url is string => Boolean(url)))]
 }
 
 async function rawgFetch(path: string, params: Record<string, string> = {}): Promise<unknown> {
@@ -116,7 +140,17 @@ export async function getGameById(externalId: string): Promise<CatalogSearchResu
   if (!/^\d+$/.test(id)) return null
 
   try {
-    return toResult((await rawgFetch(`/games/${id}`)) as RawgGame)
+    const game = (await rawgFetch(`/games/${id}`)) as RawgGame
+    const result = toResult(game)
+
+    // The detail endpoint drops short_screenshots, so an id lookup would
+    // otherwise return fewer images than a search and — via buildMetadata's
+    // merge — leave an already-populated carousel untouched but never fill
+    // an empty one. One extra request keeps the two paths equivalent.
+    const shots = (await rawgFetch(`/games/${id}/screenshots`)) as RawgScreenshotsResponse
+    result.images = dedupe([game.background_image, ...(shots.results ?? []).map((shot) => shot.image)])
+
+    return result
   } catch {
     return null
   }

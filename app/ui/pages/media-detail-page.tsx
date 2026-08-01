@@ -6,6 +6,7 @@ import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../components/document.tsx'
 import { ExpandableText } from '../components/expandable-text.tsx'
+import { ImageCarousel } from '../components/image-carousel.tsx'
 import { Modal } from '../components/modal.tsx'
 import { Nav } from '../components/nav.tsx'
 import { StatusSelect } from '../components/status-select.tsx'
@@ -36,7 +37,12 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
     const { mediaType, item, tags, interaction, from, displayName, rematchError, rematched, merged } =
       handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
-    const { releaseYear, posterUrl, overview, creator } = parseMediaMetadata(item.metadata)
+    const { releaseYear, posterUrl, overview, creator, images } = parseMediaMetadata(item.metadata)
+    // A medium with stills shows them instead of a poster, because it has no
+    // poster to show: RAWG serves 16:9 key art, which in a 220px portrait
+    // slot renders as a 124px-tall letterbox. The first still is that same
+    // key art, so nothing is lost by dropping the slot.
+    const showStills = images.length > 0
     const showHref = ui.hrefs.show(item.id)
     const returnTo = from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref
     const backLink = backLinkFrom(from)
@@ -57,8 +63,13 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 : `Updated to match the correct ${ui.itemNoun} on ${ui.catalogName}.`}
             </p>
           )}
+          {showStills && (
+            <div mix={css({ marginBottom: '24px' })}>
+              <ImageCarousel images={images} title={item.title} />
+            </div>
+          )}
           <div mix={css({ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' })}>
-            {posterUrl ? (
+            {showStills ? null : posterUrl ? (
               <img
                 src={posterUrl}
                 alt={`${item.title} poster`}

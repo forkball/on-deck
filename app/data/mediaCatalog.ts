@@ -43,6 +43,10 @@ function buildMetadata(result: TmdbSearchResult, previous?: string): string {
     pageCount: result.pageCount ?? prev?.pageCount ?? null,
     playtimeHours: result.playtimeHours ?? prev?.playtimeHours ?? null,
     creator: result.creator ?? prev?.creator ?? null,
+    // Same merge rule as the scalars, but `??` won't do it: an empty array
+    // is truthy, so a lookup that returned no stills would replace a set we
+    // already had.
+    images: result.images?.length ? result.images : (prev?.images ?? []),
   })
 }
 
