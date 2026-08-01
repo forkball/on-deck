@@ -4,7 +4,11 @@ import { css } from 'remix/ui'
 import type { GenerationParams, RecommendationRunDetail } from '../../data/recommendations.ts'
 import type { MediaType } from '../../data/mediaCatalog.ts'
 import { routes } from '../../routes.ts'
+import { Field } from '../../assets/lib/field.tsx'
 import { Document } from '../../ui/components/document.tsx'
+import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
+import { StarRatingInput } from '../../ui/components/star-rating.tsx'
+import { StatusSelect } from '../../ui/components/status-select.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { parseMediaMetadata } from '../../utils/mediaMetadata.ts'
 import { statusLabelsFor } from '../../utils/status.ts'
@@ -74,11 +78,14 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
               gap: '16px',
             })}
           >
-            {run.results.map(({ item, tags, reason, status }) => {
+            {run.results.map(({ item, tags, reason, interaction }) => {
               const { releaseYear, posterUrl } = parseMediaMetadata(item.metadata)
               const itemType = parseMediaType(item.type) ?? DEFAULT_MEDIA_TYPE
               const itemUi = MEDIA_TYPE_UI[itemType]
-              const detailHref = `${itemUi.hrefs.show(item.id)}?from=${encodeURIComponent(routes.recommendations.show.href({ runId: String(run.id) }))}`
+              // Where a log submitted from this row comes back to, and what
+              // the detail link offers as a way back.
+              const runHref = routes.recommendations.show.href({ runId: String(run.id) })
+              const detailHref = `${itemUi.hrefs.show(item.id)}?from=${encodeURIComponent(runHref)}`
 
               return (
                 <li
@@ -110,12 +117,12 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                       })}
                     />
                   )}
-                  <div mix={css({ flex: '1 1 auto' })}>
+                  <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
                     <a href={detailHref} mix={css({ fontWeight: 700 })}>
                       {item.title}
                     </a>
                     {releaseYear ? ` (${releaseYear})` : ''}
-                    {status && (
+                    {interaction && (
                       <span
                         mix={css({
                           display: 'inline-block',
@@ -127,7 +134,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                           color: '#15803d',
                         })}
                       >
-                        {statusLabelsFor(itemType)[status] ?? status}
+                        {statusLabelsFor(itemType)[interaction.status] ?? interaction.status}
                       </span>
                     )}
                     {tags.length > 0 && (
@@ -149,6 +156,50 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                       </div>
                     )}
                     <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: '#555' })}>{reason}</p>
+                  </div>
+                  {/* Right-hand column, so the control lines up down the list
+                      regardless of how long each title and reason runs. The
+                      panel hangs from the right edge because at this position
+                      a left-anchored one would open off the page. */}
+                  <div mix={css({ flex: '0 0 auto', alignSelf: 'flex-start' })}>
+                    <FloatingDropdown triggerLabel={interaction ? 'Edit' : 'Log'} align="right">
+                      <form
+                        method="post"
+                        action={itemUi.hrefs.log(item.id)}
+                        mix={css({ display: 'flex', flexDirection: 'column', gap: '10px' })}
+                      >
+                        <input type="hidden" name="return_to" value={runHref} />
+                        <Field label={`Add to ${itemUi.singular} list`}>
+                          <StatusSelect
+                            mediaType={itemType}
+                            name="status"
+                            defaultValue={interaction?.status ?? 'want_to_consume'}
+                          />
+                        </Field>
+                        {/* Pre-filled from the existing log: the action writes
+                            whatever is submitted, so leaving these out would
+                            null a rating or note already there. */}
+                        <div class="watched-only-fields" mix={css({ flexDirection: 'column', gap: '10px' })}>
+                          <div>
+                            <p mix={css({ margin: '0 0 4px' })}>Rating</p>
+                            <StarRatingInput
+                              name="rating"
+                              idPrefix={`rec-rating-${item.id}`}
+                              defaultValue={interaction?.rating ?? null}
+                            />
+                          </div>
+                          <Field label="Add thoughts">
+                            <input
+                              type="text"
+                              name="notes"
+                              defaultValue={interaction?.notes ?? ''}
+                              placeholder="What did you think?"
+                            />
+                          </Field>
+                        </div>
+                        <button type="submit">Save</button>
+                      </form>
+                    </FloatingDropdown>
                   </div>
                 </li>
               )

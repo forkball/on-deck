@@ -17,6 +17,7 @@ import {
   userRecommendations,
   type MediaItem,
   type RecommendationRun,
+  type UserMediaInteraction,
 } from './schema.ts'
 import { regenerateTasteProfile } from './tasteProfile.ts'
 import { displayLabel } from './users.ts'
@@ -102,10 +103,12 @@ export interface RecommendationResult {
   item: MediaItem
   tags: string[]
   reason: string
-  // Your current interaction with this item, if any (e.g. it's already on
-  // your watchlist, or you're mid-way through it) — looked up live, not
-  // frozen at generation time.
-  status: string | null
+  // Your current log entry for this item, if any (e.g. it's already on your
+  // watchlist, or you're mid-way through it) — looked up live, not frozen at
+  // generation time. The whole row rather than just its status, so the log
+  // control on the run page can pre-fill rating and notes: submitting without
+  // them would write null over what's there.
+  interaction: UserMediaInteraction | null
 }
 
 export type RecommendationLength = 'short' | 'medium' | 'long'
@@ -569,7 +572,7 @@ export async function generateRecommendations(
   const results: RecommendationResult[] = []
   for (const { pick, match } of verified.slice(0, TARGET_COUNT)) {
     const item = await upsertCatalogItem(db, mediaType, match)
-    results.push({ item, tags: match.tags, reason: pick.reason, status: null })
+    results.push({ item, tags: match.tags, reason: pick.reason, interaction: null })
   }
 
   const run = await db.create(
@@ -828,8 +831,8 @@ export async function getRecommendationRun(
     tags.push(tagRow.tag)
     tagsByItemId.set(tagRow.media_item_id, tags)
   }
-  const statusByItemId = new Map<number, RecommendationResult['status']>(
-    interactionRows.map((i) => [i.media_item_id, i.status]),
+  const interactionByItemId = new Map<number, UserMediaInteraction>(
+    interactionRows.map((row) => [row.media_item_id, row]),
   )
 
   const results: RecommendationResult[] = []
@@ -840,7 +843,7 @@ export async function getRecommendationRun(
       item,
       tags: tagsByItemId.get(item.id) ?? [],
       reason: row.reason,
-      status: statusByItemId.get(item.id) ?? null,
+      interaction: interactionByItemId.get(item.id) ?? null,
     })
   }
 
