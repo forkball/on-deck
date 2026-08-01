@@ -8,7 +8,7 @@ import { routes } from '../../routes.ts'
 import { createMediaActions } from '../mediaActions.tsx'
 
 // See movies/controller.tsx — all six handlers are shared; only the route map
-// and the media type differ. Games resolve against RAWG rather than TMDB,
+// and the media type differ. Games resolve against IGDB rather than TMDB,
 // which is a provider detail (see data/catalog.ts), not a controller one.
 export default createController(routes.games, {
   middleware: [requireEnabledMediaType('game'), requireAuth<User>(), rememberMediaType('game')],

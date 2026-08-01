@@ -63,13 +63,8 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 : `Updated to match the correct ${ui.itemNoun} on ${ui.catalogName}.`}
             </p>
           )}
-          {showStills && (
-            <div mix={css({ marginBottom: '24px' })}>
-              <ImageCarousel images={images} title={item.title} />
-            </div>
-          )}
           <div mix={css({ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' })}>
-            {showStills ? null : posterUrl ? (
+            {posterUrl ? (
               <img
                 src={posterUrl}
                 alt={`${item.title} poster`}
@@ -244,6 +239,12 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
               </div>
             </div>
           </div>
+          {showStills && (
+            <section mix={css({ marginTop: '32px' })}>
+              <h2>Screenshots</h2>
+              <ImageCarousel images={images} title={item.title} />
+            </section>
+          )}
         </main>
       </Document>
     )

@@ -71,10 +71,9 @@ export interface TmdbSearchResult {
   pageCount?: number | null
   playtimeHours?: number | null
   creator?: string | null
-  // Extra artwork beyond the poster, widest-first in the medium's natural
-  // shape. Games are the reason this exists: RAWG has no box art, only
-  // 16:9 stills, which look wrong squeezed into a poster slot but read
-  // well as a carousel.
+  // Extra artwork beyond the poster, in display order. Games are the reason
+  // this exists: they come with a set of 16:9 screenshots that read well as a
+  // strip under the poster, where films and books have nothing equivalent.
   images?: string[] | null
 }
 

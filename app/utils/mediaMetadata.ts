@@ -9,7 +9,7 @@ export interface MediaMetadata {
   runtimeMinutes: number | null
   // Books — the length dimension that stands in for runtime.
   pageCount: number | null
-  // Games — median hours to finish, per RAWG.
+  // Games — hours to beat, per IGDB.
   playtimeHours: number | null
   // The person most associated with the work: director for film, creator
   // for TV, author for a book. One field rather than three, since only one

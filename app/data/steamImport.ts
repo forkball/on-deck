@@ -1,5 +1,6 @@
 import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from './catalog.ts'
 import { runBounded } from './csvImport.ts'
+import { IGDB_MAX_CONCURRENCY } from './igdb.ts'
 import type { Db } from './db.ts'
 import { logInteraction, type LogInteractionInput } from './mediaCatalog.ts'
 import { fetchSteamLibrary, type SteamGame } from './steam.ts'
@@ -12,29 +13,30 @@ export interface SteamImportResult {
   imported: number
   played: number
   unplayed: number
-  // Titles RAWG had no confident match for.
+  // Titles IGDB had no confident match for.
   notFound: string[]
 }
 
-// One RAWG search per game — there's no bulk endpoint and no Steam-appid
-// lookup, so a large library is a lot of requests. Same bound as the CSV
-// importers.
-const CONCURRENCY = 8
+// One catalog search per game — there's no bulk endpoint and no Steam-appid
+// lookup, so a large library is a lot of requests. Lower than the CSV
+// importers' bound because IGDB serves 4 requests/second and will start
+// refusing above that; a large import is correspondingly slower.
+const CONCURRENCY = IGDB_MAX_CONCURRENCY
 
 // Steam libraries carry things that aren't games and would be nonsense in a
-// tracker: soundtracks, demos, server binaries, editors. RAWG would either
+// tracker: soundtracks, demos, server binaries, editors. IGDB would either
 // miss them or match the parent game and log it twice.
 const NOT_A_GAME =
   /\b(soundtrack|ost|demo|playtest|beta|dedicated server|sdk|benchmark|artbook|art book|season pass|dlc|editor|mod tools|trailer|wallpaper)\b/i
 
-// Edition wording Steam puts in a name but RAWG usually doesn't. Only tried
-// after the full name fails, so "Skyrim Special Edition" still wins when RAWG
-// does list it separately.
+// Edition wording Steam puts in a name but IGDB usually doesn't. Only tried
+// after the full name fails, so "Skyrim Special Edition" still wins when
+// IGDB does list it separately.
 const EDITION_SUFFIX =
   /\b(game of the year|goty|definitive|complete|deluxe|ultimate|enhanced|remastered|special|anniversary|legendary|collection|gold|platinum|premium|classic|directors cut)\b.*$/
 
 // Steam disambiguates re-releases in parentheses — "Mass Effect (2007)",
-// "Mafia II (Classic)", "Riven (1997)" — where RAWG carries the plain name.
+// "Mafia II (Classic)", "Riven (1997)" — where IGDB carries the plain name.
 const TRAILING_PARENTHETICAL = /\s*\([^)]*\)\s*$/
 
 // Imports a linked Steam account's owned games.
@@ -45,7 +47,7 @@ const TRAILING_PARENTHETICAL = /\s*\([^)]*\)\s*$/
 // assumed. Never launched means it's on the pile; any playtime at all means
 // it's been played.
 //
-// Games resolve through RAWG rather than being stored as Steam rows, so the
+// Games resolve through IGDB rather than being stored as Steam rows, so the
 // same game found by search and by import is one catalog entry, not two.
 export async function importSteamLibrary(db: Db, userId: number, steamId: string): Promise<SteamImportResult> {
   const outcome = await fetchSteamLibrary(steamId)
@@ -60,7 +62,7 @@ export async function importSteamLibrary(db: Db, userId: number, steamId: string
 
   // Keyed by the resolved catalog game, not by Steam entry. Steam frequently
   // lists the same game twice — "Batman: Arkham Asylum" alongside "Batman:
-  // Arkham Asylum GOTY Edition" — and both resolve here to one RAWG game.
+  // Arkham Asylum GOTY Edition" — and both resolve here to one IGDB game.
   // Writing per Steam entry meant the last one processed won, so a library
   // with 964 minutes on the GOTY edition and 0 on the plain listing could
   // import as never played. Playtime is summed instead: any time on any
@@ -110,7 +112,7 @@ export async function importSteamLibrary(db: Db, userId: number, steamId: string
   }
 }
 
-// Resolves a Steam name to a RAWG game, or nothing.
+// Resolves a Steam name to an IGDB game, or nothing.
 //
 // Deliberately stricter than the Goodreads importer's `matches[0]`. That one
 // is guessing from a title and author with no better option; here Steam gives
@@ -120,7 +122,7 @@ export async function importSteamLibrary(db: Db, userId: number, steamId: string
 async function matchGame(steamName: string): Promise<CatalogSearchResult | null> {
   // Each variant is searched separately rather than re-filtering the first
   // set of results. Measured on a 1,125-game library: searching only the full
-  // name left 127 unmatched, because a query like "Painkiller: Gold Edition"
+  // name left 127 unmatched on RAWG, because a query like "Painkiller: Gold"
   // doesn't return plain "Painkiller" at all — the base game has to be asked
   // for by name. Re-querying recovered 16 of them, Mass Effect and System
   // Shock 2 among them.
@@ -135,7 +137,7 @@ async function matchGame(steamName: string): Promise<CatalogSearchResult | null>
   return null
 }
 
-// Progressively less specific names to ask RAWG for. Only the first is tried
+// Progressively less specific names to ask IGDB for. Only the first is tried
 // for the vast majority of games; the rest cost an extra request each, and
 // only on titles that would otherwise be reported as unmatched.
 function searchVariants(steamName: string): string[] {

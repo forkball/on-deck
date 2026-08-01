@@ -3,7 +3,7 @@ import { upsertMediaItem, rematchMediaItem, type MediaType, type RematchMediaIte
 import type { MediaItem } from './schema.ts'
 import type { RecommendationLength } from './recommendations.ts'
 import { BOOK_GENRES, getBookById, parseOpenLibraryId, searchBooks } from './openLibrary.ts'
-import { GAME_GENRES, getGameById, parseRawgId, searchGames } from './rawg.ts'
+import { GAME_GENRES, getGameById, parseIgdbId, searchGames } from './igdb.ts'
 import {
   getMovieById,
   getTvShowById,
@@ -101,13 +101,13 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
     ],
   },
   game: {
-    sourceName: 'rawg',
+    sourceName: 'igdb',
     search: searchGames,
     getById: getGameById,
     genres: GAME_GENRES,
-    parseExternalId: parseRawgId,
-    matchHint: 'Paste a RAWG game id.',
-    lookupFailedError: "Couldn't find that on RAWG — check the id.",
+    parseExternalId: parseIgdbId,
+    matchHint: 'Paste an IGDB game id.',
+    lookupFailedError: "Couldn't find that on IGDB — check the id.",
     matchesLength: (result, length) => {
       const hours = result.playtimeHours
       if (hours == null || hours === 0) return false
