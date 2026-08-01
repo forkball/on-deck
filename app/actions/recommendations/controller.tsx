@@ -14,6 +14,7 @@ import { requireAuth } from '../../middleware/auth.ts'
 import { getRememberedMediaType } from '../../middleware/mediaType.ts'
 import {
   findMembersMissingSourceLogs,
+  findUnusedDuplicateRun,
   generateRecommendations,
   getRecommendationRun,
   listRecommendationRuns,
@@ -167,6 +168,53 @@ export default createController(routes.recommendations, {
           />,
           { status: 400 },
         )
+      }
+
+      // Same levers as a run they haven't taken anything from yet — ask
+      // before spending a model call on a second list they didn't finish the
+      // first of. `force` is how the confirmation gets past this.
+      if (!formData.get('force')) {
+        const duplicate = await findUnusedDuplicateRun(
+          db,
+          auth.identity.id,
+          memberIds,
+          mediaType,
+          filters,
+          sourceTypes,
+        )
+
+        if (duplicate) {
+          const data = await loadIndexData(db, auth.identity, mediaType)
+          return context.render(
+            <RecommendationsPage
+              runs={data.runs}
+              runsFromOthers={data.runsFromOthers}
+              friends={data.friends}
+              mediaType={mediaType}
+              genres={data.genres}
+              lengthOptions={data.lengthOptions}
+              displayName={data.displayName}
+              duplicate={{
+                runId: duplicate.runId,
+                name: duplicate.name,
+                createdAt: duplicate.createdAt,
+                // Everything needed to resubmit this exact request, so
+                // "generate anyway" doesn't depend on the form still being
+                // filled in.
+                fields: [
+                  ['mediaType', mediaType],
+                  ['mode', parsed.value.mode],
+                  ['name', parsed.value.name ?? ''],
+                  ['genre', filters.genre ?? ''],
+                  ['decade', filters.decade == null ? '' : String(filters.decade)],
+                  ['length', filters.length ?? ''],
+                  ...sourceTypes.map((type) => ['source', type] as [string, string]),
+                  ...friendIds.map((id) => ['friend_ids', String(id)] as [string, string]),
+                ],
+              }}
+            />,
+          )
+        }
       }
 
       const { runId, prunedOldestRun } = await generateRecommendations(

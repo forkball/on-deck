@@ -20,6 +20,57 @@ export interface RecommendationsPageProps {
   lengthOptions: { value: string; label: string }[]
   displayName: string
   error?: string
+  // Set when the request matched an earlier run the user hasn't taken
+  // anything from — see DuplicateNotice.
+  duplicate?: {
+    runId: number
+    name: string | null
+    createdAt: number
+    // Name/value pairs that reproduce the blocked request verbatim.
+    fields: [string, string][]
+  }
+}
+
+// Shown instead of generating when the same levers already produced a run
+// whose picks are all still unlogged. Not a hard block — the point is that
+// you probably want the list you already have, but the button is right there
+// if you don't.
+function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<RecommendationsPageProps['duplicate']> }>) {
+  return () => {
+    const { duplicate } = handle.props
+    const href = routes.recommendations.show.href({ runId: String(duplicate.runId) })
+
+    return (
+      <div
+        mix={css({
+          border: '1px solid #ddd',
+          borderRadius: '8px',
+          padding: '16px',
+          marginBottom: '24px',
+        })}
+      >
+        <p mix={css({ margin: '0 0 8px' })}>
+          <strong>You already have a recommendation like this.</strong>
+        </p>
+        <p mix={css({ margin: '0 0 12px', color: '#555' })}>
+          Those exact settings produced{' '}
+          <a href={href}>{duplicate.name || 'an earlier run'}</a> on{' '}
+          {new Date(duplicate.createdAt).toLocaleDateString()}, and you haven't logged anything from it
+          yet. Generating again will replace it with a different set of picks.
+        </p>
+        <div mix={css({ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' })}>
+          <a href={href}>Show me that one →</a>
+          <form method="post" action={routes.recommendations.generate.href()}>
+            {duplicate.fields.map(([name, value], index) => (
+              <input key={`${name}-${index}`} type="hidden" name={name} value={value} />
+            ))}
+            <input type="hidden" name="force" value="1" />
+            <button type="submit">Generate a new one anyway</button>
+          </form>
+        </div>
+      </div>
+    )
+  }
 }
 
 function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
@@ -68,7 +119,8 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
 
 export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
-    const { runs, runsFromOthers, friends, mediaType, genres, lengthOptions, displayName, error } = handle.props
+    const { runs, runsFromOthers, friends, mediaType, genres, lengthOptions, displayName, error, duplicate } =
+      handle.props
     const recsHref = routes.recommendations.index.href()
     const ui = MEDIA_TYPE_UI[mediaType]
 
@@ -85,6 +137,8 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             Rewrites your {ui.attributive} taste profile from what you've logged, then finds
             picks to try next.
           </p>
+
+          {duplicate && <DuplicateNotice duplicate={duplicate} />}
 
           {error && (
             <p

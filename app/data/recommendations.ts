@@ -255,6 +255,89 @@ export interface GenerationParams {
   sourceTypes: MediaType[]
 }
 
+// An earlier run with these exact levers that the user hasn't taken anything
+// from yet.
+export interface UnusedDuplicateRun {
+  runId: number
+  name: string | null
+  createdAt: number
+}
+
+// Canonical string for a set of levers, so two requests that mean the same
+// thing compare equal. JSON.stringify of the params object won't do it: key
+// order and dropped `undefined`s make the same filters serialise differently,
+// and source types arrive in whatever order the checkboxes were ticked.
+function paramsKey(filters: RecommendationFilters, sourceTypes: MediaType[], memberIds: number[]): string {
+  return JSON.stringify([
+    filters.genre ?? null,
+    filters.decade ?? null,
+    filters.length ?? null,
+    [...sourceTypes].sort(),
+    // A group run with different people is a different request, even with
+    // identical filters.
+    [...memberIds].sort((a, b) => a - b),
+  ])
+}
+
+// Finds a previous run with the same levers that the user hasn't acted on.
+//
+// "Acted on" means logging one of its picks. That's the signal the run was
+// actually used for something; a run whose picks are all still unlogged is
+// one the person hasn't worked through yet, so generating another costs a
+// model call to hand them a second list they didn't finish the first of.
+//
+// Deliberately not "has anything been logged since" — logging unrelated
+// things doesn't mean this list was used.
+export async function findUnusedDuplicateRun(
+  db: Db,
+  userId: number,
+  memberIds: number[],
+  mediaType: MediaType,
+  filters: RecommendationFilters,
+  sourceTypes: MediaType[],
+): Promise<UnusedDuplicateRun | null> {
+  const wanted = paramsKey(filters, sourceTypes.length > 0 ? sourceTypes : [mediaType], memberIds)
+
+  const runs = await db.findMany(recommendationRuns, {
+    where: { user_id: userId, media_type: mediaType },
+    orderBy: ['created_at', 'desc'],
+  })
+
+  for (const run of runs) {
+    const params = parseParams(run)
+    const members = await db.findMany(recommendationRunMembers, { where: { run_id: run.id } })
+    const key = paramsKey(
+      { genre: params.genre, decade: params.decade, length: params.length },
+      params.sourceTypes,
+      members.map((member) => member.user_id),
+    )
+    if (key !== wanted) continue
+
+    // Only the *latest* run with these levers is considered, which is why
+    // this returns from the first match rather than scanning past it. Once
+    // you've worked through that list, asking again is a real request — being
+    // sent back to an older, still-untouched run with the same settings would
+    // be worse than useless.
+    const picks = await db.findMany(userRecommendations, { where: { run_id: run.id } })
+    if (picks.length === 0) return null
+
+    const logged = await db.findMany(userMediaInteractions, {
+      where: and(
+        eq('user_id', userId),
+        inList(
+          'media_item_id',
+          picks.map((pick) => pick.media_item_id),
+        ),
+      ),
+    })
+    if (logged.length > 0) return null
+
+    return { runId: run.id, name: run.name ?? null, createdAt: Number(run.created_at) }
+  }
+
+  return null
+}
+
 export interface RecommendationRunDetail extends RecommendationRunSummary {
   otherMemberLabels: string[]
   results: RecommendationResult[]
