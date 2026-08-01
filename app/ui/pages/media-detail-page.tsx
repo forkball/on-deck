@@ -253,7 +253,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
           {showStills && (
             <section mix={css({ marginTop: '32px' })}>
               <h2>Screenshots</h2>
-              <ImageCarousel images={images} title={item.title} />
+              <ImageCarousel images={images} title={item.title} id={`stills-${item.id}`} />
             </section>
           )}
         </main>
