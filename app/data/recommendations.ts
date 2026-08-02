@@ -939,6 +939,9 @@ export async function listRecommendationRuns(db: Db, userId: number): Promise<Re
 // Restricted to mutual follows (same bar as notifyMutualFollowers): being
 // added to someone's run isn't itself consent to show up on their page, so
 // this only surfaces if the requester also follows this user back.
+// Group runs someone else requested, filtered to people you currently follow
+// each other with. See getRecommendationRun for why this is stricter than the
+// access check it sits next to.
 export async function listRecommendationRunsFromOthers(db: Db, userId: number): Promise<RecommendationRunSummary[]> {
   const memberships = await db.findMany(recommendationRunMembers, { where: { user_id: userId } })
   if (memberships.length === 0) return []
@@ -979,6 +982,19 @@ export async function listRecommendationRunsFromOthers(db: Db, userId: number): 
 // requester or one of the invited members) — the dedicated
 // /recommendations/:id page treats that as 404. Membership, not just
 // ownership, matters now that other members get notified about group runs.
+// Access is membership, and membership is permanent — deliberately unlike
+// listRecommendationRunsFromOthers below, which gates on *current* mutual
+// follow.
+//
+// The two answer different questions. This one is "may I see this run", and
+// the answer stays yes because the run was built partly from your own taste;
+// unfollowing someone shouldn't confiscate it. The listing is "what belongs in
+// my feed", which is about who you're connected to now.
+//
+// The visible consequence, checked rather than assumed: after unfollowing, a
+// shared run vanishes from your list but its URL still works and an existing
+// notification still opens it. Re-following brings it back. That mismatch is
+// intended, not an oversight.
 export async function getRecommendationRun(
   db: Db,
   runId: number,
