@@ -12,7 +12,6 @@ import type { GenerationPhase } from './generationProgress.ts'
 import { createNotification } from './notifications.ts'
 import {
   mediaItems,
-  mediaItemTags,
   recommendationRunMembers,
   recommendationRuns,
   users,
@@ -104,7 +103,6 @@ export const MAX_RUNS_PER_USER = 3
 
 export interface RecommendationResult {
   item: MediaItem
-  tags: string[]
   reason: string
   // Your current log entry for this item, if any (e.g. it's already on your
   // watchlist, or you're mid-way through it) — looked up live, not frozen at
@@ -525,15 +523,6 @@ async function resolveFromCatalog(
   )
   if (rows.length === 0) return resolved
 
-  const tagRows = await pool.query<{ media_item_id: number; tag: string }>(
-    'select media_item_id, tag from media_item_tags where media_item_id = any($1)',
-    [rows.map((row) => row.id)],
-  )
-  const tagsById = new Map<number, string[]>()
-  for (const { media_item_id, tag } of tagRows.rows) {
-    tagsById.set(media_item_id, [...(tagsById.get(media_item_id) ?? []), tag])
-  }
-
   const byTitle = new Map<string, typeof rows>()
   for (const row of rows) {
     byTitle.set(row.normalized, [...(byTitle.get(row.normalized) ?? []), row])
@@ -554,7 +543,7 @@ async function resolveFromCatalog(
         externalId: row.external_id,
         title: row.title,
         releaseYear: metadata.releaseYear,
-        tags: tagsById.get(row.id) ?? [],
+        tags: metadata.tags,
         posterUrl: metadata.posterUrl,
         popularity: Number(row.popularity_score ?? 0),
         overview: metadata.overview,
@@ -729,15 +718,8 @@ export async function generateRecommendations(
     // to the catalog before the checkpoint recorded them, so this rebuilds the
     // same output from those rows instead of asking the model again.
     const ids = checkpoint.verified.map((entry) => entry.mediaItemId)
-    const [items, tagRows] = await Promise.all([
-      db.findMany(mediaItems, { where: inList('id', ids) }),
-      db.findMany(mediaItemTags, { where: inList('media_item_id', ids) }),
-    ])
+    const items = await db.findMany(mediaItems, { where: inList('id', ids) })
     const itemsById = new Map(items.map((item) => [item.id, item]))
-    const tagsById = new Map<number, string[]>()
-    for (const row of tagRows) {
-      tagsById.set(row.media_item_id, [...(tagsById.get(row.media_item_id) ?? []), row.tag])
-    }
 
     onPhase('saving')
     results = []
@@ -746,7 +728,7 @@ export async function generateRecommendations(
       // A row could have been merged away by a rematch since; skip rather
       // than fail the resumed run over it.
       if (!item) continue
-      results.push({ item, tags: tagsById.get(item.id) ?? [], reason: entry.reason, interaction: null })
+      results.push({ item, reason: entry.reason, interaction: null })
     }
   } else {
     onPhase('verifying')
@@ -756,7 +738,7 @@ export async function generateRecommendations(
     results = []
     for (const { pick, match } of verified.slice(0, TARGET_COUNT)) {
       const item = await upsertCatalogItem(db, mediaType, match)
-      results.push({ item, tags: match.tags, reason: pick.reason, interaction: null })
+      results.push({ item, reason: pick.reason, interaction: null })
     }
 
     // Recorded as ids, not objects — the catalog rows are already written, so
@@ -1026,20 +1008,13 @@ export async function getRecommendationRun(
   }
 
   const mediaItemIds = rows.map((row) => row.media_item_id)
-  const [items, tagRows, interactionRows] = await Promise.all([
+  const [items, interactionRows] = await Promise.all([
     db.findMany(mediaItems, { where: inList('id', mediaItemIds) }),
-    db.findMany(mediaItemTags, { where: inList('media_item_id', mediaItemIds) }),
     db.findMany(userMediaInteractions, {
       where: and(eq('user_id', userId), inList('media_item_id', mediaItemIds)),
     }),
   ])
   const itemsById = new Map(items.map((item) => [item.id, item]))
-  const tagsByItemId = new Map<number, string[]>()
-  for (const tagRow of tagRows) {
-    const tags = tagsByItemId.get(tagRow.media_item_id) ?? []
-    tags.push(tagRow.tag)
-    tagsByItemId.set(tagRow.media_item_id, tags)
-  }
   const interactionByItemId = new Map<number, UserMediaInteraction>(
     interactionRows.map((row) => [row.media_item_id, row]),
   )
@@ -1050,7 +1025,6 @@ export async function getRecommendationRun(
     if (!item) continue
     results.push({
       item,
-      tags: tagsByItemId.get(item.id) ?? [],
       reason: row.reason,
       interaction: interactionByItemId.get(item.id) ?? null,
     })

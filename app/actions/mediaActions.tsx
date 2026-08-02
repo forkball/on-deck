@@ -70,7 +70,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       const interactionsByItemId = await getUserInteractionsForItems(
         db,
         identity.id,
-        results.map(({ item }) => item.id),
+        results.map((item) => item.id),
       )
 
       return context.render(
@@ -135,8 +135,8 @@ export function createMediaActions(mediaType: ActiveMediaType) {
 
       const mediaItemId = Number(context.params.mediaItemId)
       const db: Db = context.get(Database)
-      let detail = await getMediaItemDetail(db, mediaItemId)
-      if (!detail) return new Response('Not Found', { status: 404 })
+      let item = await getMediaItemDetail(db, mediaItemId)
+      if (!item) return new Response('Not Found', { status: 404 })
 
       // Credits only come back from a by-id lookup, never from search — so
       // anything that entered the catalog via a search result has none. Fill
@@ -147,12 +147,12 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       // both: if runtime is already there, this item has been enriched and a
       // missing credit is genuinely missing, not un-fetched. Without that,
       // a film TMDB has no director for would re-request on every view.
-      const meta = parseMediaMetadata(detail.item.metadata)
-      if (meta.creator === null && meta.runtimeMinutes === null && detail.item.external_source === provider.sourceName) {
-        const enriched = await provider.getById(detail.item.external_id)
+      const meta = parseMediaMetadata(item.metadata)
+      if (meta.creator === null && meta.runtimeMinutes === null && item.external_source === provider.sourceName) {
+        const enriched = await provider.getById(item.external_id)
         if (enriched) {
           await upsertCatalogItem(db, mediaType, enriched)
-          detail = (await getMediaItemDetail(db, mediaItemId)) ?? detail
+          item = (await getMediaItemDetail(db, mediaItemId)) ?? item
         }
       }
 
@@ -162,8 +162,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       return context.render(
         <MediaDetailPage
           mediaType={mediaType}
-          item={detail.item}
-          tags={detail.tags}
+          item={item}
           interaction={interaction}
           from={from}
           displayName={displayLabel(identity)}

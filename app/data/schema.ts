@@ -27,21 +27,14 @@ export const mediaItems = table({
     external_source: c.text().notNull(),
     external_id: c.text().notNull(),
     title: c.text().notNull(),
-    // SQLite has no native JSONB; type-specific metadata (runtime, poster path, etc.)
-    // is stored as a JSON string and parsed at the read boundary.
-    metadata: c.text().notNull().default('{}'),
+    // Type-specific metadata — release year, poster, runtime/pages/playtime,
+    // credits, artwork, platforms, genre tags. jsonb, so Postgres validates
+    // it on write and the GIN index can answer containment queries against
+    // it. Shape and read boundary: app/utils/mediaMetadata.ts.
+    metadata: c.json().notNull(),
     popularity_score: c.decimal(10, 2),
     created_at: c.integer().notNull(),
   },
-})
-
-export const mediaItemTags = table({
-  name: 'media_item_tags',
-  columns: {
-    media_item_id: c.integer().notNull().references('media_items', 'id'),
-    tag: c.text().notNull(),
-  },
-  primaryKey: ['media_item_id', 'tag'],
 })
 
 export const userMediaInteractions = table({
@@ -186,7 +179,6 @@ export const notifications = table({
 
 export type User = TableRow<typeof users>
 export type MediaItem = TableRow<typeof mediaItems>
-export type MediaItemTag = TableRow<typeof mediaItemTags>
 export type UserMediaInteraction = TableRow<typeof userMediaInteractions>
 export type UserTasteProfile = TableRow<typeof userTasteProfiles>
 export type UserRecommendation = TableRow<typeof userRecommendations>

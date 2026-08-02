@@ -78,8 +78,8 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
               gap: '16px',
             })}
           >
-            {run.results.map(({ item, tags, reason, interaction }) => {
-              const { releaseYear, posterUrl } = parseMediaMetadata(item.metadata)
+            {run.results.map(({ item, reason, interaction }) => {
+              const { releaseYear, posterUrl, tags } = parseMediaMetadata(item.metadata)
               const itemType = parseMediaType(item.type) ?? DEFAULT_MEDIA_TYPE
               const itemUi = MEDIA_TYPE_UI[itemType]
               // Where a log submitted from this row comes back to, and what

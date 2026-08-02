@@ -1,15 +1,9 @@
 import { and, eq, inList } from 'remix/data-table'
 
-import { parseMediaMetadata } from '../utils/mediaMetadata.ts'
+import { parseMediaMetadata, type MediaMetadata } from '../utils/mediaMetadata.ts'
 
 import type { Db } from './db.ts'
-import {
-  mediaItems,
-  mediaItemTags,
-  userMediaInteractions,
-  type MediaItem,
-  type UserMediaInteraction,
-} from './schema.ts'
+import { mediaItems, userMediaInteractions, type MediaItem, type UserMediaInteraction } from './schema.ts'
 import type { TmdbSearchResult } from './tmdb.ts'
 
 export type MediaType = MediaItem['type']
@@ -32,10 +26,10 @@ export type MediaType = MediaItem['type']
 // Rematch deliberately passes no `previous` — it repoints the row at a
 // different work entirely, so carrying the old title's metadata across would
 // be wrong rather than helpful.
-function buildMetadata(result: TmdbSearchResult, previous?: string): string {
-  const prev = previous ? parseMediaMetadata(previous) : null
+function buildMetadata(result: TmdbSearchResult, previous?: unknown): MediaMetadata {
+  const prev = previous != null ? parseMediaMetadata(previous) : null
 
-  return JSON.stringify({
+  return {
     releaseYear: result.releaseYear ?? prev?.releaseYear ?? null,
     posterUrl: result.posterUrl ?? prev?.posterUrl ?? null,
     overview: result.overview ?? prev?.overview ?? null,
@@ -49,7 +43,12 @@ function buildMetadata(result: TmdbSearchResult, previous?: string): string {
     images: result.images?.length ? result.images : (prev?.images ?? []),
     // Same non-empty rule as images — see above.
     platforms: result.platforms?.length ? result.platforms : (prev?.platforms ?? []),
-  })
+    // Note this is replace-if-non-empty, where the media_item_tags table it
+    // replaced accumulated a union of every tag ever seen. Treating the most
+    // recent lookup as authoritative is the better rule: a provider dropping
+    // a genre should drop it here too.
+    tags: result.tags?.length ? result.tags : (prev?.tags ?? []),
+  }
 }
 
 export async function upsertMediaItem(
@@ -81,17 +80,6 @@ export async function upsertMediaItem(
         },
         { returnRow: true },
       )
-
-  // Read every existing tag in one query and write only the missing ones,
-  // concurrently. This used to be a findOne + create *per tag*, in series —
-  // eight sequential round-trips for a four-tag item, against a remote
-  // database, multiplied by every search result.
-  if (result.tags.length > 0) {
-    const existingTags = await db.findMany(mediaItemTags, { where: { media_item_id: item.id } })
-    const known = new Set(existingTags.map((row) => row.tag))
-    const missing = result.tags.filter((tag) => !known.has(tag))
-    await Promise.all(missing.map((tag) => db.create(mediaItemTags, { media_item_id: item.id, tag })))
-  }
 
   return item
 }
@@ -169,11 +157,6 @@ export async function rematchMediaItem(
     metadata,
     popularity_score: result.popularity,
   })
-
-  await db.deleteMany(mediaItemTags, { where: { media_item_id: mediaItemId } })
-  for (const tag of result.tags) {
-    await db.create(mediaItemTags, { media_item_id: mediaItemId, tag })
-  }
 
   return { ok: true, item, merged: false }
 }
@@ -268,12 +251,10 @@ export async function deleteInteraction(db: Db, interactionId: number, userId: n
   return db.delete(userMediaInteractions, interactionId)
 }
 
-export async function getMediaItemDetail(db: Db, mediaItemId: number) {
-  const item = await db.find(mediaItems, mediaItemId)
-  if (!item) return null
-
-  const tagRows = await db.findMany(mediaItemTags, { where: { media_item_id: mediaItemId } })
-  return { item, tags: tagRows.map((row) => row.tag) }
+// Tags used to need a second query against media_item_tags; they now ride
+// along in the row's own metadata, so this is just the lookup.
+export async function getMediaItemDetail(db: Db, mediaItemId: number): Promise<MediaItem | null> {
+  return (await db.find(mediaItems, mediaItemId)) ?? null
 }
 
 // Batched counterpart to getUserInteractionForItem, for pages that show a

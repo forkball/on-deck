@@ -20,6 +20,12 @@ export interface MediaMetadata {
   images: string[]
   // Games — the platforms it runs on, as short abbreviations.
   platforms: string[]
+  // Genre labels from whichever catalog this item came from, lowercased.
+  // Lived in a media_item_tags join table until it became clear nothing ever
+  // queried by tag — same shape and provenance as `platforms` above, so it
+  // sits alongside it now. Indexed via the GIN index on this column, so
+  // `metadata @> '{"tags":["horror"]}'` is answerable without a scan.
+  tags: string[]
 }
 
 function stringArray(value: unknown): string[] {
@@ -35,9 +41,34 @@ function stringOrNull(value: unknown): string | null {
   return typeof value === 'string' ? value : null
 }
 
-export function parseMediaMetadata(metadata: string): MediaMetadata {
+// A fresh object each time rather than a shared constant — the array fields
+// would otherwise be one instance handed to every caller.
+function emptyMetadata(): MediaMetadata {
+  return {
+    releaseYear: null,
+    posterUrl: null,
+    overview: null,
+    runtimeMinutes: null,
+    pageCount: null,
+    playtimeHours: null,
+    creator: null,
+    images: [],
+    platforms: [],
+    tags: [],
+  }
+}
+
+// `unknown` rather than `string`: the column is jsonb, so pg hands back an
+// already-parsed object. The string branch stays because raw SQL and older
+// callers can still produce one, and because it costs a single typeof.
+export function parseMediaMetadata(metadata: unknown): MediaMetadata {
   try {
-    const parsed = JSON.parse(metadata) as Partial<MediaMetadata>
+    const parsed = (typeof metadata === 'string' ? JSON.parse(metadata) : metadata) as
+      | Partial<MediaMetadata>
+      | null
+      | undefined
+    if (!parsed || typeof parsed !== 'object') return emptyMetadata()
+
     return {
       releaseYear: numberOrNull(parsed.releaseYear),
       posterUrl: stringOrNull(parsed.posterUrl),
@@ -48,18 +79,9 @@ export function parseMediaMetadata(metadata: string): MediaMetadata {
       creator: stringOrNull(parsed.creator),
       images: stringArray(parsed.images),
       platforms: stringArray(parsed.platforms),
+      tags: stringArray(parsed.tags),
     }
   } catch {
-    return {
-      releaseYear: null,
-      posterUrl: null,
-      overview: null,
-      runtimeMinutes: null,
-      pageCount: null,
-      playtimeHours: null,
-      creator: null,
-      images: [],
-      platforms: [],
-    }
+    return emptyMetadata()
   }
 }

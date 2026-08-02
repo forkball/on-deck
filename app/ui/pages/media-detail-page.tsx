@@ -21,7 +21,6 @@ import { backLinkFrom } from '../../utils/backLink.ts'
 export interface MediaDetailPageProps {
   mediaType: ActiveMediaType
   item: MediaItem
-  tags: string[]
   interaction: UserMediaInteraction | null
   from?: string
   displayName: string
@@ -35,10 +34,12 @@ export interface MediaDetailPageProps {
 // per-type copies differed only in six strings and their route namespace.
 export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
   return () => {
-    const { mediaType, item, tags, interaction, from, displayName, rematchError, rematched, merged } =
+    const { mediaType, item, interaction, from, displayName, rematchError, rematched, merged } =
       handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
-    const { releaseYear, posterUrl, overview, creator, images, platforms } = parseMediaMetadata(item.metadata)
+    const { releaseYear, posterUrl, overview, creator, images, platforms, tags } = parseMediaMetadata(
+      item.metadata,
+    )
     // A medium with stills shows them instead of a poster, because it has no
     // poster to show: RAWG serves 16:9 key art, which in a 220px portrait
     // slot renders as a 124px-tall letterbox. The first still is that same

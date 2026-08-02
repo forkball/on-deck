@@ -1,8 +1,8 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { CatalogItemResult } from '../../data/catalog.ts'
 import type { getUserInteractionForItem } from '../../data/mediaCatalog.ts'
+import type { MediaItem } from '../../data/schema.ts'
 import { MediaTabLinks } from '../components/media-tab-links.tsx'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
 import { LazyList } from '../../assets/lazy-list.tsx'
@@ -20,7 +20,7 @@ import { statusLabelsFor } from '../../utils/status.ts'
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
   query: string
-  results: CatalogItemResult[]
+  results: MediaItem[]
   // How many are visible before scrolling reveals the rest.
   initialVisible: number
   interactionsByItemId: Map<number, Awaited<ReturnType<typeof getUserInteractionForItem>>>
@@ -74,8 +74,8 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                 id="search-results"
                 mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}
               >
-                {results.map(({ item, tags }) => {
-                  const { releaseYear, posterUrl, platforms } = parseMediaMetadata(item.metadata)
+                {results.map((item) => {
+                  const { releaseYear, posterUrl, platforms, tags } = parseMediaMetadata(item.metadata)
                   const detailHref = `${ui.hrefs.show(item.id)}?from=${encodeURIComponent(returnTo)}`
                   const interaction = interactionsByItemId.get(item.id)
                   return (

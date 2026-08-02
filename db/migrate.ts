@@ -8,6 +8,13 @@ import { loadMigrations } from 'remix/data-table/migrations/node'
 const directionArg = process.argv[2] ?? 'up'
 const direction = directionArg === 'down' ? 'down' : 'up'
 
+// How many migrations `down` reverts. One by default, because `runner.down()`
+// with no options reverts *every* applied migration — running `db:migrate:down`
+// to undo the last change would otherwise drop the entire schema. Pass a count
+// (`db:migrate:down 3`) or `all` to opt into more.
+const stepArg = process.argv[3]
+const downStep = stepArg === 'all' ? undefined : Math.max(1, Number(stepArg) || 1)
+
 // Deliberately its own pool rather than the app's (app/data/db.ts): importing
 // that would pull the whole app module graph and its 20-connection pool into a
 // script that needs neither.
@@ -77,7 +84,10 @@ try {
     const migrations = await loadMigrations(path.resolve('db/migrations'))
     const runner = createMigrationRunner(adapter, migrations)
 
-    const result = direction === 'up' ? await runner.up() : await runner.down()
+    const result =
+      direction === 'up'
+        ? await runner.up()
+        : await runner.down(downStep === undefined ? undefined : { step: downStep })
     console.log(direction, 'complete', {
       applied: result.applied.map((entry) => entry.id),
       reverted: result.reverted.map((entry) => entry.id),

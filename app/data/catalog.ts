@@ -164,11 +164,6 @@ export function supportedMediaTypes(): MediaType[] {
   return Object.keys(CATALOG_PROVIDERS)
 }
 
-export interface CatalogItemResult {
-  item: MediaItem
-  tags: string[]
-}
-
 // Searches the provider for `type` and writes every hit into the catalog, so
 // the results are real media_items the user can immediately log against.
 // Repeating a search — which is exactly what pressing "back" from a result
@@ -182,13 +177,13 @@ export interface CatalogItemResult {
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000
 const SEARCH_CACHE_MAX_ENTRIES = 50
 
-const searchCache = new Map<string, { storedAt: number; results: CatalogItemResult[] }>()
+const searchCache = new Map<string, { storedAt: number; results: MediaItem[] }>()
 
 function cacheKey(type: MediaType, query: string): string {
   return `${type}:${query.trim().toLowerCase()}`
 }
 
-export async function searchAndImport(db: Db, type: MediaType, query: string): Promise<CatalogItemResult[]> {
+export async function searchAndImport(db: Db, type: MediaType, query: string): Promise<MediaItem[]> {
   const key = cacheKey(type, query)
   const cached = searchCache.get(key)
   if (cached && Date.now() - cached.storedAt < SEARCH_CACHE_TTL_MS) {
@@ -206,11 +201,11 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
   // another against a remote database, so the page waited on the sum of
   // every round-trip instead of the slowest one. Results keep their original
   // relevance order because Promise.all preserves input order.
+  // Genre tags used to be returned alongside each item, because they lived in
+  // a separate table the caller had no other way to reach. They ride in the
+  // item's own metadata now, so the row is the whole result.
   const imported = await Promise.all(
-    results.map(async (result) => ({
-      item: await upsertMediaItem(db, type, result, provider.sourceName),
-      tags: result.tags,
-    })),
+    results.map((result) => upsertMediaItem(db, type, result, provider.sourceName)),
   )
 
   searchCache.set(key, { storedAt: Date.now(), results: imported })
