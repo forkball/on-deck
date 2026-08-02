@@ -4,7 +4,10 @@ import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from 
 import { claude, parseStructuredResponse } from './claude.ts'
 import type { Db } from './db.ts'
 import { isFollowing } from './follows.ts'
+import { pool } from './db.ts'
+import { MEDIA_TYPE_UI, type ActiveMediaType } from '../utils/mediaTypes.ts'
 import { countUserMediaLog, type MediaType } from './mediaCatalog.ts'
+import { parseMediaMetadata } from '../utils/mediaMetadata.ts'
 import type { GenerationPhase } from './generationProgress.ts'
 import { createNotification } from './notifications.ts'
 import {
@@ -115,7 +118,7 @@ export type RecommendationLength = 'short' | 'medium' | 'long'
 
 // Optional "levers" on generation. All hard-filter the final picks (not just
 // prompt hints) — genre/decade come for free off the search results already
-// fetched for matching; length needs an extra per-candidate TMDB lookup
+// fetched for matching; length needs an extra per-candidate catalog lookup
 // (search doesn't return runtime), so that only happens when a length filter
 // is actually set.
 export interface RecommendationFilters {
@@ -198,7 +201,7 @@ const VERIFY_SCHEMA = {
 // sail right through titlesLikelyMatch (and even the year check), since a
 // title string can't distinguish two different movies that happen to share
 // both. Only the plot itself can — so this asks Claude, which already knows
-// what it meant by each pick, to confirm against the actual TMDB overview.
+// what it meant by each pick, to confirm against the catalog's own overview.
 // One batched call for the whole list rather than one per pick.
 async function verifyPicksAgainstOverviews(
   candidates: { pick: Pick; match: CatalogSearchResult }[],
@@ -209,10 +212,16 @@ async function verifyPicksAgainstOverviews(
   const noun = MEDIA_NOUNS[mediaType]
   const entryNoun = mediaType === 'tv' ? 'show' : 'entry'
 
+  // Named from the registry rather than hardcoded. This said "TMDB" for every
+  // type, so a game was verified against IGDB data while Claude was told it
+  // came from TMDB — a false statement inside the one prompt whose whole job is
+  // telling two similar things apart.
+  const catalogName = MEDIA_TYPE_UI[mediaType as ActiveMediaType]?.catalogName ?? 'the catalog'
+
   const items = candidates.map(({ pick, match }, index) => ({
     index,
     you_suggested: { title: pick.title, year: pick.year, your_reason: pick.reason },
-    tmdb_found: { title: match.title, year: match.releaseYear, overview: match.overview },
+    catalog_found: { title: match.title, year: match.releaseYear, overview: match.overview },
   }))
 
   const response = await claude.messages.create({
@@ -226,12 +235,12 @@ async function verifyPicksAgainstOverviews(
       {
         role: 'user',
         content:
-          `You previously suggested some ${noun} by title/year. For each one, we looked it up on TMDB and found ` +
-          `a specific ${entryNoun} — here's what TMDB returned, described by its own title, year, and plot ` +
-          `overview. Confirm whether the TMDB ${entryNoun} found is truly the same one you meant, not just a ` +
+          `You previously suggested some ${noun} by title/year. For each one, we looked it up on ${catalogName} and found ` +
+          `a specific ${entryNoun} — here's what ${catalogName} returned, described by its own title, year, and plot ` +
+          `overview. Confirm whether the ${entryNoun} found is truly the same one you meant, not just a ` +
           `similarly- or identically-titled different one. Small title differences (translation, punctuation, ` +
           `"the" vs no "the") are fine as long as it's the same ${entryNoun}.\n\n${JSON.stringify(items, null, 2)}\n\n` +
-          `Return one boolean per entry, in the same order as given, true only if the TMDB ${entryNoun} found is ` +
+          `Return one boolean per entry, in the same order as given, true only if the ${entryNoun} found is ` +
           `genuinely the one you meant.`,
       },
     ],
@@ -450,6 +459,111 @@ async function withOverviews(
   return candidates
 }
 
+
+// Resolves picks against the catalog we already hold, so a provider is only
+// asked about titles we've never seen.
+//
+// The saving is the point: a run makes one search per pick, and popular titles
+// recur heavily across users — 21% of picks written so far were an item
+// already in the catalog, and that share only grows as the catalog fills.
+//
+// The match is deliberately tight. Normalised title equality *and* the release
+// year within one: the model is occasionally a year out, but same-titled works
+// from different eras (Dune 1984 and 2021, The Thing 1982 and 2011) are exactly
+// what a looser rule would confuse, and one year never spans them.
+//
+// A row with no overview counts as a miss. verifyPicksAgainstOverviews judges
+// on plot text, so without one it cannot tell two same-titled works apart, and
+// skipping the provider would mean skipping the only check that catches a wrong
+// match. Books hit this constantly — 12% of them carry an overview.
+//
+// Raw SQL because the normalisation has to happen in the database; the
+// alternative is reading every catalog row of this type into memory per run.
+// Matches normalizeTitle exactly: lowercase, drop anything that isn't
+// alphanumeric or space, collapse runs of space.
+// Whether a result already carries the length dimension its provider filters
+// on, so the extra by-id lookup can be skipped.
+function hasLengthDimension(mediaType: MediaType, result: CatalogSearchResult): boolean {
+  if (mediaType === 'book') return result.pageCount != null
+  if (mediaType === 'game') return result.playtimeHours != null
+  return result.runtimeMinutes != null
+}
+
+const YEAR_TOLERANCE = 1
+
+async function resolveFromCatalog(
+  mediaType: MediaType,
+  picks: Pick[],
+): Promise<Map<number, CatalogSearchResult>> {
+  const resolved = new Map<number, CatalogSearchResult>()
+  if (picks.length === 0) return resolved
+
+  const wanted = picks.map((pick) => normalizeTitle(pick.title))
+
+  const { rows } = await pool.query<{
+    id: number
+    external_id: string
+    title: string
+    metadata: string
+    popularity_score: number | null
+    normalized: string
+  }>(
+    `select id, external_id, title, metadata, popularity_score,
+            btrim(regexp_replace(regexp_replace(lower(title), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g')) as normalized
+       from media_items
+      where type = $1
+        and btrim(regexp_replace(regexp_replace(lower(title), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g')) = any($2)`,
+    [mediaType, wanted],
+  )
+  if (rows.length === 0) return resolved
+
+  const tagRows = await pool.query<{ media_item_id: number; tag: string }>(
+    'select media_item_id, tag from media_item_tags where media_item_id = any($1)',
+    [rows.map((row) => row.id)],
+  )
+  const tagsById = new Map<number, string[]>()
+  for (const { media_item_id, tag } of tagRows.rows) {
+    tagsById.set(media_item_id, [...(tagsById.get(media_item_id) ?? []), tag])
+  }
+
+  const byTitle = new Map<string, typeof rows>()
+  for (const row of rows) {
+    byTitle.set(row.normalized, [...(byTitle.get(row.normalized) ?? []), row])
+  }
+
+  for (const [index, pick] of picks.entries()) {
+    const candidates = byTitle.get(normalizeTitle(pick.title))
+    if (!candidates) continue
+
+    for (const row of candidates) {
+      const metadata = parseMediaMetadata(row.metadata)
+      if (metadata.releaseYear == null) continue
+      if (Math.abs(metadata.releaseYear - pick.year) > YEAR_TOLERANCE) continue
+      // No overview, no verification — so no shortcut.
+      if (!metadata.overview) continue
+
+      resolved.set(index, {
+        externalId: row.external_id,
+        title: row.title,
+        releaseYear: metadata.releaseYear,
+        tags: tagsById.get(row.id) ?? [],
+        posterUrl: metadata.posterUrl,
+        popularity: Number(row.popularity_score ?? 0),
+        overview: metadata.overview,
+        runtimeMinutes: metadata.runtimeMinutes,
+        pageCount: metadata.pageCount,
+        playtimeHours: metadata.playtimeHours,
+        creator: metadata.creator,
+        images: metadata.images,
+        platforms: metadata.platforms,
+      })
+      break
+    }
+  }
+
+  return resolved
+}
+
 // Generates one indexed, dated run of picks and returns its id — history is
 // kept (never replaced), so every run stays browsable at /recommendations/:id.
 // Runs are capped at MAX_RUNS_PER_USER per user; generating past the cap
@@ -512,10 +626,17 @@ export async function generateRecommendations(
   onPhase('picks')
   const picks = await requestPicks(profiles, excludedTitles, filters, mediaType, profileTypes)
 
-  // Independent lookups — resolve every pick against TMDB concurrently, then
-  // apply dedup/matching/verification over the results in order.
+  // Anything already in the catalog is resolved without leaving the process;
+  // only the rest cost a provider request.
   onPhase('matching')
-  const matchesByPick = await Promise.all(picks.map((pick) => searchForType(mediaType, pick.title)))
+  const fromCatalog = await resolveFromCatalog(mediaType, picks)
+
+  const matchesByPick = await Promise.all(
+    picks.map(async (pick, index) => {
+      const local = fromCatalog.get(index)
+      return local ? [local] : await searchForType(mediaType, pick.title)
+    }),
+  )
 
   // Only reported when a length lever is set, because only then does the loop
   // below make a second round of requests.
@@ -550,6 +671,17 @@ export async function generateRecommendations(
     // "short" means in its own units.
     let resolved = match
     if (filters.length) {
+      // The stored row often already carries the dimension this filter reads —
+      // runtime, page count, hours to beat — in which case the provider has
+      // nothing to add and the request is pure cost.
+      const provider = getCatalogProvider(mediaType)
+      if (hasLengthDimension(mediaType, match)) {
+        if (!provider.matchesLength(match, filters.length)) continue
+        seenExternalIds.add(match.externalId)
+        candidates.push({ pick, match })
+        continue
+      }
+
       const detail = await lookupForType(mediaType, match.externalId)
       if (!detail || !getCatalogProvider(mediaType).matchesLength(detail, filters.length)) continue
       // Keep the detail rather than discarding it. We've already paid for the

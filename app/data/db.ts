@@ -20,7 +20,10 @@ types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value))
 // 10 connections made half of them queue behind the others for no reason.
 // Round-trips to the hosted database are ~45ms, so queueing is the dominant
 // cost, not query time.
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 20 })
+// Exported for the one query the table API can't express: matching a title
+// after normalising it, which needs regexp_replace in SQL rather than pulling
+// every catalog row into memory to compare. See resolveFromCatalog.
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 20 })
 
 export const db = createDatabase(createPostgresDatabaseAdapter(pool))
 export type Db = typeof db
