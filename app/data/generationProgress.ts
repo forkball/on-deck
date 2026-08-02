@@ -213,6 +213,15 @@ const MAX_ATTEMPTS = 3
 // Returns abandoned work to the queue. A running job whose heartbeat stopped
 // means the machine holding it died — a deploy, an OOM, or a stop under
 // scale-to-zero.
+//
+// A null claim is deliberately *not* treated as stale. It used to be, via
+// coalesce(claimed_at, 0), which meant any row sitting in 'running' without a
+// claim looked abandoned the instant it appeared. That fired during a rolling
+// deploy: a request served by a machine still running the previous release
+// wrote a job the old way — no claim, no params — and a machine on the new
+// release immediately took it and ran it with nothing to run. The old machine
+// was executing that job perfectly well in its own process. Rows this worker
+// doesn't recognise are left alone and aged out by the TTL sweep instead.
 export async function requeueStaleJobs(db: Db): Promise<number> {
   const { rowCount } = await pool.query(
     `update recommendation_jobs
@@ -220,7 +229,7 @@ export async function requeueStaleJobs(db: Db): Promise<number> {
             error  = case when attempts >= $2 then coalesce(error, 'Generating stopped partway too many times.') else error end,
             claimed_at = null,
             updated_at = $3
-      where status = 'running' and coalesce(claimed_at, 0) < $1`,
+      where status = 'running' and claimed_at is not null and claimed_at < $1`,
     [Date.now() - CLAIM_STALE_MS, MAX_ATTEMPTS, Date.now()],
   )
   return rowCount ?? 0

@@ -52,6 +52,15 @@ export function startGenerationWorker(): GenerationWorker {
     try {
       const { memberIds, mediaType, filters, sourceTypes, name } = job.params
 
+      // A job whose params can't be read is not runnable, and guessing at
+      // defaults would silently generate something nobody asked for. Failing
+      // here says so; without this the missing field surfaced as "Cannot read
+      // properties of undefined" from deep inside generation.
+      if (!Array.isArray(memberIds) || memberIds.length === 0 || !mediaType) {
+        await failJob(db, job.id, "This run's settings couldn't be read. Try generating it again.")
+        return
+      }
+
       const { runId, prunedOldestRun } = await generateRecommendations(
         db,
         job.userId,
