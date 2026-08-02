@@ -37,9 +37,17 @@ const carouselStyle = css({
 })
 
 // Sits over the track without swallowing clicks; only the arrows take them.
+//
+// Matched to the track rather than stretched over the whole component:
+// `inset: 0` also covered the dots underneath, so an arrow centred in it sat
+// below the middle of the image. Same width and same aspect ratio as a slide
+// means this box is exactly the track's height, whatever the column width.
 const navStyle = css({
   position: 'absolute',
-  inset: 0,
+  top: 0,
+  left: 0,
+  right: 0,
+  aspectRatio: '16 / 9',
   pointerEvents: 'none',
 })
 
@@ -103,7 +111,10 @@ const dotStyle = css({
 
 const arrowStyle = css({
   position: 'absolute',
-  top: 'calc(50% - 18px)',
+  // Centred on its own height rather than by subtracting half of it, so the
+  // padding and font size can change without this needing to be recomputed.
+  top: '50%',
+  transform: 'translateY(-50%)',
   width: '36px',
   height: '36px',
   lineHeight: '34px',
