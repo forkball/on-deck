@@ -18,6 +18,8 @@ export interface MediaMetadata {
   // Additional artwork, in display order. Empty rather than null when
   // absent, so callers can map it without a guard.
   images: string[]
+  // Games — the platforms it runs on, as short abbreviations.
+  platforms: string[]
 }
 
 function stringArray(value: unknown): string[] {
@@ -45,6 +47,7 @@ export function parseMediaMetadata(metadata: string): MediaMetadata {
       playtimeHours: numberOrNull(parsed.playtimeHours),
       creator: stringOrNull(parsed.creator),
       images: stringArray(parsed.images),
+      platforms: stringArray(parsed.platforms),
     }
   } catch {
     return {
@@ -56,6 +59,7 @@ export function parseMediaMetadata(metadata: string): MediaMetadata {
       playtimeHours: null,
       creator: null,
       images: [],
+      platforms: [],
     }
   }
 }

@@ -75,6 +75,9 @@ export interface TmdbSearchResult {
   // this exists: they come with a set of 16:9 screenshots that read well as a
   // strip under the poster, where films and books have nothing equivalent.
   images?: string[] | null
+  // What a game runs on. Only games have these; the other providers leave it
+  // absent.
+  platforms?: string[] | null
 }
 
 interface TmdbSearchResponse {

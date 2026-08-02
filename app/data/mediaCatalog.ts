@@ -47,6 +47,8 @@ function buildMetadata(result: TmdbSearchResult, previous?: string): string {
     // is truthy, so a lookup that returned no stills would replace a set we
     // already had.
     images: result.images?.length ? result.images : (prev?.images ?? []),
+    // Same non-empty rule as images — see above.
+    platforms: result.platforms?.length ? result.platforms : (prev?.platforms ?? []),
   })
 }
 

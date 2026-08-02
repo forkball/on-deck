@@ -77,6 +77,7 @@ interface IgdbGame {
   screenshots?: IgdbImage[]
   genres?: { name: string }[]
   involved_companies?: { developer?: boolean; company?: { name?: string } }[]
+  platforms?: { name?: string; abbreviation?: string }[]
   // Stands in for RAWG's library-adds count: how many people have rated it.
   // Fan games and asset flips sit at 0 while real games run into thousands.
   total_rating_count?: number
@@ -177,7 +178,8 @@ async function igdbQuery<T>(endpoint: string, body: string): Promise<T[]> {
 }
 
 const GAME_FIELDS =
-  'fields name,first_release_date,summary,total_rating_count,cover.url,screenshots.url,genres.name,involved_companies.developer,involved_companies.company.name;'
+  'fields name,first_release_date,summary,total_rating_count,cover.url,screenshots.url,genres.name,' +
+  'involved_companies.developer,involved_companies.company.name,platforms.name,platforms.abbreviation;'
 
 // IGDB hands back a t_thumb URL — 90x90, useless for display — and expects
 // the size to be swapped in the path. Also protocol-relative, so it needs a
@@ -207,6 +209,13 @@ function toResult(game: IgdbGame, hoursToBeat: number | null): CatalogSearchResu
     playtimeHours: hoursToBeat,
     creator: developerOf(game),
     images: stills,
+    // Abbreviations, because the full names are unusable on a card: IGDB
+    // calls it "PC (Microsoft Windows)" and "Xbox Series X|S". Stored in full
+    // and grouped into families at render time, so nothing is thrown away
+    // here that the detail page might want.
+    platforms: (game.platforms ?? [])
+      .map((platform) => platform.abbreviation || platform.name)
+      .filter((name): name is string => Boolean(name)),
   }
 }
 

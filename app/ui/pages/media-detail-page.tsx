@@ -9,6 +9,7 @@ import { ExpandableText } from '../components/expandable-text.tsx'
 import { ImageCarousel } from '../components/image-carousel.tsx'
 import { Modal } from '../components/modal.tsx'
 import { Nav } from '../components/nav.tsx'
+import { PlatformList } from '../components/platform-list.tsx'
 import { StatusSelect } from '../components/status-select.tsx'
 import { Collapsible } from '../../assets/lib/collapsible.tsx'
 import { Field } from '../../assets/lib/field.tsx'
@@ -37,7 +38,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
     const { mediaType, item, tags, interaction, from, displayName, rematchError, rematched, merged } =
       handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
-    const { releaseYear, posterUrl, overview, creator, images } = parseMediaMetadata(item.metadata)
+    const { releaseYear, posterUrl, overview, creator, images, platforms } = parseMediaMetadata(item.metadata)
     // A medium with stills shows them instead of a poster, because it has no
     // poster to show: RAWG serves 16:9 key art, which in a 220px portrait
     // slot renders as a 124px-tall letterbox. The first still is that same
@@ -102,6 +103,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
               {tags.length > 0 && (
                 <p mix={css({ color: '#555' })}>{tags.map((t) => t.replace(/^./, (c) => c.toUpperCase())).join(', ')}</p>
               )}
+              <PlatformList platforms={platforms} />
               {overview ? (
                 <ExpandableText text={overview} id={`overview-${item.id}`} />
               ) : (

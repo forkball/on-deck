@@ -14,6 +14,7 @@ import { StarRatingDisplay, StarRatingInput } from '../components/star-rating.ts
 import { StatusSelect } from '../components/status-select.tsx'
 import { Field } from '../../assets/lib/field.tsx'
 import { parseMediaMetadata } from '../../utils/mediaMetadata.ts'
+import { PlatformList } from '../components/platform-list.tsx'
 import { statusLabelsFor } from '../../utils/status.ts'
 
 export interface MediaSearchPageProps {
@@ -74,7 +75,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                 mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}
               >
                 {results.map(({ item, tags }) => {
-                  const { releaseYear, posterUrl } = parseMediaMetadata(item.metadata)
+                  const { releaseYear, posterUrl, platforms } = parseMediaMetadata(item.metadata)
                   const detailHref = `${ui.hrefs.show(item.id)}?from=${encodeURIComponent(returnTo)}`
                   const interaction = interactionsByItemId.get(item.id)
                   return (
@@ -131,6 +132,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                             ))}
                           </div>
                         )}
+                        <PlatformList platforms={platforms} />
                         {interaction && (
                           <p
                             mix={css({
