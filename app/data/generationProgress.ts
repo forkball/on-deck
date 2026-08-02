@@ -1,16 +1,21 @@
+import { lt } from 'remix/data-table'
+
+import type { Db } from './db.ts'
+import { recommendationJobs, type RecommendationJob } from './schema.ts'
+
 // Live progress for an in-flight recommendation run.
 //
 // Generating takes tens of seconds across several distinct stages, two of
-// which are model calls. Previously the request simply blocked for the whole
-// thing and the button cycled invented captions on a timer. This lets the
-// server say which stage it is actually in.
+// which are model calls. The request doesn't block for it: it starts the work
+// and hands back a job id, and the wait page reports the stage from here.
 //
-// Deliberately in memory rather than a table. Progress is worthless the
-// moment the process holding the work dies — the generation dies with it —
-// so persisting it would only preserve a record of something that is no
-// longer happening. It does mean this only works while the app runs as a
-// single machine, which fly.toml currently specifies; more than one, and a
-// poll could land somewhere that never heard of the job.
+// This was in process memory, on the reasoning that progress is worthless
+// once the process holding the work dies. That reasoning was about
+// persistence and missed the actual requirement — the *reader* is a different
+// process. A single [[vm]] block in fly.toml sets the machine size, not the
+// count, and the app runs two: the POST wrote the job into one machine's
+// heap, and the poll that followed could be routed to the other, which
+// answered 404. Shared state is the only thing both can see.
 export type GenerationPhase = 'profiles' | 'picks' | 'matching' | 'lengths' | 'verifying' | 'saving'
 
 // Wording shown to the user, in the order the generation moves through them.
@@ -50,56 +55,81 @@ export interface GenerationJob {
   updatedAt: number
 }
 
-const jobs = new Map<string, GenerationJob>()
-
 // Long enough for a finished job to be collected by the poll that follows it,
-// short enough that abandoned jobs don't accumulate. Nothing schedules this —
-// it's swept on access, so an idle process holds no timers.
+// short enough that abandoned rows don't accumulate. Swept on write rather
+// than on a timer, so an idle machine schedules nothing.
 const JOB_TTL_MS = 10 * 60 * 1000
 
-function sweep(): void {
-  const cutoff = Date.now() - JOB_TTL_MS
-  for (const [id, job] of jobs) {
-    if (job.updatedAt < cutoff) jobs.delete(id)
+async function sweep(db: Db): Promise<void> {
+  await db.deleteMany(recommendationJobs, { where: lt('updated_at', Date.now() - JOB_TTL_MS) })
+}
+
+function parsePhases(raw: string): GenerationPhase[] {
+  const phases = raw.split(',').filter((phase): phase is GenerationPhase => phase in PHASE_LABELS)
+  return phases.length > 0 ? phases : PHASE_ORDER
+}
+
+function toJob(row: RecommendationJob): GenerationJob {
+  return {
+    userId: row.user_id,
+    phases: parsePhases(row.phases),
+    phase: (row.phase in PHASE_LABELS ? row.phase : 'profiles') as GenerationPhase,
+    runId: row.run_id ?? undefined,
+    prunedOldestRun: row.pruned_oldest_run === 1,
+    error: row.error ?? undefined,
+    startedAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
   }
 }
 
-export function createJob(userId: number, options: { withLengthCheck: boolean }): string {
-  sweep()
+export async function createJob(
+  db: Db,
+  userId: number,
+  options: { withLengthCheck: boolean },
+): Promise<string> {
+  await sweep(db)
+
   const id = crypto.randomUUID()
   const now = Date.now()
   const phases = options.withLengthCheck ? PHASE_ORDER : PHASE_ORDER.filter((phase) => phase !== 'lengths')
-  jobs.set(id, { userId, phases, phase: 'profiles', startedAt: now, updatedAt: now })
+
+  await db.create(recommendationJobs, {
+    id,
+    user_id: userId,
+    phases: phases.join(','),
+    phase: 'profiles',
+    pruned_oldest_run: 0,
+    created_at: now,
+    updated_at: now,
+  })
+
   return id
 }
 
-export function setPhase(jobId: string, phase: GenerationPhase): void {
-  const job = jobs.get(jobId)
-  if (!job) return
-  job.phase = phase
-  job.updatedAt = Date.now()
+export async function setPhase(db: Db, jobId: string, phase: GenerationPhase): Promise<void> {
+  await db.updateMany(recommendationJobs, { phase, updated_at: Date.now() }, { where: { id: jobId } })
 }
 
-export function completeJob(jobId: string, runId: number, prunedOldestRun: boolean): void {
-  const job = jobs.get(jobId)
-  if (!job) return
-  job.runId = runId
-  job.prunedOldestRun = prunedOldestRun
-  job.updatedAt = Date.now()
+export async function completeJob(
+  db: Db,
+  jobId: string,
+  runId: number,
+  prunedOldestRun: boolean,
+): Promise<void> {
+  await db.updateMany(
+    recommendationJobs,
+    { run_id: runId, pruned_oldest_run: prunedOldestRun ? 1 : 0, updated_at: Date.now() },
+    { where: { id: jobId } },
+  )
 }
 
-export function failJob(jobId: string, error: string): void {
-  const job = jobs.get(jobId)
-  if (!job) return
-  job.error = error
-  job.updatedAt = Date.now()
+export async function failJob(db: Db, jobId: string, error: string): Promise<void> {
+  await db.updateMany(recommendationJobs, { error, updated_at: Date.now() }, { where: { id: jobId } })
 }
 
 // Scoped by user: a job id is a bearer token otherwise, and someone else's
 // progress is nobody's business.
-export function getJob(jobId: string, userId: number): GenerationJob | null {
-  sweep()
-  const job = jobs.get(jobId)
-  if (!job || job.userId !== userId) return null
-  return job
+export async function getJob(db: Db, jobId: string, userId: number): Promise<GenerationJob | null> {
+  const row = await db.findOne(recommendationJobs, { where: { id: jobId, user_id: userId } })
+  return row ? toJob(row) : null
 }

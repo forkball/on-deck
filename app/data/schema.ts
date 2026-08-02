@@ -79,6 +79,24 @@ export const userTasteProfiles = table({
 // One "get recommendations" click — indexed and dated, kept forever (not
 // replaced on the next run) so past runs stay browsable by id. See
 // app/data/recommendations.ts.
+// Live progress for an in-flight recommendation run. In the database rather
+// than process memory because the app runs on more than one machine — see the
+// migration for the failure this fixes.
+export const recommendationJobs = table({
+  name: 'recommendation_jobs',
+  columns: {
+    id: c.text().primaryKey(),
+    user_id: c.integer().notNull().references('users', 'id'),
+    phases: c.text().notNull(),
+    phase: c.text().notNull(),
+    run_id: c.integer(),
+    pruned_oldest_run: c.integer().notNull(),
+    error: c.text(),
+    created_at: c.integer().notNull(),
+    updated_at: c.integer().notNull(),
+  },
+})
+
 export const recommendationRuns = table({
   name: 'recommendation_runs',
   columns: {
@@ -161,5 +179,6 @@ export type UserTasteProfile = TableRow<typeof userTasteProfiles>
 export type UserRecommendation = TableRow<typeof userRecommendations>
 export type UserFollow = TableRow<typeof userFollows>
 export type RecommendationRun = TableRow<typeof recommendationRuns>
+export type RecommendationJob = TableRow<typeof recommendationJobs>
 export type RecommendationRunMember = TableRow<typeof recommendationRunMembers>
 export type Notification = TableRow<typeof notifications>

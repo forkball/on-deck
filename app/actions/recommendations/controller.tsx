@@ -235,7 +235,7 @@ export default createController(routes.recommendations, {
       // The background task deliberately uses the module-level `db` rather
       // than the request's: it outlives the response, and anything scoped to
       // a finished request is not safe to keep using.
-      const jobId = createJob(auth.identity.id, { withLengthCheck: filters.length != null })
+      const jobId = await createJob(db, auth.identity.id, { withLengthCheck: filters.length != null })
 
       void generateRecommendations(
         sharedDb,
@@ -245,13 +245,19 @@ export default createController(routes.recommendations, {
         mediaType,
         sourceTypes,
         parsed.value.name,
-        (phase) => setPhase(jobId, phase),
+        // Fire and forget: a progress write failing must not take the run
+        // down with it, and nothing waits on it.
+        (phase) => void setPhase(sharedDb, jobId, phase).catch(() => {}),
       ).then(
-        ({ runId, prunedOldestRun }) => completeJob(jobId, runId, prunedOldestRun),
+        ({ runId, prunedOldestRun }) => completeJob(sharedDb, jobId, runId, prunedOldestRun),
         (error: unknown) => {
           // Nothing is awaiting this, so an unrecorded rejection would leave
           // the page waiting on a stage that will never advance.
-          failJob(jobId, error instanceof Error ? error.message : 'Generating failed. Try again.')
+          void failJob(
+            sharedDb,
+            jobId,
+            error instanceof Error ? error.message : 'Generating failed. Try again.',
+          )
         },
       )
 
@@ -261,11 +267,11 @@ export default createController(routes.recommendations, {
     // The wait page. Server-rendered with the current stage already filled
     // in, so it says something true before any polling happens — and keeps
     // working without JavaScript via the meta refresh it carries.
-    generating(context) {
+    async generating(context) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
-      const job = getJob(context.params.jobId, auth.identity.id)
+      const job = await getJob(context.get(Database), context.params.jobId, auth.identity.id)
       if (!job) return new Response('Not Found', { status: 404 })
 
       if (job.runId != null) {
@@ -287,11 +293,11 @@ export default createController(routes.recommendations, {
 
     // Polled by the wait page. JSON rather than HTML because the island
     // swaps a caption rather than a page.
-    status(context) {
+    async status(context) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
-      const job = getJob(context.params.jobId, auth.identity.id)
+      const job = await getJob(context.get(Database), context.params.jobId, auth.identity.id)
       if (!job) return Response.json({ error: 'not_found' }, { status: 404 })
 
       return Response.json({
