@@ -1,0 +1,34 @@
+# A local Postgres for development.
+#
+# Until this existed, `.env` pointed at the same Supabase database production
+# uses. That was survivable while local work was read-mostly, but the
+# recommendation queue made it dangerous: production's workers poll
+# recommendation_jobs every two seconds, so a row written locally was claimed
+# and run by a production machine within seconds — and a local worker could
+# just as easily claim a real user's job and run it against half-written code.
+#
+# Pinned to 17 to match the hosted database (17.6), so migrations and anything
+# version-dependent behave the same in both places.
+services:
+  postgres:
+    image: postgres:17
+    container_name: on-deck-postgres
+    environment:
+      POSTGRES_USER: ondeck
+      POSTGRES_PASSWORD: ondeck
+      POSTGRES_DB: ondeck
+    ports:
+      # Deliberately not 5432 — that clashes with any other Postgres already
+      # running locally, and the mismatch makes it obvious which database a
+      # connection string is pointing at.
+      - '55432:5432'
+    volumes:
+      - on-deck-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ondeck -d ondeck']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  on-deck-pgdata:
