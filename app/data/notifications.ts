@@ -4,21 +4,32 @@ import type { Db } from './db.ts'
 import { notifications, users } from './schema.ts'
 import { displayLabel } from './users.ts'
 
+export type NotificationType = 'recommendation' | 'follow'
+
 export interface NotificationSummary {
   id: number
   actorLabel: string
-  runId: number
+  type: NotificationType
+  // Only set for kinds that point at a run.
+  runId: number | null
+  actorUserId: number
   createdAt: number
   read: boolean
 }
 
 export async function createNotification(
   db: Db,
-  input: { userId: number; actorUserId: number; runId: number },
+  input: { userId: number; actorUserId: number; type: NotificationType; runId?: number },
 ): Promise<void> {
+  // Nobody needs telling about their own activity — a group run includes the
+  // person who asked for it, and following yourself isn't possible but costs
+  // nothing to guard.
+  if (input.userId === input.actorUserId) return
+
   await db.create(notifications, {
     user_id: input.userId,
     actor_user_id: input.actorUserId,
+    type: input.type,
     run_id: input.runId,
     created_at: Date.now(),
   })
@@ -40,7 +51,9 @@ export async function listNotifications(db: Db, userId: number): Promise<Notific
   return rows.map((row) => ({
     id: row.id,
     actorLabel: actorLabelById.get(row.actor_user_id) ?? 'Someone',
-    runId: row.run_id,
+    type: (row.type as NotificationType) ?? 'recommendation',
+    runId: row.run_id ?? null,
+    actorUserId: row.actor_user_id,
     createdAt: row.created_at,
     read: row.read_at != null,
   }))

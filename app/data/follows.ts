@@ -1,6 +1,7 @@
 import { and, eq, inList } from 'remix/data-table'
 
 import type { Db } from './db.ts'
+import { createNotification } from './notifications.ts'
 import { userFollows, users, type User } from './schema.ts'
 
 export async function followUser(db: Db, followerId: number, followedId: number): Promise<void> {
@@ -10,6 +11,16 @@ export async function followUser(db: Db, followerId: number, followedId: number)
   if (existing) return
 
   await db.create(userFollows, { follower_id: followerId, followed_id: followedId, created_at: Date.now() })
+
+  // Notified here rather than in the controller so it can only fire on a
+  // genuinely new follow — the early return above already covers the repeat
+  // case, and unfollow/refollow is caught by the unique index on the row.
+  try {
+    await createNotification(db, { userId: followedId, actorUserId: followerId, type: 'follow' })
+  } catch {
+    // Someone re-following after an unfollow hits the partial unique index.
+    // They already have the notification; the follow itself is what matters.
+  }
 }
 
 export async function unfollowUser(db: Db, followerId: number, followedId: number): Promise<void> {

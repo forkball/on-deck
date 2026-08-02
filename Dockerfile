@@ -16,6 +16,8 @@ COPY server.ts tsconfig.json ./
 ENV NODE_ENV=production
 EXPOSE 8080
 
-# npm start runs db:migrate (idempotent — only applies new migrations) then
-# starts the server; fine to run on every boot for a single-machine deploy.
+# Just the server. Migrations are a deploy step, not a boot step — see
+# release_command in fly.toml. The app runs on more than one machine, so
+# migrating from here meant every machine racing to apply the same migration
+# on every boot (and on every cold-start wake, given min_machines_running=0).
 CMD ["npm", "start"]

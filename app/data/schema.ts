@@ -174,8 +174,11 @@ export const notifications = table({
   columns: {
     id: c.integer().primaryKey().autoIncrement(),
     user_id: c.integer().notNull().references('users', 'id'), // recipient
-    actor_user_id: c.integer().notNull().references('users', 'id'), // who ran it
-    run_id: c.integer().notNull().references('recommendation_runs', 'id'),
+    actor_user_id: c.integer().notNull().references('users', 'id'), // who did the thing
+    // What happened: 'recommendation' | 'follow'. Only the kinds that have a
+    // run set run_id.
+    type: c.text().notNull(),
+    run_id: c.integer(),
     read_at: c.integer(),
     created_at: c.integer().notNull(),
   },

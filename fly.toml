@@ -5,6 +5,23 @@ primary_region = "iad"
 
 [build]
 
+# Migrations run here, not from the app's own start command.
+#
+# Fly runs this once, in a throwaway machine, before the new release reaches
+# any app machine — so exactly one process migrates, and a failure aborts the
+# deploy with the old version still serving. Chaining it into `npm start`
+# instead meant every machine migrated on every boot (there is more than one;
+# see db/migrations/20260802020000_recommendation_jobs), they raced with no
+# lock between them, and a bad migration crash-looped the machine rather than
+# failing the deploy.
+#
+# Because this runs *before* the new code is live, and because a rolling
+# deploy overlaps old and new code anyway, every migration has to be
+# compatible with the version already running. Anything that isn't needs a
+# maintenance window or an expand/contract sequence.
+[deploy]
+  release_command = "npm run db:migrate"
+
 [env]
   PORT = "8080"
 

@@ -47,7 +47,11 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
                     })}
                   >
                     <a href={routes.notifications.read.href({ notificationId: String(notification.id) })}>
-                      <strong>{notification.actorLabel}</strong> ran recommendations you can view — {date}
+                      <strong>{notification.actorLabel}</strong>{' '}
+                      {notification.type === 'follow'
+                        ? 'started following you'
+                        : 'ran recommendations you can view'}{' '}
+                      — {date}
                     </a>
                     {!notification.read && (
                       <span

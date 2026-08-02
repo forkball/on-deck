@@ -53,6 +53,18 @@ export default createController(routes.notifications, {
 
       await markNotificationRead(db, notificationId, auth.identity.id)
 
+      // Each kind opens the thing it's about: a run for recommendations, the
+      // person's profile for a follow.
+      if (notification.type === 'follow') {
+        return redirect(routes.users.show.href({ userId: String(notification.actor_user_id) }), 303)
+      }
+
+      // A recommendation notification without a run predates nothing and
+      // shouldn't exist, but a dangling redirect would 404 confusingly.
+      if (notification.run_id == null) {
+        return redirect(routes.notifications.index.href(), 303)
+      }
+
       return redirect(routes.recommendations.show.href({ runId: String(notification.run_id) }), 303)
     },
   },

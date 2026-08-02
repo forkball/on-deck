@@ -824,7 +824,7 @@ async function notifyMutualFollowers(
       ])
       if (!requesterFollowsMember || !memberFollowsRequester) return
 
-      await createNotification(db, { userId: memberId, actorUserId: requestingUserId, runId })
+      await createNotification(db, { userId: memberId, actorUserId: requestingUserId, type: 'recommendation', runId })
     }),
   )
 }
