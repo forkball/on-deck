@@ -10,6 +10,8 @@ export interface GeneratingPageProps {
   jobId: string
   phase: GenerationPhase
   phases: GenerationPhase[]
+  status: string
+  queuedAhead: number | null
   error?: string
   statusHref: string
   displayName: string
@@ -23,7 +25,7 @@ export interface GeneratingPageProps {
 // quieter poll.
 export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
   return () => {
-    const { jobId, phase, phases, error, statusHref, displayName } = handle.props
+    const { jobId, phase, phases, status, queuedAhead, error, statusHref, displayName } = handle.props
 
     return (
       <Document
@@ -48,6 +50,8 @@ export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
                 statusHref={statusHref}
                 initialLabel={PHASE_LABELS[phase]}
                 initialPhase={phase}
+                initialStatus={status}
+                initialQueuedAhead={queuedAhead}
                 phases={phases}
                 labels={PHASE_LABELS}
                 key={jobId}

@@ -87,6 +87,16 @@ export const recommendationJobs = table({
   columns: {
     id: c.text().primaryKey(),
     user_id: c.integer().notNull().references('users', 'id'),
+    // queued | running | done | failed
+    status: c.text().notNull(),
+    // Everything needed to run this job on a machine that never saw the
+    // request: member ids, media type, filters, source types, name.
+    params: c.text().notNull(),
+    // Output of each finished stage, so a resumed job doesn't repeat work it
+    // already paid for. Null until the first stage completes.
+    checkpoint: c.text(),
+    claimed_at: c.integer(),
+    attempts: c.integer().notNull(),
     phases: c.text().notNull(),
     phase: c.text().notNull(),
     run_id: c.integer(),

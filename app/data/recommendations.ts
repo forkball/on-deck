@@ -388,6 +388,14 @@ async function buildGroupLabel(db: Db, viewerId: number, run: RecommendationRun)
   return `You + ${otherMemberLabels.join(', ')}`
 }
 
+// What a partially-finished run has already bought. Deliberately small: the
+// picks list, then ids — the catalog rows those ids name are written before
+// the checkpoint records them.
+export interface GenerationCheckpoint {
+  picks?: Pick[]
+  verified?: { mediaItemId: number; reason: string }[]
+}
+
 export interface GenerateRecommendationsOutcome {
   runId: number
   // Whether generating this run pushed the user over MAX_RUNS_PER_USER and
@@ -584,6 +592,12 @@ export async function generateRecommendations(
   // instead of guessing. Every call site here sits immediately before the
   // await it describes.
   onPhase: (phase: GenerationPhase) => void = () => {},
+  // Resume support. `checkpoint` is whatever a previous attempt recorded;
+  // `onCheckpoint` is how this one records its own. A stage whose output is
+  // already present is skipped, so an interrupted run doesn't buy the same
+  // model call twice.
+  checkpoint: GenerationCheckpoint = {},
+  onCheckpoint: (checkpoint: GenerationCheckpoint) => void = () => {},
 ): Promise<GenerateRecommendationsOutcome> {
   const profileTypes: MediaType[] = sourceTypes && sourceTypes.length > 0 ? sourceTypes : [mediaType]
 
@@ -623,8 +637,17 @@ export async function generateRecommendations(
     }
   }
 
-  onPhase('picks')
-  const picks = await requestPicks(profiles, excludedTitles, filters, mediaType, profileTypes)
+  // The most expensive single call in a run, so it is the first thing worth
+  // never paying for twice.
+  let picks: Pick[]
+  if (checkpoint.picks?.length) {
+    picks = checkpoint.picks
+  } else {
+    onPhase('picks')
+    picks = await requestPicks(profiles, excludedTitles, filters, mediaType, profileTypes)
+    checkpoint = { ...checkpoint, picks }
+    onCheckpoint(checkpoint)
+  }
 
   // Anything already in the catalog is resolved without leaving the process;
   // only the rest cost a provider request.
@@ -699,14 +722,50 @@ export async function generateRecommendations(
   // Title similarity can't tell two different films apart when they share
   // both title and year — only content can, so this is a second, semantic
   // pass over the survivors before anything gets written to the catalog.
-  onPhase('verifying')
-  const verified = await verifyPicksAgainstOverviews(await withOverviews(candidates, mediaType), mediaType)
+  let results: RecommendationResult[]
 
-  onPhase('saving')
-  const results: RecommendationResult[] = []
-  for (const { pick, match } of verified.slice(0, TARGET_COUNT)) {
-    const item = await upsertCatalogItem(db, mediaType, match)
-    results.push({ item, tags: match.tags, reason: pick.reason, interaction: null })
+  if (checkpoint.verified?.length) {
+    // A previous attempt already paid for verification. Its picks were written
+    // to the catalog before the checkpoint recorded them, so this rebuilds the
+    // same output from those rows instead of asking the model again.
+    const ids = checkpoint.verified.map((entry) => entry.mediaItemId)
+    const [items, tagRows] = await Promise.all([
+      db.findMany(mediaItems, { where: inList('id', ids) }),
+      db.findMany(mediaItemTags, { where: inList('media_item_id', ids) }),
+    ])
+    const itemsById = new Map(items.map((item) => [item.id, item]))
+    const tagsById = new Map<number, string[]>()
+    for (const row of tagRows) {
+      tagsById.set(row.media_item_id, [...(tagsById.get(row.media_item_id) ?? []), row.tag])
+    }
+
+    onPhase('saving')
+    results = []
+    for (const entry of checkpoint.verified) {
+      const item = itemsById.get(entry.mediaItemId)
+      // A row could have been merged away by a rematch since; skip rather
+      // than fail the resumed run over it.
+      if (!item) continue
+      results.push({ item, tags: tagsById.get(item.id) ?? [], reason: entry.reason, interaction: null })
+    }
+  } else {
+    onPhase('verifying')
+    const verified = await verifyPicksAgainstOverviews(await withOverviews(candidates, mediaType), mediaType)
+
+    onPhase('saving')
+    results = []
+    for (const { pick, match } of verified.slice(0, TARGET_COUNT)) {
+      const item = await upsertCatalogItem(db, mediaType, match)
+      results.push({ item, tags: match.tags, reason: pick.reason, interaction: null })
+    }
+
+    // Recorded as ids, not objects — the catalog rows are already written, so
+    // the checkpoint only has to name them. Keeps a job row at a few KB.
+    checkpoint = {
+      ...checkpoint,
+      verified: results.map((result) => ({ mediaItemId: result.item.id, reason: result.reason })),
+    }
+    onCheckpoint(checkpoint)
   }
 
   const run = await db.create(

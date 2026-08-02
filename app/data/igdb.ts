@@ -136,7 +136,19 @@ async function accessToken(): Promise<string> {
 // each caller's own bookkeeping. Requests claim a slot 1/4 second after the
 // previous one; `nextSlot` is only ever advanced synchronously, so
 // concurrent callers can't be handed the same slot.
-const MIN_REQUEST_SPACING_MS = 1000 / 4
+// Divided by however many machines are running, because this limiter is
+// module-level and each process enforces its own share. Two machines each
+// pacing at 4/s put 8/s on a service that allows 4. Crude — the exact fix is a
+// token bucket both machines read — but it keeps the app's total inside the
+// limit with no shared state.
+const IGDB_REQUESTS_PER_SECOND = 4
+
+function machineCount(): number {
+  const configured = Number(process.env.MACHINE_COUNT)
+  return Number.isFinite(configured) && configured > 0 ? configured : 2
+}
+
+const MIN_REQUEST_SPACING_MS = 1000 / (IGDB_REQUESTS_PER_SECOND / machineCount())
 let nextSlot = 0
 
 async function claimRateLimitSlot(): Promise<void> {

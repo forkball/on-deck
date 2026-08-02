@@ -13,6 +13,13 @@ import { clientEntry, css, on } from 'remix/ui'
 // the model vendor nor the catalog.
 const POLL_MS = 1200
 
+// A poll can fail for reasons that have nothing to do with the run: a deploy
+// swapping machines, a dropped connection, a momentary 500. This used to
+// return out of the loop on the first one, which stopped polling for good and
+// left the page frozen on its last stage while the run finished fine behind
+// it. Failures are now tolerated until it's clear something is actually wrong.
+const MAX_CONSECUTIVE_FAILURES = 8
+
 const listStyle = css({
   listStyle: 'none',
   margin: '0 0 20px',
@@ -53,6 +60,8 @@ export type GenerationProgressProps = {
   statusHref: string
   initialLabel: string
   initialPhase: string
+  initialStatus: string
+  initialQueuedAhead: number | null
   phases: string[]
   labels: Record<string, string>
 }
@@ -61,11 +70,19 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
   import.meta.url,
   function GenerationProgress(handle: Handle<GenerationProgressProps>) {
     let phase = handle.props.initialPhase
+    let queueState = handle.props.initialStatus
+    let ahead: number | null = handle.props.initialQueuedAhead
     let failed: string | null = null
+    let lostContact = false
 
     async function poll() {
+      let consecutiveFailures = 0
+
       while (!handle.signal.aborted) {
-        await new Promise((resolve) => setTimeout(resolve, POLL_MS))
+        // Backs off as failures mount, so a struggling server isn't polled
+        // every 1.2s by every waiting page.
+        const wait = POLL_MS * Math.min(1 + consecutiveFailures, 5)
+        await new Promise((resolve) => setTimeout(resolve, wait))
         if (handle.signal.aborted) return
 
         try {
@@ -73,14 +90,29 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             headers: { Accept: 'application/json' },
             signal: handle.signal,
           })
-          if (!response.ok) return
+
+          // A swept job is gone for good — say so rather than waiting on
+          // something that will never answer.
+          if (response.status === 404) {
+            failed = "This run is no longer available. It may have finished a while ago."
+            handle.update()
+            return
+          }
+          if (!response.ok) {
+            consecutiveFailures++
+            if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) return void giveUp()
+            continue
+          }
 
           const status = (await response.json()) as {
+            status: string
             phase: string
+            queuedAhead: number | null
             done: boolean
             href: string | null
             error: string | null
           }
+          consecutiveFailures = 0
 
           if (status.error) {
             failed = status.error
@@ -95,16 +127,22 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             return
           }
 
-          if (status.phase !== phase) {
+          if (status.status !== queueState || status.phase !== phase || status.queuedAhead !== ahead) {
+            queueState = status.status
             phase = status.phase
+            ahead = status.queuedAhead
             handle.update()
           }
         } catch {
-          // A dropped poll isn't fatal — the next one will catch up, and the
-          // <noscript> refresh is a further backstop.
-          return
+          consecutiveFailures++
+          if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) return void giveUp()
         }
       }
+    }
+
+    function giveUp() {
+      lostContact = true
+      handle.update()
     }
 
     void poll()
@@ -114,6 +152,27 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       const current = phases.indexOf(phase)
 
       if (failed) return <p mix={css({ color: '#b91c1c' })}>{failed}</p>
+
+      if (lostContact) {
+        return (
+          <p mix={css({ color: '#b91c1c' })}>
+            Lost contact with the server. Your picks are probably still being put together —{' '}
+            <a href="">reload</a> to check.
+          </p>
+        )
+      }
+
+      // Queued reads as its own state rather than a dimmed first step: the run
+      // hasn't started, and showing stage one as "in progress" would be a lie.
+      if (queueState === 'queued') {
+        return (
+          <p mix={css({ color: '#555' })}>
+            Waiting to start
+            {ahead != null && ahead > 0 ? ` — ${ahead} ${ahead === 1 ? 'run' : 'runs'} ahead of yours` : ''}
+            …
+          </p>
+        )
+      }
 
       return (
         <ul mix={listStyle}>

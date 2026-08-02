@@ -8,16 +8,8 @@ import { redirect } from 'remix/response/redirect'
 
 import { getCatalogProvider } from '../../data/catalog.ts'
 import type { Db } from '../../data/db.ts'
-import { db as sharedDb } from '../../data/db.ts'
 import { listFollowedUsers } from '../../data/follows.ts'
-import {
-  completeJob,
-  createJob,
-  failJob,
-  getJob,
-  setPhase,
-  PHASE_LABELS,
-} from '../../data/generationProgress.ts'
+import { enqueueJob, getJob, hasActiveJob, PHASE_LABELS } from '../../data/generationProgress.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { getRememberedMediaType } from '../../middleware/mediaType.ts'
@@ -227,38 +219,38 @@ export default createController(routes.recommendations, {
         }
       }
 
-      // Generation takes tens of seconds and moves through several distinct
-      // stages, so the request no longer blocks for the whole thing. It
-      // starts the work, hands back a job id, and the wait page reports which
-      // stage the job is actually in.
-      //
-      // The background task deliberately uses the module-level `db` rather
-      // than the request's: it outlives the response, and anything scoped to
-      // a finished request is not safe to keep using.
-      const jobId = await createJob(db, auth.identity.id, { withLengthCheck: filters.length != null })
+      // Queued rather than started here. Generation is long and fans out into
+      // rate-limited services, so a worker with a fixed number of slots runs
+      // it — see data/generationWorker.ts. The request's only job is to record
+      // what to run.
+      if (await hasActiveJob(db, auth.identity.id)) {
+        const data = await loadIndexData(db, auth.identity, mediaType)
+        return context.render(
+          <RecommendationsPage
+            runs={data.runs}
+            runsFromOthers={data.runsFromOthers}
+            friends={data.friends}
+            mediaType={mediaType}
+            genres={data.genres}
+            lengthOptions={data.lengthOptions}
+            displayName={data.displayName}
+            error="You already have a run in progress — give that one a moment to finish first."
+          />,
+          { status: 409 },
+        )
+      }
 
-      void generateRecommendations(
-        sharedDb,
+      const jobId = await enqueueJob(
+        db,
         auth.identity.id,
-        memberIds,
-        filters,
-        mediaType,
-        sourceTypes,
-        parsed.value.name,
-        // Fire and forget: a progress write failing must not take the run
-        // down with it, and nothing waits on it.
-        (phase) => void setPhase(sharedDb, jobId, phase).catch(() => {}),
-      ).then(
-        ({ runId, prunedOldestRun }) => completeJob(sharedDb, jobId, runId, prunedOldestRun),
-        (error: unknown) => {
-          // Nothing is awaiting this, so an unrecorded rejection would leave
-          // the page waiting on a stage that will never advance.
-          void failJob(
-            sharedDb,
-            jobId,
-            error instanceof Error ? error.message : 'Generating failed. Try again.',
-          )
+        {
+          memberIds,
+          mediaType,
+          filters: filters as Record<string, unknown>,
+          sourceTypes,
+          name: parsed.value.name || undefined,
         },
+        { withLengthCheck: filters.length != null },
       )
 
       return redirect(routes.recommendations.generating.href({ jobId }), 303)
@@ -284,6 +276,8 @@ export default createController(routes.recommendations, {
           jobId={context.params.jobId}
           phase={job.phase}
           phases={job.phases}
+          status={job.status}
+          queuedAhead={job.queuedAhead ?? null}
           error={job.error}
           statusHref={routes.recommendations.status.href({ jobId: context.params.jobId })}
           displayName={displayLabel(auth.identity)}
@@ -301,6 +295,8 @@ export default createController(routes.recommendations, {
       if (!job) return Response.json({ error: 'not_found' }, { status: 404 })
 
       return Response.json({
+        status: job.status,
+        queuedAhead: job.queuedAhead ?? null,
         phase: job.phase,
         label: PHASE_LABELS[job.phase],
         done: job.runId != null,
