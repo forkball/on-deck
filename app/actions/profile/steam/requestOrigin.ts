@@ -6,11 +6,10 @@
 // party — Steam's OpenID `realm` and `return_to` have to match where the
 // browser actually is, or Steam sends people back to an http:// URL.
 //
-// Only the scheme is taken from a header. The host deliberately keeps coming
-// from the request: X-Forwarded-* is client-supplied unless a trusted proxy
-// overwrites it, and honouring a forwarded *host* would let anyone point
-// `return_to` at a domain they control. A spoofed scheme can do nothing worse
-// than downgrade the caller's own redirect.
+// Only the scheme comes from a header. X-Forwarded-* is client-supplied unless
+// a proxy overwrites it, so honouring a forwarded *host* would let anyone point
+// `return_to` at a domain they control; a spoofed scheme can only downgrade the
+// caller's own redirect.
 export function externalOrigin(url: URL, headers: Headers): string {
   // Proxies append rather than replace, so a chain gives "https, http".
   const forwarded = headers.get('x-forwarded-proto')?.split(',')[0]?.trim()

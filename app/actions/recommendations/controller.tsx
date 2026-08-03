@@ -35,10 +35,9 @@ import { RecommendationRunPage } from './run-page.tsx'
 
 const generateSchema = f.object({
   mode: f.field(s.union([s.literal('self'), s.literal('group')])),
-  // Deliberately a plain string, validated against the media-type registry
-  // below rather than a literal union here: a union would silently reject any
-  // newly-wired-up type until someone remembered to edit this schema, and
-  // being a runtime schema, TypeScript can't flag the omission.
+  // Validated against the registry below rather than a literal union here: a
+  // union would reject any newly-wired-up type until someone edited this
+  // schema, and TypeScript can't flag the omission in a runtime schema.
   mediaType: f.field(s.defaulted(s.string(), 'movie')),
   genre: f.field(s.defaulted(s.string(), '')),
   decade: f.field(s.defaulted(s.string(), '')),
@@ -46,9 +45,8 @@ const generateSchema = f.object({
   name: f.field(s.defaulted(s.string(), '')),
 })
 
-// Everything the index page needs, fetched from plain (db, user) rather than
-// a request context so the generate action can re-render that same page when
-// it rejects a run — see the missing-logs guard below.
+// From plain (db, user) rather than a request context, so the generate action
+// can re-render this page when it rejects a run.
 async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
   const [allRuns, allRunsFromOthers, friends] = await Promise.all([
     listRecommendationRuns(db, user.id),
@@ -57,9 +55,7 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
   ])
 
   return {
-    // Filtered to match the current tab — otherwise a TV run would show up
-    // in the list while the form above it is set to generate movies, which
-    // reads as inconsistent.
+    // Matched to the current tab, or a TV run lists under a movie form.
     runs: allRuns.filter((run) => run.mediaType === mediaType),
     runsFromOthers: allRunsFromOthers.filter((run) => run.mediaType === mediaType),
     friends,
@@ -76,14 +72,9 @@ export default createController(routes.recommendations, {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
-      // Which media type this page is for: an explicit ?mediaType= (set by
-      // the FAB, a plain navigation link) wins; otherwise fall back to
-      // whichever type was last remembered from visiting Media, so landing
-      // here via the nav link (no query string) stays on the same type
-      // instead of always defaulting back to movies. Either way, remember
-      // it — so if you *did* pick a type here, the Media link picks it back
-      // up too. Server-rendered, not client state, so the right genre list
-      // just comes out right without needing JS to swap it.
+      // An explicit ?mediaType= wins; otherwise the type last remembered from
+      // Media, so arriving via the nav link stays put instead of resetting to
+      // movies. Remembered either way, so Media picks up a choice made here.
       const mediaType =
         parseEnabledMediaType(context.url.searchParams.get('mediaType')) ?? getRememberedMediaType(context)
       context.get(Session).set('mediaType', mediaType)
@@ -129,8 +120,7 @@ export default createController(routes.recommendations, {
         filters.length = parsed.value.length
       }
 
-      // Which taste profiles to base picks on. Defaults to matching what's
-      // being generated, so the common case needs no thought.
+      // Defaults to matching what's being generated.
       const sourceTypes = formData
         .getAll('source')
         .map((value) => String(value))
@@ -139,15 +129,13 @@ export default createController(routes.recommendations, {
 
       const db = context.get(Database)
       const memberIds = [auth.identity.id, ...friendIds]
-      // MediaType widens to string through the table row types, so narrow
-      // once here rather than at each use below.
+      // MediaType widens to string through the row types; narrow once here.
       const mediaType = parseEnabledMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
-      // Mirrors the default inside generateRecommendations, so the guard
-      // below checks the same profiles the run would actually be built from.
+      // Mirrors generateRecommendations' own default, so the guard below checks
+      // the profiles the run would actually use.
       const profileTypes = sourceTypes.length > 0 ? sourceTypes : [mediaType]
 
-      // An empty log yields an empty taste profile, which generates picks
-      // that silently ignore that person. Refuse the run instead.
+      // An empty log yields an empty profile, silently ignoring that person.
       const missing = await findMembersMissingSourceLogs(db, memberIds, profileTypes)
       if (missing.length > 0) {
         const detail = missing
@@ -175,9 +163,8 @@ export default createController(routes.recommendations, {
         )
       }
 
-      // Same levers as a run they haven't taken anything from yet — ask
-      // before spending a model call on a second list they didn't finish the
-      // first of. `force` is how the confirmation gets past this.
+      // Same levers as a run they haven't acted on — ask before spending a
+      // model call on a second unfinished list. `force` gets past this.
       if (!formData.get('force')) {
         const duplicate = await findUnusedDuplicateRun(
           db,
@@ -203,9 +190,8 @@ export default createController(routes.recommendations, {
                 runId: duplicate.runId,
                 name: duplicate.name,
                 createdAt: duplicate.createdAt,
-                // Everything needed to resubmit this exact request, so
-                // "generate anyway" doesn't depend on the form still being
-                // filled in.
+                // So "generate anyway" doesn't depend on the form still
+                // being filled in.
                 fields: [
                   ['mediaType', mediaType],
                   ['mode', parsed.value.mode],
@@ -222,10 +208,8 @@ export default createController(routes.recommendations, {
         }
       }
 
-      // Queued rather than started here. Generation is long and fans out into
-      // rate-limited services, so a worker with a fixed number of slots runs
-      // it — see data/recommendations/worker.ts. The request's only job is to record
-      // what to run.
+      // Queued, not started: generation is long and fans out into rate-limited
+      // services, so a fixed-slot worker runs it. See recommendations/worker.ts.
       if (await hasActiveJob(db, auth.identity.id)) {
         const data = await loadIndexData(db, auth.identity, mediaType)
         return context.render(
@@ -259,9 +243,8 @@ export default createController(routes.recommendations, {
       return redirect(routes.recommendations.generating.href({ jobId }), 303)
     },
 
-    // The wait page. Server-rendered with the current stage already filled
-    // in, so it says something true before any polling happens — and keeps
-    // working without JavaScript via the meta refresh it carries.
+    // Server-rendered with the current stage, so it says something true before
+    // any polling — and keeps working without JS via its meta refresh.
     async generating(context) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -288,8 +271,7 @@ export default createController(routes.recommendations, {
       )
     },
 
-    // Polled by the wait page. JSON rather than HTML because the island
-    // swaps a caption rather than a page.
+    // JSON rather than HTML — the client entry swaps a caption, not a page.
     async status(context) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })

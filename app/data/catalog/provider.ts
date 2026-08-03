@@ -14,10 +14,8 @@ import {
   type TmdbSearchResult,
 } from './tmdb.ts'
 
-// The provider-agnostic name for a catalog hit. Structurally this is already
-// what TMDB returns — the alias exists so code written against the registry
-// doesn't have to name a specific provider, and so a non-TMDB provider (Open
-// Library for books) can satisfy the same contract.
+// The provider-agnostic name for a catalog hit — structurally what TMDB
+// returns, aliased so non-TMDB providers can satisfy the same contract.
 export type CatalogSearchResult = TmdbSearchResult
 
 // Short/medium/long, in whatever unit a given provider measures — runtime,
@@ -25,41 +23,33 @@ export type CatalogSearchResult = TmdbSearchResult
 // filters that read it: the buckets belong to the catalog that interprets them.
 export type LengthBucket = 'short' | 'medium' | 'long'
 
-// Everything that genuinely differs between one media type's catalog and
-// another's. Anything NOT here is type-agnostic and already lives in
-// mediaItems.ts.
+// Everything that differs between one media type's catalog and another's.
+// Anything not here is type-agnostic and lives in mediaItems.ts.
 export interface CatalogProvider {
-  // Recorded as media_items.external_source, so ids from different providers
-  // can never collide.
+  // Recorded as media_items.external_source, so ids can't collide.
   sourceName: string
   search(query: string): Promise<CatalogSearchResult[]>
   getById(externalId: string): Promise<CatalogSearchResult | null>
   // Genre vocabulary offered by the recommendation filter for this type.
   genres: string[]
-  // Turns whatever the "wrong match?" form accepts (a pasted URL or a bare
-  // id) into an external id, or null if it isn't one. Providers whose items
-  // have no public URL can just accept the bare id.
+  // Turns what the "wrong match?" form accepts — a pasted URL or bare id —
+  // into an external id, or null.
   parseExternalId(input: string): string | null
   // Shown when parseExternalId rejects the input.
   matchHint: string
   // Shown when the id parsed fine but the catalog had no such entry.
   lookupFailedError: string
-  // Whether a result satisfies a length filter, in whatever unit this medium
-  // is actually measured in — minutes for film, pages for books, hours for
-  // games. Lives on the provider because a single global check can only be
-  // right for one of them: it read `runtimeMinutes` unconditionally, which is
-  // null for books, so every book candidate was silently dropped and any book
-  // run with a length filter returned nothing.
+  // In whatever unit the medium is measured in — minutes, pages, hours. Lives
+  // on the provider because one global check can only be right for a single
+  // medium: reading runtimeMinutes unconditionally silently dropped every book.
   matchesLength(result: CatalogSearchResult, length: LengthBucket): boolean
-  // Labels for that filter's options, so the form stops hardcoding minutes.
+  // Labels for that filter's options, so the form doesn't hardcode minutes.
   lengthOptions: { value: LengthBucket; label: string }[]
 }
 
-// Keyed by MediaType. Note MediaType widens to `string` through the table row
-// types, so this is deliberately a partial lookup — a type with no provider
-// (games, until a provider lands) resolves to undefined
-// and callers are expected to fail loudly rather than silently substitute
-// movies, which is what the old `=== 'tv' ? tv : movie` dispatch did.
+// Keyed by MediaType, which widens to `string` through the row types — so this
+// is deliberately partial, and callers fail loudly rather than substituting
+// movies for a type with no provider.
 const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
   movie: {
     sourceName: 'tmdb',
@@ -153,8 +143,7 @@ export function findCatalogProvider(type: MediaType): CatalogProvider | undefine
   return CATALOG_PROVIDERS[type]
 }
 
-// For call sites that can't meaningfully continue without one — better to
-// throw than to quietly recommend movies to someone who asked for books.
+// Better to throw than quietly recommend movies to someone who asked for books.
 export function getCatalogProvider(type: MediaType): CatalogProvider {
   const provider = findCatalogProvider(type)
   if (!provider) throw new Error(`No catalog provider registered for media type "${type}".`)

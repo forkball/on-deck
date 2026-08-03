@@ -16,14 +16,12 @@ export interface LetterboxdImportResult {
   notFound: { title: string; year: number | null }[]
 }
 
-// Bounded so we don't fire hundreds of concurrent TMDB requests at once, but
-// high enough that a few hundred ratings still finish in one request — this
-// app has no background job queue, so the whole import runs synchronously.
+// The whole import runs inside the request, so this has to bound TMDB fan-out
+// without making a few hundred ratings time out.
 const CONCURRENCY = 8
 
-// Imports a Letterboxd ratings.csv (the one file inside the Data Export zip
-// this cares about — asking for just that file directly means no zip
-// handling at all, and users don't need us to explain what we ignore).
+// ratings.csv is the only file in Letterboxd's Data Export this needs, and
+// asking for it directly avoids any zip handling.
 export async function importLetterboxdRatings(
   db: Db,
   userId: number,
@@ -66,9 +64,7 @@ async function matchMovie(title: string, year: number | null): Promise<CatalogSe
   )
 }
 
-// Letterboxd's ratings.csv columns: Date, Name, Year, Letterboxd URI, Rating
-// — matched by header name (not position) so column order/extra columns
-// don't break parsing.
+// Matched by header name, so column order doesn't break parsing.
 function parseRatingsCsv(text: string): RatingRow[] {
   const table = parseCsv(text)
   if (table.length === 0) return []

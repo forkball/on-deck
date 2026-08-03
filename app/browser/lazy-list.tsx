@@ -7,19 +7,15 @@ export type LazyListProps = {
   step: number
 }
 
-// Progressively reveals a server-rendered list as you scroll, instead of
-// making you click through pages.
+// Reveals a server-rendered list as you scroll.
 //
-// It deliberately does NOT render the list itself. Island props are
-// JSON-serialized for hydration, so an island can't wrap server-rendered
-// children — and the result markup needs StatusSelect/StarRating/
-// FloatingDropdown, which live in app/ui/components and can't be imported
-// here (the asset server only bundles app/assets/**). So this renders a
-// zero-content sentinel after the list and reaches for the list by id.
+// Deliberately doesn't render the list itself: client entry props are
+// JSON-serialized, so an entry can't wrap server-rendered children, and the row
+// markup needs components under app/ui that this can't import. Instead it
+// renders a sentinel after the list and reaches for the list by id.
 //
-// Degrades correctly: with JS off, nothing hides anything and the full list
-// is visible — which is why the server renders every result rather than a
-// slice. The whole result set arrives in one catalog request either way, so
+// With JS off nothing hides anything and the full list shows, which is why the
+// server renders every result rather than a slice. The whole set arrives in one
 // revealing more costs no extra network.
 export const LazyList = clientEntry<LazyListProps>(
   import.meta.url,

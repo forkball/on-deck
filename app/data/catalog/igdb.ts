@@ -1,37 +1,18 @@
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
 
-// IGDB (Twitch) video game importer, replacing rawg.ts. Every claim below was
-// probed against the live API before this was written:
-//
-//  - It carries real portrait cover art *and* 16:9 screenshots, which RAWG
-//    never had — RAWG only had landscape key art, which is why games had to
-//    be shown as a carousel with no poster.
-//  - Console exclusives resolve properly. Zelda: Tears of the Kingdom, Super
-//    Mario Odyssey and Bloodborne all return with covers, which neither Steam
-//    (a storefront) nor Steam's box art could do.
-//  - `search` cannot be combined with `sort` — that pairing 406s — so
-//    relevance ranking has to happen here rather than in the query.
+// `search` cannot be combined with `sort` — that pairing 406s — so relevance
+// ranking happens here rather than in the query.
 const IGDB_API = 'https://api.igdb.com/v4'
 const TWITCH_TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
 
-// IGDB serves 4 requests/second. Anything batching lookups (the Steam
-// importer) has to respect this.
+// IGDB serves 4 requests/second.
 export const IGDB_MAX_CONCURRENCY = 4
 
-// game_type values worth treating as "a game someone played", from
-// /v4/game_types.
-//
-// The exclusions are what matter: mods (5), DLC (1), expansions (2),
-// episodes (6), seasons (7), packs (13) and updates (14) aren't things you
-// own and play on their own. Without this, searching "hollow knight" returns
-// an unofficial Vita port — catalogued as a mod — above the real game, the
-// same junk problem RAWG had in different clothes.
-//
-// Bundles, standalone expansions, expanded games and ports are included
-// because people genuinely own them under those names: "Devil May Cry HD
-// Collection", "Tony Hawk's Pro Skater 1+2" and "Deus Ex: Human Revolution -
-// Director's Cut" are all catalogued that way and were unmatchable while this
-// was narrower. Verified that widening doesn't bring the mod back.
+// game_type values from /v4/game_types that count as "a game someone played".
+// Excluding mods/DLC/expansions/episodes/seasons/packs/updates matters:
+// otherwise "hollow knight" returns an unofficial Vita port, catalogued as a
+// mod, above the real game. Bundles and ports stay in — people own games under
+// those names ("Tony Hawk's Pro Skater 1+2").
 const REAL_GAME_TYPES = '(0,3,4,8,9,10,11)'
 
 const SEARCH_LIMIT = 20
@@ -78,8 +59,7 @@ interface IgdbGame {
   genres?: { name: string }[]
   involved_companies?: { developer?: boolean; company?: { name?: string } }[]
   platforms?: { name?: string; abbreviation?: string }[]
-  // Stands in for RAWG's library-adds count: how many people have rated it.
-  // Fan games and asset flips sit at 0 while real games run into thousands.
+  // How many people have rated it — fan games and asset flips sit at 0.
   total_rating_count?: number
 }
 
@@ -91,10 +71,8 @@ interface IgdbTimeToBeat {
   completely?: number
 }
 
-// Unlike every other provider here, IGDB isn't authenticated with a static
-// key. The Twitch client id and secret are exchanged for a bearer token that
-// lasts about 56 days, so it's cached in module scope and renewed on demand
-// rather than fetched per request.
+// Unlike the other providers, IGDB has no static key: the Twitch id/secret are
+// exchanged for a ~56-day bearer token, cached here and renewed on demand.
 let cachedToken: { value: string; expiresAt: number } | null = null
 
 // A minute of slack, so a token that expires mid-flight isn't sent.
@@ -127,20 +105,11 @@ async function accessToken(): Promise<string> {
   return cachedToken.value
 }
 
-// IGDB enforces 4 requests/second and answers 429 above it. Bounding caller
-// *concurrency* isn't enough, which is how the first migration run failed:
-// four workers each making two requests per item (the game, then its
-// time-to-beat) sustained roughly eight per second and got refused.
-//
-// So the limit lives here, where every caller inherits it, rather than in
-// each caller's own bookkeeping. Requests claim a slot 1/4 second after the
-// previous one; `nextSlot` is only ever advanced synchronously, so
-// concurrent callers can't be handed the same slot.
-// Divided by however many machines are running, because this limiter is
-// module-level and each process enforces its own share. Two machines each
-// pacing at 4/s put 8/s on a service that allows 4. Crude — the exact fix is a
-// token bucket both machines read — but it keeps the app's total inside the
-// limit with no shared state.
+// Bounding caller concurrency isn't enough — four workers making two requests
+// per item sustain ~8/s and get 429'd — so the pacing lives here, where every
+// caller inherits it. `nextSlot` only advances synchronously, so concurrent
+// callers can't be handed the same slot. Divided by machine count because each
+// process enforces its own share of the limit.
 const IGDB_REQUESTS_PER_SECOND = 4
 
 function machineCount(): number {
@@ -176,8 +145,8 @@ async function igdbQuery<T>(endpoint: string, body: string): Promise<T[]> {
     body,
   })
 
-  // A token revoked before its stated expiry reads as 401; clearing the cache
-  // means the next call re-authenticates rather than failing forever.
+  // A token revoked before its stated expiry reads as 401; clear it so the next
+  // call re-authenticates rather than failing forever.
   if (response.status === 401) {
     cachedToken = null
     throw new Error('IGDB rejected the access token')
@@ -193,9 +162,8 @@ const GAME_FIELDS =
   'fields name,first_release_date,summary,total_rating_count,cover.url,screenshots.url,genres.name,' +
   'involved_companies.developer,involved_companies.company.name,platforms.name,platforms.abbreviation;'
 
-// IGDB hands back a t_thumb URL — 90x90, useless for display — and expects
-// the size to be swapped in the path. Also protocol-relative, so it needs a
-// scheme before a browser will load it.
+// IGDB returns a 90x90 t_thumb URL and expects the size to be swapped in the
+// path. Protocol-relative, so it also needs a scheme.
 function image(raw: string | undefined, size: string): string | null {
   if (!raw) return null
   return `https:${raw.replace('t_thumb', size)}`
@@ -211,8 +179,6 @@ function toResult(game: IgdbGame, hoursToBeat: number | null): CatalogSearchResu
     title: game.name ?? 'Untitled',
     releaseYear: game.first_release_date ? new Date(game.first_release_date * 1000).getUTCFullYear() : null,
     tags: (game.genres ?? []).map((genre) => genre.name.toLowerCase()),
-    // A real portrait cover, so games sit alongside films and books in a grid
-    // instead of needing their own shape.
     posterUrl: image(game.cover?.url, 't_cover_big'),
     popularity: game.total_rating_count ?? 0,
     overview: game.summary?.trim() || null,
@@ -221,10 +187,7 @@ function toResult(game: IgdbGame, hoursToBeat: number | null): CatalogSearchResu
     playtimeHours: hoursToBeat,
     creator: developerOf(game),
     images: stills,
-    // Abbreviations, because the full names are unusable on a card: IGDB
-    // calls it "PC (Microsoft Windows)" and "Xbox Series X|S". Stored in full
-    // and grouped into families at render time, so nothing is thrown away
-    // here that the detail page might want.
+    // Abbreviations — the full names ("PC (Microsoft Windows)") don't fit a card.
     platforms: (game.platforms ?? [])
       .map((platform) => platform.abbreviation || platform.name)
       .filter((name): name is string => Boolean(name)),
@@ -248,8 +211,8 @@ async function hoursToBeatFor(gameIds: number[]): Promise<Map<number, number>> {
 
   const hours = new Map<number, number>()
   for (const row of rows) {
-    // Seconds, and `normally` is the headline figure — falling back to the
-    // other two so a game with only a completionist time still gets a length.
+    // `normally` is the headline figure; fall back so a completionist-only
+    // time still yields a length.
     const seconds = row.normally ?? row.hastily ?? row.completely
     if (seconds) hours.set(row.game_id, Math.round(seconds / 3600))
   }
@@ -265,10 +228,8 @@ export async function searchGames(query: string): Promise<CatalogSearchResult[]>
     `${GAME_FIELDS} search "${escaped}"; where game_type = ${REAL_GAME_TYPES} & cover != null; limit ${SEARCH_LIMIT};`,
   )
 
-  // IGDB's own relevance puts "Elden Ring Nightreign" above "Elden Ring" and
-  // a fan project above "Super Mario Odyssey", and it refuses to sort a
-  // search server-side — so results are re-ranked here. Exact title first,
-  // then by how many people have rated it.
+  // IGDB's relevance puts "Elden Ring Nightreign" above "Elden Ring", and it
+  // won't sort a search server-side. Exact title first, then rating count.
   const wanted = normalize(query)
   const ranked = [...games].sort((a, b) => {
     const exact = Number(normalize(b.name ?? '') === wanted) - Number(normalize(a.name ?? '') === wanted)
@@ -281,18 +242,15 @@ export async function searchGames(query: string): Promise<CatalogSearchResult[]>
   return ranked.map((game) => toResult(game, hours.get(game.id) ?? null))
 }
 
-// Accepts either the numeric id or the slug from a game's igdb.com URL —
-// whichever parseIgdbId pulled out of what was pasted. Either way the stored
-// external_id comes from the response, so a slug never ends up in the
-// database.
+// Takes a numeric id or a slug. Either way external_id comes from the response,
+// so a slug never reaches the database.
 export async function getGameById(externalId: string): Promise<CatalogSearchResult | null> {
   const value = externalId.trim()
   if (!value) return null
 
   const selector = /^\d+$/.test(value)
     ? `where id = ${value};`
-    : // Quotes are stripped by parseIgdbId's character class, so this can't
-      // break out of the string literal.
+    : // parseIgdbId's character class strips quotes, so this can't break out.
       `where slug = "${value}";`
 
   try {
@@ -311,10 +269,8 @@ function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
-// IGDB's own slug form of a title, for the fallback above: its fuzzy search
-// misses exact titles surprisingly often — "For the King" and "We Who Are
-// About to Die" both return unrelated games — while `where slug = …` finds
-// them immediately.
+// Fuzzy search misses exact titles surprisingly often ("For the King" returns
+// unrelated games) while `where slug = …` finds them immediately.
 export function slugifyTitle(title: string): string {
   return title
     .toLowerCase()
@@ -322,16 +278,9 @@ export function slugifyTitle(title: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-// Pulls a game reference out of whatever someone pasted.
-//
-// The thing a person actually has is the page URL —
-// igdb.com/games/hollow-knight — so that's what this takes. It resolves,
-// contrary to an earlier comment here: `where slug = "hollow-knight"` returns
-// the game, verified against all of Hollow Knight, Elden Ring and Tears of
-// the Kingdom. That assumption came from RAWG, whose slug lookups 502'd.
-//
-// A bare numeric id still works for anyone who has one, and the character
-// class keeps quotes out of the APICalypse string literal built from it.
+// Pulls a game reference out of whatever someone pasted — normally the page
+// URL (igdb.com/games/hollow-knight), but a bare numeric id works too. The
+// character class keeps quotes out of the APICalypse literal built from it.
 export function parseIgdbId(input: string): string | null {
   const trimmed = input.trim()
   if (/^\d+$/.test(trimmed)) return trimmed

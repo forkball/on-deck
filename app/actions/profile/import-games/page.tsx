@@ -11,16 +11,14 @@ export interface SteamImportPageProps {
   // SteamID64 of the linked account, or null when nothing is connected yet.
   steamId: string | null
   connected?: boolean
-  // Ready to display — the controller turns both OpenID failure codes and
-  // Steam's own import errors into wording before they get here.
+  // The controller turns failure codes into wording before they get here.
   error?: string
   result?: SteamImportResult
 }
 
-// Mirrors the Goodreads import summary. The counts are split because a Steam
-// library imports into two different statuses, which no other importer does —
-// "imported 300 games" alone would hide that most of them landed on the
-// want-to-play pile rather than being marked played.
+// Counts are split because a Steam library imports into two statuses, which no
+// other importer does: "imported 300 games" would hide that most landed on the
+// want-to-play pile.
 function ImportSummary(handle: Handle<{ result: SteamImportResult }>) {
   return () => {
     const { result } = handle.props
@@ -70,9 +68,8 @@ function ImportSummary(handle: Handle<{ result: SteamImportResult }>) {
   }
 }
 
-// Mirrors the Letterboxd and Goodreads import pages, but the source is a
-// linked account rather than an uploaded file — so this page carries the
-// connection state too, instead of the profile doing it.
+// Carries the connection state too, since the source is a linked account
+// rather than an uploaded file.
 export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
   return () => {
     const { displayName, steamId, connected, error, result } = handle.props

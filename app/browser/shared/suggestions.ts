@@ -1,8 +1,5 @@
-// Shared by the movie and "find people" autosuggest inputs. Plain module
-// (no JSX/components), so it can be imported by more than one clientEntry
-// file without running into the "one hydrated island can't nest another"
-// question — each form hydrates itself and just uses this for its fetch
-// state machine.
+// A plain module, not a component, so more than one clientEntry can use it
+// without nesting hydrated client entries.
 
 export type Suggestion = {
   key: string
@@ -20,9 +17,8 @@ export type SuggestState = {
 export const EMPTY_SUGGEST_STATE: SuggestState = { suggestions: [], loading: false, open: false }
 
 export interface SuggestionFetcher {
-  // Called on every keystroke. Debounces, cancels any still-in-flight
-  // request, and reports state transitions (opening the dropdown with a
-  // loading spinner, then swapping in results) via onChange.
+  // Debounces, cancels any in-flight request, and reports transitions via
+  // onChange.
   query(value: string): void
 }
 

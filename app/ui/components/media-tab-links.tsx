@@ -3,31 +3,22 @@ import { css } from 'remix/ui'
 
 import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
-// Only movies and TV are wired up — the rest match the placeholders shown
-// in media-tabs.tsx (the profile page's tabs) so the two read the same.
 const PLACEHOLDER_TYPES: string[] = []
 
 export interface MediaTabLinksProps {
   current: ActiveMediaType
-  // Builds the link for each wired-up type. A callback rather than fixed
-  // movieHref/tvHref props because callers need to preserve their own query
-  // string (?q=, ?mediaType=) across the switch.
+  // A callback rather than fixed per-type props, so callers can preserve their
+  // own query string across the switch.
   hrefFor: (type: ActiveMediaType) => string
 }
 
-// The navigation counterpart to media-tabs.tsx: that one is a CSS-only
-// radio toggle (both panels are server-rendered in the same response, so
-// switching is free), but search/recommendations content genuinely differs
-// per type — different TMDB endpoint, different genre list — so these tabs
-// are links that fetch the other type's page.
+// The navigation counterpart to media-tabs.tsx, which can toggle in CSS because
+// both its panels are server-rendered together. Search content genuinely
+// differs per type, so these are links that fetch the other type's page.
 //
-// `rmx-document` is load-bearing, not decoration: without it the framework
-// intercepts the click and does a client-side frame reload, which swaps the
-// visible DOM but leaves already-hydrated islands holding their original
-// props. That's what made the TV search page fire /movies/suggest and show
-// movie titles in its autosuggest — the page said "Search TV" while the
-// hydrated search form was still the movie one. Forcing a real document
-// navigation re-hydrates everything against the new page.
+// `rmx-document` is load-bearing: without it the framework does a client-side
+// frame reload, swapping the DOM but leaving hydrated client entries holding
+// their original props — which had the TV search page firing /movies/suggest.
 export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
   return () => {
     const { current, hrefFor } = handle.props

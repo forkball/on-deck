@@ -5,8 +5,8 @@ export interface PaginationProps {
   page: number
   totalPages: number
   pageHref: (page: number) => string
-  // Default to the chronological wording the watched-log pages want. Search
-  // results are relevance-ordered, so "Newer/Older" would be a lie there.
+  // Chronological by default; search results are relevance-ordered, where
+  // "Newer/Older" would be a lie.
   prevLabel?: string
   nextLabel?: string
 }

@@ -17,42 +17,32 @@ export interface SteamImportResult {
   notFound: string[]
 }
 
-// One catalog search per game — there's no bulk endpoint and no Steam-appid
-// lookup, so a large library is a lot of requests. Lower than the CSV
-// importers' bound because IGDB serves 4 requests/second and will start
-// refusing above that; a large import is correspondingly slower.
+// One catalog search per game — IGDB has no bulk or by-appid endpoint. Lower
+// than the CSV importers' bound because IGDB serves only 4 requests/second.
 const CONCURRENCY = IGDB_MAX_CONCURRENCY
 
-// Steam libraries carry things that aren't games and would be nonsense in a
-// tracker: soundtracks, demos, server binaries, editors. IGDB would either
-// miss them or match the parent game and log it twice.
+// Soundtracks, demos, server binaries, editors. IGDB would either miss these or
+// match the parent game and log it twice.
 const NOT_A_GAME =
   /\b(soundtrack|ost|demo|playtest|beta|dedicated server|sdk|benchmark|artbook|art book|season pass|dlc|editor|mod tools|trailer|wallpaper)\b/i
 
-// Edition wording Steam puts in a name but IGDB usually doesn't. Only tried
-// after the full name fails, so "Skyrim Special Edition" still wins when
-// IGDB does list it separately.
+// Only tried after the full name fails, so "Skyrim Special Edition" still wins
+// where IGDB lists it separately.
 const EDITION_SUFFIX =
   /\b(game of the year|goty|definitive|complete|deluxe|ultimate|enhanced|remastered|special|anniversary|legendary|collection|gold|platinum|premium|classic|directors cut)\b.*$/
 
-// Steam disambiguates re-releases in parentheses — "Mass Effect (2007)",
-// "Mafia II (Classic)", "Riven (1997)" — where IGDB carries the plain name.
+// Steam disambiguates re-releases in parentheses ("Mass Effect (2007)") where
+// IGDB carries the plain name.
 const TRAILING_PARENTHETICAL = /\s*\([^)]*\)\s*$/
 
-// Imports a linked Steam account's owned games.
+// Every entry carries `playtime_forever`, so status is derived rather than
+// assumed: never launched means it's on the pile, any playtime means played.
 //
-// Unlike the CSV importers the source is an API call, which changes two
-// things: the failure modes are Steam's rather than a malformed file, and
-// every entry carries `playtime_forever` — so status is derived rather than
-// assumed. Never launched means it's on the pile; any playtime at all means
-// it's been played.
-//
-// Games resolve through IGDB rather than being stored as Steam rows, so the
-// same game found by search and by import is one catalog entry, not two.
+// Games resolve through IGDB rather than being stored as Steam rows, so one
+// game found by search and by import is a single catalog entry.
 export async function importSteamLibrary(db: Db, userId: number, steamId: string): Promise<SteamImportResult> {
   const outcome = await fetchSteamLibrary(steamId)
-  // The message is already written for a person to read — a private profile
-  // is the common case and says what to change.
+  // Already written for a person to read.
   if (!outcome.ok) throw new Error(outcome.message)
 
   const games = outcome.games
@@ -60,13 +50,10 @@ export async function importSteamLibrary(db: Db, userId: number, steamId: string
 
   const notFound: string[] = []
 
-  // Keyed by the resolved catalog game, not by Steam entry. Steam frequently
-  // lists the same game twice — "Batman: Arkham Asylum" alongside "Batman:
-  // Arkham Asylum GOTY Edition" — and both resolve here to one IGDB game.
-  // Writing per Steam entry meant the last one processed won, so a library
-  // with 964 minutes on the GOTY edition and 0 on the plain listing could
-  // import as never played. Playtime is summed instead: any time on any
-  // edition means you've played it.
+  // Keyed by resolved catalog game, not Steam entry: Steam lists the same game
+  // twice ("Arkham Asylum" and "Arkham Asylum GOTY Edition") and both resolve
+  // to one IGDB game. Per-entry writes let the last one win, so 964 minutes on
+  // one edition and 0 on the other imported as never played. Playtime is summed.
   const merged = new Map<string, { match: CatalogSearchResult; playtimeMinutes: number }>()
 
   await runBounded(playable, CONCURRENCY, async (game) => {
@@ -92,8 +79,7 @@ export async function importSteamLibrary(db: Db, userId: number, steamId: string
       status,
       rating: null,
       notes: null,
-      // Steam knows how long, never when — `rtime_last_played` is only on
-      // recently played games — so this stays unset rather than guessing.
+      // Steam knows how long, never when, so this stays unset.
     })
 
     if (status === 'consumed') played++
@@ -103,8 +89,7 @@ export async function importSteamLibrary(db: Db, userId: number, steamId: string
   return {
     totalGames: games.length,
     skipped: games.length - playable.length,
-    // Distinct games, which is why this can be lower than the number of
-    // Steam entries matched.
+    // Distinct games, so lower than the number of Steam entries matched.
     imported: merged.size,
     played,
     unplayed,
@@ -112,20 +97,13 @@ export async function importSteamLibrary(db: Db, userId: number, steamId: string
   }
 }
 
-// Resolves a Steam name to an IGDB game, or nothing.
-//
-// Deliberately stricter than the Goodreads importer's `matches[0]`. That one
-// is guessing from a title and author with no better option; here Steam gives
-// the exact published name, so anything short of a title match is more likely
-// a wrong game than a lucky one — and a wrong game silently poisons the taste
-// profile. Unmatched titles get reported instead.
+// Stricter than the Goodreads importer's `matches[0]`: Steam gives the exact
+// published name, so anything short of a title match is more likely a wrong
+// game than a lucky one — and a wrong game silently poisons the taste profile.
 async function matchGame(steamName: string): Promise<CatalogSearchResult | null> {
-  // Each variant is searched separately rather than re-filtering the first
-  // set of results. Measured on a 1,125-game library: searching only the full
-  // name left 127 unmatched on RAWG, because a query like "Painkiller: Gold"
-  // doesn't return plain "Painkiller" at all — the base game has to be asked
-  // for by name. Re-querying recovered 16 of them, Mass Effect and System
-  // Shock 2 among them.
+  // Searched separately rather than re-filtering the first result set: a query
+  // like "Painkiller: Gold" doesn't return plain "Painkiller" at all. On a
+  // 1,125-game library this recovered 16 of 127 unmatched titles.
   for (const query of searchVariants(steamName)) {
     const results = await getCatalogProvider('game').search(query)
     const wanted = normalizeTitle(query)
@@ -137,17 +115,15 @@ async function matchGame(steamName: string): Promise<CatalogSearchResult | null>
   return null
 }
 
-// Progressively less specific names to ask IGDB for. Only the first is tried
-// for the vast majority of games; the rest cost an extra request each, and
-// only on titles that would otherwise be reported as unmatched.
+// Progressively less specific. The rest cost an extra request each, and are
+// only reached by titles that would otherwise be reported unmatched.
 function searchVariants(steamName: string): string[] {
   const variants = [steamName]
 
   const withoutYear = steamName.replace(TRAILING_PARENTHETICAL, '').trim()
   if (withoutYear && withoutYear !== steamName) variants.push(withoutYear)
 
-  // Normalized rather than raw, since the edition wording is matched against
-  // normalized text — punctuation between the title and the suffix varies.
+  // Normalized, since punctuation between title and suffix varies.
   const normalized = normalizeTitle(withoutYear)
   const base = normalized.replace(EDITION_SUFFIX, '').trim()
   if (base && base !== normalized) variants.push(base)
@@ -155,9 +131,8 @@ function searchVariants(steamName: string): string[] {
   return variants
 }
 
-// Trademark symbols and punctuation differ constantly between the two
-// catalogues — "Sid Meier's Civilization® VI" against "Sid Meier's
-// Civilization VI" — so comparison happens on letters and digits only.
+// Trademark symbols and punctuation differ constantly between the two catalogues
+// ("Sid Meier's Civilization® VI"), so compare on letters and digits only.
 function normalizeTitle(title: string): string {
   return title
     .toLowerCase()

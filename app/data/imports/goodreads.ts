@@ -9,24 +9,20 @@ export interface GoodreadsImportResult {
   imported: number
   // Rows whose book couldn't be found in the catalog at all.
   notFound: { title: string; author: string }[]
-  // How many resolved by exact ISBN vs. a title/author guess — surfaced
-  // because the second kind is where wrong matches come from.
+  // Surfaced because title/author guesses are where wrong matches come from.
   matchedByIsbn: number
   matchedByTitle: number
 }
 
-// Goodreads' three shelves map exactly onto the app's three statuses, so an
-// import preserves your want-to-read list and current reads — unlike the
-// Letterboxd one, which can only ever produce "watched".
+// Goodreads' three shelves map exactly onto the app's three statuses, unlike
+// Letterboxd's export, which can only produce "watched".
 const SHELF_STATUS: Record<string, LogInteractionInput['status']> = {
   read: 'consumed',
   'currently-reading': 'in_progress',
   'to-read': 'want_to_consume',
 }
 
-// Title/author fallback lookups are one request each, unlike the ISBN path
-// which resolves 20 at a time — so this bound only really governs the
-// fallback.
+// Only really governs the fallback: the ISBN path resolves 20 per request.
 const CONCURRENCY = 8
 
 interface ShelfRow {
@@ -39,10 +35,8 @@ interface ShelfRow {
   readAt: number | null
 }
 
-// Imports a Goodreads library export (My Books → Import and export → Export
-// Library). Goodreads retired its public API in 2020, so the CSV is the only
-// way in — but it's richer than Letterboxd's: it carries ISBNs, so most rows
-// resolve to an exact edition rather than a title guess.
+// Goodreads retired its public API in 2020, so the CSV export is the only way
+// in — but it carries ISBNs, so most rows resolve to an exact edition.
 export async function importGoodreadsLibrary(
   db: Db,
   userId: number,
@@ -54,9 +48,8 @@ export async function importGoodreadsLibrary(
   let matchedByIsbn = 0
   let matchedByTitle = 0
 
-  // Every ISBN in one pass first: 20 per request instead of one request per
-  // book, which is the difference between seconds and minutes on a real
-  // library.
+  // 20 per request instead of one per book — seconds rather than minutes on a
+  // real library.
   const byIsbn = await getBooksByIsbns(rows.map((row) => row.isbn).filter(Boolean))
 
   const needsFallback: ShelfRow[] = []
@@ -88,7 +81,7 @@ export async function importGoodreadsLibrary(
       status: row.status,
       rating: row.rating,
       notes: row.notes,
-      // Only "read" rows carry a date; a to-read shelf entry has none.
+      // Only "read" rows carry a date.
       consumedAt: row.readAt ?? undefined,
     })
     imported++
@@ -103,9 +96,7 @@ async function matchByTitle(title: string, author: string): Promise<CatalogSearc
   return matches[0] ?? null
 }
 
-// Goodreads export columns: Title, Author, ISBN, ISBN13, My Rating,
-// Number of Pages, Original Publication Year, Date Read, Date Added,
-// Bookshelves, Exclusive Shelf, My Review, and others we ignore.
+// Goodreads export columns, of which the rest are ignored.
 function parseShelfCsv(text: string): ShelfRow[] {
   const table = parseCsv(text)
   if (table.length === 0) return []
@@ -132,8 +123,7 @@ function parseShelfCsv(text: string): ShelfRow[] {
     const status = SHELF_STATUS[cleanCell(record[shelfIndex]).toLowerCase()]
     if (!title || !status) continue
 
-    // 0 means "unrated" in a Goodreads export, not a zero-star review — the
-    // row is still worth importing, just without a rating.
+    // 0 means unrated, not a zero-star review.
     const rawRating = Number(cleanCell(record[ratingIndex]))
     const rating = Number.isFinite(rawRating) && rawRating > 0 ? rawRating : null
 
@@ -142,8 +132,7 @@ function parseShelfCsv(text: string): ShelfRow[] {
     rows.push({
       title,
       author: cleanCell(record[authorIndex]),
-      // ISBN13 preferred; the 10-digit column is the fallback, and plenty of
-      // rows have neither.
+      // ISBN13 preferred; plenty of rows have neither.
       isbn: cleanCell(record[isbn13Index]) || cleanCell(record[isbnIndex]),
       status,
       rating,

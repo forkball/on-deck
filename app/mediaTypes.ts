@@ -1,41 +1,27 @@
 import type { LogInteractionInput, MediaType } from './data/mediaItems.ts'
 import { routes } from './routes.ts'
 
-// The media types that are actually searchable and loggable today. The DB
-// enum (see schema.ts) also allows game; this is the narrower
-// "wired up end to end" list. Adding a type here makes TypeScript enumerate
-// every place that owes it an answer, via the `satisfies` below — which is
-// exactly the property the old `=== 'tv' ? … : 'movie'` checks lacked, since
-// those silently treated anything unrecognized as a movie.
+// The types wired up end to end. Adding one here makes the `satisfies` below
+// enumerate every place that owes it an answer.
 export const ACTIVE_MEDIA_TYPES = ['movie', 'tv', 'book', 'game'] as const
 
 export type ActiveMediaType = (typeof ACTIVE_MEDIA_TYPES)[number]
 
 export const DEFAULT_MEDIA_TYPE: ActiveMediaType = 'movie'
 
-// Narrows an untrusted string (query param, form field, DB column widened to
-// `string` by the table row types) to a type we can actually serve. Returns
-// null rather than defaulting, so each caller decides whether "unknown" means
-// fall back to movies or reject the request.
+// Narrows an untrusted string. Null rather than a default, so each caller
+// decides whether "unknown" means fall back or reject.
 export function parseMediaType(value: unknown): ActiveMediaType | null {
   return ACTIVE_MEDIA_TYPES.includes(value as ActiveMediaType) ? (value as ActiveMediaType) : null
 }
 
-// Types that exist in the vocabulary but aren't ready to be shown.
+// Types in the vocabulary that aren't ready to be shown. Empty today, and free
+// while unused.
 //
-// Empty today — games shipped. The mechanism stays because board games are
-// the next candidate and will want it, and because it costs nothing while
-// unused: with no type listed, isMediaTypeEnabled is always true and
-// parseEnabledMediaType behaves exactly like parseMediaType.
-//
-// A gated type stays in ACTIVE_MEDIA_TYPES on purpose. That tuple is what
-// makes `satisfies Record<ActiveMediaType, …>` force every consumer to have
-// an answer, and dropping a type from it to hide it would silently delete
-// that guarantee — so gating is a separate, runtime question.
-//
-// Opt-in rather than opt-out, so nothing has to be configured in production
-// for a half-finished type to stay hidden — forgetting to set a variable
-// hides it, rather than shipping it.
+// A gated type stays in ACTIVE_MEDIA_TYPES: that tuple is what forces every
+// consumer to have an answer, so hiding a type by removing it would silently
+// delete the guarantee. Opt-in, so forgetting to set the variable hides a
+// half-finished type rather than shipping it.
 const EXPERIMENTAL_MEDIA_TYPES: readonly ActiveMediaType[] = []
 
 function experimentalEnabled(): Set<string> {
@@ -52,17 +38,14 @@ export function isMediaTypeEnabled(type: ActiveMediaType): boolean {
   return experimentalEnabled().has(type)
 }
 
-// The types to actually show, in the registry's order. Read at call time
-// rather than module load so the environment can differ per deployment
-// without a rebuild.
+// Read at call time, so the environment can differ per deployment.
 export function enabledMediaTypes(): ActiveMediaType[] {
   return ACTIVE_MEDIA_TYPES.filter(isMediaTypeEnabled)
 }
 
-// For anything a visitor supplies — a ?tab=, a form field, a saved
-// preference. Distinct from parseMediaType, which stays ungated because it
-// also reads back rows already in the database: a logged game still needs
-// its own status verbs on a shared list, whether or not the tab is showing.
+// For anything a visitor supplies. parseMediaType stays ungated because it also
+// reads back existing rows — a logged game needs its status verbs whether or
+// not its tab is showing.
 export function parseEnabledMediaType(value: unknown): ActiveMediaType | null {
   const type = parseMediaType(value)
   return type && isMediaTypeEnabled(type) ? type : null
@@ -75,35 +58,27 @@ interface StatusVerbs {
 }
 
 interface MediaTypeUi {
-  // Route segment and CSS panel suffix. Plural, unlike MediaType itself —
-  // this is the single place that mismatch is reconciled.
+  // Plural, unlike MediaType — the single place that mismatch is reconciled.
   slug: string
   tabLabel: string
-  // Nouns for prose. `plural` is what the recommendation prompts use.
+  // Nouns for prose; the recommendation prompts read these.
   singular: string
   plural: string
-  // Used attributively before another noun — "movie taste profile",
-  // "TV taste profile". Distinct from tabLabel ('Movies') and singular
-  // ('TV show'), neither of which reads correctly in that position.
+  // Before another noun — "TV taste profile", where tabLabel and singular
+  // both read wrong.
   attributive: string
-  // Used when asking Claude to confirm a match — "the same show" reads better
-  // than "the same entry" for TV.
+  // For match confirmation — "the same show" beats "the same entry" for TV.
   entryNoun: string
-  // How one item is referred to conversationally: "Wrong movie?" / "Wrong
-  // show?", "Log this movie" / "Log this show". Shorter than `singular`,
-  // which would give the stilted "Wrong TV show?".
+  // Conversational: "Wrong show?" rather than singular's "Wrong TV show?".
   itemNoun: string
   // The catalog these items come from, named in user-facing copy.
   catalogName: string
   rematchPlaceholder: string
-  // Deep link into the external catalog's own search, pre-filled with the
-  // item's title — so the "wrong match?" form can send people straight to
-  // where the id it's asking for actually lives. Whether the year is usable
-  // is per-catalog and was measured, not assumed; see each entry.
+  // Sends the "wrong match?" form straight to where the id it asks for lives.
+  // Whether the year helps is per-catalog and was measured — see each entry.
   catalogSearchUrl: (title: string, year: number | null) => string
-  // Deliberately doesn't name the catalog: which service backs a search
-  // is an implementation detail, and it changes per type. The rematch
-  // form still names it, because there you're pasting a link from it.
+  // Deliberately unbranded; the rematch form names the catalog because there
+  // you're pasting a link from it.
   searchPlaceholder: string
   // Page heading and <title> on the search route.
   searchHeading: string
@@ -111,14 +86,12 @@ interface MediaTypeUi {
   statusVerbs: StatusVerbs
   // How the primary credit is labelled on a detail page.
   creditLabel: string
-  // Past participle for prose — "What I've watched" / "What I've read".
-  // Kept separate from statusVerbs.done so copy doesn't depend on how a
-  // status label happens to be capitalised.
+  // "What I've watched" / "read". Separate from statusVerbs.done so copy doesn't
+  // depend on how a status label is capitalised.
   pastParticiple: string
-  // Href builders are closures, not Route objects on purpose: routes.movies.show
-  // and routes.tv.show are different generic instantiations, and TypeScript
-  // won't let you call a union of their signatures. Closures keep the call
-  // sites type-checked at the definition instead.
+  // Closures, not Route objects: routes.movies.show and routes.tv.show are
+  // different generic instantiations, and TypeScript won't call a union of
+  // their signatures.
   hrefs: {
     search: () => string
     suggest: () => string
@@ -144,9 +117,8 @@ export const MEDIA_TYPE_UI = {
     itemNoun: 'movie',
     catalogName: 'TMDB',
     rematchPlaceholder: 'Paste a themoviedb.org link or id',
-    // Year deliberately unused: TMDB's web search returns identical results
-    // for ?year=2010 and ?year=1994, so the param is ignored, and folding the
-    // year into the query text instead measurably *worsens* matching.
+    // Year unused: TMDB's web search ignores ?year=, and folding it into the
+    // query text measurably worsens matching.
     catalogSearchUrl: (title) => `https://www.themoviedb.org/search/movie?query=${encodeURIComponent(title)}`,
     searchPlaceholder: 'Search for a movie…',
     searchHeading: 'Search movies',
@@ -198,9 +170,8 @@ export const MEDIA_TYPE_UI = {
     itemNoun: 'book',
     catalogName: 'Open Library',
     rematchPlaceholder: 'Paste an openlibrary.org link or work id',
-    // Open Library *does* honour a year, but only as a field filter:
-    // "stoner 1965" as free text returns Hamlet, while
-    // "stoner first_publish_year:1965" returns exactly the right editions.
+    // Open Library honours a year only as a field filter: "stoner 1965" returns
+    // Hamlet, "stoner first_publish_year:1965" returns the right editions.
     catalogSearchUrl: (title, year) =>
       `https://openlibrary.org/search?q=${encodeURIComponent(
         year ? `${title} first_publish_year:${year}` : title,
@@ -246,41 +217,33 @@ export const MEDIA_TYPE_UI = {
   },
 } satisfies Record<ActiveMediaType, MediaTypeUi>
 
-// Convenience for the common "I have a possibly-unknown type, give me
-// something renderable" case.
 export function mediaTypeUi(type: ActiveMediaType): MediaTypeUi {
   return MEDIA_TYPE_UI[type]
 }
 
-// The same registry, for code holding a MediaType straight off a database row.
-// Those row types widen the column to `string`, so such callers can't index
-// MEDIA_TYPE_UI directly — which is why the recommendation prompts each used
-// to carry their own private copy of the noun table. The DB enum already
-// constrains the column to the four active types, so this only has to
-// re-narrow what the row type lost.
+// For code holding a MediaType off a database row. Row types widen the column
+// to `string`, so those callers can't index MEDIA_TYPE_UI directly — which is
+// why the prompts each used to keep a private copy of the noun table.
 export function mediaTypeUiFor(type: MediaType): MediaTypeUi {
   return MEDIA_TYPE_UI[parseMediaType(type) ?? DEFAULT_MEDIA_TYPE]
 }
 
-// For prose about a type that may have come from the DB widened to `string`
-// (e.g. media_items.type on a recommendation row).
+// For prose about a type that may have come from the DB widened to `string`.
 export function mediaTypeLabel(value: unknown): string {
   const type = parseMediaType(value)
   return type ? MEDIA_TYPE_UI[type].tabLabel : String(value)
 }
 
-// Guards against a MediaType that isn't wired up yet reaching UI that assumes
-// it is. Kept separate from parseMediaType so callers holding a DB MediaType
-// don't have to launder it through `unknown`.
+// Separate from parseMediaType so callers holding a DB MediaType don't have to
+// launder it through `unknown`.
 export function isActiveMediaType(type: MediaType): type is ActiveMediaType {
   return parseMediaType(type) !== null
 }
 
 export type InteractionStatus = LogInteractionInput['status']
 
-// The three statuses are the same across every medium; only the verbs differ
-// — you watch a film but read a book. Verbs live on the registry above so
-// adding a type doesn't mean editing a second table here.
+// Same three statuses everywhere; only the verbs differ, and they live on the
+// registry above so adding a type doesn't mean editing a second table.
 export function statusOptionsFor(mediaType: ActiveMediaType): { value: InteractionStatus; label: string }[] {
   const verbs = MEDIA_TYPE_UI[mediaType].statusVerbs
   return [
@@ -294,8 +257,7 @@ export function statusLabelsFor(mediaType: ActiveMediaType): Record<string, stri
   return Object.fromEntries(statusOptionsFor(mediaType).map((o) => [o.value, o.label]))
 }
 
-// For the handful of places that render a status without knowing (or caring)
-// which medium it belongs to — e.g. a mixed list. Falls back to watch verbs.
+// For mixed lists that render a status without knowing its medium.
 export function statusLabel(status: string, mediaType?: unknown): string {
   const type = parseMediaType(mediaType) ?? DEFAULT_MEDIA_TYPE
   return statusLabelsFor(type)[status] ?? status

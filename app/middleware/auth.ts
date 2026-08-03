@@ -27,10 +27,8 @@ export function loadAuth() {
   })
 }
 
-// Wraps the framework's requireAuth so an unauthenticated request lands on
-// the login page (with `next` pointing back at what it asked for) instead of
-// a bare 401 — use this everywhere instead of importing requireAuth directly
-// from remix/middleware/auth.
+// Redirects to login with `next` set, rather than a bare 401. Use this instead
+// of importing requireAuth from remix/middleware/auth directly.
 export function requireAuth<identity = unknown>() {
   return requireAuthBase<identity>({
     onFailure(context) {

@@ -18,17 +18,14 @@ import {
 import { displayLabel } from '../users.ts'
 import type { RecommendationFilters } from './picks.ts'
 
-// Exported so the UI can tell users about the cap without duplicating it.
 export const MAX_RUNS_PER_USER = 3
 
 export interface RecommendationResult {
   item: MediaItem
   reason: string
-  // Your current log entry for this item, if any (e.g. it's already on your
-  // watchlist, or you're mid-way through it) — looked up live, not frozen at
-  // generation time. The whole row rather than just its status, so the log
-  // control on the run page can pre-fill rating and notes: submitting without
-  // them would write null over what's there.
+  // Looked up live, not frozen at generation time. The whole row rather than
+  // just its status, so the run page's log control can pre-fill rating and
+  // notes — submitting without them would write null over what's there.
   interaction: UserMediaInteraction | null
 }
 
@@ -40,9 +37,8 @@ export interface RecommendationRunSummary {
   name: string | null
 }
 
-// The levers used to generate a run, as shown back on its detail page.
-// sourceTypes always has at least one entry — old runs (generated before
-// this was tracked) fall back to [mediaType] in parseParams below.
+// sourceTypes always has at least one entry — runs generated before it was
+// tracked fall back to [mediaType] in parseParams.
 export interface GenerationParams {
   genre?: string
   decade?: number
@@ -56,8 +52,7 @@ export interface RecommendationRunDetail extends RecommendationRunSummary {
   params: GenerationParams
 }
 
-// An earlier run with these exact levers that the user hasn't taken anything
-// from yet.
+// An earlier run with these levers that the user hasn't acted on.
 export interface UnusedDuplicateRun {
   runId: number
   name: string | null
@@ -78,10 +73,9 @@ function parseParams(run: RecommendationRun): GenerationParams {
   }
 }
 
-// Canonical string for a set of levers, so two requests that mean the same
-// thing compare equal. JSON.stringify of the params object won't do it: key
-// order and dropped `undefined`s make the same filters serialise differently,
-// and source types arrive in whatever order the checkboxes were ticked.
+// Canonical, so two requests that mean the same thing compare equal.
+// JSON.stringify of the params object won't do: key order, dropped
+// `undefined`s and checkbox order all vary independently of meaning.
 function paramsKey(filters: RecommendationFilters, sourceTypes: MediaType[], memberIds: number[]): string {
   return JSON.stringify([
     filters.genre ?? null,
@@ -94,15 +88,9 @@ function paramsKey(filters: RecommendationFilters, sourceTypes: MediaType[], mem
   ])
 }
 
-// Finds a previous run with the same levers that the user hasn't acted on.
-//
-// "Acted on" means logging one of its picks. That's the signal the run was
-// actually used for something; a run whose picks are all still unlogged is
-// one the person hasn't worked through yet, so generating another costs a
-// model call to hand them a second list they didn't finish the first of.
-//
-// Deliberately not "has anything been logged since" — logging unrelated
-// things doesn't mean this list was used.
+// "Acted on" means logging one of its own picks — deliberately not "has
+// anything been logged since", which unrelated activity would satisfy. A run
+// with everything still unlogged means a second list would go unfinished too.
 export async function findUnusedDuplicateRun(
   db: Db,
   userId: number,
@@ -128,11 +116,9 @@ export async function findUnusedDuplicateRun(
     )
     if (key !== wanted) continue
 
-    // Only the *latest* run with these levers is considered, which is why
-    // this returns from the first match rather than scanning past it. Once
-    // you've worked through that list, asking again is a real request — being
-    // sent back to an older, still-untouched run with the same settings would
-    // be worse than useless.
+    // Only the latest run with these levers counts: once you've worked through
+    // it, asking again is a real request, and being sent back to an older
+    // untouched one would be worse than useless.
     const picks = await db.findMany(userRecommendations, { where: { run_id: run.id } })
     if (picks.length === 0) return null
 
@@ -153,8 +139,8 @@ export async function findUnusedDuplicateRun(
   return null
 }
 
-// Every other member's display label, relative to `viewerId` — not
-// necessarily the run's original requester, since any member can view a run.
+// Relative to `viewerId`, who isn't necessarily the requester — any member can
+// view a run.
 async function listOtherMemberLabels(db: Db, viewerId: number, run: RecommendationRun): Promise<string[]> {
   const memberRows = await db.findMany(recommendationRunMembers, { where: { run_id: run.id } })
   const otherMemberIds = memberRows.map((m) => m.user_id).filter((id) => id !== viewerId)
@@ -180,7 +166,6 @@ export interface SaveRunInput {
   results: RecommendationResult[]
 }
 
-// Writes a finished run and its picks, returning the new run's id.
 export async function saveRun(db: Db, input: SaveRunInput): Promise<number> {
   const run = await db.create(
     recommendationRuns,
@@ -210,11 +195,8 @@ export async function saveRun(db: Db, input: SaveRunInput): Promise<number> {
   return run.id
 }
 
-// Deletes the oldest run(s) for a user beyond MAX_RUNS_PER_USER, scoped to
-// one media type — a TV run should never prune an older movie run just
-// because the combined total crossed the cap. Returns whether anything was
-// deleted. Relies on recommendation_run_members and user_recommendations
-// cascading on delete of the run row.
+// Scoped to one media type, so a TV run never prunes an older movie run.
+// Members and picks go with it via ON DELETE CASCADE.
 export async function pruneOldRuns(db: Db, userId: number, mediaType: MediaType): Promise<boolean> {
   const runs = await db.findMany(recommendationRuns, {
     where: { user_id: userId, media_type: mediaType },
@@ -244,12 +226,9 @@ export async function listRecommendationRuns(db: Db, userId: number): Promise<Re
   )
 }
 
-// Group runs someone else requested that included this user as a member —
-// e.g. a friend generated picks "for" a group they added this user to.
-// Restricted to mutual follows (same bar as notifyMutualFollowers): being
-// added to someone's run isn't itself consent to show up on their page, so
-// this only surfaces if the requester also follows this user back. See
-// getRecommendationRun for why this is stricter than the access check.
+// Group runs someone else requested this user into. Restricted to mutual
+// follows — being added to someone's run isn't consent to show up on their
+// page. See getRecommendationRun for why this is stricter than the access check.
 export async function listRecommendationRunsFromOthers(db: Db, userId: number): Promise<RecommendationRunSummary[]> {
   const memberships = await db.findMany(recommendationRunMembers, { where: { user_id: userId } })
   if (memberships.length === 0) return []
@@ -286,23 +265,14 @@ export async function listRecommendationRunsFromOthers(db: Db, userId: number): 
   )
 }
 
-// Returns null if the run doesn't exist or userId wasn't part of it (the
-// requester or one of the invited members) — the dedicated
-// /recommendations/:id page treats that as 404. Membership, not just
-// ownership, matters now that other members get notified about group runs.
-// Access is membership, and membership is permanent — deliberately unlike
-// listRecommendationRunsFromOthers above, which gates on *current* mutual
-// follow.
+// Null (a 404) if the run doesn't exist or this user wasn't in it. Access is
+// membership and membership is permanent — deliberately unlike
+// listRecommendationRunsFromOthers, which gates on *current* mutual follow.
 //
-// The two answer different questions. This one is "may I see this run", and
-// the answer stays yes because the run was built partly from your own taste;
-// unfollowing someone shouldn't confiscate it. The listing is "what belongs in
-// my feed", which is about who you're connected to now.
-//
-// The visible consequence, checked rather than assumed: after unfollowing, a
-// shared run vanishes from your list but its URL still works and an existing
-// notification still opens it. Re-following brings it back. That mismatch is
-// intended, not an oversight.
+// The two answer different questions: "may I see this run" stays yes because it
+// was built partly from your taste, while the listing is about who you're
+// connected to now. So after unfollowing, a shared run leaves your list but its
+// URL still works. That mismatch is intended.
 export async function getRecommendationRun(
   db: Db,
   runId: number,

@@ -3,8 +3,7 @@ import { css } from 'remix/ui'
 
 type CSSStyle = Parameters<typeof css>[0]
 
-// Computed selector keys need the Record<string, unknown> cast — same as
-// tabsStyle in media-tabs.tsx.
+// Computed selector keys need the cast — same as tabsStyle in media-tabs.tsx.
 function modalStyle(id: string): CSSStyle {
   const style: Record<string, unknown> = {
     '& .modal-toggle': {
@@ -29,14 +28,9 @@ function modalStyle(id: string): CSSStyle {
   return style as CSSStyle
 }
 
-// A CSS-only modal (no JS), driven by a visually-hidden checkbox.
-//
-// This used to key off `:target` with the trigger as a link to `#<id>`. That
-// worked, but put modal state in the URL: opening pushed a history entry, so
-// after submitting the form and being redirected away, pressing Back returned
-// to the fragment and silently reopened the modal over the page. A checkbox
-// holds the same state without touching history, so Back now does what you'd
-// expect.
+// CSS-only, driven by a visually-hidden checkbox. Deliberately not `:target`,
+// which put modal state in the URL — after submitting and being redirected
+// away, Back returned to the fragment and silently reopened the modal.
 //
 // The trigger's look lives on an inner <span>, not the <label>: DoodleCSS
 // sets `.doodle label { padding: .25em 0 }` outside any @layer, and unlayered

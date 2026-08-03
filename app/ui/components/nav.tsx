@@ -1,8 +1,8 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { NotificationBell } from '../../assets/notification-bell.tsx'
-import { ProfileMenu } from '../../assets/profile-menu.tsx'
+import { NotificationBell } from '../../browser/notification-bell.tsx'
+import { ProfileMenu } from '../../browser/profile-menu.tsx'
 import { routes } from '../../routes.ts'
 
 export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {

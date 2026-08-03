@@ -34,7 +34,7 @@ export function Document(handle: Handle<DocumentProps>) {
         </head>
         <body class="doodle" mix={css({ margin: 0, fontFamily: "'Short Stack', cursive" })}>
           {children}
-          <script type="module" src={routes.assets.href({ path: 'app/assets/entry.ts' })}></script>
+          <script type="module" src={routes.assets.href({ path: 'app/browser/entry.ts' })}></script>
         </body>
       </html>
     )

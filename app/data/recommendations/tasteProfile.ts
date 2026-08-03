@@ -17,9 +17,8 @@ export async function getTasteProfile(db: Db, userId: number, mediaType: MediaTy
 
 export interface UpsertTasteProfileInput extends TasteProfileData {
   summary: string
-  // Fingerprint of the log this profile was written from — see logSignature.
-  // Lives inside the existing JSON blob rather than a new column, which keeps
-  // this migration-free.
+  // Fingerprint of the log this was written from. Inside the existing JSON blob
+  // rather than a new column, which keeps it migration-free.
   logSignature?: string
 }
 
@@ -63,13 +62,8 @@ export interface RegeneratedTasteProfile extends UpsertTasteProfileInput {
   log: Awaited<ReturnType<typeof listUserMediaLog>>
 }
 
-// Regenerates the taste profile from the user's log (scoped to one media
-// type — see the media_type column on user_taste_profiles) via Claude,
-// persists it, and returns the fresh value (plus the log it was built from,
-// so callers that also need the log — e.g. to compute already-seen titles —
-// don't have to re-fetch it). The sole write path for the profile now that
-// manual editing is gone. See generate.ts, which calls this
-// before generating picks.
+// The sole write path for a profile. Returns the log it was built from too, so
+// callers that need it (to exclude already-seen titles) don't re-fetch.
 export async function regenerateTasteProfile(
   db: Db,
   userId: number,
@@ -79,8 +73,7 @@ export async function regenerateTasteProfile(
 
   if (log.length === 0) {
     const empty = { summary: '', liked_tags: [], disliked_tags: [] }
-    // Signed like any other, or an empty log would read as stale on every
-    // run and rewrite this row forever.
+    // Signed like any other, or an empty log reads as stale on every run.
     await upsertTasteProfile(db, userId, mediaType, { ...empty, logSignature: logSignature(log) })
     return { ...empty, log }
   }
@@ -138,22 +131,13 @@ function parseStoredProfile(profile: UserTasteProfile): StoredProfile {
 
 type LogEntry = Awaited<ReturnType<typeof listUserMediaLog>>[number]
 
-// A fingerprint of everything about the log that reaches the model.
+// Exactly the fields the prompt is built from, and nothing else: if this is
+// unchanged the model would see a byte-identical prompt, so the stored profile
+// is still the right answer.
 //
-// Deliberately the exact fields the prompt is built from, and nothing else:
-// if this is unchanged the model would be handed a byte-identical prompt, so
-// the profile it produced is still the right answer. That equivalence is the
-// whole point — it makes "has anything changed?" answerable without deciding,
-// case by case, which kinds of change matter.
-//
-// Timestamps and a row count were the first attempt and were not enough. They
-// see additions, edits and deletions, but not a change to the item a log
-// points at: rematching a title rewrites what the model reads while every
-// interaction row, and every timestamp on it, stays exactly as it was. They
-// also quietly assume every write bumps updated_at, which is a property of
-// code elsewhere rather than anything guaranteed here.
-//
-// Sorted, so the order rows come back in can't register as a change.
+// Timestamps and a row count aren't enough — rematching a title rewrites what
+// the model reads while every interaction row stays as it was. Sorted, so row
+// order can't register as a change.
 function logSignature(log: LogEntry[]): string {
   const rows = log
     .map(({ interaction, item }) =>
@@ -171,30 +155,21 @@ function logSignature(log: LogEntry[]): string {
   return createHash('sha1').update(rows).digest('hex')
 }
 
-// Whether the log has moved since the profile was written.
-//
-// Profiles written before signatures existed report undefined, which reads as
-// stale and regenerates once, filling it in.
+// Profiles written before signatures existed report undefined, so they read as
+// stale and regenerate once.
 function isProfileStale(profile: UserTasteProfile | null, log: LogEntry[]): boolean {
   if (!profile) return true
   return parseStoredProfile(profile).logSignature !== logSignature(log)
 }
 
 export interface EnsuredTasteProfile extends RegeneratedTasteProfile {
-  // False when the stored profile was reused — the caller can report how much
-  // work it actually did.
+  // False when the stored profile was reused.
   regenerated: boolean
 }
 
-// The profile a recommendation run should use.
-//
-// Regenerating is a model call per member per source type, and a run repeats
-// it every single time even when nothing has been logged since — so the same
-// answer gets paid for again. This returns the stored profile untouched
-// unless the log has actually moved.
-//
-// The log itself is always read: it's a plain query, and the caller needs it
-// to exclude things already logged from the picks.
+// Regenerating costs a model call per member per source type, so the stored
+// profile is returned untouched unless the log has actually moved. The log
+// itself is always read — it's a plain query the caller needs anyway.
 export async function ensureTasteProfile(
   db: Db,
   userId: number,

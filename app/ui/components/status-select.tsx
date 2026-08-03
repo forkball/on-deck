@@ -2,11 +2,9 @@ import type { Handle } from 'remix/ui'
 
 import { DEFAULT_MEDIA_TYPE, statusOptionsFor, type ActiveMediaType } from '../../mediaTypes.ts'
 
-// A <select defaultValue={...}> doesn't actually preselect anything in this
-// framework — real HTML needs `selected` set on the matching <option>. Set it
-// explicitly per option instead of relying on a select-level default.
-// `defaultValue` is a plain string (not InteractionStatus) because the
-// data-table enum column type doesn't narrow on read, only on write.
+// `<select defaultValue>` doesn't preselect in this framework — HTML needs
+// `selected` on the matching <option>. `defaultValue` is a plain string because
+// the data-table enum column doesn't narrow on read, only on write.
 export function StatusSelect(
   handle: Handle<{ name: string; defaultValue: string; mediaType?: ActiveMediaType }>,
 ) {

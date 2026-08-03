@@ -1,24 +1,15 @@
-// Steam account linking via OpenID 2.0, plus reading a linked account's
-// owned games.
-//
-// Two different mechanisms with two different purposes, easy to conflate:
-//
-//  - OpenID proves identity and needs no key. It returns exactly one thing —
-//    the SteamID64 — and grants no access to anything.
-//  - The Web API key reads that account's library. It authenticates *this
-//    app* to Steam, not the person, and confers no privileges: Steam still
-//    enforces the profile's own privacy settings, so a private profile
-//    returns nothing however valid the key is.
+// Two mechanisms, easy to conflate: OpenID proves identity, needs no key, and
+// returns only the SteamID64. The Web API key reads the library — it
+// authenticates this app, not the person, and Steam still enforces the
+// profile's own privacy settings.
 const OPENID_ENDPOINT = 'https://steamcommunity.com/openid/login'
 const STEAM_API_BASE = 'https://api.steampowered.com'
 
 // Steam returns the identity as a URL; the SteamID64 is the last segment.
 const CLAIMED_ID_PATTERN = /^https?:\/\/steamcommunity\.com\/openid\/id\/(\d{17})$/
 
-// Where Steam sends people to sign in. `realm` is the origin it will return
-// to and must match `returnTo`, so both are derived from the live request
-// rather than configured — the app runs on localhost in development and on
-// Fly in production, and hardcoding either would break the other.
+// `realm` must match `returnTo`, and both are derived from the live request:
+// the app runs on localhost in development and Fly in production.
 export function buildSteamLoginUrl(realm: string, returnTo: string): string {
   const url = new URL(OPENID_ENDPOINT)
   url.searchParams.set('openid.ns', 'http://specs.openid.net/auth/2.0')
@@ -31,14 +22,10 @@ export function buildSteamLoginUrl(realm: string, returnTo: string): string {
   return url.toString()
 }
 
-// Verifies a callback and returns the SteamID64, or null.
-//
-// The callback is a plain GET the browser was redirected to, so every
-// parameter in it is attacker-supplied — including the claimed id. Trusting
-// it directly would let anyone link any Steam account by typing a URL. The
-// only thing that makes it trustworthy is handing the parameters straight
-// back to Steam with mode=check_authentication and letting Steam confirm it
-// signed them; a forged or replayed assertion answers `is_valid:false`.
+// The callback is a plain GET, so every parameter including the claimed id is
+// attacker-supplied — trusting it would let anyone link any account by typing a
+// URL. Only Steam confirming it signed them (mode=check_authentication) makes
+// it trustworthy; a forged or replayed assertion answers `is_valid:false`.
 export async function verifySteamCallback(params: URLSearchParams): Promise<string | null> {
   const claimedId = params.get('openid.claimed_id')
   if (!claimedId) return null
@@ -66,8 +53,8 @@ export async function verifySteamCallback(params: URLSearchParams): Promise<stri
 export interface SteamGame {
   appId: number
   name: string
-  // Total minutes played, ever. Zero means owned but never launched, which
-  // is what lets an import set a status rather than guess one.
+  // Zero means owned but never launched, which is what lets an import derive
+  // a status.
   playtimeMinutes: number
 }
 
@@ -79,12 +66,9 @@ interface OwnedGamesResponse {
   response?: { game_count?: number; games?: { appid: number; name?: string; playtime_forever?: number }[] }
 }
 
-// Reads a linked account's owned games.
-//
-// A private profile is indistinguishable from an empty one in the payload —
-// Steam returns `{"response":{}}` either way rather than an error — so this
-// reports it as its own outcome instead of silently importing zero games and
-// looking like it worked.
+// Steam returns `{"response":{}}` for both a private profile and an empty one,
+// so this reports privacy as its own outcome rather than silently importing
+// zero games and looking like it worked.
 export async function fetchSteamLibrary(steamId: string): Promise<SteamLibraryOutcome> {
   const key = process.env.STEAM_API_KEY
   if (!key) {

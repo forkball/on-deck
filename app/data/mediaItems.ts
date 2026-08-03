@@ -8,23 +8,14 @@ import type { TmdbSearchResult } from './catalog/tmdb.ts'
 
 export type MediaType = MediaItem['type']
 
-// Shared by every media type — everything here is genuinely type-agnostic:
-// it operates on media_item_id and never assumes a specific `type`. Only the
-// catalog providers (see catalog/provider.ts) know which external endpoint or
-// which `type` value to pass.
+// Everything here is type-agnostic: it operates on media_item_id and never
+// assumes a specific `type`.
 
-// Single place the metadata blob is assembled, so upsert and rematch can't
-// drift on which fields they persist. See mediaMetadata.ts for the read side.
-//
-// `previous` makes this a merge rather than an overwrite, and that matters:
-// search payloads carry no credits, runtime, or (for books) description, so
-// re-importing an already-enriched item from a search result would otherwise
-// null out everything the by-id lookup had filled in. A known value is never
-// replaced by an absent one.
-//
-// Rematch deliberately passes no `previous` — it repoints the row at a
-// different work entirely, so carrying the old title's metadata across would
-// be wrong rather than helpful.
+// `previous` makes this a merge, not an overwrite: search payloads carry no
+// credits, runtime or description, so re-importing an enriched item from a
+// search result would otherwise null out what a by-id lookup had filled in.
+// Rematch passes no `previous` — it repoints the row at a different work, so
+// carrying the old metadata across would be wrong.
 function buildMetadata(result: TmdbSearchResult, previous?: unknown): MediaMetadata {
   const prev = previous != null ? parseMediaMetadata(previous) : null
 
@@ -36,16 +27,12 @@ function buildMetadata(result: TmdbSearchResult, previous?: unknown): MediaMetad
     pageCount: result.pageCount ?? prev?.pageCount ?? null,
     playtimeHours: result.playtimeHours ?? prev?.playtimeHours ?? null,
     creator: result.creator ?? prev?.creator ?? null,
-    // Same merge rule as the scalars, but `??` won't do it: an empty array
-    // is truthy, so a lookup that returned no stills would replace a set we
-    // already had.
+    // `??` won't do: an empty array is truthy, so a lookup returning no stills
+    // would replace a set we already had.
     images: result.images?.length ? result.images : (prev?.images ?? []),
     // Same non-empty rule as images — see above.
     platforms: result.platforms?.length ? result.platforms : (prev?.platforms ?? []),
-    // Note this is replace-if-non-empty, where the media_item_tags table it
-    // replaced accumulated a union of every tag ever seen. Treating the most
-    // recent lookup as authoritative is the better rule: a provider dropping
-    // a genre should drop it here too.
+    // Replace-if-non-empty, so a provider dropping a genre drops it here too.
     tags: result.tags?.length ? result.tags : (prev?.tags ?? []),
   }
 }
@@ -54,8 +41,7 @@ export async function upsertMediaItem(
   db: Db,
   type: MediaType,
   result: TmdbSearchResult,
-  // Which catalog this came from — recorded so ids from different providers
-  // (TMDB for film, Open Library for books) can never collide.
+  // Recorded so ids from different providers can't collide.
   source: string,
 ): Promise<MediaItem> {
   const existing = await db.findOne(mediaItems, {
@@ -85,13 +71,10 @@ export async function upsertMediaItem(
 
 export type RematchMediaItemResult = { ok: true; item: MediaItem; merged: boolean } | { ok: false; error: string }
 
-// The catalog is shared across users (media_items isn't per-user), so a bad
-// title/year match can end up with two or more people's logs scattered
-// across a wrong item and the real one. Moves every interaction on the wrong
-// item onto the real one. If a given user already has a log on both (rare —
-// they logged the wrong item, then separately found and logged the right
-// one), keeps whichever was updated more recently and drops the other,
-// since the unique (user_id, media_item_id) constraint won't allow both.
+// media_items is shared across users, so a bad match scatters several people's
+// logs across the wrong item and the real one. If a user has a log on both,
+// the more recently updated wins — the unique (user_id, media_item_id)
+// constraint won't allow keeping both.
 async function mergeInteractionsInto(db: Db, fromMediaItemId: number, toMediaItemId: number): Promise<void> {
   const interactions = await db.findMany(userMediaInteractions, { where: { media_item_id: fromMediaItemId } })
 
@@ -106,20 +89,14 @@ async function mergeInteractionsInto(db: Db, fromMediaItemId: number, toMediaIte
       await db.delete(userMediaInteractions, existingOnTarget.id)
       await db.update(userMediaInteractions, interaction.id, { media_item_id: toMediaItemId })
     }
-    // else: the target's own log is newer — leave interaction where it is,
-    // it'll be cascade-deleted along with the rest of the wrong item.
+    // else: the target's log is newer — leave it to be cascade-deleted.
   }
 }
 
-// Re-points an existing media item at a different TMDB entry — the fix for a
-// bad title/year match (from search, autosuggest, or the Letterboxd import
-// all silently picking a plausible-but-wrong TMDB entry). Updates the item
-// in place (interactions stay attached to the same id) rather than creating
-// a new item, and fully replaces its tags since the old ones described the
-// wrong thing. If the target TMDB id is already a different item in the
-// catalog, merges into it instead (see mergeInteractionsInto) and deletes
-// the wrong item — ON DELETE CASCADE takes care of its now-orphaned tags
-// and any interactions that weren't moved.
+// Re-points an item at a different catalog entry, in place so interactions stay
+// attached to the same id. Tags are fully replaced — the old ones described the
+// wrong work. If the target id is already in the catalog, merges into it and
+// deletes the wrong item instead.
 export async function rematchMediaItem(
   db: Db,
   type: MediaType,
@@ -169,19 +146,17 @@ export interface LogInteractionInput {
   consumedAt?: number
 }
 
-// Clamps to 0.5-5 in half-star steps, defensively — the star picker only
-// submits valid values, but the request could be tampered with.
+// Clamps to 0.5-5 in half-star steps — the picker only submits valid values,
+// but the request could be tampered with.
 export function parseRatingInput(raw: string): number | null {
   const trimmed = raw.trim()
   if (!trimmed || !Number.isFinite(Number(trimmed))) return null
   return Math.min(5, Math.max(0.5, Math.round(Number(trimmed) * 2) / 2))
 }
 
-// Atomic upsert on (user_id, media_item_id) — a plain findOne-then-write
-// here would race under concurrent callers (the Letterboxd import runs 8 of
-// these in parallel; two rows resolving to the same movie could both see "no
-// existing row" and both insert). The DB-level unique constraint is what
-// makes ON CONFLICT possible at all; see the matching migration.
+// Atomic on (user_id, media_item_id): findOne-then-write races when the
+// Letterboxd import runs 8 of these in parallel and two rows resolve to the
+// same movie. The unique constraint is what makes ON CONFLICT possible.
 export async function logInteraction(
   db: Db,
   userId: number,
@@ -190,11 +165,9 @@ export async function logInteraction(
 ) {
   const now = Date.now()
   const consumedAt = input.consumedAt ?? now
-  // updated_at drives both the "What I've watched" sort order and the
-  // "logged on" date shown per row (watched-list-item.tsx) — when a caller
-  // backdates via consumedAt (the Letterboxd import), that backdate should
-  // win here too, or every imported movie would show up as "logged today."
-  // created_at stays as the true insert time regardless, for bookkeeping.
+  // updated_at drives the watched-list sort and its "logged on" date, so a
+  // caller backdating via consumedAt has to win here too — otherwise every
+  // imported movie reads as "logged today". created_at stays the insert time.
   const activityAt = input.consumedAt ?? now
 
   const values: Partial<UserMediaInteraction> = {
@@ -206,9 +179,8 @@ export async function logInteraction(
     created_at: now,
     updated_at: activityAt,
   }
-  // Only touched when actively marking something consumed — omitting the
-  // key from `update` (rather than setting it) leaves an existing
-  // consumed_at alone when just editing status/rating/notes later.
+  // Omitted rather than set when not marking consumed, so a later edit to
+  // status/rating/notes leaves an existing consumed_at alone.
   const update: Partial<UserMediaInteraction> = {
     status: input.status,
     rating: input.rating ?? undefined,
@@ -227,9 +199,8 @@ export async function logInteraction(
   })
 }
 
-// Updates an existing interaction directly by id (the editable-log flow on the
-// profile page), rather than upserting by media item. Returns null if the
-// interaction doesn't exist or doesn't belong to this user.
+// By id rather than upserting by media item. Null if it doesn't exist or isn't
+// this user's.
 export async function updateInteraction(
   db: Db,
   interactionId: number,
@@ -249,8 +220,7 @@ export async function updateInteraction(
   })
 }
 
-// Returns false (rather than throwing) if the interaction doesn't exist or
-// doesn't belong to this user, matching updateInteraction's ownership check.
+// False rather than throwing if it doesn't exist or isn't this user's.
 export async function deleteInteraction(db: Db, interactionId: number, userId: number): Promise<boolean> {
   const existing = await db.find(userMediaInteractions, interactionId)
   if (!existing || existing.user_id !== userId) return false
@@ -258,15 +228,12 @@ export async function deleteInteraction(db: Db, interactionId: number, userId: n
   return db.delete(userMediaInteractions, interactionId)
 }
 
-// Tags used to need a second query against media_item_tags; they now ride
-// along in the row's own metadata, so this is just the lookup.
 export async function getMediaItemDetail(db: Db, mediaItemId: number): Promise<MediaItem | null> {
   return (await db.find(mediaItems, mediaItemId)) ?? null
 }
 
-// Batched counterpart to getUserInteractionForItem, for pages that show a
-// list of items and need each one's status. One query instead of one per
-// item — a 20-result search page was otherwise 20 sequential round-trips.
+// One query instead of one per item — a 20-result search page was otherwise
+// 20 sequential round-trips.
 export async function getUserInteractionsForItems(db: Db, userId: number, mediaItemIds: number[]) {
   if (mediaItemIds.length === 0) return new Map<number, UserMediaInteraction>()
 
@@ -280,18 +247,11 @@ export async function getUserInteractionForItem(db: Db, userId: number, mediaIte
   return db.findOne(userMediaInteractions, { where: { user_id: userId, media_item_id: mediaItemId } })
 }
 
-// Loads a user's interactions joined to their media items in two queries
-// rather than one-per-row.
+// Two queries regardless of log size. Fetching items per-row is an N+1 that
+// took a 400-item log to ~10s on the profile page, which runs this six times.
 //
-// This was previously an `await db.find(...)` inside a map, i.e. an N+1: a
-// 400-item log issued 400 queries, and the profile page runs this six times
-// (list + count, per media type), so a single page load could fire thousands
-// and take ~10s. Batching the item fetch through one `inList` makes it two
-// queries regardless of log size.
-//
-// The type filter still happens in JS: userMediaInteractions has no `type`
-// column of its own (it lives on the joined media_items row), and filtering
-// after a batched join is cheap now that the join isn't the bottleneck.
+// The type filter stays in JS because userMediaInteractions has no `type`
+// column — it lives on the joined media_items row.
 export async function loadUserLogEntries(db: Db, userId: number) {
   const interactions = await db.findMany(userMediaInteractions, {
     where: { user_id: userId },
@@ -303,8 +263,7 @@ export async function loadUserLogEntries(db: Db, userId: number) {
   const items = await db.findMany(mediaItems, { where: inList('id', itemIds) })
   const itemsById = new Map(items.map((item) => [item.id, item]))
 
-  // `?? null` keeps the previous contract: db.find returned null for a
-  // missing row, and callers' prop types expect `MediaItem | null`.
+  // Callers' prop types expect `MediaItem | null`.
   return interactions.map((interaction) => ({
     interaction,
     item: itemsById.get(interaction.media_item_id) ?? null,

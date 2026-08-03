@@ -2,7 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { PHASE_LABELS, type GenerationPhase } from '../../data/recommendations/jobs.ts'
-import { GenerationProgress } from '../../assets/generation-progress.tsx'
+import { GenerationProgress } from '../../browser/generation-progress.tsx'
 import { Document } from '../../ui/components/document.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 
@@ -17,12 +17,9 @@ export interface GeneratingPageProps {
   displayName: string
 }
 
-// The wait while a run generates.
-//
-// Server-rendered with the real current stage, so it reads correctly before
-// any JavaScript runs — and the <noscript> refresh means it still advances
-// without any. The island on top only replaces full page reloads with a
-// quieter poll.
+// Server-rendered with the real current stage, and the <noscript> refresh keeps
+// it advancing without JavaScript. The client entry only replaces full reloads
+// with a quieter poll.
 export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
   return () => {
     const { jobId, phase, phases, status, queuedAhead, error, statusHref, displayName } = handle.props
@@ -31,8 +28,7 @@ export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
       <Document
         title="Generating recommendations | On Deck"
         head={
-          // Only when scripting is off: with the island running, this would
-          // reload the page underneath it.
+          // With the client entry running, this would reload the page under it.
           <noscript>
             <meta httpEquiv="refresh" content="3" />
           </noscript>

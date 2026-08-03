@@ -7,7 +7,7 @@ import { routes } from '../../routes.ts'
 import { Modal } from './modal.tsx'
 import { StarRatingInput } from './star-rating.tsx'
 import { StatusSelect } from './status-select.tsx'
-import { Field } from '../../assets/ui/field.tsx'
+import { Field } from '../shared/field.tsx'
 
 export interface MediaLogEditModalProps {
   interaction: UserMediaInteraction

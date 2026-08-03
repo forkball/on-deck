@@ -3,10 +3,8 @@ export interface BackLink {
   label: string
 }
 
-// `from` is an untrusted query param, so the same rule the login controller
-// applies to `next`/`return_to` applies here: same-origin relative paths only.
-// Rendering it unchecked would turn every detail page into an open redirect
-// dressed up as a "back" link.
+// `from` is an untrusted query param: same-origin relative paths only, or every
+// detail page becomes an open redirect dressed up as a "back" link.
 function safeFrom(value: string | null | undefined): string | null {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return null
   return value
@@ -27,14 +25,9 @@ const DESTINATIONS: [test: RegExp, label: string][] = [
   [/^\/notifications/, 'notifications'],
 ]
 
-// Builds the "back" link for a detail page, but only when there's somewhere
-// meaningful to go back to.
-//
-// The blanket per-page back links this replaces were removed because they
-// were noise: they pointed at a fixed parent whether or not you'd come from
-// there, duplicating the nav. This only appears when the page was actually
-// reached from somewhere (the `?from=` the app already threads through), and
-// names that place — so it tells you something the nav can't.
+// Only when there's somewhere meaningful to go back to. A fixed parent link
+// would duplicate the nav; this appears only when the page was actually reached
+// from somewhere, and names that place.
 export function backLinkFrom(from: string | null | undefined): BackLink | null {
   const href = safeFrom(from)
   if (!href) return null

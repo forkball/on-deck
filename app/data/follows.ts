@@ -12,14 +12,13 @@ export async function followUser(db: Db, followerId: number, followedId: number)
 
   await db.create(userFollows, { follower_id: followerId, followed_id: followedId, created_at: Date.now() })
 
-  // Notified here rather than in the controller so it can only fire on a
-  // genuinely new follow — the early return above already covers the repeat
-  // case, and unfollow/refollow is caught by the unique index on the row.
+  // Here rather than in the controller so it can only fire on a genuinely new
+  // follow; unfollow/refollow is caught by the unique index.
   try {
     await createNotification(db, { userId: followedId, actorUserId: followerId, type: 'follow' })
   } catch {
-    // Someone re-following after an unfollow hits the partial unique index.
-    // They already have the notification; the follow itself is what matters.
+    // Re-following after an unfollow hits the partial unique index; they
+    // already have the notification.
   }
 }
 
@@ -34,8 +33,7 @@ export async function isFollowing(db: Db, followerId: number, followedId: number
   return existing != null
 }
 
-// Which of `candidateIds` does `followerId` already follow — one query instead
-// of one `isFollowing` call per candidate.
+// One query instead of an `isFollowing` call per candidate.
 export async function listFollowingIds(
   db: Db,
   followerId: number,

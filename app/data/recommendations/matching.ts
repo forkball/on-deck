@@ -6,17 +6,14 @@ import type { MediaType } from '../mediaItems.ts'
 import { claude, parseStructuredResponse } from './claude.ts'
 import type { Pick } from './picks.ts'
 
-// A pick paired with the catalog entry it was resolved to. The unit that
-// flows through the whole matching stage.
+// A pick paired with the catalog entry it resolved to.
 export interface Candidate {
   pick: Pick
   match: CatalogSearchResult
 }
 
-// Dispatch to whichever catalog serves this media type. Previously a
-// `=== 'tv' ? … : …` binary that silently fell back to movies; going through
-// the registry means an unserved type throws instead of quietly returning
-// film results for, say, a book request.
+// Via the registry, so an unserved type throws rather than quietly returning
+// film results for a book request.
 export function searchForType(mediaType: MediaType, query: string): Promise<CatalogSearchResult[]> {
   return getCatalogProvider(mediaType).search(query)
 }
@@ -49,25 +46,18 @@ function levenshteinDistance(a: string, b: string): number {
   return dp[a.length][b.length]
 }
 
-// Cheap first-pass guard against TMDB search returning something with
-// little resemblance to what Claude actually asked for — deliberately
-// lenient (normalized edit distance, not exact match) since real TMDB
-// titles routinely differ from a natural-language ask in punctuation,
-// "the"/no "the", or a translated title. Catches "wrong movie entirely";
-// see verifyPicksAgainstOverviews for the case this can't catch — same
-// title, same year, different film.
+// Lenient on purpose: real catalog titles differ from a natural-language ask in
+// punctuation, "the"/no "the", or translation. Catches "wrong film entirely";
+// verifyPicksAgainstOverviews catches same-title-same-year-different-film.
 const TITLE_SIMILARITY_THRESHOLD = 0.5
 
-// Catalog titles frequently carry a subtitle the recommendation didn't ask
-// for — "The Dispossessed" vs "The Dispossessed: An Ambiguous Utopia", which
-// scores 0.44 on edit distance and was being dropped despite being an exact
-// match. Books hit this constantly because the Open Library provider joins
-// title and subtitle (needed to tell "Saga: Volume Two" from "Volume Four").
+// Catalog titles often carry a subtitle the pick didn't ask for — "The
+// Dispossessed: An Ambiguous Utopia" scores 0.44 and was dropped despite being
+// an exact match. Books hit this constantly, since Open Library joins the two.
 //
-// Deliberately strips at the subtitle separator rather than allowing a plain
-// prefix match: "Foundation" is a prefix of "Foundation and Empire", a
-// different novel entirely, and prefix matching would silently accept it.
-// A colon is a structural marker; a space isn't.
+// Strips at the separator rather than allowing a prefix match: "Foundation" is
+// a prefix of "Foundation and Empire", a different novel. A colon is a
+// structural marker; a space isn't.
 function withoutSubtitle(title: string): string {
   const [main] = title.split(/\s*[:–—]\s*/)
   return normalizeTitle(main ?? title)
@@ -94,22 +84,17 @@ const VERIFY_SCHEMA = {
   required: ['verdicts'],
 }
 
-// Second-pass guard: a same-titled, same-year-but-different film would
-// sail right through titlesLikelyMatch (and even the year check), since a
-// title string can't distinguish two different movies that happen to share
-// both. Only the plot itself can — so this asks Claude, which already knows
-// what it meant by each pick, to confirm against the catalog's own overview.
-// One batched call for the whole list rather than one per pick.
+// A same-title-same-year-different-film sails through titlesLikelyMatch, since
+// only the plot can tell them apart. Asks Claude, which knows what it meant, to
+// confirm against the catalog's overview — one batched call for the list.
 export async function verifyPicksAgainstOverviews(
   candidates: Candidate[],
   mediaType: MediaType = 'movie',
 ): Promise<Candidate[]> {
   if (candidates.length === 0) return []
 
-  // Named from the registry rather than hardcoded. catalogName said "TMDB" for
-  // every type, so a game was verified against IGDB data while Claude was told
-  // it came from TMDB — a false statement inside the one prompt whose whole job
-  // is telling two similar things apart.
+  // From the registry: a hardcoded "TMDB" told Claude the wrong source for
+  // games, inside the one prompt whose job is telling similar things apart.
   const { plural: noun, entryNoun, catalogName } = mediaTypeUiFor(mediaType)
 
   const items = candidates.map(({ pick, match }, index) => ({
@@ -144,15 +129,12 @@ export async function verifyPicksAgainstOverviews(
   return candidates.filter((_, index) => verdicts[index] === true)
 }
 
-// How many catalog lookups to run at once when backfilling descriptions —
-// same bound (and reason) as the Letterboxd importer's.
+// Same bound as the Letterboxd importer's.
 const OVERVIEW_CONCURRENCY = 8
 
-// Some catalogs return descriptions on search, some don't: TMDB does, Open
-// Library only exposes them on the per-work record. Since
-// verifyPicksAgainstOverviews is precisely the guard that reads them, a
-// missing description would make it rubber-stamp every book. Backfill the
-// gaps before verifying rather than letting the check run blind.
+// TMDB returns descriptions on search; Open Library only on the per-work
+// record. Since verifyPicksAgainstOverviews reads them, a missing one would
+// make it rubber-stamp every book.
 export async function withOverviews(candidates: Candidate[], mediaType: MediaType): Promise<Candidate[]> {
   const missing = candidates.filter(({ match }) => !match.overview)
   if (missing.length === 0) return candidates
@@ -170,8 +152,7 @@ export async function withOverviews(candidates: Candidate[], mediaType: MediaTyp
   return candidates
 }
 
-// Whether a result already carries the length dimension its provider filters
-// on, so the extra by-id lookup can be skipped.
+// Whether the by-id lookup can be skipped.
 export function hasLengthDimension(mediaType: MediaType, result: CatalogSearchResult): boolean {
   if (mediaType === 'book') return result.pageCount != null
   if (mediaType === 'game') return result.playtimeHours != null
@@ -181,26 +162,19 @@ export function hasLengthDimension(mediaType: MediaType, result: CatalogSearchRe
 const YEAR_TOLERANCE = 1
 
 // Resolves picks against the catalog we already hold, so a provider is only
-// asked about titles we've never seen.
+// asked about titles we've never seen — 21% of picks written so far were
+// already there, and that share grows as the catalog fills.
 //
-// The saving is the point: a run makes one search per pick, and popular titles
-// recur heavily across users — 21% of picks written so far were an item
-// already in the catalog, and that share only grows as the catalog fills.
+// The match is tight on purpose: normalised title equality *and* release year
+// within one. Same-titled works from different eras (Dune 1984 and 2021) are
+// exactly what a looser rule confuses, and one year never spans them.
 //
-// The match is deliberately tight. Normalised title equality *and* the release
-// year within one: the model is occasionally a year out, but same-titled works
-// from different eras (Dune 1984 and 2021, The Thing 1982 and 2011) are exactly
-// what a looser rule would confuse, and one year never spans them.
+// A row with no overview counts as a miss, since verifyPicksAgainstOverviews
+// judges on plot text and skipping the provider would skip the only check that
+// catches a wrong match. Books hit this constantly — 12% carry an overview.
 //
-// A row with no overview counts as a miss. verifyPicksAgainstOverviews judges
-// on plot text, so without one it cannot tell two same-titled works apart, and
-// skipping the provider would mean skipping the only check that catches a wrong
-// match. Books hit this constantly — 12% of them carry an overview.
-//
-// Raw SQL because the normalisation has to happen in the database; the
-// alternative is reading every catalog row of this type into memory per run.
-// Matches normalizeTitle exactly: lowercase, drop anything that isn't
-// alphanumeric or space, collapse runs of space.
+// Raw SQL because the normalisation has to happen in the database. Matches
+// normalizeTitle exactly.
 export async function resolveFromCatalog(
   mediaType: MediaType,
   picks: Pick[],

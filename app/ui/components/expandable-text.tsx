@@ -1,16 +1,13 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-// Roughly how many characters fit in one clamped line at the detail page's
-// column width. Only used to decide whether a toggle is worth rendering at
-// all — CSS does the actual clamping, so being approximate is fine. Erring
-// low just means a short paragraph occasionally gets a redundant toggle;
-// erring high would clip text with no way to expand it, which is worse.
+// Roughly one clamped line at the detail page's width. Only decides whether a
+// toggle is worth rendering — CSS does the clamping. Erring low costs a
+// redundant toggle; erring high clips text with no way to expand it.
 const CHARS_PER_LINE = 80
 
-// Computed selector keys make TypeScript infer a string index signature that
-// CSSProps rejects — same situation as tabsStyle in media-tabs.tsx, and the
-// same fix.
+// Computed selector keys infer a string index signature CSSProps rejects —
+// same as tabsStyle in media-tabs.tsx.
 type CSSStyle = Parameters<typeof css>[0]
 
 function clampStyle(id: string, maxLines: number): CSSStyle {
@@ -29,12 +26,9 @@ function clampStyle(id: string, maxLines: number): CSSStyle {
       overflow: 'hidden',
       margin: 0,
     },
-    // The toggles live on wrapper <span>s, not on the <label>s themselves.
-    // DoodleCSS sets `.doodle label { display: inline-block }` *outside* any
-    // @layer, and unlayered declarations beat layered ones no matter how
-    // specific the layered selector is — so `display: none` on a label is
-    // silently ignored and both toggles render at once. Spans are untouched
-    // by doodle, so hiding those works.
+    // On wrapper <span>s, not the <label>s: DoodleCSS sets `.doodle label`
+    // display unlayered, so `display: none` on a label is ignored and both
+    // toggles render at once.
     '& .toggle': { display: 'block', marginTop: '6px' },
     '& .less': { display: 'none' },
   }
@@ -51,13 +45,9 @@ export interface ExpandableTextProps {
   maxLines?: number
 }
 
-// Clamps long prose to `maxLines` with a Read more / Read less toggle.
-//
-// CSS-only, matching the rest of the app (see media-tabs.tsx for the same
-// `:has(#id:checked)` pattern): a visually-hidden checkbox holds the state and
-// two toggles swap places, so this works with JS disabled and needs no
-// hydration. Line clamping itself is `-webkit-line-clamp`, which despite the
-// prefix is supported across every current browser.
+// CSS-only, like the rest of the app: a hidden checkbox holds the state and two
+// toggles swap places, so no hydration. `-webkit-line-clamp` does the clamping
+// and, despite the prefix, is supported everywhere current.
 export function ExpandableText(handle: Handle<ExpandableTextProps>) {
   return () => {
     const { text, id, maxLines = 5 } = handle.props

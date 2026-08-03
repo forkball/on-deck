@@ -1,27 +1,29 @@
 import { clientEntry, css, on, ref } from 'remix/ui'
 
-import { SuggestionDropdown } from './ui/suggestion-dropdown.tsx'
-import { createSuggestionFetcher, EMPTY_SUGGEST_STATE, type SuggestState, type Suggestion } from './ui/suggestions.ts'
+import { SuggestionDropdown } from './shared/suggestion-dropdown.tsx'
+import { createSuggestionFetcher, EMPTY_SUGGEST_STATE, type SuggestState, type Suggestion } from './shared/suggestions.ts'
 
-export type UserSearchFormProps = {
+export type MovieSearchFormProps = {
   query: string
   searchHref: string
   suggestHref: string
+  importHref: string
+  placeholder?: string
 }
 
-// Client-hydrated (see generate-recommendations-form.tsx for the pattern).
-// The <form> still works as a plain GET without JS; this adds a submit
-// spinner plus an autosuggest dropdown (debounced request to suggestHref,
-// its own loading state) — picking a suggestion submits the real search
-// immediately, landing on the results list with its Follow/Unfollow
-// buttons. Mirrors movie-search-form.tsx.
-export const UserSearchForm = clientEntry<UserSearchFormProps>(
+// The <form> works as a plain GET without JS; this adds a spinner over it,
+// since searching hits the catalog and imports results.
+//
+// Also drives the autosuggest dropdown. Because the suggest endpoint already
+// resolved a pick to an exact id, selecting one goes straight to importHref
+// rather than resubmitting a title search — which cost two catalog calls and
+// could resolve to a different item.
+export const MovieSearchForm = clientEntry<MovieSearchFormProps>(
   import.meta.url,
-  function UserSearchForm(handle) {
+  function MovieSearchForm(handle) {
     let submitting = false
     let query = handle.props.query
     let suggestState: SuggestState = EMPTY_SUGGEST_STATE
-    let inputNode: HTMLInputElement | null = null
 
     const fetcher = createSuggestionFetcher({
       suggestHref: handle.props.suggestHref,
@@ -33,22 +35,21 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
     })
 
     function selectSuggestion(suggestion: Suggestion) {
-      query = suggestion.label
-      suggestState = EMPTY_SUGGEST_STATE
-      if (inputNode) inputNode.value = suggestion.label
-      handle.update()
-      inputNode?.form?.requestSubmit()
+      const { importHref, searchHref, query: initialQuery } = handle.props
+      const from = `${searchHref}?q=${encodeURIComponent(query || initialQuery)}`
+      window.location.href =
+        `${importHref}?externalId=${encodeURIComponent(suggestion.key)}&from=${encodeURIComponent(from)}`
     }
 
     return () => {
-      const { searchHref } = handle.props
+      const { searchHref, placeholder = 'Search TMDB for a movie…' } = handle.props
 
       return (
         <form
           method="get"
           action={searchHref}
           mix={[
-            css({ display: 'flex', gap: '8px', marginBottom: '24px' }),
+            css({ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }),
             on('submit', () => {
               submitting = true
               handle.update()
@@ -57,7 +58,7 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
         >
           <div
             mix={[
-              css({ position: 'relative', flex: '1 1 auto', minWidth: 0 }),
+              css({ position: 'relative' }),
               ref((node, signal) => {
                 document.addEventListener(
                   'click',
@@ -76,12 +77,9 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
               name="q"
               value={query}
               autocomplete="off"
-              placeholder="Search by name or email…"
+              placeholder={placeholder}
               mix={[
                 css({ display: 'block', width: '100%' }),
-                ref((node) => {
-                  inputNode = node as HTMLInputElement
-                }),
                 on('input', (event) => {
                   query = (event.target as HTMLInputElement).value
                   fetcher.query(query)
@@ -97,6 +95,7 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
             {suggestState.open && <SuggestionDropdown state={suggestState} onSelect={selectSuggestion} />}
           </div>
 
+
           <button
             type="submit"
             disabled={submitting}
@@ -106,7 +105,7 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
               <span
                 aria-hidden="true"
                 mix={css({
-                  '@keyframes user-search-spin': {
+                  '@keyframes movie-search-spin': {
                     from: { transform: 'rotate(0deg)' },
                     to: { transform: 'rotate(360deg)' },
                   },
@@ -116,7 +115,7 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
                   borderRadius: '50%',
                   border: '2px solid currentColor',
                   borderTopColor: 'transparent',
-                  animation: 'user-search-spin 0.6s linear infinite',
+                  animation: 'movie-search-spin 0.6s linear infinite',
                 })}
               />
             )}

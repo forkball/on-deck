@@ -1,17 +1,13 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-// A carousel: one image at a time, with dots and prev/next.
+// CSS-only, like the tabs and the log modal: a hidden radio per slide and
+// `:has(…:checked)` sliding the track. Deliberately not anchor-based —
+// `#slide-2` would push a history entry per image, so Back would step through
+// them instead of leaving the page.
 //
-// CSS-only, matching the tabs and the log modal — a hidden radio per slide
-// and `:has(…:checked)` sliding the track. No JavaScript, and no URL state:
-// anchor-based slides (`#slide-2`) would push a history entry each time, the
-// same reason the log modal was moved off `:target`, so pressing back would
-// step through images instead of leaving the page.
-//
-// The selectors key off `nth-of-type` rather than the ids, which keeps this
-// one static stylesheet no matter how many carousels are on a page — only
-// the `for`/`id` pairing needs to be unique per instance.
+// Selectors key off `nth-of-type` rather than ids, so one static stylesheet
+// serves any number of carousels.
 const MAX_STILLS = 3
 
 const carouselStyle = css({
@@ -19,8 +15,7 @@ const carouselStyle = css({
   // Clips the slides that are translated out of view.
   overflow: 'hidden',
   borderRadius: '8px',
-  // Each rule moves the track one full slide. Written out rather than
-  // generated because MAX_STILLS is small and fixed.
+  // Written out rather than generated — MAX_STILLS is small and fixed.
   '&:has(input:nth-of-type(1):checked) > .carousel-track': { transform: 'translateX(0%)' },
   '&:has(input:nth-of-type(2):checked) > .carousel-track': { transform: 'translateX(-100%)' },
   '&:has(input:nth-of-type(3):checked) > .carousel-track': { transform: 'translateX(-200%)' },
@@ -28,20 +23,16 @@ const carouselStyle = css({
   '&:has(input:nth-of-type(1):checked) .carousel-dots > label:nth-of-type(1)': { background: '#3c3c3c' },
   '&:has(input:nth-of-type(2):checked) .carousel-dots > label:nth-of-type(2)': { background: '#3c3c3c' },
   '&:has(input:nth-of-type(3):checked) .carousel-dots > label:nth-of-type(3)': { background: '#3c3c3c' },
-  // Only the arrow pair belonging to the current slide is shown, so each one
-  // can point at a fixed neighbour instead of needing to know where it is.
+  // Only the current slide's arrows show, so each points at a fixed neighbour.
   '& .carousel-nav': { display: 'none' },
   '&:has(input:nth-of-type(1):checked) .carousel-nav-0': { display: 'block' },
   '&:has(input:nth-of-type(2):checked) .carousel-nav-1': { display: 'block' },
   '&:has(input:nth-of-type(3):checked) .carousel-nav-2': { display: 'block' },
 })
 
-// Sits over the track without swallowing clicks; only the arrows take them.
-//
-// Matched to the track rather than stretched over the whole component:
-// `inset: 0` also covered the dots underneath, so an arrow centred in it sat
-// below the middle of the image. Same width and same aspect ratio as a slide
-// means this box is exactly the track's height, whatever the column width.
+// Sits over the track without swallowing clicks. Matched to the track, not the
+// whole component: `inset: 0` covered the dots too, leaving arrows centred
+// below the middle of the image.
 const navStyle = css({
   position: 'absolute',
   top: 0,
@@ -51,16 +42,12 @@ const navStyle = css({
   pointerEvents: 'none',
 })
 
-// Visually hidden but still focusable, so arrow keys move through the slides
-// the way they would in any radio group.
+// Hidden but focusable, so arrow keys move through slides as in any radio group.
 //
-// `opacity` and `pointer-events` do the hiding rather than `border: 0` or a
-// smaller box, because DoodleCSS gives `.doodle input[type=radio]` a 16px
-// border-image and a `::after` glyph from outside any @layer — unlayered wins
-// over anything here regardless of specificity, so the element is really ~33px
-// however small this says it is. Transparent is enough for the eye; without
-// pointer-events it would still be an invisible click target sitting over the
-// top-left corner of the image, quietly changing slides.
+// Hidden via opacity and pointer-events rather than size: DoodleCSS gives
+// `.doodle input[type=radio]` a 16px border-image from outside any @layer, so
+// the element is really ~33px however small this says it is — an invisible
+// click target over the image that would quietly change slides.
 const radioStyle = css({
   position: 'absolute',
   width: '1px',
@@ -73,7 +60,6 @@ const radioStyle = css({
 const trackStyle = css({
   display: 'flex',
   transition: 'transform 0.3s ease',
-  // Nobody asked for motion; respect that.
   '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
 })
 
@@ -83,10 +69,8 @@ const slideStyle = css({
   aspectRatio: '16 / 9',
   objectFit: 'cover',
   background: '#eee',
-  // No border-radius: DoodleCSS styles `.doodle img` outside any @layer, and
-  // unlayered wins over anything layered regardless of specificity, so a
-  // radius set here would be dead code. Slides get the same hand-drawn frame
-  // as every other image in the app.
+  // No border-radius — DoodleCSS styles `.doodle img` unlayered, so it would be
+  // dead code. Slides keep the same hand-drawn frame as every other image.
 })
 
 const dotsStyle = css({
@@ -96,10 +80,8 @@ const dotsStyle = css({
   marginTop: '8px',
 })
 
-// Deliberately no `display` here. DoodleCSS forces `.doodle label` to
-// inline-block from outside any layer, so setting it would be silently
-// discarded — this has caught the project four times. Width and height are
-// honoured on an inline-block box, which is all a dot needs.
+// No `display` — DoodleCSS forces `.doodle label` to inline-block unlayered, so
+// it would be silently discarded. This has caught the project four times.
 const dotStyle = css({
   width: '10px',
   height: '10px',
@@ -111,8 +93,7 @@ const dotStyle = css({
 
 const arrowStyle = css({
   position: 'absolute',
-  // Centred on its own height rather than by subtracting half of it, so the
-  // padding and font size can change without this needing to be recomputed.
+  // Centred on its own height, so padding and font size can change freely.
   top: '50%',
   transform: 'translateY(-50%)',
   width: '36px',
@@ -130,8 +111,7 @@ const arrowStyle = css({
 export interface ImageCarouselProps {
   images: string[]
   title: string
-  // Unique per carousel on the page — the radios need their own name, and the
-  // dots need ids to point `for` at.
+  // Unique per carousel — the radios need their own name and the dots need ids.
   id: string
 }
 
@@ -166,8 +146,8 @@ export function ImageCarousel(handle: Handle<ImageCarouselProps>) {
             <img
               key={image}
               src={image}
-              // The first stands in for the set; the rest are decorative and
-              // gain a screen reader nothing by being enumerated.
+              // The first stands in for the set; enumerating the rest helps
+              // a screen reader none.
               alt={index === 0 ? `${title} artwork` : ''}
               loading={index === 0 ? 'eager' : 'lazy'}
               mix={slideStyle}

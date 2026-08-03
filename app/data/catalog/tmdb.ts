@@ -1,9 +1,8 @@
-// TMDB movie importer (plan section 2). Uses the v3 API key as a query param
-// (the credential type most people get by default when they sign up).
+// Uses the v3 API key as a query param.
 
 const TMDB_API_BASE = 'https://api.themoviedb.org/3'
 
-// Static TMDB movie genre list — rarely changes, avoids an extra API round trip.
+// Static — rarely changes, and avoids an API round trip.
 const GENRE_ID_TO_NAME: Record<number, string> = {
   28: 'action',
   12: 'adventure',
@@ -26,14 +25,11 @@ const GENRE_ID_TO_NAME: Record<number, string> = {
   37: 'western',
 }
 
-// Sorted list of every genre this app knows about — used to build the
-// recommendation genre filter's dropdown without a second API round trip.
+// Every genre this app knows about, for the recommendation filter's dropdown.
 export const MOVIE_GENRES: string[] = Object.values(GENRE_ID_TO_NAME).sort()
 
-// TV has its own, differently-numbered genre list on TMDB (e.g. "Action &
-// Adventure" and "Sci-Fi & Fantasy" don't exist for movies; "Documentary"
-// and "Western" share ids with the movie list by coincidence, not by design
-// — so this is kept as its own table rather than merged with the movie one).
+// TV genres are numbered differently on TMDB, and the ids that do overlap with
+// the movie list do so by coincidence — hence a separate table.
 const TV_GENRE_ID_TO_NAME: Record<number, string> = {
   10759: 'action & adventure',
   16: 'animation',
@@ -63,20 +59,16 @@ export interface TmdbSearchResult {
   posterUrl: string | null
   popularity: number
   overview: string | null
-  // Only ever populated via getMovieById — TMDB's search endpoint doesn't
-  // return runtime, only the per-movie detail endpoint does.
+  // Only via getMovieById — TMDB's search endpoint omits runtime.
   runtimeMinutes: number | null
-  // Populated by non-film providers — each medium's own length dimension,
-  // plus the credit that stands in for a director.
+  // Non-film providers: each medium's length dimension and lead credit.
   pageCount?: number | null
   playtimeHours?: number | null
   creator?: string | null
-  // Extra artwork beyond the poster, in display order. Games are the reason
-  // this exists: they come with a set of 16:9 screenshots that read well as a
-  // strip under the poster, where films and books have nothing equivalent.
+  // Extra artwork beyond the poster, in display order. Games are the reason:
+  // their 16:9 screenshots read well as a strip, and no other medium has any.
   images?: string[] | null
-  // What a game runs on. Only games have these; the other providers leave it
-  // absent.
+  // Games only.
   platforms?: string[] | null
 }
 
@@ -135,8 +127,7 @@ interface TmdbTvSearchResponse {
   }[]
 }
 
-// Mirrors searchMovies — TMDB's TV search shape differs only in field names
-// (name/first_air_date instead of title/release_date) and its own genre ids.
+// Mirrors searchMovies; TV differs only in field names and genre ids.
 export async function searchTv(query: string): Promise<TmdbSearchResult[]> {
   const apiKey = process.env.TMDB_API_KEY
   if (!apiKey) {
@@ -176,14 +167,12 @@ interface TmdbMovieDetailResponse {
   popularity: number
   overview: string
   runtime: number | null
-  // Present because of append_to_response=credits below — folded into the
-  // same request rather than costing a second round trip.
+  // From append_to_response=credits, folded into the same request.
   credits?: { crew?: { job?: string; name?: string }[] }
 }
 
-// Looks a movie up by its known TMDB id — used when the autosuggest dropdown
-// already resolved a pick, so selecting it doesn't need a second title
-// search (which could in principle even resolve to a different movie).
+// Used when autosuggest already resolved a pick, so selecting it doesn't need
+// a second title search that could resolve to a different movie.
 export async function getMovieById(externalId: string): Promise<TmdbSearchResult | null> {
   const apiKey = process.env.TMDB_API_KEY
   if (!apiKey) {
@@ -192,8 +181,7 @@ export async function getMovieById(externalId: string): Promise<TmdbSearchResult
 
   const url = new URL(`${TMDB_API_BASE}/movie/${encodeURIComponent(externalId)}`)
   url.searchParams.set('api_key', apiKey)
-  // Credits ride along on the same request; the search endpoint has no
-  // director at all, which is why this only appears on a by-id lookup.
+  // The search endpoint has no director at all, hence by-id only.
   url.searchParams.set('append_to_response', 'credits')
 
   const response = await fetch(url)
@@ -225,9 +213,8 @@ interface TmdbTvDetailResponse {
   poster_path: string | null
   popularity: number
   overview: string
-  // TMDB has largely stopped populating this (empty array on most modern
-  // entries) in favor of per-episode runtime — kept as the first fallback
-  // since it's still present on some older/legacy entries.
+  // Mostly empty on modern entries in favour of per-episode runtime, but still
+  // present on older ones.
   episode_run_time: number[]
   last_episode_to_air: { runtime: number | null } | null
   created_by: { name?: string }[]
@@ -264,9 +251,7 @@ export async function getTvShowById(externalId: string): Promise<TmdbSearchResul
   }
 }
 
-// Accepts a bare TMDB id or a full URL like themoviedb.org/movie/27205-inception
-// (or /tv/1396-breaking-bad) — used by the "wrong movie/show? fix it" form on
-// detail pages, where pasting the URL straight from TMDB's site is the
+// Accepts a bare id or a full themoviedb.org URL, since pasting the URL is the
 // natural thing to do. `segment` is 'movie' or 'tv' to match the right path.
 export function parseTmdbId(input: string, segment: 'movie' | 'tv'): string | null {
   const trimmed = input.trim()

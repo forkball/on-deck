@@ -30,11 +30,8 @@ function BellIcon() {
   )
 }
 
-// Client-hydrated (see generate-recommendations-form.tsx for the pattern).
-// Deliberately self-contained: it fetches its own unread count on mount
-// instead of taking it as a prop, so adding a notification bell doesn't
-// require threading a new value through every single page controller that
-// renders <Nav> — just this one component change here.
+// Fetches its own unread count on mount rather than taking it as a prop, so the
+// bell doesn't have to be threaded through every controller that renders <Nav>.
 export const NotificationBell = clientEntry<NotificationBellProps>(
   import.meta.url,
   function NotificationBell(handle) {

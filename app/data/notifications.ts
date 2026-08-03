@@ -21,9 +21,7 @@ export async function createNotification(
   db: Db,
   input: { userId: number; actorUserId: number; type: NotificationType; runId?: number },
 ): Promise<void> {
-  // Nobody needs telling about their own activity — a group run includes the
-  // person who asked for it, and following yourself isn't possible but costs
-  // nothing to guard.
+  // A group run includes the person who asked for it.
   if (input.userId === input.actorUserId) return
 
   await db.create(notifications, {
@@ -67,9 +65,8 @@ export async function markAllNotificationsRead(db: Db, userId: number): Promise<
   await db.updateMany(notifications, { read_at: Date.now() }, { where: { user_id: userId, read_at: null } })
 }
 
-// Returns false (rather than throwing) if the notification doesn't exist or
-// doesn't belong to this user. Already-read notifications are left alone
-// (read_at keeps its original timestamp) rather than bumped to now.
+// False rather than throwing if it isn't this user's. Already-read
+// notifications keep their original read_at.
 export async function markNotificationRead(db: Db, notificationId: number, userId: number): Promise<boolean> {
   const existing = await db.find(notifications, notificationId)
   if (!existing || existing.user_id !== userId) return false

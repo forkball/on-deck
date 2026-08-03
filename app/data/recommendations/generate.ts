@@ -39,9 +39,8 @@ import { ensureTasteProfile } from './tasteProfile.ts'
 
 const TARGET_COUNT = 10
 
-// What a partially-finished run has already bought. Deliberately small: the
-// picks list, then ids — the catalog rows those ids name are written before
-// the checkpoint records them.
+// What a partially-finished run has already bought. Small on purpose: ids, not
+// objects — the rows they name are written before the checkpoint records them.
 export interface GenerationCheckpoint {
   picks?: Pick[]
   verified?: { mediaItemId: number; reason: string }[]
@@ -49,8 +48,7 @@ export interface GenerationCheckpoint {
 
 export interface GenerateRecommendationsOutcome {
   runId: number
-  // Whether generating this run pushed the user over MAX_RUNS_PER_USER and
-  // caused their oldest run to be deleted.
+  // Whether this run pushed the user over MAX_RUNS_PER_USER.
   prunedOldestRun: boolean
 }
 
@@ -61,12 +59,9 @@ export interface MissingSourceLogs {
   missing: MediaType[]
 }
 
-// Finds anyone in a proposed run who has an empty log for one of the taste
-// profiles the run would be based on. regenerateTasteProfile happily returns
-// an empty profile in that case, so without this the run still generates —
-// it just quietly ignores that person, and a "group" pick ends up reflecting
-// only whoever actually had logs. Callers block generation on a non-empty
-// result rather than producing something that only looks personalized.
+// An empty log yields an empty taste profile, so the run would still generate
+// while quietly ignoring that person — a "group" pick reflecting only whoever
+// had logs. Callers block generation on a non-empty result.
 export async function findMembersMissingSourceLogs(
   db: Db,
   memberUserIds: number[],
@@ -89,42 +84,33 @@ export async function findMembersMissingSourceLogs(
   return checked.filter((entry) => entry.missing.length > 0)
 }
 
-// Generates one indexed, dated run of picks and returns its id — history is
-// kept (never replaced), so every run stays browsable at /recommendations/:id.
-// Runs are capped at MAX_RUNS_PER_USER per user; generating past the cap
-// deletes the oldest run (cascading to its members/results).
+// One dated run of picks, kept rather than replaced so it stays browsable at
+// /recommendations/:id. Capped at MAX_RUNS_PER_USER, oldest pruned.
 //
-// The stages themselves live next door: picks.ts asks the model, matching.ts
-// turns those picks into catalog entries, runs.ts persists the result. This
-// function owns only the order they happen in, and what gets skipped on resume.
+// The stages live next door — picks.ts asks the model, matching.ts resolves to
+// catalog entries, runs.ts persists. This owns only their order and what a
+// resume skips.
 export async function generateRecommendations(
   db: Db,
   requestingUserId: number,
   memberUserIds: number[],
   filters: RecommendationFilters = {},
   mediaType: MediaType = 'movie',
-  // Which taste profile(s) the picks are based on. Independent of what's
-  // being generated — "recommend me movies based on my TV taste" is a
+  // Independent of what's being generated — "movies based on my TV taste" is a
   // legitimate ask. Defaults to matching the output type.
   sourceTypes?: MediaType[],
   // Optional user-given label for the run, e.g. "Cozy weekend picks".
   name?: string,
-  // Called as each stage begins, so a waiting page can say what's happening
-  // instead of guessing. Every call site here sits immediately before the
-  // await it describes.
+  // Every call site sits immediately before the await it describes.
   onPhase: (phase: GenerationPhase) => void = () => {},
-  // Resume support. `checkpoint` is whatever a previous attempt recorded;
-  // `onCheckpoint` is how this one records its own. A stage whose output is
-  // already present is skipped, so an interrupted run doesn't buy the same
-  // model call twice.
+  // Resume support: a stage whose output is already in `checkpoint` is skipped,
+  // so an interrupted run doesn't buy the same model call twice.
   checkpoint: GenerationCheckpoint = {},
   onCheckpoint: (checkpoint: GenerationCheckpoint) => void = () => {},
 ): Promise<GenerateRecommendationsOutcome> {
   const profileTypes: MediaType[] = sourceTypes && sourceTypes.length > 0 ? sourceTypes : [mediaType]
 
-  // Independent per member — refresh every profile (and fetch their name)
-  // concurrently. Each one only costs a model call if that member's log has
-  // changed since it was last written; otherwise the stored profile is reused.
+  // Each only costs a model call if that member's log has moved.
   onPhase('profiles')
   const members = await Promise.all(
     memberUserIds.map(async (memberId) => {
@@ -158,8 +144,7 @@ export async function generateRecommendations(
     }
   }
 
-  // The most expensive single call in a run, so it is the first thing worth
-  // never paying for twice.
+  // The most expensive call in a run, so the first worth never paying twice.
   let picks: Pick[]
   if (checkpoint.picks?.length) {
     picks = checkpoint.picks
@@ -170,8 +155,7 @@ export async function generateRecommendations(
     onCheckpoint(checkpoint)
   }
 
-  // Anything already in the catalog is resolved without leaving the process;
-  // only the rest cost a provider request.
+  // Only what isn't already in the catalog costs a provider request.
   onPhase('matching')
   const fromCatalog = await resolveFromCatalog(mediaType, picks)
 
@@ -182,15 +166,12 @@ export async function generateRecommendations(
     }),
   )
 
-  // Only reported when a length lever is set, because only then does the loop
-  // below make a second round of requests.
+  // Only then does the loop below make a second round of requests.
   if (filters.length) onPhase('lengths')
 
-  // Deliberately not capped at TARGET_COUNT here — verifyPicksAgainstOverviews
-  // below drops some of these too, so the same over-request slack that
-  // covers dedup/filter misses needs to reach verification as well, or a
-  // verification drop would under-fill the run instead of just consuming
-  // slack that was already budgeted for exactly this.
+  // Not capped at TARGET_COUNT: verification below drops some too, so the
+  // over-request slack has to reach it or a verification drop under-fills the
+  // run rather than spending slack already budgeted for it.
   const candidates: Candidate[] = []
   const seenExternalIds = new Set<string>()
 
@@ -209,15 +190,11 @@ export async function generateRecommendations(
     if (filters.genre && !match.tags.includes(filters.genre)) continue
     if (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade)) continue
 
-    // The length dimension isn't in search results for any provider — only
-    // the by-id lookup carries it — so this only pays for the extra round
-    // trip when a length lever is actually set. The provider decides what
-    // "short" means in its own units.
+    // No provider returns the length dimension on search, only on by-id — so
+    // this extra round trip is paid only when the lever is set.
     let resolved = match
     if (filters.length) {
-      // The stored row often already carries the dimension this filter reads —
-      // runtime, page count, hours to beat — in which case the provider has
-      // nothing to add and the request is pure cost.
+      // The stored row often already carries it, making the request pure cost.
       const provider = getCatalogProvider(mediaType)
       if (hasLengthDimension(mediaType, match)) {
         if (!provider.matchesLength(match, filters.length)) continue
@@ -228,11 +205,8 @@ export async function generateRecommendations(
 
       const detail = await lookupForType(mediaType, match.externalId)
       if (!detail || !provider.matchesLength(detail, filters.length)) continue
-      // Keep the detail rather than discarding it. We've already paid for the
-      // request, and it carries everything search omits — runtime/page count,
-      // the credit, and (for books) the description. Storing `match` instead
-      // meant a filtered run wrote rows with a null runtime it had just
-      // fetched, and left the detail page to re-request it later.
+      // Already paid for, and it carries what search omits. Keeping `match`
+      // instead wrote rows with a null runtime it had just fetched.
       resolved = detail
     }
 
@@ -240,15 +214,12 @@ export async function generateRecommendations(
     candidates.push({ pick, match: resolved })
   }
 
-  // Title similarity can't tell two different films apart when they share
-  // both title and year — only content can, so this is a second, semantic
-  // pass over the survivors before anything gets written to the catalog.
+  // A second, semantic pass over the survivors before anything is written.
   let results: RecommendationResult[]
 
   if (checkpoint.verified?.length) {
-    // A previous attempt already paid for verification. Its picks were written
-    // to the catalog before the checkpoint recorded them, so this rebuilds the
-    // same output from those rows instead of asking the model again.
+    // A previous attempt already paid for verification, and wrote its picks to
+    // the catalog before recording them — so rebuild from those rows.
     const ids = checkpoint.verified.map((entry) => entry.mediaItemId)
     const items = await db.findMany(mediaItems, { where: inList('id', ids) })
     const itemsById = new Map(items.map((item) => [item.id, item]))
@@ -257,8 +228,7 @@ export async function generateRecommendations(
     results = []
     for (const entry of checkpoint.verified) {
       const item = itemsById.get(entry.mediaItemId)
-      // A row could have been merged away by a rematch since; skip rather
-      // than fail the resumed run over it.
+      // Could have been merged away by a rematch since.
       if (!item) continue
       results.push({ item, reason: entry.reason, interaction: null })
     }
@@ -273,8 +243,7 @@ export async function generateRecommendations(
       results.push({ item, reason: pick.reason, interaction: null })
     }
 
-    // Recorded as ids, not objects — the catalog rows are already written, so
-    // the checkpoint only has to name them. Keeps a job row at a few KB.
+    // Ids, not objects — keeps a job row at a few KB.
     checkpoint = {
       ...checkpoint,
       verified: results.map((result) => ({ mediaItemId: result.item.id, reason: result.reason })),
@@ -303,9 +272,8 @@ export async function generateRecommendations(
   return { runId, prunedOldestRun }
 }
 
-// Notifies the other members of a group run, but only ones who mutually
-// follow the requester (the friend picker already requires the requester to
-// follow them; this also requires the follow back before pinging them).
+// Only members who mutually follow the requester — the picker already requires
+// one direction; this requires the follow back before pinging them.
 async function notifyMutualFollowers(
   db: Db,
   requestingUserId: number,

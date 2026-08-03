@@ -6,7 +6,7 @@ import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../me
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
-import { Field } from '../../assets/ui/field.tsx'
+import { Field } from '../../ui/shared/field.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { Modal } from '../../ui/components/modal.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
@@ -15,9 +15,7 @@ import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
-// Bulk-import entry points, per media type. Movies come from a Letterboxd
-// export, books from a Goodreads one, games from a linked Steam account; TV
-// has no equivalent worth importing.
+// TV has no equivalent worth importing.
 const IMPORT_LINKS: Partial<Record<ActiveMediaType, { href: string; label: string }>> = {
   movie: { href: routes.profile.importMovies.index.href(), label: 'Import from Letterboxd' },
   book: { href: routes.profile.importBooks.index.href(), label: 'Import from Goodreads' },
@@ -220,8 +218,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                     <LoggedList
                       log={log}
                       total={total}
-                      // Carries the tab, so "back to your profile" returns
-                      // to the tab you left rather than the first one.
+                      // Carries the tab, so "back" returns to the one you left.
                       detailHref={(id) =>
                         `${ui.hrefs.show(id)}?from=${encodeURIComponent(`${profileHref}?tab=${type}`)}`
                       }

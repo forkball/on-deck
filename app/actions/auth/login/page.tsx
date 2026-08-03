@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
-import { Field } from '../../../assets/ui/field.tsx'
+import { Field } from '../../../ui/shared/field.tsx'
 
 export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
   return () => {

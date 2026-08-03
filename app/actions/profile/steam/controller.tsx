@@ -10,9 +10,8 @@ import { requireEnabledMediaType } from '../../../middleware/gatedMediaType.ts'
 import { routes } from '../../../routes.ts'
 import { externalOrigin } from './requestOrigin.ts'
 
-// Links a Steam account to the signed-in On Deck account. Not an app login —
-// the password auth is untouched; this only records which Steam account to
-// read a library from.
+// Not an app login — this only records which Steam account to read a library
+// from.
 export default createController(routes.profile.steam, {
   // Steam exists only to feed the games library, so it is gated with it.
   middleware: [requireEnabledMediaType('game'), requireAuth<User>()],
@@ -21,11 +20,9 @@ export default createController(routes.profile.steam, {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
-      // Derived from the live request, not configured: this runs on
-      // localhost in development and on Fly in production, and Steam
-      // requires `realm` and `return_to` to agree with each other and with
-      // where the browser actually is — including the scheme, which behind
-      // Fly's TLS proxy only the forwarded header knows.
+      // Steam requires `realm` and `return_to` to agree with each other and
+      // with where the browser actually is — including the scheme, which
+      // behind Fly's TLS proxy only the forwarded header knows.
       const origin = externalOrigin(context.url, context.request.headers)
       return redirect(buildSteamLoginUrl(origin, `${origin}${routes.profile.steam.callback.href()}`), 303)
     },

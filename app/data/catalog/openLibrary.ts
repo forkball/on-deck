@@ -1,17 +1,12 @@
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
 
-// Open Library book importer — the books counterpart to tmdb.ts. No API key
-// (it's Internet Archive-run and open), but three quirks drove the shape of
-// this file, all confirmed against the live API:
-//
-//  1. Covers 200 on a *missing* image, returning a 43-byte blank rather than
-//     a 404, so `?default=false` is required to make absence detectable.
-//  2. The index carries a lot of "SUMMARY of…" / "Study Guide…" spam that
-//     ranks below the real book but still shows up. Real books have readers
-//     and/or a cover; the spam has neither.
-//  3. Titles are inconsistently split — some rows are title:"Saga",
-//     subtitle:"Volume One", others title:"Saga, Volume Five" with no
-//     subtitle — so the two have to be joined to get a usable display title.
+// Open Library needs no API key, but three quirks shape this file:
+//  1. Covers 200 on a *missing* image (a 43-byte blank), so `?default=false`
+//     is required to make absence detectable.
+//  2. The index carries "SUMMARY of…" / "Study Guide…" spam. Real books have
+//     readers and/or a cover; the spam has neither.
+//  3. Titles are inconsistently split between title and subtitle, so the two
+//     have to be joined to get a usable display title.
 const OPEN_LIBRARY_BASE = 'https://openlibrary.org'
 
 const SEARCH_FIELDS = [
@@ -28,12 +23,10 @@ const SEARCH_FIELDS = [
   'isbn',
 ].join(',')
 
-// Open Library subjects are free-form and unbounded — a single book can carry
-// 15-44 of them, mixing BISAC codes ("FICTION / Thrillers"), plot topics
-// ("Married people"), and awards metadata ("Hugo Award Winner"). So unlike
-// TMDB's fixed genre ids, book genres are *derived*: each entry below matches
-// if any of its needles appears in any subject. Order matters — the list is
-// truncated to TAG_LIMIT, so the most genre-defining categories come first.
+// Subjects are free-form and unbounded (15-44 per book, mixing BISAC codes,
+// plot topics and awards), so unlike TMDB's fixed ids book genres are derived:
+// an entry matches if any needle appears in any subject. Order matters — the
+// list is truncated to TAG_LIMIT.
 const GENRE_MATCHERS: [genre: string, needles: string[]][] = [
   ['graphic novel', ['graphic novel', 'comic book', 'comics', 'manga']],
   ['science fiction', ['science fiction', 'sci-fi', 'science-fiction']],
@@ -53,8 +46,7 @@ const GENRE_MATCHERS: [genre: string, needles: string[]][] = [
   ['history', ['history']],
 ]
 
-// The vocabulary offered by the recommendation genre filter, mirroring
-// MOVIE_GENRES/TV_GENRES.
+// The vocabulary offered by the recommendation genre filter.
 export const BOOK_GENRES: string[] = GENRE_MATCHERS.map(([genre]) => genre).sort()
 
 const TAG_LIMIT = 4
@@ -96,29 +88,26 @@ interface OpenLibraryWork {
   description?: string | { value?: string }
 }
 
-// Work keys come back as "/works/OL123W"; the leading path is stripped for
-// storage so external_id stays a bare token like every other provider's.
+// Work keys come back as "/works/OL123W"; stripped so external_id stays a
+// bare token like every other provider's.
 function toExternalId(key: string): string {
   return key.replace(/^\/works\//, '')
 }
 
 function coverUrl(coverId: number | undefined): string | null {
-  // default=false turns a missing cover into a 404 instead of a 200 carrying
-  // a blank placeholder image, which would otherwise render as an invisible
-  // broken box instead of falling back to the app's "no poster" state.
+  // default=false turns a missing cover into a 404 rather than a 200 carrying
+  // a blank placeholder, so the "no poster" fallback actually triggers.
   return coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg?default=false` : null
 }
 
 // Self-published study aids that shadow popular books. Readership can't
-// separate these — "Study Guide -- The Other Wes Moore" has more readers on
-// Open Library than most novels do, presumably students — so they're matched
-// on the one thing that is consistent: the title shape.
+// separate them (students give them more readers than most novels), so they're
+// matched on the one consistent thing: title shape.
 const STUDY_AID_TITLE = /^\s*(summary|study guide|workbook|analysis|conversation starters|key takeaways|sparknotes)\b|\bstudy guide\b/i
 
-// Two filters, because neither alone is enough. Missing cover art reliably
-// marks index junk (real books have ~94% cover coverage, and the cover id is
-// 100% trustworthy when present); the title pattern catches the study aids
-// that do have covers.
+// Neither filter alone is enough: missing cover art marks index junk (real
+// books have ~94% coverage), the title pattern catches study aids that do
+// have covers.
 function looksReal(doc: OpenLibraryDoc): boolean {
   if (!doc.cover_i) return false
   return !STUDY_AID_TITLE.test(doc.title ?? '')
@@ -133,11 +122,10 @@ function toResult(doc: OpenLibraryDoc): CatalogSearchResult {
     releaseYear: doc.first_publish_year ?? null,
     tags: deriveGenres(doc.subject),
     posterUrl: coverUrl(doc.cover_i),
-    // Stands in for TMDB's popularity — how many people have this on a shelf.
+    // How many people have this on a shelf.
     popularity: doc.readinglog_count ?? doc.ratings_count ?? 0,
-    // Open Library's search index has no description; the works endpoint does,
-    // but that's a second request per result. Left null here for the same
-    // reason tmdb.ts leaves runtimeMinutes null on search.
+    // The search index has no description; the works endpoint does, but that's
+    // a second request per result.
     overview: null,
     runtimeMinutes: null,
     pageCount: doc.number_of_pages_median ?? null,
@@ -145,11 +133,9 @@ function toResult(doc: OpenLibraryDoc): CatalogSearchResult {
   }
 }
 
-// Open Library resets connections fairly often — measured two ECONNRESETs in
-// three consecutive identical requests. Without a retry that surfaces as a
-// failed search page, or an import that dies partway through, for a request
-// that succeeds on the next attempt. Backs off between tries so a wobble
-// isn't met with a tight loop.
+// Open Library resets connections often — measured two ECONNRESETs in three
+// consecutive identical requests — so a wobble would otherwise fail a search
+// page or kill an import mid-way.
 const FETCH_ATTEMPTS = 3
 const RETRY_BASE_MS = 400
 
@@ -189,11 +175,8 @@ async function searchOpenLibrary(query: string, limit: number): Promise<OpenLibr
   return data.docs ?? []
 }
 
-// Open Library descriptions are wiki-editable, so they collect junk that
-// would otherwise render verbatim: SEO spam appended to the real blurb
-// ("**Stoner pdf**", or a markdown link to a file-locker domain), trailing
-// markdown link-reference blocks, and raw markdown that has no renderer here
-// and would show as literal asterisks.
+// Descriptions are wiki-editable, so they collect SEO spam, trailing markdown
+// link-reference blocks, and raw markdown that has no renderer here.
 const PROMO_LABEL = /\b(pdf|epub|mobi|download|read online|free read)\b/i
 
 function cleanDescription(raw: string): string {
@@ -203,17 +186,14 @@ function cleanDescription(raw: string): string {
   // whose descriptions link sibling volumes.
   text = text.replace(/^[ \t]*\[[^\]]+\]:\s*\S+.*$/gm, '')
 
-  // Inline markdown links: drop download promos entirely, keep the visible
-  // text of everything else (the URL itself is never useful here).
-  // The label pattern allows one level of nested brackets — Open Library
-  // link labels like "The Lord of the Rings [3/9]" are common, and a plain
-  // [^\]]* would stop at the inner bracket and leave the URL behind.
+  // Drop download promos, keep the visible text of other links. The label
+  // pattern allows one level of nesting — labels like "The Lord of the Rings
+  // [3/9]" are common, and a plain [^\]]* would leave the URL behind.
   text = text.replace(/\[((?:[^[\]]|\[[^\]]*\])*)\]\(\s*https?:[^)]*\)/g, (_match, label: string) =>
     PROMO_LABEL.test(label) ? '' : label,
   )
 
-  // Emphasis markers would render as literal asterisks/underscores; there's
-  // no markdown renderer on the detail page.
+  // No markdown renderer on the detail page, so these would render literally.
   text = text.replace(/\*\*|__/g, '')
   text = text.replace(/\*([^*\n]+)\*/g, '$1')
 

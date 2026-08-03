@@ -1,15 +1,9 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-// Which platforms a game runs on.
-//
-// Grouped into families rather than listed raw. Hades alone returns eight
-// entries — PC, PS4, PS5, XONE, Series X|S, Switch, iOS, Mac — which buries
-// the answer to the only question a card is being asked: can I play this on
-// the thing I own. Four families read at a glance; eight generations don't.
-//
-// Deliberately lossy at render only. The full list stays in metadata, so a
-// page that wants "PS4 and PS5, not PS3" can still say so.
+// Grouped into families rather than listed raw: Hades alone returns eight
+// entries, which buries the only question a card is asked — can I play this on
+// what I own. Lossy at render only; the full list stays in metadata.
 const FAMILIES: { label: string; match: RegExp }[] = [
   { label: 'PC', match: /^(PC|Win|DOS)/i },
   { label: 'PlayStation', match: /^(PS|PlayStation|PSVR|Vita)/i },
@@ -20,8 +14,7 @@ const FAMILIES: { label: string; match: RegExp }[] = [
   { label: 'Linux', match: /^Linux/i },
 ]
 
-// Returns family labels in the order above, so two games never list the same
-// platforms in a different order.
+// In the order above, so two games never list the same platforms differently.
 export function platformFamilies(platforms: string[]): string[] {
   const found = new Set<string>()
   const unmatched: string[] = []
@@ -29,8 +22,7 @@ export function platformFamilies(platforms: string[]): string[] {
   for (const platform of platforms) {
     const family = FAMILIES.find((candidate) => candidate.match.test(platform))
     if (family) found.add(family.label)
-    // Anything unrecognised keeps its own name rather than being dropped —
-    // better an unfamiliar label than silently claiming a game runs nowhere.
+    // Unrecognised names pass through rather than being dropped.
     else if (!unmatched.includes(platform)) unmatched.push(platform)
   }
 

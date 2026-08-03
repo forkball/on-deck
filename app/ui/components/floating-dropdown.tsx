@@ -1,17 +1,14 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-// A CSS-only floating dropdown anchored to its trigger, using the native
-// <details>/<summary> disclosure (no JS, no shared URL-fragment state, so
-// many of these can exist independently on one page — e.g. one per search
-// result row).
+// Native <details>/<summary>, so many can exist independently on one page —
+// one per search result row.
 export function FloatingDropdown(
   handle: Handle<{
     triggerLabel: string
     children?: RemixNode
-    // Which edge the panel hangs from. Defaults to the left, matching the
-    // trigger; a trigger sitting at the right edge of its container needs
-    // 'right', or the 240px panel opens off the side of the page.
+    // A trigger at the right edge of its container needs 'right', or the
+    // 240px panel opens off the side of the page.
     align?: 'left' | 'right'
   }>,
 ) {

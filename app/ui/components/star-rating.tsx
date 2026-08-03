@@ -21,8 +21,8 @@ function StarIcon(handle: Handle<{ variant: 'outline' | 'filled' }>) {
   }
 }
 
-// Read-only star display — supports half-star values via a clipped overlay
-// (outline star underneath, filled star on top clipped to 0/50/100% width).
+// Half-stars via a clipped overlay: outline underneath, filled on top clipped
+// to 0/50/100% width.
 export function StarRatingDisplay(handle: Handle<{ value: number }>) {
   return () => {
     const { value } = handle.props
@@ -54,9 +54,8 @@ export function StarRatingDisplay(handle: Handle<{ value: number }>) {
 
 const STEPS = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5]
 
-// A clickable half-star picker: 10 radios (0.5 steps) in descending DOM order,
-// displayed reversed (row-reverse) so the ":checked ~ label" general sibling
-// selector fills the current star plus every lower one. No JS required.
+// 10 radios in descending DOM order, displayed row-reverse so `:checked ~ label`
+// fills the current star plus every lower one. No JS.
 export function StarRatingInput(
   handle: Handle<{ name: string; defaultValue: number | null; idPrefix?: string }>,
 ) {

@@ -10,14 +10,11 @@ import { displayLabel } from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
 import { SteamImportPage } from './page.tsx'
 
-// Mirrors profile/import-movies (Letterboxd) and profile/import-books
-// (Goodreads). The difference is the source: a linked account rather than an
-// uploaded file, so this page owns the connection state that the other two
-// replace with a file picker.
-// The OpenID callback can only redirect with a code in the query string, so
-// the wording lives here rather than travelling through the URL. Anything
-// unrecognised is treated as a failed sign-in, since `error` is only ever set
-// by that redirect.
+// Like import-movies and import-books, but the source is a linked account
+// rather than an uploaded file, so this page owns the connection state.
+//
+// The OpenID callback can only redirect with a code, so the wording lives here
+// rather than travelling through the URL.
 function connectError(code: string | null): string | undefined {
   if (!code) return undefined
   if (code === 'taken') return 'That Steam account is already connected to another profile.'
@@ -47,9 +44,8 @@ export default createController(routes.profile.importGames, {
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const steamId = auth.identity.steam_id
-      // Nothing to import from until an account is linked; the page only
-      // shows this button once one is, so reaching here means the link was
-      // dropped between render and submit.
+      // The button only renders once linked, so reaching here means the link
+      // was dropped between render and submit.
       if (!steamId) {
         return context.render(
           <SteamImportPage
@@ -69,9 +65,7 @@ export default createController(routes.profile.importGames, {
           <SteamImportPage displayName={displayLabel(auth.identity)} steamId={steamId} result={result} />,
         )
       } catch (error) {
-        // Steam's own wording for a private profile or an outage — already
-        // written to be read, so it passes through rather than being
-        // flattened into a generic failure.
+        // Steam's own wording, already written to be read.
         return context.render(
           <SteamImportPage
             displayName={displayLabel(auth.identity)}

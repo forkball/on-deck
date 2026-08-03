@@ -8,9 +8,8 @@ export const users = table({
     email: c.text().notNull().unique(),
     password_hash: c.text().notNull(),
     display_name: c.text(),
-    // Free-text, user-authored — shown on their profile for other people to
-    // read. Deliberately never fed into regenerateTasteProfile/recommendations;
-    // only the movie log drives those.
+    // User-authored. Deliberately never fed into taste profiles — only the log
+    // drives those.
     bio: c.text(),
     // SteamID64 of a linked Steam account, set by the OpenID flow (see
     // data/imports/steamApi.ts). Null until someone connects one.
@@ -27,10 +26,8 @@ export const mediaItems = table({
     external_source: c.text().notNull(),
     external_id: c.text().notNull(),
     title: c.text().notNull(),
-    // Type-specific metadata — release year, poster, runtime/pages/playtime,
-    // credits, artwork, platforms, genre tags. jsonb, so Postgres validates
-    // it on write and the GIN index can answer containment queries against
-    // it. Shape and read boundary: app/data/mediaMetadata.ts.
+    // jsonb, so Postgres validates on write and the GIN index answers
+    // containment queries. Shape: app/data/mediaMetadata.ts.
     metadata: c.json().notNull(),
     popularity_score: c.decimal(10, 2),
     created_at: c.integer().notNull(),
@@ -59,9 +56,8 @@ export const userTasteProfiles = table({
   primaryKey: ['user_id', 'media_type'],
   columns: {
     user_id: c.integer().notNull().references('users', 'id'),
-    // One row per (user, media_type) — movies and TV get independently
-    // regenerated/persisted profiles, since cross-media taste mixing is an
-    // explicit opt-in (not yet built) rather than the default.
+    // One row per (user, media_type) — cross-media taste mixing is an explicit
+    // opt-in, not the default.
     media_type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
     profile: c.text().notNull().default('{}'), // JSON string: { liked_tags: string[], disliked_tags: string[] }
     summary: c.text(),
@@ -69,9 +65,8 @@ export const userTasteProfiles = table({
   },
 })
 
-// Live progress for an in-flight recommendation run. In the database rather
-// than process memory because the app runs on more than one machine — see the
-// migration for the failure this fixes.
+// Live progress for an in-flight run. In the database rather than process
+// memory because the app runs on more than one machine.
 export const recommendationJobs = table({
   name: 'recommendation_jobs',
   columns: {
@@ -97,36 +92,27 @@ export const recommendationJobs = table({
   },
 })
 
-// One "get recommendations" click — indexed and dated, kept forever (not
-// replaced on the next run) so past runs stay browsable by id. See
-// app/data/recommendations/runs.ts.
+// One "get recommendations" click, kept forever so past runs stay browsable.
 export const recommendationRuns = table({
   name: 'recommendation_runs',
   columns: {
     id: c.integer().primaryKey().autoIncrement(),
     user_id: c.integer().notNull().references('users', 'id'), // the requester
-    // Which catalog this run's picks were matched against — the MAX_RUNS_PER_USER
-    // cap (see recommendations/runs.ts) is scoped per media_type, so generating a
-    // TV run never prunes an older movie run and vice versa. Note this is
-    // the type of thing being recommended, which is independent of which
-    // taste profile(s) the picks were based on — see sourceTypes in
-    // recommendations/generate.ts.
+    // What was recommended — independent of which taste profiles it was based
+    // on (sourceTypes). The MAX_RUNS_PER_USER cap is scoped per media_type, so
+    // a TV run never prunes an older movie run.
     media_type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
     created_at: c.integer().notNull(),
     // Optional user-given label (e.g. "Cozy weekend picks") — falls back to
     // the date in the UI when unset.
     name: c.text(),
-    // JSON string of the levers used to generate this run: { genre?, decade?,
-    // length?, sourceTypes }. Kept alongside the run so its detail page can
-    // show exactly what was asked for, even after taste profiles/filters
-    // used elsewhere have since changed. See GenerationParams in
-    // recommendations/runs.ts.
+    // The levers used, kept with the run so its page shows what was asked for
+    // even after filters elsewhere change. See GenerationParams.
     params: c.text().notNull().default('{}'),
   },
 })
 
-// Who was in a given run (the requester + any friends included) — the
-// "people involved" for that run.
+// The requester plus any friends included in the run.
 export const recommendationRunMembers = table({
   name: 'recommendation_run_members',
   primaryKey: ['run_id', 'user_id'],
@@ -159,17 +145,14 @@ export const userFollows = table({
   },
 })
 
-// "X ran recommendations you can view" — created when a group run's
-// requester and another member mutually follow each other. See
-// app/data/notifications.ts.
+// Created when a group run's requester and another member mutually follow.
 export const notifications = table({
   name: 'notifications',
   columns: {
     id: c.integer().primaryKey().autoIncrement(),
     user_id: c.integer().notNull().references('users', 'id'), // recipient
     actor_user_id: c.integer().notNull().references('users', 'id'), // who did the thing
-    // What happened: 'recommendation' | 'follow'. Only the kinds that have a
-    // run set run_id.
+    // 'recommendation' | 'follow'. Only the former sets run_id.
     type: c.text().notNull(),
     run_id: c.integer(),
     read_at: c.integer(),

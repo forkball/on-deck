@@ -11,20 +11,13 @@ export type ProfileMenuProps = {
   logoutHref: string
 }
 
-// Client-hydrated (see generate-recommendations-form.tsx for the pattern):
-// native <details>/<summary> alone drives the open/close toggle and works
-// with no JS, but "close on outside click" and "close immediately when an
-// option is clicked" both need real click handling that CSS/HTML can't do —
-// the earlier :focus-within version raced with clicking the menu's own
-// links (Safari doesn't focus a plain <a> on click, so the blur-close could
-// hide the menu before the click landed). ref() scopes a single
-// document-level click listener to this element's lifetime; any click
-// outside the trigger closes it, whether that's an option inside the menu
-// (which still navigates normally) or anywhere else on the page.
+// <details>/<summary> drives the toggle with no JS, but closing on an outside
+// click needs real click handling. A :focus-within version raced with the
+// menu's own links — Safari doesn't focus a plain <a> on click, so blur-close
+// hid the menu before the click landed.
 //
-// URLs come in as plain string props rather than importing routes.ts — the
-// asset server only allows bundling files under app/assets/**, and routes.ts
-// lives outside that.
+// URLs arrive as plain string props: the browser bundle is limited to
+// app/browser/**, and routes.ts lives outside it.
 export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, function ProfileMenu(handle) {
   return () => {
     const { displayName, links, logoutHref } = handle.props

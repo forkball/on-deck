@@ -3,8 +3,7 @@ import type { LengthBucket } from '../catalog/provider.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { claude, parseStructuredResponse } from './claude.ts'
 
-// What one recommendation looks like coming back from the model, before it
-// has been matched to anything in a catalog.
+// One recommendation as the model returns it, before catalog matching.
 export interface Pick {
   title: string
   year: number
@@ -21,10 +20,8 @@ export interface MemberProfile extends TasteSummary {
   label: string
 }
 
-// When picks are based on more than one taste profile, each member's
-// profiles stay separate and labeled by type, so Claude can reason about
-// "this person's movie taste vs their TV taste" rather than being handed
-// one blurred-together profile.
+// Kept separate and labeled by type so Claude can reason about "their movie
+// taste vs their TV taste" rather than one blurred-together profile.
 export interface MultiSourceMemberProfile {
   label: string
   [sourceLabel: string]: TasteSummary | string
@@ -38,11 +35,9 @@ export function toTasteSummary(profile: {
   return { summary: profile.summary, liked_tags: profile.liked_tags, disliked_tags: profile.disliked_tags }
 }
 
-// Optional "levers" on generation. All hard-filter the final picks (not just
-// prompt hints) — genre/decade come for free off the search results already
-// fetched for matching; length needs an extra per-candidate catalog lookup
-// (search doesn't return runtime), so that only happens when a length filter
-// is actually set.
+// All hard-filter the final picks, not just hint the prompt. Genre and decade
+// come free off the search results already fetched; length needs an extra
+// per-candidate lookup, so it only happens when that lever is set.
 export interface RecommendationFilters {
   genre?: string
   // Decade start year, e.g. 1990 for "the 1990s".
@@ -92,8 +87,6 @@ export async function requestPicks(
 ): Promise<Pick[]> {
   const isGroup = profiles.length > 1
   const noun = mediaTypeUiFor(mediaType).plural
-  // The whole point of picking a different source: translate the taste
-  // across media rather than only recommending more of the same kind.
   // Spelled out only when the source isn't simply the output type.
   const sourceNouns = sourceTypes.map((type) => mediaTypeUiFor(type).plural)
   const crossesMedia = sourceTypes.some((type) => type !== mediaType)
@@ -104,8 +97,8 @@ export async function requestPicks(
     : sourceTypes.length > 1
       ? ` Each person has a separate profile per type above; weigh all of them.`
       : ''
-  // Hard filters (applied by generateRecommendations) drop some picks after
-  // the fact, so ask for more up front to still land near TARGET_COUNT.
+  // Hard filters drop some picks afterwards, so over-request to land near
+  // TARGET_COUNT.
   const hasFilters = filters.genre != null || filters.decade != null || filters.length != null
   const requestedCount = hasFilters ? REQUESTED_COUNT + 10 : REQUESTED_COUNT
   const filterInstructions = buildFilterInstructions(filters, noun) + sourceInstructions

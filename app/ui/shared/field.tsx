@@ -1,11 +1,9 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-// Lives under app/assets/ui rather than app/ui/components because it has to be
-// usable from both sides: the asset server only bundles app/assets/**, so a
-// clientEntry island can't import out of it, while server components import
-// in freely (see nav.tsx and media-search-page.tsx). This is the only
-// directory both can reach, so shared form primitives live here.
+// Rendered on both sides, so it lives in app/ui/shared — the narrow slice of
+// app/ui the asset allowlist covers — rather than app/ui/components, which
+// reaches routes and the media-type registry and so can't be bundled.
 
 // Stacks the label above its control and makes the control span the field.
 //

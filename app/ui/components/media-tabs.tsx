@@ -3,14 +3,11 @@ import { css } from 'remix/ui'
 
 import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
-// Mirrors the media types offered in media-tab-links.tsx — movies and TV are
-// wired up, the rest are placeholders so this reads as "more coming" rather
-// than movies+TV being the only media types the app will ever support.
+// Mirrors media-tab-links.tsx.
 const PLACEHOLDER_MEDIA_TYPES = [] as const
 
-// Slugs are plural ('movies') while MediaType is singular ('movie') — the
-// registry's `slug` is the single place that mismatch is reconciled, and
-// using it here keeps the rendered ids/class names stable.
+// The registry's `slug` reconciles plural route segments with singular
+// MediaType, and keeps rendered ids stable.
 const ACTIVE_SLUGS = enabledMediaTypes().map((type) => MEDIA_TYPE_UI[type].slug)
 const TYPES = [...ACTIVE_SLUGS, ...PLACEHOLDER_MEDIA_TYPES]
 
@@ -18,21 +15,13 @@ function capitalize(type: string): string {
   return type === 'tv' ? 'TV' : type.replace(/^./, (c) => c.toUpperCase())
 }
 
-// Radio-driven CSS-only tabs (same no-JS approach as the rest of the app —
-// see the star rating input and the watched-only-fields toggle in app.css).
-// Each radio's `:checked` state is read via `:has()` on the wrapper to
-// toggle both which panel shows and which tab label looks active, so no
-// sibling-order constraints are needed between the tab bar and the panels.
+// Radio-driven CSS-only tabs. `:has()` on the wrapper reads each radio's
+// `:checked`, so the tab bar and panels need no sibling-order relationship.
 type CSSStyle = Parameters<typeof css>[0]
 
-// Label base + active-state overrides both live in this one style object
-// (applied to the wrapper) rather than splitting the label's own look into
-// a separate mix={css(...)} on the <label> itself — two different css()
-// calls land in two different cascade @layers ordered by declaration order,
-// not specificity, so a later-declared "base" layer would silently beat an
-// earlier "active override" layer regardless of how specific its selector
-// is. Keeping both in the same object keeps them in the same layer, where
-// the more specific :has() selector reliably wins.
+// Base and active-state styles share one object on purpose: two css() calls
+// land in two @layers ordered by declaration, not specificity, so a
+// later-declared base would silently beat an earlier active override.
 function tabsStyle(idPrefix: string): CSSStyle {
   const style: Record<string, unknown> = {
     position: 'relative',
@@ -66,15 +55,12 @@ function tabsStyle(idPrefix: string): CSSStyle {
 }
 
 export interface MediaTabsProps {
-  // Distinguishes this instance's radio group/ids from any other MediaTabs
-  // on the same page — not needed today (one per page), but cheap insurance.
+  // Distinguishes this instance's radio group from any other on the page.
   idPrefix: string
-  // One entry per wired-up media type. Keyed by MediaType rather than fixed
-  // `movies`/`tv` slots so adding a type is a registry edit, not a prop edit.
+  // Keyed by MediaType, so adding a type is a registry edit, not a prop edit.
   panels: Partial<Record<ActiveMediaType, RemixNode>>
-  // Which tab opens selected. Without this the tabs are pure CSS state with
-  // no URL representation, so returning from a detail page always dumped you
-  // back on the first tab regardless of where you'd been.
+  // Without this the tabs have no URL representation, so returning from a
+  // detail page always lands on the first one.
   active?: ActiveMediaType
 }
 

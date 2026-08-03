@@ -3,7 +3,7 @@ import { css } from 'remix/ui'
 
 import type { LetterboxdImportResult } from '../../../data/imports/letterboxd.ts'
 import { routes } from '../../../routes.ts'
-import { LetterboxdImportForm } from '../../../assets/letterboxd-import-form.tsx'
+import { LetterboxdImportForm } from '../../../browser/letterboxd-import-form.tsx'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
 

@@ -23,9 +23,8 @@ import { MediaSearchPage } from '../ui/pages/media-search-page.tsx'
 
 const SUGGESTION_LIMIT = 6
 
-// How many search hits are visible before scrolling reveals more. The whole
-// result set is rendered — see the LazyList island, which hides the overflow
-// client-side so the page still works fully without JS.
+// The whole result set is rendered; LazyList hides the overflow client-side, so
+// the page works fully without JS.
 const SEARCH_INITIAL_VISIBLE = 10
 
 
@@ -37,22 +36,16 @@ const logSchema = f.object({
 })
 
 // The six actions every media type's controller needs, with the type-specific
-// bits (which catalog to search, which routes to build) resolved from the
-// registry and the provider rather than hardcoded per copy.
+// bits resolved from the registry and the provider.
 //
-// This is a factory over the *actions*, not over createController itself:
-// createController resolves its action types from the concrete route map, and
-// routes.movies.show / routes.tv.show are different generic instantiations, so
-// a controller factory generic over the route map can't typecheck. Each
-// controller therefore stays a ~10-line createController call that passes its
-// own route map and spreads these handlers in.
+// A factory over the *actions*, not over createController: that resolves its
+// action types from the concrete route map, and routes.movies.show and
+// routes.tv.show are different generic instantiations, so a factory generic
+// over the route map can't typecheck.
 //
-// `context` is loosely typed for the same reason — extracting the handlers out
-// of createController loses its inference, and the middleware-installed
-// `render` property isn't on the bare RequestContext type. Each handler
-// re-establishes concrete types immediately (see `db`/`auth` below), so the
-// looseness is confined to the parameter itself. Same tradeoff as
-// getRememberedMediaType in middleware/mediaType.ts.
+// `context` is loosely typed for the same reason — pulling the handlers out of
+// createController loses its inference. Each handler re-establishes concrete
+// types immediately, so the looseness stays in the parameter.
 export function createMediaActions(mediaType: ActiveMediaType) {
   const ui = MEDIA_TYPE_UI[mediaType]
   const provider = getCatalogProvider(mediaType)
@@ -85,9 +78,8 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       )
     },
 
-    // Live catalog search for the autosuggest dropdown — deliberately doesn't
-    // import/upsert anything, unlike `search`, since most keystrokes never
-    // turn into a pick. Import only happens once you submit an actual search.
+    // Deliberately doesn't import/upsert, unlike `search` — most keystrokes
+    // never turn into a pick.
     async suggest(context: any) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -106,10 +98,9 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       return Response.json({ suggestions })
     },
 
-    // Where picking an autosuggest option lands — imports the exact entry the
-    // suggestion already resolved (by id) and goes straight to it, instead of
-    // resubmitting a title search that could in principle turn up something
-    // else and definitely re-hits the catalog for no reason.
+    // Imports the exact entry the suggestion already resolved, by id — a
+    // resubmitted title search could turn up something else, and re-hits the
+    // catalog regardless.
     async import(context: any) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -138,14 +129,11 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       let item = await getMediaItemDetail(db, mediaItemId)
       if (!item) return new Response('Not Found', { status: 404 })
 
-      // Credits only come back from a by-id lookup, never from search — so
-      // anything that entered the catalog via a search result has none. Fill
-      // it in on first view and persist, rather than making every search pay
-      // for 20 detail requests up front.
+      // Credits only come back from a by-id lookup, so anything that entered
+      // via search has none. Filled in on first view rather than making every
+      // search pay for 20 detail requests.
       //
-      // Gated on runtimeMinutes being absent too, because a by-id lookup sets
-      // both: if runtime is already there, this item has been enriched and a
-      // missing credit is genuinely missing, not un-fetched. Without that,
+      // Also gated on runtimeMinutes, which the same lookup sets: without that,
       // a film TMDB has no director for would re-request on every view.
       const meta = parseMediaMetadata(item.metadata)
       if (meta.creator === null && meta.runtimeMinutes === null && item.external_source === provider.sourceName) {
@@ -173,9 +161,8 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       )
     },
 
-    // Manual fix for a bad title/year match — re-points this item at a
-    // different catalog entry by id/link rather than trying to auto-detect
-    // low-confidence matches, since there's no reliable signal for that yet.
+    // Manual rather than auto-detected: there's no reliable signal for a
+    // low-confidence match yet.
     async rematch(context: any) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -196,9 +183,8 @@ export function createMediaActions(mediaType: ActiveMediaType) {
         return redirect(`${returnTo}${separator}rematchError=${encodeURIComponent(outcome.error)}`, 303)
       }
 
-      // A merge deletes the original item, so `returnTo` (which points at
-      // mediaItemId's own page) is only still valid when nothing merged —
-      // otherwise land on the item everything just got merged into.
+      // A merge deletes the original, so `returnTo` is only valid when nothing
+      // merged; otherwise land on the item everything merged into.
       const from = new URL(returnTo, context.url.origin).searchParams.get('from')
       const successPath = ui.hrefs.show(outcome.item.id)
       const query = new URLSearchParams({ rematched: '1' })
@@ -225,8 +211,8 @@ export function createMediaActions(mediaType: ActiveMediaType) {
 
       const db: Db = context.get(Database)
       await logInteraction(db, identity.id, mediaItemId, {
-        // The schema union widens to string through f.field/s.union, so the
-        // parse has already validated this even though the type says otherwise.
+        // The schema union widens to string, so the parse already validated
+        // this even though the type says otherwise.
         status: parsed.value.status as LogInteractionInput['status'],
         rating,
         notes: parsed.value.notes || null,

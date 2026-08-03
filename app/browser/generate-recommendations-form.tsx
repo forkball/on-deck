@@ -1,7 +1,7 @@
 import { clientEntry, css, on } from 'remix/ui'
 
-import { Collapsible } from './ui/collapsible.tsx'
-import { Field } from './ui/field.tsx'
+import { Collapsible } from '../ui/shared/collapsible.tsx'
+import { Field } from '../ui/shared/field.tsx'
 
 export type FriendOption = {
   id: number
@@ -10,21 +10,16 @@ export type FriendOption = {
 
 export type GenerateRecommendationsFormProps = {
   friends: FriendOption[]
-  // Which media type this run generates for — set by the page's tabs, not
-  // chosen in this form, so it's just carried through as a hidden field.
-  // Plain strings rather than the shared media-type registry: this file is a
-  // clientEntry island, and the asset server only bundles app/assets/**, so
-  // anything outside that has to arrive as a serializable prop.
+  // Set by the page's tabs, so just carried through as a hidden field. Plain
+  // strings rather than the registry: the browser bundle is limited to
+  // app/browser/**, so anything outside has to arrive as a serializable prop.
   mediaType: string
   // e.g. "movie" / "TV" — used attributively in "you'll still get X picks".
   mediaTypeLabel: string
-  // Taste profiles that can feed a run, computed server-side from the media
-  // type registry — the island can't import it (asset bundle boundary), so
-  // they arrive as plain data.
+  // Computed server-side from the registry, which this entry can't import.
   sources: { value: string; label: string }[]
   genres: string[]
-  // Supplied per media type — "short" means minutes for a film, pages for
-  // a book, hours for a game.
+  // Per media type: "short" is minutes for a film, pages for a book.
   lengthOptions: { value: string; label: string }[]
   generateHref: string
   findPeopleHref: string
@@ -32,31 +27,24 @@ export type GenerateRecommendationsFormProps = {
 
 const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
 
-// Taste profiles that don't exist yet — shown so the picker reads as
-// "more coming" rather than movies/TV being the permanent ceiling.
+// Shown so the picker reads as "more coming".
 const PLACEHOLDER_SOURCES: string[] = []
 
 const FRIENDS_PAGE_SIZE = 8
 
-// A client-hydrated island — most of the app is CSS-only. Submitting now
-// redirects almost immediately to a page that reports the real stage the run
-// is in, so this only needs to cover that hop: the button disables itself so
-// a second submit can't start a second run.
+// Submitting redirects almost immediately to a page reporting the real stage,
+// so this only covers that hop: the button disables itself so a second submit
+// can't start a second run. Nothing here guesses at progress.
 //
-// It used to cycle invented captions on a 1.8s timer, which looped — so it
-// claimed to be "almost there" and then started over. Nothing here guesses at
-// progress any more. Comments here ship to the browser with the bundle, so
-// this names neither the model vendor nor the catalog. The <form> still works
-// as a plain POST without JS; this only adds feedback on top.
+// Comments here ship to the browser with the bundle, so this names neither the
+// model vendor nor the catalog.
 //
-// The friend picker is search-filtered and paginated client-side (the
-// server hands over the full list once). Every friend's checkbox always
-// stays mounted — only its visibility toggles — so a selection made before
-// searching/paging away never gets silently dropped from the submitted form.
+// The friend picker filters and pages client-side, but every checkbox stays
+// mounted and only its visibility toggles — so a selection made before paging
+// away isn't silently dropped from the submitted form.
 //
-// URLs come in as plain string props rather than importing routes.ts — the
-// asset server only allows bundling files under app/assets/**, and routes.ts
-// lives outside that.
+// URLs arrive as plain string props: the browser bundle is limited to
+// app/browser/**, and routes.ts lives outside it.
 export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFormProps>(
   import.meta.url,
   function GenerateRecommendationsForm(handle) {
@@ -64,8 +52,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let mode: 'self' | 'group' = 'self'
     let search = ''
     let page = 1
-    // Defaults to the type being generated: the common case is "books from
-    // my book taste", with cross-media sourcing as the deliberate opt-in.
+    // Cross-media sourcing is the deliberate opt-in.
     const selectedSources = new Set<string>([handle.props.mediaType])
 
     return () => {

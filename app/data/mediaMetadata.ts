@@ -1,30 +1,25 @@
-// The denormalized blob stored on media_items.metadata. Every field parses
-// back as null when absent, so widening this never needs a migration — rows
-// written before a field existed just read as null.
+// The blob stored on media_items.metadata. Every field parses back as null when
+// absent, so widening it never needs a migration.
 export interface MediaMetadata {
   releaseYear: number | null
   posterUrl: string | null
   overview: string | null
-  // Films and episodes. Null for media measured some other way.
+  // Films and episodes.
   runtimeMinutes: number | null
-  // Books — the length dimension that stands in for runtime.
+  // Books.
   pageCount: number | null
-  // Games — hours to beat, per IGDB.
+  // Games — hours to beat.
   playtimeHours: number | null
-  // The person most associated with the work: director for film, creator
-  // for TV, author for a book. One field rather than three, since only one
-  // is ever meaningful per type — MEDIA_TYPE_UI.creditLabel names it.
+  // Director, creator or author — one field, since only one is meaningful per
+  // type. MEDIA_TYPE_UI.creditLabel names it.
   creator: string | null
-  // Additional artwork, in display order. Empty rather than null when
-  // absent, so callers can map it without a guard.
+  // Additional artwork, in display order. Empty rather than null, so callers
+  // can map it without a guard.
   images: string[]
-  // Games — the platforms it runs on, as short abbreviations.
+  // Games — short abbreviations.
   platforms: string[]
-  // Genre labels from whichever catalog this item came from, lowercased.
-  // Lived in a media_item_tags join table until it became clear nothing ever
-  // queried by tag — same shape and provenance as `platforms` above, so it
-  // sits alongside it now. Indexed via the GIN index on this column, so
-  // `metadata @> '{"tags":["horror"]}'` is answerable without a scan.
+  // Lowercased genre labels from the source catalog. Covered by the GIN index
+  // on this column, so `metadata @> '{"tags":["horror"]}'` avoids a scan.
   tags: string[]
 }
 
@@ -41,8 +36,7 @@ function stringOrNull(value: unknown): string | null {
   return typeof value === 'string' ? value : null
 }
 
-// A fresh object each time rather than a shared constant — the array fields
-// would otherwise be one instance handed to every caller.
+// Fresh each time — a shared constant would hand every caller the same arrays.
 function emptyMetadata(): MediaMetadata {
   return {
     releaseYear: null,
@@ -58,9 +52,8 @@ function emptyMetadata(): MediaMetadata {
   }
 }
 
-// `unknown` rather than `string`: the column is jsonb, so pg hands back an
-// already-parsed object. The string branch stays because raw SQL and older
-// callers can still produce one, and because it costs a single typeof.
+// `unknown` because the column is jsonb and pg hands back a parsed object; the
+// string branch stays for raw SQL callers.
 export function parseMediaMetadata(metadata: unknown): MediaMetadata {
   try {
     const parsed = (typeof metadata === 'string' ? JSON.parse(metadata) : metadata) as

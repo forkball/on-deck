@@ -1,8 +1,8 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-// Same reason as field.tsx for living here: app/assets/ui is the only place
-// both islands and server components can import from.
+// Same reason as field.tsx for living here: app/ui/shared is the part of app/ui
+// that client entries are allowed to import.
 
 const summaryStyle = css({ cursor: 'pointer' })
 const boxedBodyStyle = css({

@@ -1,23 +1,17 @@
 import type { Handle } from 'remix/ui'
 import { clientEntry, css, on } from 'remix/ui'
 
-// Polls the server for which stage a run is actually in, and replaces the
-// caption as it moves.
+// Polls for the stage a run is actually in. Not on a timer: every label here
+// comes from the server having entered that stage, so progress can't run
+// backwards the way invented captions on a loop did.
 //
-// The captions are not on a timer. An earlier version cycled invented
-// messages every 1.8 seconds and looped, so it said "Almost there" and then
-// went back to the beginning — progress that ran backwards. Every label here
-// comes from the server having entered that stage.
-//
-// Comments here ship to the browser with the bundle, so this names neither
-// the model vendor nor the catalog.
+// Comments here ship to the browser with the bundle, so this names neither the
+// model vendor nor the catalog.
 const POLL_MS = 1200
 
-// A poll can fail for reasons that have nothing to do with the run: a deploy
-// swapping machines, a dropped connection, a momentary 500. This used to
-// return out of the loop on the first one, which stopped polling for good and
-// left the page frozen on its last stage while the run finished fine behind
-// it. Failures are now tolerated until it's clear something is actually wrong.
+// A poll can fail for reasons unrelated to the run — a deploy, a dropped
+// connection. Returning on the first one froze the page on its last stage while
+// the run finished fine behind it.
 const MAX_CONSECUTIVE_FAILURES = 8
 
 const listStyle = css({
@@ -54,8 +48,8 @@ const doneStepStyle = css({
   fontSize: '14px',
 })
 
-// A type alias, not an interface: island props must satisfy the framework's
-// SerializableProps index signature, which an interface doesn't provide.
+// A type alias, not an interface — client entry props need SerializableProps'
+// index signature, which an interface doesn't provide.
 export type GenerationProgressProps = {
   statusHref: string
   initialLabel: string
@@ -79,8 +73,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       let consecutiveFailures = 0
 
       while (!handle.signal.aborted) {
-        // Backs off as failures mount, so a struggling server isn't polled
-        // every 1.2s by every waiting page.
+        // Backs off as failures mount.
         const wait = POLL_MS * Math.min(1 + consecutiveFailures, 5)
         await new Promise((resolve) => setTimeout(resolve, wait))
         if (handle.signal.aborted) return
@@ -91,8 +84,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             signal: handle.signal,
           })
 
-          // A swept job is gone for good — say so rather than waiting on
-          // something that will never answer.
+          // A swept job is gone for good.
           if (response.status === 404) {
             failed = "This run is no longer available. It may have finished a while ago."
             handle.update()
@@ -120,8 +112,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             return
           }
 
-          // Navigating away is the end of the wait, so the loop stops here
-          // rather than polling a job that has finished.
+          // Stop rather than polling a finished job.
           if (status.done && status.href) {
             window.location.href = status.href
             return
@@ -162,8 +153,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
         )
       }
 
-      // Queued reads as its own state rather than a dimmed first step: the run
-      // hasn't started, and showing stage one as "in progress" would be a lie.
+      // Its own state, not a dimmed first step — the run hasn't started.
       if (queueState === 'queued') {
         return (
           <p mix={css({ color: '#555' })}>

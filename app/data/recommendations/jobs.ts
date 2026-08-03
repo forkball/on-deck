@@ -3,24 +3,15 @@ import { lt } from 'remix/data-table'
 import { pool, type Db } from '../db.ts'
 import { recommendationJobs, type RecommendationJob } from '../schema.ts'
 
-// Live progress for an in-flight recommendation run.
+// Live progress for an in-flight run. Generating takes tens of seconds, so the
+// request hands back a job id and the wait page polls the stage from here.
 //
-// Generating takes tens of seconds across several distinct stages, two of
-// which are model calls. The request doesn't block for it: it starts the work
-// and hands back a job id, and the wait page reports the stage from here.
-//
-// This was in process memory, on the reasoning that progress is worthless
-// once the process holding the work dies. That reasoning was about
-// persistence and missed the actual requirement — the *reader* is a different
-// process. A single [[vm]] block in fly.toml sets the machine size, not the
-// count, and the app runs two: the POST wrote the job into one machine's
-// heap, and the poll that followed could be routed to the other, which
-// answered 404. Shared state is the only thing both can see.
+// In the database, not process memory: the app runs two machines, so the POST
+// and the poll that follows it can land on different ones.
 export type GenerationPhase = 'profiles' | 'picks' | 'matching' | 'lengths' | 'verifying' | 'saving'
 
-// Wording shown to the user, in the order the generation moves through them.
-// Each one corresponds to a real await in generateRecommendations — if a
-// stage is added there, it belongs here too, and vice versa.
+// Each corresponds to a real await in generateRecommendations — adding a stage
+// there means adding it here too.
 export const PHASE_LABELS: Record<GenerationPhase, string> = {
   profiles: 'Reading what everyone has logged…',
   picks: 'Choosing picks…',
@@ -46,10 +37,9 @@ export interface GenerationJob {
   status: JobStatus
   // Position in line when queued; 0 once running.
   queuedAhead?: number
-  // The stages this particular run will actually go through. Not every run
-  // hits every stage — the length check only happens when a length lever is
-  // set — and listing a stage that never runs, then ticking it complete,
-  // would be exactly the invented progress this replaced.
+  // Only the stages this run will actually hit — the length check happens only
+  // when a length lever is set, and showing a stage that never runs is
+  // invented progress.
   phases: GenerationPhase[]
   phase: GenerationPhase
   // Set once finished; the client navigates here.
@@ -60,9 +50,8 @@ export interface GenerationJob {
   updatedAt: number
 }
 
-// Long enough for a finished job to be collected by the poll that follows it,
-// short enough that abandoned rows don't accumulate. Swept on write rather
-// than on a timer, so an idle machine schedules nothing.
+// Long enough for the poll that follows a finish to still find it. Swept on
+// write rather than on a timer, so an idle machine schedules nothing.
 const JOB_TTL_MS = 10 * 60 * 1000
 
 async function sweep(db: Db): Promise<void> {
@@ -132,8 +121,8 @@ export async function hasActiveJob(db: Db, userId: number): Promise<boolean> {
 }
 
 export async function setPhase(db: Db, jobId: string, phase: GenerationPhase): Promise<void> {
-  // claimed_at doubles as a heartbeat: a job reporting stages is alive, so
-  // the staleness sweep must not reclaim it out from under its worker.
+  // claimed_at doubles as a heartbeat, so the staleness sweep won't reclaim a
+  // job that's still reporting stages.
   await db.updateMany(
     recommendationJobs,
     { phase, claimed_at: Date.now(), updated_at: Date.now() },
@@ -170,8 +159,8 @@ export async function failJob(db: Db, jobId: string, error: string): Promise<voi
   )
 }
 
-// Returns a job to the queue so another attempt can resume it from its
-// checkpoint. Used when a run is interrupted rather than genuinely broken.
+// For an interrupted run, not a broken one: the next attempt resumes from the
+// checkpoint.
 export async function requeueJob(db: Db, jobId: string): Promise<void> {
   await db.updateMany(
     recommendationJobs,
@@ -180,8 +169,7 @@ export async function requeueJob(db: Db, jobId: string): Promise<void> {
   )
 }
 
-// Scoped by user: a job id is a bearer token otherwise, and someone else's
-// progress is nobody's business.
+// Scoped by user — a job id would otherwise be a bearer token.
 export async function getJob(db: Db, jobId: string, userId: number): Promise<GenerationJob | null> {
   const row = await db.findOne(recommendationJobs, { where: { id: jobId, user_id: userId } })
   if (!row) return null
@@ -189,10 +177,8 @@ export async function getJob(db: Db, jobId: string, userId: number): Promise<Gen
   const job = toJob(row)
   if (job.status !== 'queued') return job
 
-  // Everything genuinely ahead of this one: older queued jobs *and* whatever
-  // is already running. Counting only the queued ones reported "0 ahead"
-  // while four runs were in progress in front of it, which is true of the
-  // queue and useless to the person reading it.
+  // Older queued jobs *and* whatever is already running — counting only the
+  // queued ones reports "0 ahead" with four runs in progress.
   const { rows } = await pool.query<{ ahead: string }>(
     `select count(*)::text as ahead from recommendation_jobs
       where status = 'running' or (status = 'queued' and created_at < $1)`,
@@ -201,27 +187,20 @@ export async function getJob(db: Db, jobId: string, userId: number): Promise<Gen
   return { ...job, queuedAhead: Number(rows[0]?.ahead ?? 0) }
 }
 
-// How long a claim may go without a heartbeat before another worker may take
-// the job. Comfortably longer than the slowest stage — the model calls are
-// tens of seconds — so a working run is never stolen mid-flight.
+// Comfortably longer than the slowest stage (model calls are tens of seconds),
+// so a working run is never stolen mid-flight.
 const CLAIM_STALE_MS = 3 * 60 * 1000
 
-// Retried twice, then left failed. An interrupted run resumes cheaply from its
-// checkpoint, but a genuinely broken one must not cycle forever.
+// Retried twice, then left failed, so a genuinely broken run can't cycle.
 const MAX_ATTEMPTS = 3
 
-// Returns abandoned work to the queue. A running job whose heartbeat stopped
-// means the machine holding it died — a deploy, an OOM, or a stop under
-// scale-to-zero.
+// A running job whose heartbeat stopped means its machine died.
 //
-// A null claim is deliberately *not* treated as stale. It used to be, via
-// coalesce(claimed_at, 0), which meant any row sitting in 'running' without a
-// claim looked abandoned the instant it appeared. That fired during a rolling
-// deploy: a request served by a machine still running the previous release
-// wrote a job the old way — no claim, no params — and a machine on the new
-// release immediately took it and ran it with nothing to run. The old machine
-// was executing that job perfectly well in its own process. Rows this worker
-// doesn't recognise are left alone and aged out by the TTL sweep instead.
+// A null claim is deliberately not stale. Treating it as stale (via
+// coalesce(claimed_at, 0)) meant that during a rolling deploy, a job written
+// the old way by a machine on the previous release was immediately taken by a
+// new-release machine and run with nothing to run. Unrecognised rows are left
+// to the TTL sweep.
 export async function requeueStaleJobs(db: Db): Promise<number> {
   const { rowCount } = await pool.query(
     `update recommendation_jobs
@@ -242,12 +221,8 @@ export interface ClaimedJob {
   checkpoint: unknown
 }
 
-// Claims up to `limit` queued jobs for this process.
-//
-// SKIP LOCKED is what makes two machines safe: neither waits on the other's
-// locked rows, and neither can be handed the same job. Without it both would
-// serialise on the same head-of-queue row and one would take work the other
-// had already started.
+// SKIP LOCKED is what makes two machines safe: without it both serialise on the
+// same head-of-queue row and one takes work the other already started.
 export async function claimJobs(db: Db, limit: number): Promise<ClaimedJob[]> {
   if (limit <= 0) return []
 

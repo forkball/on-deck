@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { GenerateRecommendationsForm } from '../../assets/generate-recommendations-form.tsx'
+import { GenerateRecommendationsForm } from '../../browser/generate-recommendations-form.tsx'
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations/runs.ts'
 import type { User } from '../../data/schema.ts'
@@ -31,10 +31,8 @@ export interface RecommendationsPageProps {
   }
 }
 
-// Shown instead of generating when the same levers already produced a run
-// whose picks are all still unlogged. Not a hard block — the point is that
-// you probably want the list you already have, but the button is right there
-// if you don't.
+// Shown when the same levers already produced a run whose picks are all still
+// unlogged. Not a hard block — the button is right there.
 function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<RecommendationsPageProps['duplicate']> }>) {
   return () => {
     const { duplicate } = handle.props

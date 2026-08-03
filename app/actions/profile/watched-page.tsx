@@ -24,8 +24,7 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
     const ui = MEDIA_TYPE_UI[mediaType]
     const typeQuery = mediaType === 'movie' ? '' : `&type=${mediaType}`
     const returnTo = `${routes.profile.watched.href()}?page=${page}${typeQuery}`
-    // Per-medium verb, not "watched" — the games tab read "What I've
-    // watched (Games)". The registry already had the right word.
+    // Per-medium verb: the games tab otherwise read "What I've watched (Games)".
     const heading = `What I've ${ui.pastParticiple} (${ui.tabLabel})`
 
     return (

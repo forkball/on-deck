@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { UserSearchForm } from '../../assets/user-search-form.tsx'
+import { UserSearchForm } from '../../browser/user-search-form.tsx'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'

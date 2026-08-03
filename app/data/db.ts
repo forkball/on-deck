@@ -4,25 +4,18 @@ import { createDatabase, Database } from 'remix/data-table'
 import { createPostgresDatabaseAdapter } from 'remix/data-table/postgres'
 import type { Middleware } from 'remix/router'
 
-// pg returns bigint (int8) columns as strings by default, since they can
-// exceed Number.MAX_SAFE_INTEGER. Our bigint columns only ever hold epoch-ms
-// timestamps (see db/migrations), which are well within that range, so parse
-// them as numbers — otherwise `new Date(createdAt)` gets a numeric string,
-// which Date parses as a date string rather than a timestamp.
+// pg returns int8 as strings (they can exceed MAX_SAFE_INTEGER). Ours only hold
+// epoch-ms, and `new Date()` on a numeric string parses it as a date string
+// rather than a timestamp.
 types.setTypeParser(types.builtins.INT8, (value) => parseInt(value, 10))
-// Same story for numeric/decimal columns (rating, popularity_score): pg
-// returns them as strings since NUMERIC can exceed float precision, but ours
-// only ever hold small ratings/scores, and a string rating breaks strict
-// equality checks like the star-rating input's `defaultValue === step`.
+// Same for NUMERIC (rating, popularity_score): a string rating breaks strict
+// equality like the star input's `defaultValue === step`.
 types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value))
 
-// A single search page fans out ~20 concurrent upserts; the pg default of
-// 10 connections made half of them queue behind the others for no reason.
-// Round-trips to the hosted database are ~45ms, so queueing is the dominant
-// cost, not query time.
-// Exported for the one query the table API can't express: matching a title
-// after normalising it, which needs regexp_replace in SQL rather than pulling
-// every catalog row into memory to compare. See resolveFromCatalog.
+// A search page fans out ~20 concurrent upserts, and round-trips are ~45ms, so
+// the pg default of 10 connections made queueing the dominant cost.
+// For the one query the table API can't express: title matching that needs
+// regexp_replace in SQL. See resolveFromCatalog.
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 20 })
 
 export const db = createDatabase(createPostgresDatabaseAdapter(pool))
