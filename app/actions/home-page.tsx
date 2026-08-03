@@ -1,9 +1,9 @@
 import type { Handle } from "remix/ui";
 import { css } from "remix/ui";
 
-import { routes } from "../../routes.ts";
-import { Document } from "../components/document.tsx";
-import { Nav } from "../components/nav.tsx";
+import { routes } from "../routes.ts";
+import { Document } from "../ui/components/document.tsx";
+import { Nav } from "../ui/components/nav.tsx";
 
 export function HomePage(
   handle: Handle<{ authed: boolean; displayName?: string }>,

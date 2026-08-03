@@ -1,10 +1,10 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { getUserInteractionForItem } from '../../data/mediaCatalog.ts'
+import type { getUserInteractionForItem } from '../../data/mediaItems.ts'
 import type { MediaItem } from '../../data/schema.ts'
 import { MediaTabLinks } from '../components/media-tab-links.tsx'
-import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import { MEDIA_TYPE_UI, statusLabelsFor, type ActiveMediaType } from '../../mediaTypes.ts'
 import { LazyList } from '../../assets/lazy-list.tsx'
 import { MovieSearchForm } from '../../assets/movie-search-form.tsx'
 import { Document } from '../components/document.tsx'
@@ -12,10 +12,9 @@ import { FloatingDropdown } from '../components/floating-dropdown.tsx'
 import { Nav } from '../components/nav.tsx'
 import { StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { StatusSelect } from '../components/status-select.tsx'
-import { Field } from '../../assets/lib/field.tsx'
-import { parseMediaMetadata } from '../../utils/mediaMetadata.ts'
+import { Field } from '../../assets/ui/field.tsx'
+import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { PlatformList } from '../components/platform-list.tsx'
-import { statusLabelsFor } from '../../utils/status.ts'
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType

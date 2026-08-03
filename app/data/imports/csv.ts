@@ -1,5 +1,5 @@
 // Shared CSV plumbing for the Letterboxd and Goodreads importers. Extracted
-// from letterboxdImport.ts when the second importer arrived — the parser and
+// from letterboxd.ts when the second importer arrived — the parser and
 // the concurrency bound are identical; only the column mapping differs.
 
 // Minimal RFC 4180 parser — handles quoted fields (including embedded commas

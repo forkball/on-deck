@@ -8,7 +8,7 @@ import { createMediaActions } from '../mediaActions.tsx'
 
 // See movies/controller.tsx — all six handlers are shared; only the route
 // map and the media type differ. Books resolve against Open Library rather
-// than TMDB, which is a provider detail (see data/catalog.ts), not a
+// than TMDB, which is a provider detail (see data/catalog/provider.ts), not a
 // controller one.
 export default createController(routes.books, {
   middleware: [requireAuth<User>(), rememberMediaType('book')],

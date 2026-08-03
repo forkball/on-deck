@@ -1,8 +1,8 @@
-import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from './catalog.ts'
-import { cleanCell, headerIndex, parseCsv, runBounded } from './csvImport.ts'
-import type { Db } from './db.ts'
-import { logInteraction, type LogInteractionInput } from './mediaCatalog.ts'
-import { getBooksByIsbns, normalizeIsbn } from './openLibrary.ts'
+import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
+import { cleanCell, headerIndex, parseCsv, runBounded } from './csv.ts'
+import type { Db } from '../db.ts'
+import { logInteraction, type LogInteractionInput } from '../mediaItems.ts'
+import { getBooksByIsbns, normalizeIsbn } from '../catalog/openLibrary.ts'
 
 export interface GoodreadsImportResult {
   totalRows: number

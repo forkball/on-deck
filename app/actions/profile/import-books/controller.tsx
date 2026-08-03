@@ -2,7 +2,7 @@ import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 
-import { importGoodreadsLibrary } from '../../../data/goodreadsImport.ts'
+import { importGoodreadsLibrary } from '../../../data/imports/goodreads.ts'
 import type { User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { displayLabel } from '../../../data/users.ts'

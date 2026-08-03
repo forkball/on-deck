@@ -1,18 +1,17 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { GenerationParams, RecommendationRunDetail } from '../../data/recommendations.ts'
-import type { MediaType } from '../../data/mediaCatalog.ts'
+import type { GenerationParams, RecommendationRunDetail } from '../../data/recommendations/runs.ts'
+import type { MediaType } from '../../data/mediaItems.ts'
 import { routes } from '../../routes.ts'
-import { Field } from '../../assets/lib/field.tsx'
+import { Field } from '../../assets/ui/field.tsx'
 import { Document } from '../../ui/components/document.tsx'
 import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
 import { StarRatingInput } from '../../ui/components/star-rating.tsx'
 import { StatusSelect } from '../../ui/components/status-select.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
-import { parseMediaMetadata } from '../../utils/mediaMetadata.ts'
-import { statusLabelsFor } from '../../utils/status.ts'
-import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, parseMediaType } from '../../utils/mediaTypes.ts'
+import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
+import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, parseMediaType, statusLabelsFor } from '../../mediaTypes.ts'
 
 const SOURCE_LABELS: Record<MediaType, string> = {
   movie: 'Movie taste',

@@ -2,9 +2,8 @@ import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
-import { parseMediaMetadata } from '../../utils/mediaMetadata.ts'
-import { statusLabelsFor } from '../../utils/status.ts'
-import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../utils/mediaTypes.ts'
+import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
+import { DEFAULT_MEDIA_TYPE, parseMediaType, statusLabelsFor } from '../../mediaTypes.ts'
 import { StarRatingDisplay } from './star-rating.tsx'
 
 export interface WatchedListItemProps {

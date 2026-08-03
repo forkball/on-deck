@@ -1,7 +1,7 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-// Lives under app/assets/lib rather than ui/components because it has to be
+// Lives under app/assets/ui rather than app/ui/components because it has to be
 // usable from both sides: the asset server only bundles app/assets/**, so a
 // clientEntry island can't import out of it, while server components import
 // in freely (see nav.tsx and media-search-page.tsx). This is the only

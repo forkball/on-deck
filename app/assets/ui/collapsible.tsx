@@ -1,7 +1,7 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-// Same reason as field.tsx for living here: app/assets/lib is the only place
+// Same reason as field.tsx for living here: app/assets/ui is the only place
 // both islands and server components can import from.
 
 const summaryStyle = css({ cursor: 'pointer' })

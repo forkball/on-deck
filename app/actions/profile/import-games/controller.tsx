@@ -3,7 +3,7 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 
 import type { User } from '../../../data/schema.ts'
-import { importSteamLibrary } from '../../../data/steamImport.ts'
+import { importSteamLibrary } from '../../../data/imports/steam.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { requireEnabledMediaType } from '../../../middleware/gatedMediaType.ts'
 import { displayLabel } from '../../../data/users.ts'

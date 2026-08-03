@@ -7,8 +7,8 @@ import { redirect } from 'remix/response/redirect'
 import { db } from '../../../data/db.ts'
 import { users, type User } from '../../../data/schema.ts'
 import { routes } from '../../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI } from '../../../utils/mediaTypes.ts'
-import { verifyPassword } from '../../../utils/password.ts'
+import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI } from '../../../mediaTypes.ts'
+import { verifyPassword } from '../password.ts'
 import { LoginPage } from './page.tsx'
 
 const loginSchema = f.object({

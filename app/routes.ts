@@ -88,7 +88,7 @@ export const routes = route({
     index: get('/'),
     generate: post('/'),
     // The wait while a run is generating, and the endpoint it polls. Both
-    // keyed by an in-memory job id (see data/generationProgress.ts).
+    // keyed by a persisted job id (see data/recommendations/jobs.ts).
     generating: get('generating/:jobId'),
     status: get('status/:jobId'),
     show: get(':runId'),

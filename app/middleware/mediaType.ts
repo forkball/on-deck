@@ -1,7 +1,7 @@
 import { Session } from 'remix/session'
 import type { Middleware, RequestContext } from 'remix/router'
 
-import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType, type ActiveMediaType } from '../utils/mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType, type ActiveMediaType } from '../mediaTypes.ts'
 
 // Remembers which media type (movie/tv) the user was last looking at, in
 // the same signed session cookie already used for auth — read back by the

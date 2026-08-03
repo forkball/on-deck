@@ -1,6 +1,6 @@
 import { clientEntry, css, on, ref } from 'remix/ui'
 
-import { space } from './lib/spacing.ts'
+import { space } from './ui/spacing.ts'
 
 export type LetterboxdImportFormProps = {
   uploadHref: string

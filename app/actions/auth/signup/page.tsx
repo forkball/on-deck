@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
-import { Field } from '../../../assets/lib/field.tsx'
+import { Field } from '../../../assets/ui/field.tsx'
 
 export interface SignupPageProps {
   error?: string

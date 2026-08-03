@@ -4,20 +4,20 @@ import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
 import { redirect } from 'remix/response/redirect'
 
-import { getCatalogProvider, rematchCatalogItem, searchAndImport, upsertCatalogItem } from '../data/catalog.ts'
+import { getCatalogProvider, rematchCatalogItem, searchAndImport, upsertCatalogItem } from '../data/catalog/provider.ts'
 import type { Db } from '../data/db.ts'
 import {
   getMediaItemDetail,
   getUserInteractionForItem,
   getUserInteractionsForItems,
   logInteraction,
+  parseRatingInput,
   type LogInteractionInput,
-} from '../data/mediaCatalog.ts'
+} from '../data/mediaItems.ts'
 import type { User } from '../data/schema.ts'
 import { displayLabel } from '../data/users.ts'
-import { MEDIA_TYPE_UI, type ActiveMediaType } from '../utils/mediaTypes.ts'
-import { parseMediaMetadata } from '../utils/mediaMetadata.ts'
-import { parseRatingInput } from '../utils/stars.ts'
+import { MEDIA_TYPE_UI, type ActiveMediaType } from '../mediaTypes.ts'
+import { parseMediaMetadata } from '../data/mediaMetadata.ts'
 import { MediaDetailPage } from '../ui/pages/media-detail-page.tsx'
 import { MediaSearchPage } from '../ui/pages/media-search-page.tsx'
 

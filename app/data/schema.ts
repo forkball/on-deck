@@ -13,7 +13,7 @@ export const users = table({
     // only the movie log drives those.
     bio: c.text(),
     // SteamID64 of a linked Steam account, set by the OpenID flow (see
-    // data/steam.ts). Null until someone connects one.
+    // data/imports/steamApi.ts). Null until someone connects one.
     steam_id: c.text(),
     created_at: c.integer().notNull(),
   },
@@ -30,7 +30,7 @@ export const mediaItems = table({
     // Type-specific metadata — release year, poster, runtime/pages/playtime,
     // credits, artwork, platforms, genre tags. jsonb, so Postgres validates
     // it on write and the GIN index can answer containment queries against
-    // it. Shape and read boundary: app/utils/mediaMetadata.ts.
+    // it. Shape and read boundary: app/data/mediaMetadata.ts.
     metadata: c.json().notNull(),
     popularity_score: c.decimal(10, 2),
     created_at: c.integer().notNull(),
@@ -53,7 +53,7 @@ export const userMediaInteractions = table({
 })
 
 // The persisted, user-editable taste profile — distinct from the raw
-// interaction log above. See app/data/tasteProfile.ts.
+// interaction log above. See app/data/recommendations/tasteProfile.ts.
 export const userTasteProfiles = table({
   name: 'user_taste_profiles',
   primaryKey: ['user_id', 'media_type'],
@@ -69,9 +69,6 @@ export const userTasteProfiles = table({
   },
 })
 
-// One "get recommendations" click — indexed and dated, kept forever (not
-// replaced on the next run) so past runs stay browsable by id. See
-// app/data/recommendations.ts.
 // Live progress for an in-flight recommendation run. In the database rather
 // than process memory because the app runs on more than one machine — see the
 // migration for the failure this fixes.
@@ -100,17 +97,20 @@ export const recommendationJobs = table({
   },
 })
 
+// One "get recommendations" click — indexed and dated, kept forever (not
+// replaced on the next run) so past runs stay browsable by id. See
+// app/data/recommendations/runs.ts.
 export const recommendationRuns = table({
   name: 'recommendation_runs',
   columns: {
     id: c.integer().primaryKey().autoIncrement(),
     user_id: c.integer().notNull().references('users', 'id'), // the requester
     // Which catalog this run's picks were matched against — the MAX_RUNS_PER_USER
-    // cap (see recommendations.ts) is scoped per media_type, so generating a
+    // cap (see recommendations/runs.ts) is scoped per media_type, so generating a
     // TV run never prunes an older movie run and vice versa. Note this is
     // the type of thing being recommended, which is independent of which
     // taste profile(s) the picks were based on — see sourceTypes in
-    // recommendations.ts.
+    // recommendations/generate.ts.
     media_type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
     created_at: c.integer().notNull(),
     // Optional user-given label (e.g. "Cozy weekend picks") — falls back to
@@ -120,7 +120,7 @@ export const recommendationRuns = table({
     // length?, sourceTypes }. Kept alongside the run so its detail page can
     // show exactly what was asked for, even after taste profiles/filters
     // used elsewhere have since changed. See GenerationParams in
-    // recommendations.ts.
+    // recommendations/runs.ts.
     params: c.text().notNull().default('{}'),
   },
 })

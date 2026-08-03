@@ -4,7 +4,7 @@ import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import type { Db } from '../../data/db.ts'
-import { countUserMediaLog, listUserMediaLog } from '../../data/mediaCatalog.ts'
+import { countUserMediaLog, listUserMediaLog } from '../../data/mediaItems.ts'
 import {
   countFollowers,
   countFollowing,
@@ -20,7 +20,7 @@ import { users, type User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, searchUsers } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType } from '../../utils/mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType } from '../../mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { UserSearchPage } from './search-page.tsx'
 import { UserProfilePage } from './show-page.tsx'

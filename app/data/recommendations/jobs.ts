@@ -1,7 +1,7 @@
 import { lt } from 'remix/data-table'
 
-import { pool, type Db } from './db.ts'
-import { recommendationJobs, type RecommendationJob } from './schema.ts'
+import { pool, type Db } from '../db.ts'
+import { recommendationJobs, type RecommendationJob } from '../schema.ts'
 
 // Live progress for an in-flight recommendation run.
 //

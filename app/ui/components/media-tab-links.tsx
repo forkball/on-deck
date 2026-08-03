@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
 // Only movies and TV are wired up — the rest match the placeholders shown
 // in media-tabs.tsx (the profile page's tabs) so the two read the same.

@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { SteamImportResult } from '../../../data/steamImport.ts'
+import type { SteamImportResult } from '../../../data/imports/steam.ts'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'

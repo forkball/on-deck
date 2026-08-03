@@ -3,13 +3,13 @@ import { css } from 'remix/ui'
 
 import { GenerateRecommendationsForm } from '../../assets/generate-recommendations-form.tsx'
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
-import { MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations.ts'
+import { MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations/runs.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
-import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
 export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]

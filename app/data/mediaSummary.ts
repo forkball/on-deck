@@ -1,7 +1,7 @@
 import type { Db } from './db.ts'
-import { loadUserLogEntries, type listUserMediaLog } from './mediaCatalog.ts'
-import { getTasteProfile } from './tasteProfile.ts'
-import { ACTIVE_MEDIA_TYPES, type ActiveMediaType } from '../utils/mediaTypes.ts'
+import { loadUserLogEntries, type listUserMediaLog } from './mediaItems.ts'
+import { getTasteProfile } from './recommendations/tasteProfile.ts'
+import { ACTIVE_MEDIA_TYPES, type ActiveMediaType } from '../mediaTypes.ts'
 
 export interface MediaTypeSummary {
   summary: string

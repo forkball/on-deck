@@ -1,7 +1,7 @@
-import type { Db } from './db.ts'
-import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from './catalog.ts'
-import { logInteraction } from './mediaCatalog.ts'
-import { headerIndex, parseCsv, runBounded } from './csvImport.ts'
+import type { Db } from '../db.ts'
+import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
+import { logInteraction } from '../mediaItems.ts'
+import { headerIndex, parseCsv, runBounded } from './csv.ts'
 
 interface RatingRow {
   title: string

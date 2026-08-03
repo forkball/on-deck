@@ -1,5 +1,5 @@
 // 4px spacing scale — keep every padding/gap value on this grid for a
-// consistent rhythm instead of one-off px numbers. Lives under app/assets/lib
+// consistent rhythm instead of one-off px numbers. Lives under app/assets/ui
 // (not app/ui/components/styles.ts) because the asset bundler only resolves
 // imports rooted under app/assets/**.
 export const space = {

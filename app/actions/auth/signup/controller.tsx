@@ -8,8 +8,8 @@ import { redirect } from 'remix/response/redirect'
 
 import { users } from '../../../data/schema.ts'
 import { routes } from '../../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI } from '../../../utils/mediaTypes.ts'
-import { hashPassword } from '../../../utils/password.ts'
+import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI } from '../../../mediaTypes.ts'
+import { hashPassword } from '../password.ts'
 import { SignupPage } from './page.tsx'
 
 const signupSchema = f.object({

@@ -1,7 +1,7 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
 // Mirrors the media types offered in media-tab-links.tsx — movies and TV are
 // wired up, the rest are placeholders so this reads as "more coming" rather

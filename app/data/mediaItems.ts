@@ -1,21 +1,20 @@
 import { and, eq, inList } from 'remix/data-table'
 
-import { parseMediaMetadata, type MediaMetadata } from '../utils/mediaMetadata.ts'
+import { parseMediaMetadata, type MediaMetadata } from './mediaMetadata.ts'
 
 import type { Db } from './db.ts'
 import { mediaItems, userMediaInteractions, type MediaItem, type UserMediaInteraction } from './schema.ts'
-import type { TmdbSearchResult } from './tmdb.ts'
+import type { TmdbSearchResult } from './catalog/tmdb.ts'
 
 export type MediaType = MediaItem['type']
 
-// Shared by movies.ts and tv.ts (and any future media type) — everything
-// here is genuinely type-agnostic: it operates on media_item_id, never
-// assumes a specific `type`, and only the thin per-type wrapper modules
-// (movies.ts, tv.ts) know which TMDB endpoint or which `type` value to pass.
+// Shared by every media type — everything here is genuinely type-agnostic:
+// it operates on media_item_id and never assumes a specific `type`. Only the
+// catalog providers (see catalog/provider.ts) know which external endpoint or
+// which `type` value to pass.
 
 // Single place the metadata blob is assembled, so upsert and rematch can't
-// drift on which fields they persist. See utils/mediaMetadata.ts for the
-// read side.
+// drift on which fields they persist. See mediaMetadata.ts for the read side.
 //
 // `previous` makes this a merge rather than an overwrite, and that matters:
 // search payloads carry no credits, runtime, or (for books) description, so
@@ -168,6 +167,14 @@ export interface LogInteractionInput {
   // Overrides the consumed_at timestamp instead of stamping "now" — used by
   // the Letterboxd import to preserve the original watch/rating date.
   consumedAt?: number
+}
+
+// Clamps to 0.5-5 in half-star steps, defensively — the star picker only
+// submits valid values, but the request could be tampered with.
+export function parseRatingInput(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (!trimmed || !Number.isFinite(Number(trimmed))) return null
+  return Math.min(5, Math.max(0.5, Math.round(Number(trimmed) * 2) / 2))
 }
 
 // Atomic upsert on (user_id, media_item_id) — a plain findOne-then-write

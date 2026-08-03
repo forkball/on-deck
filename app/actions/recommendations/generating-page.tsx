@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { PHASE_LABELS, type GenerationPhase } from '../../data/generationProgress.ts'
+import { PHASE_LABELS, type GenerationPhase } from '../../data/recommendations/jobs.ts'
 import { GenerationProgress } from '../../assets/generation-progress.tsx'
 import { Document } from '../../ui/components/document.tsx'
 import { Nav } from '../../ui/components/nav.tsx'

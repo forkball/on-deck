@@ -2,7 +2,7 @@ import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 
-import { importLetterboxdRatings } from '../../../data/letterboxdImport.ts'
+import { importLetterboxdRatings } from '../../../data/imports/letterboxd.ts'
 import type { User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { displayLabel } from '../../../data/users.ts'

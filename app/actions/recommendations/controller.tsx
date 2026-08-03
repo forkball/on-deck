@@ -6,26 +6,29 @@ import { Session } from 'remix/session'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { getCatalogProvider } from '../../data/catalog.ts'
+import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import type { Db } from '../../data/db.ts'
 import { listFollowedUsers } from '../../data/follows.ts'
-import { enqueueJob, getJob, hasActiveJob, PHASE_LABELS } from '../../data/generationProgress.ts'
+import { enqueueJob, getJob, hasActiveJob, PHASE_LABELS } from '../../data/recommendations/jobs.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { getRememberedMediaType } from '../../middleware/mediaType.ts'
+import { findMembersMissingSourceLogs, generateRecommendations } from '../../data/recommendations/generate.ts'
+import type { RecommendationFilters } from '../../data/recommendations/picks.ts'
 import {
-  findMembersMissingSourceLogs,
   findUnusedDuplicateRun,
-  generateRecommendations,
   getRecommendationRun,
   listRecommendationRuns,
   listRecommendationRunsFromOthers,
-  MEDIA_NOUNS,
-  type RecommendationFilters,
-} from '../../data/recommendations.ts'
+} from '../../data/recommendations/runs.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import {
+  DEFAULT_MEDIA_TYPE,
+  mediaTypeUiFor,
+  parseEnabledMediaType,
+  type ActiveMediaType,
+} from '../../mediaTypes.ts'
 import { GeneratingPage } from './generating-page.tsx'
 import { RecommendationsPage } from './page.tsx'
 import { RecommendationRunPage } from './run-page.tsx'
@@ -149,7 +152,7 @@ export default createController(routes.recommendations, {
       if (missing.length > 0) {
         const detail = missing
           .map(({ userId, label, missing: types }) => {
-            const nouns = types.map((type) => MEDIA_NOUNS[type]).join(' or ')
+            const nouns = types.map((type) => mediaTypeUiFor(type).plural).join(' or ')
             return userId === auth.identity.id
               ? `you have no ${nouns} logged`
               : `${label} has no ${nouns} logged`
@@ -221,7 +224,7 @@ export default createController(routes.recommendations, {
 
       // Queued rather than started here. Generation is long and fans out into
       // rate-limited services, so a worker with a fixed number of slots runs
-      // it — see data/generationWorker.ts. The request's only job is to record
+      // it — see data/recommendations/worker.ts. The request's only job is to record
       // what to run.
       if (await hasActiveJob(db, auth.identity.id)) {
         const data = await loadIndexData(db, auth.identity, mediaType)

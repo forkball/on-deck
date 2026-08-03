@@ -6,8 +6,8 @@ import { assetServer } from '../assets.ts'
 import { displayLabel } from '../data/users.ts'
 import { getRememberedMediaType } from '../middleware/mediaType.ts'
 import { routes } from '../routes.ts'
-import { HomePage } from '../ui/pages/home-page.tsx'
-import { MEDIA_TYPE_UI } from '../utils/mediaTypes.ts'
+import { HomePage } from './home-page.tsx'
+import { MEDIA_TYPE_UI } from '../mediaTypes.ts'
 
 export default createController(routes, {
   actions: {

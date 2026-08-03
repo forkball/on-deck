@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
 
 import { claude, parseStructuredResponse } from './claude.ts'
-import type { Db } from './db.ts'
-import { listUserMediaLog, type MediaType } from './mediaCatalog.ts'
-import { userTasteProfiles, type UserTasteProfile } from './schema.ts'
+import type { Db } from '../db.ts'
+import { listUserMediaLog, type MediaType } from '../mediaItems.ts'
+import { userTasteProfiles, type UserTasteProfile } from '../schema.ts'
+import { mediaTypeUiFor } from '../../mediaTypes.ts'
 
 export interface TasteProfileData {
   liked_tags: string[]
@@ -62,19 +63,12 @@ export interface RegeneratedTasteProfile extends UpsertTasteProfileInput {
   log: Awaited<ReturnType<typeof listUserMediaLog>>
 }
 
-const MEDIA_NOUNS: Record<MediaType, string> = {
-  movie: 'movie',
-  tv: 'TV show',
-  book: 'book',
-  game: 'game',
-}
-
 // Regenerates the taste profile from the user's log (scoped to one media
 // type — see the media_type column on user_taste_profiles) via Claude,
 // persists it, and returns the fresh value (plus the log it was built from,
 // so callers that also need the log — e.g. to compute already-seen titles —
 // don't have to re-fetch it). The sole write path for the profile now that
-// manual editing is gone. See app/data/recommendations.ts, which calls this
+// manual editing is gone. See generate.ts, which calls this
 // before generating picks.
 export async function regenerateTasteProfile(
   db: Db,
@@ -91,7 +85,7 @@ export async function regenerateTasteProfile(
     return { ...empty, log }
   }
 
-  const noun = MEDIA_NOUNS[mediaType]
+  const noun = mediaTypeUiFor(mediaType).singular
   const loggedItems = log.map(({ interaction, item }) => ({
     title: item?.title ?? 'Unknown title',
     status: interaction.status,

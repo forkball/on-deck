@@ -1,5 +1,5 @@
-import type { MediaType } from '../data/mediaCatalog.ts'
-import { routes } from '../routes.ts'
+import type { LogInteractionInput, MediaType } from './data/mediaItems.ts'
+import { routes } from './routes.ts'
 
 // The media types that are actually searchable and loggable today. The DB
 // enum (see schema.ts) also allows game; this is the narrower
@@ -252,6 +252,16 @@ export function mediaTypeUi(type: ActiveMediaType): MediaTypeUi {
   return MEDIA_TYPE_UI[type]
 }
 
+// The same registry, for code holding a MediaType straight off a database row.
+// Those row types widen the column to `string`, so such callers can't index
+// MEDIA_TYPE_UI directly — which is why the recommendation prompts each used
+// to carry their own private copy of the noun table. The DB enum already
+// constrains the column to the four active types, so this only has to
+// re-narrow what the row type lost.
+export function mediaTypeUiFor(type: MediaType): MediaTypeUi {
+  return MEDIA_TYPE_UI[parseMediaType(type) ?? DEFAULT_MEDIA_TYPE]
+}
+
 // For prose about a type that may have come from the DB widened to `string`
 // (e.g. media_items.type on a recommendation row).
 export function mediaTypeLabel(value: unknown): string {
@@ -265,3 +275,31 @@ export function mediaTypeLabel(value: unknown): string {
 export function isActiveMediaType(type: MediaType): type is ActiveMediaType {
   return parseMediaType(type) !== null
 }
+
+export type InteractionStatus = LogInteractionInput['status']
+
+// The three statuses are the same across every medium; only the verbs differ
+// — you watch a film but read a book. Verbs live on the registry above so
+// adding a type doesn't mean editing a second table here.
+export function statusOptionsFor(mediaType: ActiveMediaType): { value: InteractionStatus; label: string }[] {
+  const verbs = MEDIA_TYPE_UI[mediaType].statusVerbs
+  return [
+    { value: 'want_to_consume', label: verbs.want },
+    { value: 'in_progress', label: verbs.inProgress },
+    { value: 'consumed', label: verbs.done },
+  ]
+}
+
+export function statusLabelsFor(mediaType: ActiveMediaType): Record<string, string> {
+  return Object.fromEntries(statusOptionsFor(mediaType).map((o) => [o.value, o.label]))
+}
+
+// For the handful of places that render a status without knowing (or caring)
+// which medium it belongs to — e.g. a mixed list. Falls back to watch verbs.
+export function statusLabel(status: string, mediaType?: unknown): string {
+  const type = parseMediaType(mediaType) ?? DEFAULT_MEDIA_TYPE
+  return statusLabelsFor(type)[status] ?? status
+}
+
+export const STATUS_OPTIONS = statusOptionsFor(DEFAULT_MEDIA_TYPE)
+export const STATUS_LABELS = statusLabelsFor(DEFAULT_MEDIA_TYPE)

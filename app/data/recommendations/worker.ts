@@ -1,4 +1,4 @@
-import { db } from './db.ts'
+import { db } from '../db.ts'
 import {
   claimJobs,
   completeJob,
@@ -7,10 +7,10 @@ import {
   saveCheckpoint,
   setPhase,
   type ClaimedJob,
-} from './generationProgress.ts'
-import { generateRecommendations, type GenerationCheckpoint } from './recommendations.ts'
-import type { MediaType } from './mediaCatalog.ts'
-import type { RecommendationFilters } from './recommendations.ts'
+} from './jobs.ts'
+import { generateRecommendations, type GenerationCheckpoint } from './generate.ts'
+import type { MediaType } from '../mediaItems.ts'
+import type { RecommendationFilters } from './picks.ts'
 
 // Drains the recommendation queue.
 //

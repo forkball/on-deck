@@ -5,11 +5,15 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { deleteInteraction, updateInteraction, type LogInteractionInput } from '../../data/mediaCatalog.ts'
+import {
+  deleteInteraction,
+  parseRatingInput,
+  updateInteraction,
+  type LogInteractionInput,
+} from '../../data/mediaItems.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import type { User } from '../../data/schema.ts'
 import { routes } from '../../routes.ts'
-import { parseRatingInput } from '../../utils/stars.ts'
 
 const updateSchema = f.object({
   status: f.field(

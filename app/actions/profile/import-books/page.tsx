@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { GoodreadsImportResult } from '../../../data/goodreadsImport.ts'
+import type { GoodreadsImportResult } from '../../../data/imports/goodreads.ts'
 import { routes } from '../../../routes.ts'
 import { LetterboxdImportForm } from '../../../assets/letterboxd-import-form.tsx'
 import { Document } from '../../../ui/components/document.tsx'

@@ -1,7 +1,6 @@
-import type { Db } from './db.ts'
-import { upsertMediaItem, rematchMediaItem, type MediaType, type RematchMediaItemResult } from './mediaCatalog.ts'
-import type { MediaItem } from './schema.ts'
-import type { RecommendationLength } from './recommendations.ts'
+import type { Db } from '../db.ts'
+import { upsertMediaItem, rematchMediaItem, type MediaType, type RematchMediaItemResult } from '../mediaItems.ts'
+import type { MediaItem } from '../schema.ts'
 import { BOOK_GENRES, getBookById, parseOpenLibraryId, searchBooks } from './openLibrary.ts'
 import { GAME_GENRES, getGameById, parseIgdbId, searchGames } from './igdb.ts'
 import {
@@ -21,9 +20,14 @@ import {
 // Library for books) can satisfy the same contract.
 export type CatalogSearchResult = TmdbSearchResult
 
+// Short/medium/long, in whatever unit a given provider measures — runtime,
+// page count, hours to beat. Defined here rather than with the recommendation
+// filters that read it: the buckets belong to the catalog that interprets them.
+export type LengthBucket = 'short' | 'medium' | 'long'
+
 // Everything that genuinely differs between one media type's catalog and
 // another's. Anything NOT here is type-agnostic and already lives in
-// mediaCatalog.ts.
+// mediaItems.ts.
 export interface CatalogProvider {
   // Recorded as media_items.external_source, so ids from different providers
   // can never collide.
@@ -46,9 +50,9 @@ export interface CatalogProvider {
   // right for one of them: it read `runtimeMinutes` unconditionally, which is
   // null for books, so every book candidate was silently dropped and any book
   // run with a length filter returned nothing.
-  matchesLength(result: CatalogSearchResult, length: RecommendationLength): boolean
+  matchesLength(result: CatalogSearchResult, length: LengthBucket): boolean
   // Labels for that filter's options, so the form stops hardcoding minutes.
-  lengthOptions: { value: RecommendationLength; label: string }[]
+  lengthOptions: { value: LengthBucket; label: string }[]
 }
 
 // Keyed by MediaType. Note MediaType widens to `string` through the table row

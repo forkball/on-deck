@@ -1,6 +1,6 @@
 import type { Middleware } from 'remix/router'
 
-import { isMediaTypeEnabled, type ActiveMediaType } from '../utils/mediaTypes.ts'
+import { isMediaTypeEnabled, type ActiveMediaType } from '../mediaTypes.ts'
 
 // Refuses every route in a media type's group while that type is gated.
 //

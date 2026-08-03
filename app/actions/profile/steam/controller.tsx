@@ -3,12 +3,12 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { buildSteamLoginUrl, verifySteamCallback } from '../../../data/steam.ts'
+import { buildSteamLoginUrl, verifySteamCallback } from '../../../data/imports/steamApi.ts'
 import { users, type User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { requireEnabledMediaType } from '../../../middleware/gatedMediaType.ts'
 import { routes } from '../../../routes.ts'
-import { externalOrigin } from '../../../utils/requestOrigin.ts'
+import { externalOrigin } from './requestOrigin.ts'
 
 // Links a Steam account to the signed-in On Deck account. Not an app login —
 // the password auth is untouched; this only records which Steam account to

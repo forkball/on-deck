@@ -2,12 +2,12 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { UserMediaInteraction } from '../../data/schema.ts'
-import type { ActiveMediaType } from '../../utils/mediaTypes.ts'
+import type { ActiveMediaType } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
 import { Modal } from './modal.tsx'
 import { StarRatingInput } from './star-rating.tsx'
 import { StatusSelect } from './status-select.tsx'
-import { Field } from '../../assets/lib/field.tsx'
+import { Field } from '../../assets/ui/field.tsx'
 
 export interface MediaLogEditModalProps {
   interaction: UserMediaInteraction

@@ -10,13 +10,13 @@ import {
   listFollowers,
   listFollowingIds,
 } from '../../data/follows.ts'
-import { countUserMediaLog, listUserMediaLog } from '../../data/mediaCatalog.ts'
+import { countUserMediaLog, listUserMediaLog } from '../../data/mediaItems.ts'
 import { loadMediaSummaries } from '../../data/mediaSummary.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, updateUserBio } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType } from '../../utils/mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType } from '../../mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { ProfilePage } from './page.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'

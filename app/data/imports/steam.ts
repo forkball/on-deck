@@ -1,9 +1,9 @@
-import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from './catalog.ts'
-import { runBounded } from './csvImport.ts'
-import { IGDB_MAX_CONCURRENCY } from './igdb.ts'
-import type { Db } from './db.ts'
-import { logInteraction, type LogInteractionInput } from './mediaCatalog.ts'
-import { fetchSteamLibrary, type SteamGame } from './steam.ts'
+import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
+import { runBounded } from './csv.ts'
+import { IGDB_MAX_CONCURRENCY } from '../catalog/igdb.ts'
+import type { Db } from '../db.ts'
+import { logInteraction, type LogInteractionInput } from '../mediaItems.ts'
+import { fetchSteamLibrary, type SteamGame } from './steamApi.ts'
 
 export interface SteamImportResult {
   // Everything Steam returned, before filtering.

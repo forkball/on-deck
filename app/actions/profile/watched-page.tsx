@@ -1,14 +1,14 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { listUserMediaLog } from '../../data/mediaCatalog.ts'
+import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
-import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../utils/mediaTypes.ts'
+import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
 export interface ProfileWatchedPageProps {
   movieLog: Awaited<ReturnType<typeof listUserMediaLog>>

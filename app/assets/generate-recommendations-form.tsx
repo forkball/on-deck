@@ -1,7 +1,7 @@
 import { clientEntry, css, on } from 'remix/ui'
 
-import { Collapsible } from './lib/collapsible.tsx'
-import { Field } from './lib/field.tsx'
+import { Collapsible } from './ui/collapsible.tsx'
+import { Field } from './ui/field.tsx'
 
 export type FriendOption = {
   id: number
