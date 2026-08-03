@@ -6,7 +6,7 @@
     "dev": "NODE_ENV=development node --env-file-if-exists=.env --watch --import remix/node-tsx server.ts",
     "start": "NODE_ENV=production node --env-file-if-exists=.env --import remix/node-tsx server.ts",
     "test": "NODE_ENV=test node --env-file-if-exists=.env --import remix/node-tsx --test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && node --import remix/node-tsx scripts/check-browser-bundle.ts",
     "db:up": "docker compose up -d && docker compose exec -T postgres pg_isready -U ondeck -d ondeck",
     "db:down": "docker compose down",
     "db:migrate": "node --env-file-if-exists=.env --import remix/node-tsx db/migrate.ts up",
