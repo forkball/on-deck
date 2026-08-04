@@ -112,7 +112,7 @@ function LoggedList(
         </ul>
         {seeAllHref && total > log.length && (
           <p mix={css({ marginTop: '16px' })}>
-            <a href={seeAllHref}>See all {total} →</a>
+            <a href={seeAllHref}>See all →</a>
           </p>
         )}
       </>

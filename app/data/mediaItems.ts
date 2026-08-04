@@ -145,6 +145,21 @@ export async function rematchMediaItem(
 
 export type InteractionStatus = (typeof INTERACTION_STATUSES)[number]
 
+// Every status except the rejection: the three that describe engaging with
+// something, in one state or another. Derived rather than listed again, so a
+// status added later is included by default — only another kind of refusal
+// would need excluding here too.
+export const CONSUMPTION_STATUSES: readonly InteractionStatus[] = INTERACTION_STATUSES.filter(
+  (status) => status !== 'not_interested',
+)
+
+// One row of a user's log: the interaction, plus the item it points at when
+// that row still resolves to one.
+export interface UserLogEntry {
+  interaction: UserMediaInteraction
+  item: MediaItem | null
+}
+
 export interface LogInteractionInput {
   status: InteractionStatus
   rating: number | null
@@ -260,7 +275,7 @@ export async function getUserInteractionForItem(db: Db, userId: number, mediaIte
 //
 // The type filter stays in JS because userMediaInteractions has no `type`
 // column — it lives on the joined media_items row.
-export async function loadUserLogEntries(db: Db, userId: number) {
+export async function loadUserLogEntries(db: Db, userId: number): Promise<UserLogEntry[]> {
   const interactions = await db.findMany(userMediaInteractions, {
     where: { user_id: userId },
     orderBy: ['updated_at', 'desc'],
@@ -278,22 +293,44 @@ export async function loadUserLogEntries(db: Db, userId: number) {
   }))
 }
 
+// What a caller wants out of the log. Both fields stay in JS rather than
+// becoming a where-clause: `type` has to (see loadUserLogEntries), and keeping
+// `statuses` next to it means one predicate answers for the list and the count
+// alike, which is what keeps a page's rows and its pagination in agreement.
+export interface UserLogFilter {
+  type?: MediaType
+  // Which statuses to include. All of them when unset — the callers that pass
+  // CONSUMPTION_STATUSES are the ones presenting the log as "what I've
+  // engaged with", where a rejection doesn't belong.
+  statuses?: readonly InteractionStatus[]
+}
+
+export function matchesLogFilter(entry: UserLogEntry, filter: UserLogFilter): boolean {
+  if (filter.type && entry.item?.type !== filter.type) return false
+  if (filter.statuses && !filter.statuses.includes(entry.interaction.status)) return false
+  return true
+}
+
 export async function listUserMediaLog(
   db: Db,
   userId: number,
-  options: { limit?: number; offset?: number; type?: MediaType } = {},
+  options: UserLogFilter & { limit?: number; offset?: number } = {},
 ) {
   const entries = await loadUserLogEntries(db, userId)
-  const filtered = options.type ? entries.filter(({ item }) => item?.type === options.type) : entries
+  const filtered = entries.filter((entry) => matchesLogFilter(entry, options))
 
   const start = options.offset ?? 0
   const end = options.limit != null ? start + options.limit : undefined
   return filtered.slice(start, end)
 }
 
-export async function countUserMediaLog(db: Db, userId: number, type?: MediaType): Promise<number> {
-  if (!type) return db.count(userMediaInteractions, { where: { user_id: userId } })
+export async function countUserMediaLog(db: Db, userId: number, filter: UserLogFilter = {}): Promise<number> {
+  // An unfiltered count is the one the database can answer on its own — every
+  // other shape needs the joined item row or a partitioned pass anyway.
+  if (!filter.type && !filter.statuses) {
+    return db.count(userMediaInteractions, { where: { user_id: userId } })
+  }
 
   const entries = await loadUserLogEntries(db, userId)
-  return entries.filter(({ item }) => item?.type === type).length
+  return entries.filter((entry) => matchesLogFilter(entry, filter)).length
 }

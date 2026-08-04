@@ -16,7 +16,7 @@ import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, updateUserBio } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType } from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType, parseInteractionStatus } from '../../mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { ProfilePage } from './page.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
@@ -72,17 +72,26 @@ export default createController(routes.profile, {
       const db = context.get(Database)
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
       const mediaType = parseEnabledMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
-      const totalWatched = await countUserMediaLog(db, auth.identity.id, mediaType)
+      // Unlike the profile page, this one shows every status — it's the full
+      // log, including what you've declined, which is the only place you can
+      // find those again to undo them. Null means no filter.
+      const status = parseInteractionStatus(context.url.searchParams.get('status'))
+      const filter = { type: mediaType, statuses: status ? [status] : undefined }
+
+      // Counted through the same filter, or the last page of a filtered list
+      // pages past its own end.
+      const totalWatched = await countUserMediaLog(db, auth.identity.id, filter)
       const movieLog = await listUserMediaLog(db, auth.identity.id, {
+        ...filter,
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
-        type: mediaType,
       })
 
       return context.render(
         <ProfileWatchedPage
           movieLog={movieLog}
           mediaType={mediaType}
+          status={status}
           page={page}
           totalPages={Math.max(1, Math.ceil(totalWatched / PAGE_SIZE))}
           displayName={displayLabel(auth.identity)}

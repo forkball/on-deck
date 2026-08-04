@@ -1,5 +1,5 @@
 import type { Db } from './db.ts'
-import { loadUserLogEntries, type listUserMediaLog } from './mediaItems.ts'
+import { CONSUMPTION_STATUSES, loadUserLogEntries, matchesLogFilter, type listUserMediaLog } from './mediaItems.ts'
 import { getTasteProfile } from './recommendations/tasteProfile.ts'
 import { ACTIVE_MEDIA_TYPES, type ActiveMediaType } from '../mediaTypes.ts'
 
@@ -26,7 +26,13 @@ export async function loadMediaSummaries(db: Db, userId: number, recentCount: nu
   ])
 
   const entries = ACTIVE_MEDIA_TYPES.map((type, index) => {
-    const forType = logEntries.filter(({ item }) => item?.type === type)
+    // Declined items are left out of both the list and the count: this feeds
+    // the "What I've watched" sections, and a rejection isn't something you've
+    // watched. They're still browsable in full at /profile/watched, and they
+    // still reach the taste profile, which reads the log directly.
+    const forType = logEntries.filter((entry) =>
+      matchesLogFilter(entry, { type, statuses: CONSUMPTION_STATUSES }),
+    )
     return [
       type,
       {

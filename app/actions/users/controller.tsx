@@ -4,7 +4,7 @@ import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import type { Db } from '../../data/db.ts'
-import { countUserMediaLog, listUserMediaLog } from '../../data/mediaItems.ts'
+import { CONSUMPTION_STATUSES, countUserMediaLog, listUserMediaLog } from '../../data/mediaItems.ts'
 import {
   countFollowers,
   countFollowing,
@@ -121,11 +121,14 @@ export default createController(routes.users, {
 
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
       const mediaType = parseEnabledMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
-      const totalWatched = await countUserMediaLog(db, userId, mediaType)
+      // Someone else's log, so no status filter and no declined items — what
+      // they turned down is a note to themselves, not something to browse.
+      const filter = { type: mediaType, statuses: CONSUMPTION_STATUSES }
+      const totalWatched = await countUserMediaLog(db, userId, filter)
       const movieLog = await listUserMediaLog(db, userId, {
+        ...filter,
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
-        type: mediaType,
       })
 
       return context.render(

@@ -1,4 +1,5 @@
-import type { LogInteractionInput, MediaType } from './data/mediaItems.ts'
+import type { InteractionStatus, MediaType } from './data/mediaItems.ts'
+import { INTERACTION_STATUSES } from './data/schema.ts'
 import { routes } from './routes.ts'
 
 // The types wired up end to end. Adding one here makes the `satisfies` below
@@ -240,7 +241,13 @@ export function isActiveMediaType(type: MediaType): type is ActiveMediaType {
   return parseMediaType(type) !== null
 }
 
-export type InteractionStatus = LogInteractionInput['status']
+export type { InteractionStatus }
+
+// Narrows an untrusted string, like parseMediaType. Null rather than a
+// default, and every caller so far reads that as "no status filter".
+export function parseInteractionStatus(value: unknown): InteractionStatus | null {
+  return INTERACTION_STATUSES.includes(value as InteractionStatus) ? (value as InteractionStatus) : null
+}
 
 // Same four statuses everywhere; only the verbs differ, and they live on the
 // registry above so adding a type doesn't mean editing a second table.

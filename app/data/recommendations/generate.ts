@@ -4,7 +4,7 @@ import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
 import type { Db } from '../db.ts'
 import { isFollowing } from '../follows.ts'
-import { countUserMediaLog, type MediaType } from '../mediaItems.ts'
+import { countUserMediaLog, CONSUMPTION_STATUSES, type MediaType } from '../mediaItems.ts'
 import { createNotification } from '../notifications.ts'
 import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
@@ -72,7 +72,12 @@ export async function findMembersMissingSourceLogs(
     memberUserIds.map(async (memberId) => {
       const [user, counts] = await Promise.all([
         db.find(users, memberId),
-        Promise.all(sourceTypes.map((type) => countUserMediaLog(db, memberId, type))),
+        // Rejections don't count: a member whose log for a type is nothing but
+        // "not interested" has given the profile nothing to work from, which
+        // is exactly the case this check exists to catch.
+        Promise.all(
+          sourceTypes.map((type) => countUserMediaLog(db, memberId, { type, statuses: CONSUMPTION_STATUSES })),
+        ),
       ])
       return {
         userId: memberId,
