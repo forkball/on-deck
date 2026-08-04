@@ -35,6 +35,17 @@ export function toTasteSummary(profile: {
   return { summary: profile.summary, liked_tags: profile.liked_tags, disliked_tags: profile.disliked_tags }
 }
 
+// Titles the model is told to stay off, split by why. Both are enforced by id
+// after the fact (see generate.ts); this split exists because rejection is a
+// taste signal and having seen something isn't, so they can't be phrased the
+// same way in the prompt.
+export interface ExcludedTitles {
+  // Already consumed.
+  seen: string[]
+  // Logged as "not interested".
+  rejected: string[]
+}
+
 // All hard-filter the final picks, not just hint the prompt. Genre and decade
 // come free off the search results already fetched; length needs an extra
 // per-candidate lookup, so it only happens when that lever is set.
@@ -80,7 +91,7 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string): 
 
 export async function requestPicks(
   profiles: MemberProfile[] | MultiSourceMemberProfile[],
-  excludedTitles: string[],
+  excluded: ExcludedTitles,
   filters: RecommendationFilters = {},
   mediaType: MediaType = 'movie',
   sourceTypes: MediaType[] = ['movie'],
@@ -128,7 +139,16 @@ export async function requestPicks(
       {
         role: 'user',
         content:
-          prompt + `\n\nThey've already seen (do not suggest any of these): ${JSON.stringify(excludedTitles)}`,
+          prompt +
+          `\n\nThey've already seen (do not suggest any of these): ${JSON.stringify(excluded.seen)}` +
+          // Worth its own paragraph rather than being folded into the list
+          // above: a rejection is the one negative signal that came from the
+          // person rather than being inferred, so it should shape the
+          // neighbouring picks too, not just remove these titles.
+          (excluded.rejected.length > 0
+            ? `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
+              `as a signal about what to steer away from more broadly: ${JSON.stringify(excluded.rejected)}`
+            : ''),
       },
     ],
   })

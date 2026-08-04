@@ -3,7 +3,13 @@ import { and, eq, inList } from 'remix/data-table'
 import { parseMediaMetadata, type MediaMetadata } from './mediaMetadata.ts'
 
 import type { Db } from './db.ts'
-import { mediaItems, userMediaInteractions, type MediaItem, type UserMediaInteraction } from './schema.ts'
+import {
+  INTERACTION_STATUSES,
+  mediaItems,
+  userMediaInteractions,
+  type MediaItem,
+  type UserMediaInteraction,
+} from './schema.ts'
 import type { TmdbSearchResult } from './catalog/tmdb.ts'
 
 export type MediaType = MediaItem['type']
@@ -137,8 +143,10 @@ export async function rematchMediaItem(
   return { ok: true, item, merged: false }
 }
 
+export type InteractionStatus = (typeof INTERACTION_STATUSES)[number]
+
 export interface LogInteractionInput {
-  status: 'want_to_consume' | 'in_progress' | 'consumed'
+  status: InteractionStatus
   rating: number | null
   notes: string | null
   // Overrides the consumed_at timestamp instead of stamping "now" — used by

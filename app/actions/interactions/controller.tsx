@@ -5,24 +5,13 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import {
-  deleteInteraction,
-  parseRatingInput,
-  updateInteraction,
-  type LogInteractionInput,
-} from '../../data/mediaItems.ts'
+import { deleteInteraction, parseRatingInput, updateInteraction } from '../../data/mediaItems.ts'
 import { requireAuth } from '../../middleware/auth.ts'
-import type { User } from '../../data/schema.ts'
+import { INTERACTION_STATUSES, type User } from '../../data/schema.ts'
 import { routes } from '../../routes.ts'
 
 const updateSchema = f.object({
-  status: f.field(
-    s.union([
-      s.literal('want_to_consume'),
-      s.literal('in_progress'),
-      s.literal('consumed'),
-    ]),
-  ),
+  status: f.field(s.enum_(INTERACTION_STATUSES)),
   rating: f.field(s.defaulted(s.string(), '')),
   notes: f.field(s.defaulted(s.string(), '')),
   return_to: f.field(s.defaulted(s.string(), '')),
@@ -45,7 +34,7 @@ export default createController(routes.interactions, {
 
       const db = context.get(Database)
       const updated = await updateInteraction(db, interactionId, auth.identity.id, {
-        status: parsed.value.status as LogInteractionInput['status'],
+        status: parsed.value.status,
         rating: parseRatingInput(parsed.value.rating),
         notes: parsed.value.notes || null,
       })

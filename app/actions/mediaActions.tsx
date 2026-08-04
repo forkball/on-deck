@@ -12,9 +12,8 @@ import {
   getUserInteractionsForItems,
   logInteraction,
   parseRatingInput,
-  type LogInteractionInput,
 } from '../data/mediaItems.ts'
-import type { User } from '../data/schema.ts'
+import { INTERACTION_STATUSES, type User } from '../data/schema.ts'
 import { displayLabel } from '../data/users.ts'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../mediaTypes.ts'
 import { parseMediaMetadata } from '../data/mediaMetadata.ts'
@@ -29,7 +28,7 @@ const SEARCH_INITIAL_VISIBLE = 10
 
 
 const logSchema = f.object({
-  status: f.field(s.union([s.literal('want_to_consume'), s.literal('in_progress'), s.literal('consumed')])),
+  status: f.field(s.enum_(INTERACTION_STATUSES)),
   rating: f.field(s.defaulted(s.string(), '')),
   notes: f.field(s.defaulted(s.string(), '')),
   return_to: f.field(s.defaulted(s.string(), '')),
@@ -211,9 +210,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
 
       const db: Db = context.get(Database)
       await logInteraction(db, identity.id, mediaItemId, {
-        // The schema union widens to string, so the parse already validated
-        // this even though the type says otherwise.
-        status: parsed.value.status as LogInteractionInput['status'],
+        status: parsed.value.status,
         rating,
         notes: parsed.value.notes || null,
       })

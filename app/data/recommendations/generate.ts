@@ -23,6 +23,7 @@ import {
 import {
   requestPicks,
   toTasteSummary,
+  type ExcludedTitles,
   type MemberProfile,
   type MultiSourceMemberProfile,
   type Pick,
@@ -132,13 +133,25 @@ export async function generateRecommendations(
           ),
         }))
 
-  const excludedTitles: string[] = []
+  // Two reasons not to suggest something, kept apart because only one of them
+  // says anything about taste. The id set is what actually enforces both — the
+  // title lists are a prompt hint, and the model is free to ignore them.
+  const excluded: ExcludedTitles = { seen: [], rejected: [] }
   const excludedExternalIds = new Set<string>()
   for (const { regenerated } of members) {
     for (const profile of regenerated) {
       for (const { interaction, item } of profile.log) {
-        if (interaction.status !== 'consumed') continue
-        if (item?.title) excludedTitles.push(item.title)
+        const titles =
+          interaction.status === 'consumed'
+            ? excluded.seen
+            : interaction.status === 'not_interested'
+              ? excluded.rejected
+              : null
+        // Wanting something, or being partway through it, is no reason to
+        // withhold it — only the two statuses that are finished with it, one
+        // way or the other, exclude anything.
+        if (!titles) continue
+        if (item?.title) titles.push(item.title)
         if (item?.external_id) excludedExternalIds.add(item.external_id)
       }
     }
@@ -150,7 +163,7 @@ export async function generateRecommendations(
     picks = checkpoint.picks
   } else {
     onPhase('picks')
-    picks = await requestPicks(profiles, excludedTitles, filters, mediaType, profileTypes)
+    picks = await requestPicks(profiles, excluded, filters, mediaType, profileTypes)
     checkpoint = { ...checkpoint, picks }
     onCheckpoint(checkpoint)
   }

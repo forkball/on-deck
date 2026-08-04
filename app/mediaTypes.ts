@@ -242,14 +242,20 @@ export function isActiveMediaType(type: MediaType): type is ActiveMediaType {
 
 export type InteractionStatus = LogInteractionInput['status']
 
-// Same three statuses everywhere; only the verbs differ, and they live on the
+// Same four statuses everywhere; only the verbs differ, and they live on the
 // registry above so adding a type doesn't mean editing a second table.
+//
+// "Not interested" takes no verb — you decline a book the same way you decline
+// a film — so it isn't in StatusVerbs. Last, because it's the odd one out:
+// the three before it are stages of consuming something, and this is a refusal
+// to. See INTERACTION_STATUSES.
 export function statusOptionsFor(mediaType: ActiveMediaType): { value: InteractionStatus; label: string }[] {
   const verbs = MEDIA_TYPE_UI[mediaType].statusVerbs
   return [
     { value: 'want_to_consume', label: verbs.want },
     { value: 'in_progress', label: verbs.inProgress },
     { value: 'consumed', label: verbs.done },
+    { value: 'not_interested', label: 'Not interested' },
   ]
 }
 

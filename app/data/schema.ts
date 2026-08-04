@@ -34,13 +34,22 @@ export const mediaItems = table({
   },
 })
 
+// Every status a log row can hold, in the order the picker offers them. Shared
+// so the form parsers and the status picker can't drift from the column: a
+// value added in only one of them fails at the database instead of the form.
+//
+// `not_interested` is a rejection rather than a stage of consuming something —
+// nothing is ever read, played or watched under it. It exists so the
+// recommendation pipeline has a way to be told "stop suggesting this".
+export const INTERACTION_STATUSES = ['want_to_consume', 'in_progress', 'consumed', 'not_interested'] as const
+
 export const userMediaInteractions = table({
   name: 'user_media_interactions',
   columns: {
     id: c.integer().primaryKey().autoIncrement(),
     user_id: c.integer().notNull().references('users', 'id'),
     media_item_id: c.integer().notNull().references('media_items', 'id'),
-    status: c.enum(['want_to_consume', 'in_progress', 'consumed']).notNull(),
+    status: c.enum(INTERACTION_STATUSES).notNull(),
     rating: c.decimal(3, 1),
     notes: c.text(),
     consumed_at: c.integer(),

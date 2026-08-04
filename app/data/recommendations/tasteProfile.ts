@@ -102,7 +102,8 @@ export async function regenerateTasteProfile(
           `Write a short (2-4 sentence) natural-language summary of their taste, grounded only ` +
           `in what's above — no invented facts. Also derive liked_tags and disliked_tags: short, ` +
           `lowercase genre/mood/style tags (e.g. "slow-burn", "dystopian", "feel-good") inferred ` +
-          `from what they rated highly vs. poorly.`,
+          `from what they rated highly vs. poorly. A "not_interested" status is one they turned ` +
+          `down without trying — a dislike signal in its own right, carrying no rating.`,
       },
     ],
   })
