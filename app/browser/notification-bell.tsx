@@ -53,14 +53,29 @@ export const NotificationBell = clientEntry<NotificationBellProps>(
               textDecoration: 'none',
             }),
             ref((node, signal) => {
-              fetch(countHref, { signal })
-                .then((response) => (response.ok ? response.json() : { count: 0 }))
-                .then((data: { count: number }) => {
-                  count = data.count
-                  loaded = true
-                  handle.update()
-                })
-                .catch(() => {})
+              const refresh = () => {
+                fetch(countHref, { signal })
+                  .then((response) => (response.ok ? response.json() : { count: 0 }))
+                  .then((data: { count: number }) => {
+                    count = data.count
+                    loaded = true
+                    handle.update()
+                  })
+                  .catch(() => {})
+              }
+
+              refresh()
+
+              // Bfcache restores (e.g. hitting Back after reading a notification) bring
+              // the old DOM back without re-running this ref, so the badge would
+              // otherwise keep showing a stale count until a hard reload.
+              window.addEventListener(
+                'pageshow',
+                (event) => {
+                  if (event.persisted) refresh()
+                },
+                { signal },
+              )
             }),
           ]}
         >
