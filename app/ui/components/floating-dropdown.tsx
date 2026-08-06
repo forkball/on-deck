@@ -1,6 +1,8 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import { FloatingDropdownCloser } from '../../browser/floating-dropdown-closer.tsx'
+
 // Native <details>/<summary>, so many can exist independently on one page —
 // one per search result row.
 export function FloatingDropdown(
@@ -45,6 +47,7 @@ export function FloatingDropdown(
         >
           {children}
         </div>
+        <FloatingDropdownCloser />
       </details>
     )
   }
