@@ -198,7 +198,10 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
   // a separate table the caller had no other way to reach. They ride in the
   // item's own metadata now, so the row is the whole result.
   const imported = await Promise.all(
-    results.map((result) => upsertMediaItem(db, type, result, provider.sourceName)),
+    // sourceOverride wins when set — a fallback hit (Google Books down,
+    // served from Open Library instead) carries an id that belongs to a
+    // different provider than the one registered for this type.
+    results.map((result) => upsertMediaItem(db, type, result, result.sourceOverride ?? provider.sourceName)),
   )
 
   searchCache.set(key, { storedAt: Date.now(), results: imported })

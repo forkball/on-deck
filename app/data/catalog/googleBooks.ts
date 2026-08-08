@@ -1,4 +1,5 @@
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
+import { searchBooks as searchOpenLibraryBooks } from './openLibrary.ts'
 
 const GOOGLE_BOOKS_BASE = 'https://www.googleapis.com/books/v1'
 
@@ -135,7 +136,7 @@ async function fetchWithRetry(url: URL): Promise<Response> {
 
 const SEARCH_MAX_RESULTS = 20
 
-export async function searchBooks(query: string): Promise<CatalogSearchResult[]> {
+async function searchGoogleBooksOnly(query: string): Promise<CatalogSearchResult[]> {
   const apiKey = requireApiKey()
 
   const url = new URL(`${GOOGLE_BOOKS_BASE}/volumes`)
@@ -150,6 +151,21 @@ export async function searchBooks(query: string): Promise<CatalogSearchResult[]>
 
   const data = (await response.json()) as GoogleBooksSearchResponse
   return (data.items ?? []).map(toResult)
+}
+
+// Search only — not getBookById, which a fallback can't help anyway: a
+// Google-Books-shaped id means nothing to Open Library, so there's no id to
+// hand it. Search has no such constraint, and it's the path an outage
+// actually breaks for a user (typing into the search/autosuggest box), so
+// this is where resilience earns its keep.
+export async function searchBooks(query: string): Promise<CatalogSearchResult[]> {
+  try {
+    return await searchGoogleBooksOnly(query)
+  } catch (error) {
+    console.error('Google Books search failed, falling back to Open Library:', error)
+    const fallback = await searchOpenLibraryBooks(query)
+    return fallback.map((result) => ({ ...result, sourceOverride: 'openlibrary' }))
+  }
 }
 
 export async function getBookById(externalId: string): Promise<CatalogSearchResult | null> {

@@ -70,6 +70,12 @@ export interface TmdbSearchResult {
   images?: string[] | null
   // Games only.
   platforms?: string[] | null
+  // Set only when a result's actual provenance differs from the provider
+  // that produced it — currently just Google Books falling back to Open
+  // Library on outage. searchAndImport uses this in place of the provider's
+  // own sourceName when present, so a fallback hit isn't mistagged with an
+  // id format that belongs to the primary provider instead.
+  sourceOverride?: string
 }
 
 interface TmdbSearchResponse {
