@@ -1,7 +1,7 @@
 import type { Db } from '../db.ts'
 import { upsertMediaItem, rematchMediaItem, type MediaType, type RematchMediaItemResult } from '../mediaItems.ts'
 import type { MediaItem } from '../schema.ts'
-import { BOOK_GENRES, getBookById, parseOpenLibraryId, searchBooks } from './openLibrary.ts'
+import { BOOK_GENRES, getBookById, parseGoogleBooksId, searchBooks } from './googleBooks.ts'
 import { GAME_GENRES, getGameById, parseIgdbId, searchGames } from './igdb.ts'
 import {
   getMovieById,
@@ -74,13 +74,13 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
 
   },
   book: {
-    sourceName: 'openlibrary',
+    sourceName: 'google-books',
     search: searchBooks,
     getById: getBookById,
     genres: BOOK_GENRES,
-    parseExternalId: parseOpenLibraryId,
-    matchHint: 'Paste an Open Library link or work id.',
-    lookupFailedError: "Couldn't find that on Open Library — check the link.",
+    parseExternalId: parseGoogleBooksId,
+    matchHint: 'Paste a Google Books link or volume id.',
+    lookupFailedError: "Couldn't find that on Google Books — check the link.",
     matchesLength: (result, length) => {
       const pages = result.pageCount
       if (pages == null) return false

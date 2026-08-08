@@ -82,12 +82,6 @@ interface OpenLibrarySearchResponse {
   docs: OpenLibraryDoc[]
 }
 
-// The works endpoint returns `description` either as a bare string or as a
-// { type, value } object, depending on the record's vintage.
-interface OpenLibraryWork {
-  description?: string | { value?: string }
-}
-
 // Work keys come back as "/works/OL123W"; stripped so external_id stays a
 // bare token like every other provider's.
 function toExternalId(key: string): string {
@@ -175,52 +169,6 @@ async function searchOpenLibrary(query: string, limit: number): Promise<OpenLibr
   return data.docs ?? []
 }
 
-// Descriptions are wiki-editable, so they collect SEO spam, trailing markdown
-// link-reference blocks, and raw markdown that has no renderer here.
-const PROMO_LABEL = /\b(pdf|epub|mobi|download|read online|free read)\b/i
-
-function cleanDescription(raw: string): string {
-  let text = raw.replace(/\r\n/g, '\n')
-
-  // Trailing "[1]: https://…" reference definitions — common on classics
-  // whose descriptions link sibling volumes.
-  text = text.replace(/^[ \t]*\[[^\]]+\]:\s*\S+.*$/gm, '')
-
-  // Drop download promos, keep the visible text of other links. The label
-  // pattern allows one level of nesting — labels like "The Lord of the Rings
-  // [3/9]" are common, and a plain [^\]]* would leave the URL behind.
-  text = text.replace(/\[((?:[^[\]]|\[[^\]]*\])*)\]\(\s*https?:[^)]*\)/g, (_match, label: string) =>
-    PROMO_LABEL.test(label) ? '' : label,
-  )
-
-  // No markdown renderer on the detail page, so these would render literally.
-  text = text.replace(/\*\*|__/g, '')
-  text = text.replace(/\*([^*\n]+)\*/g, '$1')
-
-  // A bare promo left dangling after the above, e.g. "… world. Stoner pdf".
-  text = text.replace(/([.!?]\s*)[^.!?\n]{0,60}\b(pdf|epub|mobi)\b[\s.]*$/i, '$1')
-
-  // Horizontal rules and the blank-line runs left by the deletions above.
-  text = text.replace(/^\s*[-_*]{3,}\s*$/gm, '')
-  return text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
-}
-
-// The search index carries no description at all — only the per-work record
-// does. Fetched separately so a single lookup can fill it in, exactly as
-// tmdb.ts leaves runtimeMinutes null on search and populates it on detail.
-export async function getWorkDescription(externalId: string): Promise<string | null> {
-  const key = toExternalId(externalId)
-  if (!/^OL\d+W$/i.test(key)) return null
-
-  const response = await fetchWithRetry(new URL(`${OPEN_LIBRARY_BASE}/works/${key}.json`))
-  if (!response.ok) return null
-
-  const work = (await response.json()) as OpenLibraryWork
-  const description = typeof work.description === 'string' ? work.description : work.description?.value
-  const cleaned = description ? cleanDescription(description) : ''
-  return cleaned || null
-}
-
 // Deliberately keeps Open Library's own relevance ordering. Sorting by
 // readership instead destroys it outright — `sort=readinglog` on a search for
 // "project hail mary" returns Romeo and Juliet.
@@ -266,34 +214,4 @@ export async function getBooksByIsbns(isbns: string[]): Promise<Map<string, Cata
 
 export function normalizeIsbn(value: string): string {
   return value.replace(/[^0-9Xx]/g, '').toUpperCase()
-}
-
-// Accepts a work key (bare "OL123W" or the full "/works/OL123W" path) or an
-// ISBN — the latter matters for the Goodreads importer, whose CSV carries
-// ISBN13 and so can resolve exactly instead of guessing from a title.
-export async function getBookById(externalId: string): Promise<CatalogSearchResult | null> {
-  const trimmed = externalId.trim()
-  if (!trimmed) return null
-
-  const query = /^\d{10}(\d{3})?$/.test(trimmed.replace(/-/g, ''))
-    ? `isbn:${trimmed.replace(/-/g, '')}`
-    : `key:/works/${toExternalId(trimmed)}`
-
-  const docs = await searchOpenLibrary(query, 1)
-  if (docs.length === 0) return null
-
-  const result = toResult(docs[0])
-  // A by-id lookup is a single item, so the extra round trip for the
-  // description is worth it here (unlike search, which would pay it per hit).
-  return { ...result, overview: await getWorkDescription(result.externalId) }
-}
-
-// Open Library book pages are openlibrary.org/works/OL123W — accepted here so
-// the "wrong book?" form can take a pasted URL, same as the TMDB one does.
-export function parseOpenLibraryId(input: string): string | null {
-  const trimmed = input.trim()
-  if (/^OL\d+W$/i.test(trimmed)) return trimmed.toUpperCase()
-
-  const match = trimmed.match(/openlibrary\.org\/works\/(OL\d+W)/i)
-  return match ? match[1].toUpperCase() : null
 }

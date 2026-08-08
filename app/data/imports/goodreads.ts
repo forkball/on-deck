@@ -1,8 +1,15 @@
-import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
+import type { CatalogSearchResult } from '../catalog/provider.ts'
 import { cleanCell, headerIndex, parseCsv, runBounded } from './csv.ts'
 import type { Db } from '../db.ts'
-import { logInteraction, type LogInteractionInput } from '../mediaItems.ts'
-import { getBooksByIsbns, normalizeIsbn } from '../catalog/openLibrary.ts'
+import { logInteraction, upsertMediaItem, type LogInteractionInput } from '../mediaItems.ts'
+import { getBooksByIsbns, normalizeIsbn, searchBooks } from '../catalog/openLibrary.ts'
+
+// Pinned to Open Library rather than routed through the book provider
+// registry (which is Google Books): the ISBN batch resolution below only
+// Open Library supports, so the whole import stays on one provider rather
+// than mixing sources — and tagging a row 'google-books' with an Open
+// Library-shaped id would break any later rematch against it.
+const SOURCE = 'openlibrary'
 
 export interface GoodreadsImportResult {
   totalRows: number
@@ -76,7 +83,7 @@ export async function importGoodreadsLibrary(
   })
 
   await runBounded(resolved, CONCURRENCY, async ({ row, match }) => {
-    const item = await upsertCatalogItem(db, 'book', match)
+    const item = await upsertMediaItem(db, 'book', match, SOURCE)
     await logInteraction(db, userId, item.id, {
       status: row.status,
       rating: row.rating,
@@ -92,7 +99,7 @@ export async function importGoodreadsLibrary(
 
 async function matchByTitle(title: string, author: string): Promise<CatalogSearchResult | null> {
   const query = author ? `${title} ${author}` : title
-  const matches = await getCatalogProvider('book').search(query)
+  const matches = await searchBooks(query)
   return matches[0] ?? null
 }
 

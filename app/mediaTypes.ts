@@ -169,14 +169,12 @@ export const MEDIA_TYPE_UI = {
     attributive: 'book',
     entryNoun: 'book',
     itemNoun: 'book',
-    catalogName: 'Open Library',
-    rematchPlaceholder: 'Paste an openlibrary.org link or work id',
-    // Open Library honours a year only as a field filter: "stoner 1965" returns
-    // Hamlet, "stoner first_publish_year:1965" returns the right editions.
+    catalogName: 'Google Books',
+    rematchPlaceholder: 'Paste a Google Books link or volume id',
+    // Folded into the query text, same as every other catalog's search page —
+    // Google Books' web search has no dedicated year filter either.
     catalogSearchUrl: (title, year) =>
-      `https://openlibrary.org/search?q=${encodeURIComponent(
-        year ? `${title} first_publish_year:${year}` : title,
-      )}`,
+      `https://books.google.com/books?q=${encodeURIComponent(year ? `${title} ${year}` : title)}`,
     searchPlaceholder: 'Search for a book…',
     searchHeading: 'Search books',
     statusVerbs: READ_VERBS,
