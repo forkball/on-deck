@@ -15,7 +15,9 @@ import { SignupPage } from './page.tsx'
 const signupSchema = f.object({
   email: f.field(s.string().pipe(email())),
   password: f.field(s.string().pipe(minLength(8))),
-  display_name: f.field(s.defaulted(s.string(), '')),
+  // Doubles as a login handle (see auth/login/controller.tsx), so it has to
+  // be non-empty and unique like email.
+  display_name: f.field(s.string().pipe(minLength(1))),
 })
 
 export default createController(routes.auth.signup, {
@@ -30,7 +32,7 @@ export default createController(routes.auth.signup, {
       if (!parsed.success) {
         return context.render(
           <SignupPage
-            error="Please enter a valid email and a password of at least 8 characters."
+            error="Please enter a valid email, a username, and a password of at least 8 characters."
             values={Object.fromEntries(formData) as Record<string, string>}
           />,
           { status: 400 },
@@ -49,13 +51,24 @@ export default createController(routes.auth.signup, {
         )
       }
 
+      const existingByName = await db.findOne(users, { where: { display_name: parsed.value.display_name } })
+      if (existingByName) {
+        return context.render(
+          <SignupPage
+            error="That username is already taken."
+            values={Object.fromEntries(formData) as Record<string, string>}
+          />,
+          { status: 409 },
+        )
+      }
+
       const passwordHash = await hashPassword(parsed.value.password)
       const user = await db.create(
         users,
         {
           email: parsed.value.email,
           password_hash: passwordHash,
-          display_name: parsed.value.display_name || undefined,
+          display_name: parsed.value.display_name,
           created_at: Date.now(),
         },
         { returnRow: true },

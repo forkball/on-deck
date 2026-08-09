@@ -1,6 +1,7 @@
 import { completeAuth, createCredentialsAuthProvider, verifyCredentials } from 'remix/auth'
 import * as s from 'remix/data-schema'
 import * as f from 'remix/data-schema/form-data'
+import { eq, or } from 'remix/data-table'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
@@ -12,17 +13,19 @@ import { verifyPassword } from '../password.ts'
 import { LoginPage } from './page.tsx'
 
 const loginSchema = f.object({
-  email: f.field(s.defaulted(s.string(), '')),
+  identifier: f.field(s.defaulted(s.string(), '')),
   password: f.field(s.defaulted(s.string(), '')),
 })
 
-const passwordProvider = createCredentialsAuthProvider<{ email: string; password: string }, User>({
+const passwordProvider = createCredentialsAuthProvider<{ identifier: string; password: string }, User>({
   parse(context) {
     const formData = context.get(FormData)
     return s.parse(loginSchema, formData)
   },
-  async verify({ email, password }) {
-    const user = await db.findOne(users, { where: { email } })
+  // `identifier` matches either handle — email and display_name can never
+  // collide since both are unique, so at most one row matches.
+  async verify({ identifier, password }) {
+    const user = await db.findOne(users, { where: or(eq('email', identifier), eq('display_name', identifier)) })
     if (!user || !(await verifyPassword(password, user.password_hash))) {
       return null
     }
@@ -47,7 +50,7 @@ export default createController(routes.auth.login, {
       const user = await verifyCredentials(passwordProvider, context)
 
       if (user == null) {
-        return context.render(<LoginPage error="Invalid email or password." />, { status: 401 })
+        return context.render(<LoginPage error="Invalid email/username or password." />, { status: 401 })
       }
 
       const session = completeAuth(context)

@@ -22,8 +22,8 @@ export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
             mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
           >
             {next && <input type="hidden" name="return_to" value={next} />}
-            <Field label="Email">
-              <input type="email" name="email" required />
+            <Field label="Email or username">
+              <input type="text" name="identifier" required />
             </Field>
             <Field label="Password">
               <input type="password" name="password" required />

@@ -7,7 +7,8 @@ export const users = table({
     id: c.integer().primaryKey().autoIncrement(),
     email: c.text().notNull().unique(),
     password_hash: c.text().notNull(),
-    display_name: c.text(),
+    // Doubles as the login handle alongside email — see auth/login/controller.tsx.
+    display_name: c.text().notNull().unique(),
     // User-authored. Deliberately never fed into taste profiles — only the log
     // drives those.
     bio: c.text(),

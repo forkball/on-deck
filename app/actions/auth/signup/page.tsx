@@ -32,8 +32,8 @@ export function SignupPage(handle: Handle<SignupPageProps>) {
             <Field label="Password (min 8 characters)">
               <input type="password" name="password" required minLength={8} />
             </Field>
-            <Field label="Display name (optional)">
-              <input type="text" name="display_name" defaultValue={values?.display_name ?? ''} />
+            <Field label="Username">
+              <input type="text" name="display_name" required defaultValue={values?.display_name ?? ''} />
             </Field>
             <button type="submit">Create account</button>
           </form>
