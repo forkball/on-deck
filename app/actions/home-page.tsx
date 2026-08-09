@@ -24,8 +24,7 @@ export function HomePage(
           <h1>On Deck</h1>
           <p>
             A media taste profile for you (and your group) — movies, TV, books,
-            and games — with a Claude-powered recommender that knows what
-            you actually like.
+            and games — with a recommender that knows what you actually like.
           </p>
           {authed ? (
             <p>
@@ -36,11 +35,24 @@ export function HomePage(
               .
             </p>
           ) : (
-            <p>
-              <a href={routes.auth.signup.index.href()}>Sign up</a> or{" "}
-              <a href={routes.auth.login.index.href()}>log in</a> to get
-              started.
-            </p>
+            <div mix={css({ display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" })}>
+              <a
+                href={routes.auth.login.index.href()}
+                class="doodle-border"
+                mix={css({
+                  display: "inline-block",
+                  boxSizing: "border-box",
+                  width: "420px",
+                  maxWidth: "100%",
+                  padding: "4px 14px",
+                  textAlign: "center",
+                  textDecoration: "none",
+                })}
+              >
+                Log in
+              </a>
+              <a href={routes.auth.signup.index.href()}>Sign up</a>
+            </div>
           )}
         </main>
       </Document>
