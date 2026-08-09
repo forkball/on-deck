@@ -134,6 +134,7 @@ export async function rematchMediaItem(
   const metadata = buildMetadata(result)
 
   const item = await db.update(mediaItems, mediaItemId, {
+    external_source: source,
     external_id: result.externalId,
     title: result.title,
     metadata,
