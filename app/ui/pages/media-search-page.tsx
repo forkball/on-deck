@@ -5,6 +5,7 @@ import type { getUserInteractionForItem } from '../../data/mediaItems.ts'
 import type { MediaItem } from '../../data/schema.ts'
 import { MediaTabLinks } from '../components/media-tab-links.tsx'
 import { MEDIA_TYPE_UI, statusLabelsFor, type ActiveMediaType } from '../../mediaTypes.ts'
+import { FrameForm } from '../../browser/frame-form.tsx'
 import { LazyList } from '../../browser/lazy-list.tsx'
 import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
 import { Document } from '../components/document.tsx'
@@ -186,6 +187,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                                 </Field>
                               </div>
                               <button type="submit">Save</button>
+                              <FrameForm />
                             </form>
                           </FloatingDropdown>
                         </div>

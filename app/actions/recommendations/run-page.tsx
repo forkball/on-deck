@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { GenerationParams, RecommendationRunDetail } from '../../data/recommendations/runs.ts'
 import type { MediaType } from '../../data/mediaItems.ts'
 import { routes } from '../../routes.ts'
+import { FrameForm } from '../../browser/frame-form.tsx'
 import { Field } from '../../ui/shared/field.tsx'
 import { Document } from '../../ui/components/document.tsx'
 import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
@@ -197,6 +198,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                           </Field>
                         </div>
                         <button type="submit">Save</button>
+                        <FrameForm />
                       </form>
                     </FloatingDropdown>
                   </div>

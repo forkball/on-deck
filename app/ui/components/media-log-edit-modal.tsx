@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { UserMediaInteraction } from '../../data/schema.ts'
 import type { ActiveMediaType } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
+import { FrameForm } from '../../browser/frame-form.tsx'
 import { Modal } from './modal.tsx'
 import { StarRatingInput } from './star-rating.tsx'
 import { StatusSelect } from './status-select.tsx'
@@ -50,6 +51,7 @@ export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
               <textarea name="notes" rows={3} defaultValue={interaction.notes ?? ''} placeholder="What did you think?" />
             </Field>
           </div>
+          <FrameForm />
         </form>
         {/* Destructive action on the left, confirming action on the right,
             so the button under the cursor after filling the form is the one
@@ -66,6 +68,7 @@ export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
             <button type="submit" class="danger">
               Delete log
             </button>
+            <FrameForm />
           </form>
           <button type="submit" form={`edit-log-form-${interaction.id}`} mix={css({ marginLeft: 'auto' })}>
             Save

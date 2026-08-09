@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
 import { MEDIA_TYPE_UI, statusLabelsFor, type ActiveMediaType } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
+import { FrameForm } from '../../browser/frame-form.tsx'
 import { Document } from '../components/document.tsx'
 import { ExpandableText } from '../components/expandable-text.tsx'
 import { ImageCarousel } from '../components/image-carousel.tsx'
@@ -214,6 +215,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                         />
                       </Field>
                     </div>
+                    <FrameForm />
                   </form>
                   {/* Delete left, save right — see media-log-edit-modal.tsx.
                       Delete only exists once something is logged, which is why
@@ -238,6 +240,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                         <button type="submit" class="danger">
                           Delete log
                         </button>
+                        <FrameForm />
                       </form>
                     )}
                     <button
