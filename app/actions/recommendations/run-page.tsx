@@ -22,23 +22,34 @@ const SOURCE_LABELS: Record<MediaType, string> = {
 }
 
 const LENGTH_LABELS: Record<NonNullable<GenerationParams['length']>, string> = {
-  short: 'Under 90 min',
-  medium: '90–150 min',
-  long: 'Over 150 min',
+  short: '90 min or less',
+  medium: '120 min or less',
+  long: '150 min or less',
+  very_long: 'Over 150 min',
 }
 
 const PLAYER_TYPE_LABELS: Record<string, string> = { singleplayer: 'Singleplayer', multiplayer: 'Multiplayer' }
 const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus: 'Versus' }
+const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series', standalone: 'Standalone' }
 
 function describeParams(params: GenerationParams): string[] {
   const lines: string[] = [`Based on: ${params.sourceTypes.map((type) => SOURCE_LABELS[type]).join(', ')}`]
   if (params.genre) lines.push(`Genre: ${params.genre.replace(/^./, (c) => c.toUpperCase())}`)
-  if (params.decade != null) lines.push(`Decade: ${params.decade}s`)
+  if (params.decade != null) {
+    const label =
+      params.decadeRelation === 'before'
+        ? `Before ${params.decade}`
+        : params.decadeRelation === 'after'
+          ? `After ${params.decade + 9}`
+          : `${params.decade}s`
+    lines.push(`Decade: ${label}`)
+  }
   if (params.length) lines.push(`Length: ${LENGTH_LABELS[params.length]}`)
   if (params.playerType) lines.push(`Player type: ${PLAYER_TYPE_LABELS[params.playerType] ?? params.playerType}`)
   if (params.multiplayerType) {
     lines.push(`Multiplayer type: ${MULTIPLAYER_TYPE_LABELS[params.multiplayerType] ?? params.multiplayerType}`)
   }
+  if (params.series) lines.push(`Series: ${SERIES_TYPE_LABELS[params.series] ?? params.series}`)
   return lines
 }
 

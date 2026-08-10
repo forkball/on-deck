@@ -23,6 +23,8 @@ export type GenerateRecommendationsFormProps = {
   // Games only — empty for every other type, which hides both selects below.
   playerTypes: string[]
   multiplayerTypes: string[]
+  // Books only — empty for every other type, which hides the select below.
+  seriesTypes: string[]
   generateHref: string
   findPeopleHref: string
 }
@@ -33,6 +35,7 @@ const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
 // vocabularies that a label map beats a formatting rule.
 const PLAYER_TYPE_LABELS: Record<string, string> = { singleplayer: 'Singleplayer', multiplayer: 'Multiplayer' }
 const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus: 'Versus' }
+const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series', standalone: 'Standalone' }
 
 // Shown so the picker reads as "more coming".
 const PLACEHOLDER_SOURCES: string[] = []
@@ -79,6 +82,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         lengthOptions,
         playerTypes,
         multiplayerTypes,
+        seriesTypes,
         generateHref,
         findPeopleHref,
       } = handle.props
@@ -301,6 +305,13 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   ))}
                 </select>
               </Field>
+              <Field label="Relative to decade">
+                <select name="decade_relation" defaultValue="within">
+                  <option value="before">Before</option>
+                  <option value="within">Within</option>
+                  <option value="after">After</option>
+                </select>
+              </Field>
               <Field label="Length">
                 <select name="length" defaultValue="">
                   <option value="">Any</option>
@@ -337,6 +348,18 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                     {multiplayerTypes.map((type) => (
                       <option key={type} value={type}>
                         {MULTIPLAYER_TYPE_LABELS[type] ?? type}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+              {seriesTypes.length > 0 && (
+                <Field label="Series">
+                  <select name="series" defaultValue="">
+                    <option value="">Any</option>
+                    {seriesTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {SERIES_TYPE_LABELS[type] ?? type}
                       </option>
                     ))}
                   </select>

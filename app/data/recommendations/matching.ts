@@ -4,7 +4,7 @@ import { pool } from '../db.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { claude, parseStructuredResponse } from './claude.ts'
-import type { Pick } from './picks.ts'
+import type { DecadeRelation, Pick } from './picks.ts'
 
 // A pick paired with the catalog entry it resolved to.
 export interface Candidate {
@@ -22,8 +22,11 @@ export function lookupForType(mediaType: MediaType, externalId: string): Promise
   return getCatalogProvider(mediaType).getById(externalId)
 }
 
-export function matchesDecade(releaseYear: number | null, decade: number): boolean {
-  return releaseYear != null && releaseYear >= decade && releaseYear < decade + 10
+export function matchesDecade(releaseYear: number | null, decade: number, relation: DecadeRelation = 'within'): boolean {
+  if (releaseYear == null) return false
+  if (relation === 'before') return releaseYear < decade
+  if (relation === 'after') return releaseYear >= decade + 10
+  return releaseYear >= decade && releaseYear < decade + 10
 }
 
 function normalizeTitle(title: string): string {

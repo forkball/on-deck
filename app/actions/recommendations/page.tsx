@@ -20,6 +20,7 @@ export interface RecommendationsPageProps {
   lengthOptions: { value: string; label: string }[]
   playerTypes: string[]
   multiplayerTypes: string[]
+  seriesTypes: string[]
   displayName: string
   error?: string
   // Set when the request matched an earlier run the user hasn't taken
@@ -128,6 +129,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       lengthOptions,
       playerTypes,
       multiplayerTypes,
+      seriesTypes,
       displayName,
       error,
       duplicate,
@@ -177,6 +179,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             lengthOptions={lengthOptions}
             playerTypes={playerTypes}
             multiplayerTypes={multiplayerTypes}
+            seriesTypes={seriesTypes}
             generateHref={routes.recommendations.generate.href()}
             findPeopleHref={routes.users.search.href()}
           />

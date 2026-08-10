@@ -29,6 +29,10 @@ const GENRE_MATCHERS: [genre: string, needles: string[]][] = [
 // The vocabulary offered by the recommendation genre filter.
 export const BOOK_GENRES: string[] = GENRE_MATCHERS.map(([genre]) => genre).sort()
 
+// The series filter's vocabulary — backed by volumeInfo.seriesInfo (see
+// GoogleBooksVolume above), not a category/genre derivation.
+export const BOOK_SERIES_TYPES: string[] = ['series', 'standalone']
+
 const TAG_LIMIT = 4
 
 function deriveGenres(categories: string[] | undefined): string[] {
@@ -56,6 +60,10 @@ interface GoogleBooksVolume {
     categories?: string[]
     ratingsCount?: number
     imageLinks?: { thumbnail?: string; smallThumbnail?: string }
+    // Undocumented in the public reference but present in the API's own
+    // discovery schema, and how "part of a series" is derived below — Google
+    // Books has nothing else for it (no separate series/standalone flag).
+    seriesInfo?: { volumeSeries?: unknown[] }
   }
 }
 
@@ -87,11 +95,13 @@ function toResult(volume: GoogleBooksVolume): CatalogSearchResult {
   const info = volume.volumeInfo ?? {}
   const title = info.subtitle ? `${info.title}: ${info.subtitle}` : (info.title ?? 'Untitled')
 
+  const seriesTag = (info.seriesInfo?.volumeSeries?.length ?? 0) > 0 ? 'series' : 'standalone'
+
   return {
     externalId: volume.id,
     title,
     releaseYear: info.publishedDate ? Number(info.publishedDate.slice(0, 4)) || null : null,
-    tags: deriveGenres(info.categories),
+    tags: [...deriveGenres(info.categories), seriesTag],
     posterUrl: toHttps(info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail),
     popularity: info.ratingsCount ?? 0,
     overview: info.description ? cleanDescription(info.description) : null,

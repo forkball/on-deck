@@ -41,9 +41,11 @@ const generateSchema = f.object({
   mediaType: f.field(s.defaulted(s.string(), 'movie')),
   genre: f.field(s.defaulted(s.string(), '')),
   decade: f.field(s.defaulted(s.string(), '')),
+  decade_relation: f.field(s.defaulted(s.string(), '')),
   length: f.field(s.defaulted(s.string(), '')),
   player_type: f.field(s.defaulted(s.string(), '')),
   multiplayer_type: f.field(s.defaulted(s.string(), '')),
+  series: f.field(s.defaulted(s.string(), '')),
   name: f.field(s.defaulted(s.string(), '')),
 })
 
@@ -62,9 +64,12 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     runsFromOthers: allRunsFromOthers.filter((run) => run.mediaType === mediaType),
     friends,
     genres: getCatalogProvider(mediaType).genres,
-    lengthOptions: getCatalogProvider(mediaType).lengthOptions,
+    // Label only — `phrase` is prompt copy the form has no use for, and these
+    // props are serialized into the page for the client entry.
+    lengthOptions: getCatalogProvider(mediaType).lengthOptions.map(({ value, label }) => ({ value, label })),
     playerTypes: getCatalogProvider(mediaType).playerTypes ?? [],
     multiplayerTypes: getCatalogProvider(mediaType).multiplayerTypes ?? [],
+    seriesTypes: getCatalogProvider(mediaType).seriesTypes ?? [],
     displayName: displayLabel(user),
   }
 }
@@ -96,6 +101,7 @@ export default createController(routes.recommendations, {
           lengthOptions={data.lengthOptions}
           playerTypes={data.playerTypes}
           multiplayerTypes={data.multiplayerTypes}
+          seriesTypes={data.seriesTypes}
           displayName={data.displayName}
         />,
       )
@@ -122,11 +128,24 @@ export default createController(routes.recommendations, {
       const filters: RecommendationFilters = {}
       if (parsed.value.genre) filters.genre = parsed.value.genre
       if (parsed.value.decade) filters.decade = Number(parsed.value.decade)
-      if (parsed.value.length === 'short' || parsed.value.length === 'medium' || parsed.value.length === 'long') {
+      if (
+        parsed.value.decade_relation === 'before' ||
+        parsed.value.decade_relation === 'within' ||
+        parsed.value.decade_relation === 'after'
+      ) {
+        filters.decadeRelation = parsed.value.decade_relation
+      }
+      if (
+        parsed.value.length === 'short' ||
+        parsed.value.length === 'medium' ||
+        parsed.value.length === 'long' ||
+        parsed.value.length === 'very_long'
+      ) {
         filters.length = parsed.value.length
       }
       if (parsed.value.player_type) filters.playerType = parsed.value.player_type
       if (parsed.value.multiplayer_type) filters.multiplayerType = parsed.value.multiplayer_type
+      if (parsed.value.series) filters.series = parsed.value.series
 
       // Defaults to matching what's being generated.
       const sourceTypes = formData
@@ -166,6 +185,7 @@ export default createController(routes.recommendations, {
             lengthOptions={data.lengthOptions}
             playerTypes={data.playerTypes}
             multiplayerTypes={data.multiplayerTypes}
+            seriesTypes={data.seriesTypes}
             displayName={data.displayName}
             error={`Can't generate this run — ${detail}. Everyone included needs something logged for each taste you're basing picks on.`}
           />,
@@ -197,6 +217,7 @@ export default createController(routes.recommendations, {
               lengthOptions={data.lengthOptions}
               playerTypes={data.playerTypes}
               multiplayerTypes={data.multiplayerTypes}
+              seriesTypes={data.seriesTypes}
               displayName={data.displayName}
               duplicate={{
                 runId: duplicate.runId,
@@ -210,9 +231,11 @@ export default createController(routes.recommendations, {
                   ['name', parsed.value.name ?? ''],
                   ['genre', filters.genre ?? ''],
                   ['decade', filters.decade == null ? '' : String(filters.decade)],
+                  ['decade_relation', filters.decadeRelation ?? ''],
                   ['length', filters.length ?? ''],
                   ['player_type', filters.playerType ?? ''],
                   ['multiplayer_type', filters.multiplayerType ?? ''],
+                  ['series', filters.series ?? ''],
                   ...sourceTypes.map((type) => ['source', type] as [string, string]),
                   ...friendIds.map((id) => ['friend_ids', String(id)] as [string, string]),
                 ],
@@ -236,6 +259,7 @@ export default createController(routes.recommendations, {
             lengthOptions={data.lengthOptions}
             playerTypes={data.playerTypes}
             multiplayerTypes={data.multiplayerTypes}
+            seriesTypes={data.seriesTypes}
             displayName={data.displayName}
             error="You already have a run in progress — give that one a moment to finish first."
           />,

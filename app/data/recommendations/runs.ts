@@ -16,7 +16,7 @@ import {
   type UserMediaInteraction,
 } from '../schema.ts'
 import { displayLabel } from '../users.ts'
-import type { RecommendationFilters } from './picks.ts'
+import type { DecadeRelation, RecommendationFilters } from './picks.ts'
 
 export const MAX_RUNS_PER_USER = 3
 
@@ -42,10 +42,14 @@ export interface RecommendationRunSummary {
 export interface GenerationParams {
   genre?: string
   decade?: number
+  // Defaults to 'within' when `decade` is set — see matchesDecade.
+  decadeRelation?: DecadeRelation
   length?: LengthBucket
   // Games only — see GAME_PLAYER_TYPES / GAME_MULTIPLAYER_TYPES.
   playerType?: string
   multiplayerType?: string
+  // Books only — see BOOK_SERIES_TYPES.
+  series?: string
   sourceTypes: MediaType[]
 }
 
@@ -68,9 +72,11 @@ function parseParams(run: RecommendationRun): GenerationParams {
     return {
       genre: parsed.genre,
       decade: parsed.decade,
+      decadeRelation: parsed.decadeRelation,
       length: parsed.length,
       playerType: parsed.playerType,
       multiplayerType: parsed.multiplayerType,
+      series: parsed.series,
       sourceTypes: parsed.sourceTypes && parsed.sourceTypes.length > 0 ? parsed.sourceTypes : [run.media_type],
     }
   } catch {
@@ -85,9 +91,11 @@ function paramsKey(filters: RecommendationFilters, sourceTypes: MediaType[], mem
   return JSON.stringify([
     filters.genre ?? null,
     filters.decade ?? null,
+    filters.decade != null ? (filters.decadeRelation ?? 'within') : null,
     filters.length ?? null,
     filters.playerType ?? null,
     filters.multiplayerType ?? null,
+    filters.series ?? null,
     [...sourceTypes].sort(),
     // A group run with different people is a different request, even with
     // identical filters.
@@ -120,9 +128,11 @@ export async function findUnusedDuplicateRun(
       {
         genre: params.genre,
         decade: params.decade,
+        decadeRelation: params.decadeRelation,
         length: params.length,
         playerType: params.playerType,
         multiplayerType: params.multiplayerType,
+        series: params.series,
       },
       params.sourceTypes,
       members.map((member) => member.user_id),

@@ -1,7 +1,7 @@
 import type { Db } from '../db.ts'
 import { upsertMediaItem, rematchMediaItem, type MediaType, type RematchMediaItemResult } from '../mediaItems.ts'
 import type { MediaItem } from '../schema.ts'
-import { BOOK_GENRES, getBookById, parseGoogleBooksId, searchBooks } from './googleBooks.ts'
+import { BOOK_GENRES, BOOK_SERIES_TYPES, getBookById, parseGoogleBooksId, searchBooks } from './googleBooks.ts'
 import { GAME_GENRES, GAME_MULTIPLAYER_TYPES, GAME_PLAYER_TYPES, getGameById, parseIgdbId, searchGames } from './igdb.ts'
 import {
   getMovieById,
@@ -18,10 +18,12 @@ import {
 // returns, aliased so non-TMDB providers can satisfy the same contract.
 export type CatalogSearchResult = TmdbSearchResult
 
-// Short/medium/long, in whatever unit a given provider measures — runtime,
-// page count, hours to beat. Defined here rather than with the recommendation
-// filters that read it: the buckets belong to the catalog that interprets them.
-export type LengthBucket = 'short' | 'medium' | 'long'
+// Short/medium/long(/very long), in whatever unit a given provider measures —
+// runtime, page count, hours to beat. Defined here rather than with the
+// recommendation filters that read it: the buckets belong to the catalog that
+// interprets them. `very_long` exists only for providers with a 4th tier
+// (currently movies) — the rest just never emit it in their lengthOptions.
+export type LengthBucket = 'short' | 'medium' | 'long' | 'very_long'
 
 // Everything that differs between one media type's catalog and another's.
 // Anything not here is type-agnostic and lives in mediaItems.ts.
@@ -36,6 +38,8 @@ export interface CatalogProvider {
   // absent (rather than empty) for every other type.
   playerTypes?: string[]
   multiplayerTypes?: string[]
+  // Books-only — see BOOK_SERIES_TYPES.
+  seriesTypes?: string[]
   // Turns what the "wrong match?" form accepts — a pasted URL or bare id —
   // into an external id, or null.
   parseExternalId(input: string): string | null
@@ -47,8 +51,21 @@ export interface CatalogProvider {
   // on the provider because one global check can only be right for a single
   // medium: reading runtimeMinutes unconditionally silently dropped every book.
   matchesLength(result: CatalogSearchResult, length: LengthBucket): boolean
-  // Labels for that filter's options, so the form doesn't hardcode minutes.
-  lengthOptions: { value: LengthBucket; label: string }[]
+  // Every bucket this provider offers — the buckets it omits are ones it has no
+  // meaning for, so a provider's own list is what `length` may validly be.
+  //
+  // `label` is for the form, `phrase` for the pick prompt, and they live on the
+  // same entry so a bucket can't reach one and not the other. They used to be
+  // separate, and the prompt's copy was movie-shaped for every medium: asking
+  // for long books requested books "with a runtime of 150 minutes or less" —
+  // wrong unit, and backwards, since long books are the ones over 500 pages.
+  lengthOptions: { value: LengthBucket; label: string; phrase: string }[]
+}
+
+// Fits after "Only suggest books with …". Null when this medium doesn't offer
+// the bucket at all, in which case there's nothing truthful to ask for.
+export function describeLength(provider: CatalogProvider, length: LengthBucket): string | null {
+  return provider.lengthOptions.find((option) => option.value === length)?.phrase ?? null
 }
 
 // Keyed by MediaType, which widens to `string` through the row types — so this
@@ -66,22 +83,26 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
     matchesLength: (result, length) => {
       const minutes = result.runtimeMinutes
       if (minutes == null) return false
-      if (length === 'short') return minutes < 90
-      if (length === 'long') return minutes > 150
-      return minutes >= 90 && minutes <= 150
+      if (length === 'short') return minutes <= 90
+      if (length === 'medium') return minutes <= 120
+      if (length === 'long') return minutes <= 150
+      return minutes > 150
     },
+    // Ceilings rather than bands, unlike every other provider here: each option
+    // is "no longer than this", so they nest deliberately.
     lengthOptions: [
-      { value: 'short', label: 'Under 90 min' },
-      { value: 'medium', label: '90–150 min' },
-      { value: 'long', label: 'Over 150 min' },
+      { value: 'short', label: '90 min or less', phrase: 'a runtime of 90 minutes or less' },
+      { value: 'medium', label: '120 min or less', phrase: 'a runtime of 120 minutes or less' },
+      { value: 'long', label: '150 min or less', phrase: 'a runtime of 150 minutes or less' },
+      { value: 'very_long', label: 'Over 150 min', phrase: 'a runtime over 150 minutes' },
     ],
-
   },
   book: {
     sourceName: 'google-books',
     search: searchBooks,
     getById: getBookById,
     genres: BOOK_GENRES,
+    seriesTypes: BOOK_SERIES_TYPES,
     parseExternalId: parseGoogleBooksId,
     matchHint: 'Paste a Google Books link or volume id.',
     lookupFailedError: "Couldn't find that on Google Books — check the link.",
@@ -90,12 +111,14 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
       if (pages == null) return false
       if (length === 'short') return pages < 250
       if (length === 'long') return pages > 500
-      return pages >= 250 && pages <= 500
+      // Explicit, so a bucket this provider doesn't offer (very_long) matches
+      // nothing rather than falling into the middle band.
+      return length === 'medium' && pages >= 250 && pages <= 500
     },
     lengthOptions: [
-      { value: 'short', label: 'Under 250 pages' },
-      { value: 'medium', label: '250–500 pages' },
-      { value: 'long', label: 'Over 500 pages' },
+      { value: 'short', label: 'Under 250 pages', phrase: 'fewer than 250 pages' },
+      { value: 'medium', label: '250–500 pages', phrase: 'between 250 and 500 pages' },
+      { value: 'long', label: 'Over 500 pages', phrase: 'more than 500 pages' },
     ],
   },
   game: {
@@ -113,12 +136,13 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
       if (hours == null || hours === 0) return false
       if (length === 'short') return hours < 10
       if (length === 'long') return hours > 30
-      return hours >= 10 && hours <= 30
+      // See the book entry — very_long isn't offered here either.
+      return length === 'medium' && hours >= 10 && hours <= 30
     },
     lengthOptions: [
-      { value: 'short', label: 'Under 10 hours' },
-      { value: 'medium', label: '10–30 hours' },
-      { value: 'long', label: 'Over 30 hours' },
+      { value: 'short', label: 'Under 10 hours', phrase: 'a playtime under 10 hours' },
+      { value: 'medium', label: '10–30 hours', phrase: 'a playtime between 10 and 30 hours' },
+      { value: 'long', label: 'Over 30 hours', phrase: 'a playtime over 30 hours' },
     ],
   },
   tv: {
@@ -134,14 +158,17 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
       if (minutes == null) return false
       if (length === 'short') return minutes < 90
       if (length === 'long') return minutes > 150
-      return minutes >= 90 && minutes <= 150
+      // See the book entry — very_long isn't offered here either.
+      return length === 'medium' && minutes >= 90 && minutes <= 150
     },
+    // getTvShowById reads this off episode_run_time, so it's the length of one
+    // episode, not of the show — worth spelling out in the prompt, since the
+    // same numbers as the movie entry mean something quite different here.
     lengthOptions: [
-      { value: 'short', label: 'Under 90 min' },
-      { value: 'medium', label: '90–150 min' },
-      { value: 'long', label: 'Over 150 min' },
+      { value: 'short', label: 'Under 90 min', phrase: 'an episode runtime under 90 minutes' },
+      { value: 'medium', label: '90–150 min', phrase: 'an episode runtime between 90 and 150 minutes' },
+      { value: 'long', label: 'Over 150 min', phrase: 'an episode runtime over 150 minutes' },
     ],
-
   },
 }
 

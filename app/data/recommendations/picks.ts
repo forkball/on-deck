@@ -1,5 +1,5 @@
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
-import type { LengthBucket } from '../catalog/provider.ts'
+import { describeLength, getCatalogProvider, type LengthBucket } from '../catalog/provider.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { claude, parseStructuredResponse } from './claude.ts'
 
@@ -46,6 +46,9 @@ export interface ExcludedTitles {
   rejected: string[]
 }
 
+// How a release year relates to `decade` — ignored unless `decade` is set too.
+export type DecadeRelation = 'before' | 'within' | 'after'
+
 // All hard-filter the final picks, not just hint the prompt. Genre and decade
 // come free off the search results already fetched; length needs an extra
 // per-candidate lookup, so it only happens when that lever is set.
@@ -53,10 +56,14 @@ export interface RecommendationFilters {
   genre?: string
   // Decade start year, e.g. 1990 for "the 1990s".
   decade?: number
+  // Defaults to 'within' when `decade` is set — see matchesDecade.
+  decadeRelation?: DecadeRelation
   length?: LengthBucket
   // Games only — see GAME_PLAYER_TYPES / GAME_MULTIPLAYER_TYPES.
   playerType?: string
   multiplayerType?: string
+  // Books only — see BOOK_SERIES_TYPES.
+  series?: string
 }
 
 const PICKS_SCHEMA = {
@@ -82,19 +89,33 @@ const PICKS_SCHEMA = {
 
 const REQUESTED_COUNT = 15
 
-function buildFilterInstructions(filters: RecommendationFilters, noun: string): string {
+function buildFilterInstructions(filters: RecommendationFilters, noun: string, mediaType: MediaType): string {
   const clauses: string[] = []
   if (filters.genre) clauses.push(`Only suggest ${noun} in the "${filters.genre}" genre.`)
-  if (filters.decade != null) clauses.push(`Only suggest ${noun} originally released in the ${filters.decade}s.`)
-  if (filters.length === 'short') clauses.push(`Only suggest ${noun} with a runtime under 90 minutes.`)
-  if (filters.length === 'medium') clauses.push(`Only suggest ${noun} with a runtime between 90 and 150 minutes.`)
-  if (filters.length === 'long') clauses.push(`Only suggest ${noun} with a runtime over 150 minutes.`)
+  if (filters.decade != null) {
+    if (filters.decadeRelation === 'before') {
+      clauses.push(`Only suggest ${noun} originally released before ${filters.decade}.`)
+    } else if (filters.decadeRelation === 'after') {
+      clauses.push(`Only suggest ${noun} originally released after ${filters.decade + 9}.`)
+    } else {
+      clauses.push(`Only suggest ${noun} originally released in the ${filters.decade}s.`)
+    }
+  }
+  // Described by the medium's own bucket, not a runtime for everything: asking
+  // for long books used to request a runtime under 150 minutes, so the model
+  // returned short books and the hard filter then dropped nearly all of them.
+  if (filters.length) {
+    const phrase = describeLength(getCatalogProvider(mediaType), filters.length)
+    if (phrase) clauses.push(`Only suggest ${noun} with ${phrase}.`)
+  }
   if (filters.playerType === 'singleplayer') clauses.push(`Only suggest ${noun} playable single-player.`)
   if (filters.playerType === 'multiplayer') clauses.push(`Only suggest ${noun} playable multiplayer.`)
   if (filters.multiplayerType === 'coop') clauses.push(`Only suggest ${noun} with a co-op multiplayer mode.`)
   if (filters.multiplayerType === 'versus') {
     clauses.push(`Only suggest ${noun} with a competitive (versus) multiplayer mode.`)
   }
+  if (filters.series === 'series') clauses.push(`Only suggest ${noun} that are part of a series.`)
+  if (filters.series === 'standalone') clauses.push(`Only suggest standalone ${noun}, not part of a series.`)
   return clauses.length > 0 ? ` ${clauses.join(' ')}` : ''
 }
 
@@ -124,9 +145,10 @@ export async function requestPicks(
     filters.decade != null ||
     filters.length != null ||
     filters.playerType != null ||
-    filters.multiplayerType != null
+    filters.multiplayerType != null ||
+    filters.series != null
   const requestedCount = hasFilters ? REQUESTED_COUNT + 10 : REQUESTED_COUNT
-  const filterInstructions = buildFilterInstructions(filters, noun) + sourceInstructions
+  const filterInstructions = buildFilterInstructions(filters, noun, mediaType) + sourceInstructions
 
   const prompt = isGroup
     ? `Group of ${profiles.length} people, each with their own ${noun} taste profile:\n${JSON.stringify(profiles, null, 2)}\n\n` +
