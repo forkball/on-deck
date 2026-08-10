@@ -76,6 +76,13 @@ export const NotificationBell = clientEntry<NotificationBellProps>(
                 },
                 { signal },
               )
+
+              // Clicking a notification does a client-side frame reload (not a real
+              // navigation), which patches the DOM in place rather than recreating
+              // it — this node gets reclaimed instead of reinserted, so `insert`
+              // never fires again and the badge would otherwise sit stale until a
+              // hard reload.
+              handle.frames.top.addEventListener('reloadComplete', refresh, { signal })
             }),
           ]}
         >
