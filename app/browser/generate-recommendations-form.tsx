@@ -64,6 +64,8 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let page = 1
     // Drives whether the multiplayer-type sub-select shows at all.
     let playerType = ''
+    // Drives whether the "relative to decade" sub-select shows at all.
+    let decade = ''
     // Tracked rather than left to native <details> alone: a re-render from
     // any other control in this form (player type included) would otherwise
     // re-close the filters panel, since its open-ness wouldn't be reflected
@@ -296,22 +298,31 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 </select>
               </Field>
               <Field label="Decade">
-                <select name="decade" defaultValue="">
+                <select
+                  name="decade"
+                  defaultValue=""
+                  mix={on('change', (event) => {
+                    decade = (event.target as HTMLSelectElement).value
+                    handle.update()
+                  })}
+                >
                   <option value="">Any</option>
-                  {DECADES.map((decade) => (
-                    <option key={decade} value={String(decade)}>
-                      {decade}s
+                  {DECADES.map((value) => (
+                    <option key={value} value={String(value)}>
+                      {value}s
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Relative to decade">
-                <select name="decade_relation" defaultValue="within">
-                  <option value="before">Before</option>
-                  <option value="within">Within</option>
-                  <option value="after">After</option>
-                </select>
-              </Field>
+              {decade !== '' && (
+                <Field label="Relative to decade">
+                  <select name="decade_relation" defaultValue="within">
+                    <option value="before">Before</option>
+                    <option value="within">Within</option>
+                    <option value="after">After</option>
+                  </select>
+                </Field>
+              )}
               <Field label="Length">
                 <select name="length" defaultValue="">
                   <option value="">Any</option>
