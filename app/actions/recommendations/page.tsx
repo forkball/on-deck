@@ -18,6 +18,8 @@ export interface RecommendationsPageProps {
   mediaType: ActiveMediaType
   genres: string[]
   lengthOptions: { value: string; label: string }[]
+  playerTypes: string[]
+  multiplayerTypes: string[]
   displayName: string
   error?: string
   // Set when the request matched an earlier run the user hasn't taken
@@ -117,8 +119,19 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
 
 export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
-    const { runs, runsFromOthers, friends, mediaType, genres, lengthOptions, displayName, error, duplicate } =
-      handle.props
+    const {
+      runs,
+      runsFromOthers,
+      friends,
+      mediaType,
+      genres,
+      lengthOptions,
+      playerTypes,
+      multiplayerTypes,
+      displayName,
+      error,
+      duplicate,
+    } = handle.props
     const recsHref = routes.recommendations.index.href()
     const ui = MEDIA_TYPE_UI[mediaType]
 
@@ -162,6 +175,8 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             }))}
             genres={genres}
             lengthOptions={lengthOptions}
+            playerTypes={playerTypes}
+            multiplayerTypes={multiplayerTypes}
             generateHref={routes.recommendations.generate.href()}
             findPeopleHref={routes.users.search.href()}
           />

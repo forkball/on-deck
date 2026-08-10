@@ -54,6 +54,9 @@ export interface RecommendationFilters {
   // Decade start year, e.g. 1990 for "the 1990s".
   decade?: number
   length?: LengthBucket
+  // Games only — see GAME_PLAYER_TYPES / GAME_MULTIPLAYER_TYPES.
+  playerType?: string
+  multiplayerType?: string
 }
 
 const PICKS_SCHEMA = {
@@ -86,6 +89,12 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string): 
   if (filters.length === 'short') clauses.push(`Only suggest ${noun} with a runtime under 90 minutes.`)
   if (filters.length === 'medium') clauses.push(`Only suggest ${noun} with a runtime between 90 and 150 minutes.`)
   if (filters.length === 'long') clauses.push(`Only suggest ${noun} with a runtime over 150 minutes.`)
+  if (filters.playerType === 'singleplayer') clauses.push(`Only suggest ${noun} playable single-player.`)
+  if (filters.playerType === 'multiplayer') clauses.push(`Only suggest ${noun} playable multiplayer.`)
+  if (filters.multiplayerType === 'coop') clauses.push(`Only suggest ${noun} with a co-op multiplayer mode.`)
+  if (filters.multiplayerType === 'versus') {
+    clauses.push(`Only suggest ${noun} with a competitive (versus) multiplayer mode.`)
+  }
   return clauses.length > 0 ? ` ${clauses.join(' ')}` : ''
 }
 
@@ -110,7 +119,12 @@ export async function requestPicks(
       : ''
   // Hard filters drop some picks afterwards, so over-request to land near
   // TARGET_COUNT.
-  const hasFilters = filters.genre != null || filters.decade != null || filters.length != null
+  const hasFilters =
+    filters.genre != null ||
+    filters.decade != null ||
+    filters.length != null ||
+    filters.playerType != null ||
+    filters.multiplayerType != null
   const requestedCount = hasFilters ? REQUESTED_COUNT + 10 : REQUESTED_COUNT
   const filterInstructions = buildFilterInstructions(filters, noun) + sourceInstructions
 

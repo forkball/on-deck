@@ -43,6 +43,9 @@ export interface GenerationParams {
   genre?: string
   decade?: number
   length?: LengthBucket
+  // Games only — see GAME_PLAYER_TYPES / GAME_MULTIPLAYER_TYPES.
+  playerType?: string
+  multiplayerType?: string
   sourceTypes: MediaType[]
 }
 
@@ -66,6 +69,8 @@ function parseParams(run: RecommendationRun): GenerationParams {
       genre: parsed.genre,
       decade: parsed.decade,
       length: parsed.length,
+      playerType: parsed.playerType,
+      multiplayerType: parsed.multiplayerType,
       sourceTypes: parsed.sourceTypes && parsed.sourceTypes.length > 0 ? parsed.sourceTypes : [run.media_type],
     }
   } catch {
@@ -81,6 +86,8 @@ function paramsKey(filters: RecommendationFilters, sourceTypes: MediaType[], mem
     filters.genre ?? null,
     filters.decade ?? null,
     filters.length ?? null,
+    filters.playerType ?? null,
+    filters.multiplayerType ?? null,
     [...sourceTypes].sort(),
     // A group run with different people is a different request, even with
     // identical filters.
@@ -110,7 +117,13 @@ export async function findUnusedDuplicateRun(
     const params = parseParams(run)
     const members = await db.findMany(recommendationRunMembers, { where: { run_id: run.id } })
     const key = paramsKey(
-      { genre: params.genre, decade: params.decade, length: params.length },
+      {
+        genre: params.genre,
+        decade: params.decade,
+        length: params.length,
+        playerType: params.playerType,
+        multiplayerType: params.multiplayerType,
+      },
       params.sourceTypes,
       members.map((member) => member.user_id),
     )

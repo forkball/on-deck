@@ -42,6 +42,8 @@ const generateSchema = f.object({
   genre: f.field(s.defaulted(s.string(), '')),
   decade: f.field(s.defaulted(s.string(), '')),
   length: f.field(s.defaulted(s.string(), '')),
+  player_type: f.field(s.defaulted(s.string(), '')),
+  multiplayer_type: f.field(s.defaulted(s.string(), '')),
   name: f.field(s.defaulted(s.string(), '')),
 })
 
@@ -61,6 +63,8 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     friends,
     genres: getCatalogProvider(mediaType).genres,
     lengthOptions: getCatalogProvider(mediaType).lengthOptions,
+    playerTypes: getCatalogProvider(mediaType).playerTypes ?? [],
+    multiplayerTypes: getCatalogProvider(mediaType).multiplayerTypes ?? [],
     displayName: displayLabel(user),
   }
 }
@@ -90,6 +94,8 @@ export default createController(routes.recommendations, {
           mediaType={mediaType}
           genres={data.genres}
           lengthOptions={data.lengthOptions}
+          playerTypes={data.playerTypes}
+          multiplayerTypes={data.multiplayerTypes}
           displayName={data.displayName}
         />,
       )
@@ -119,6 +125,8 @@ export default createController(routes.recommendations, {
       if (parsed.value.length === 'short' || parsed.value.length === 'medium' || parsed.value.length === 'long') {
         filters.length = parsed.value.length
       }
+      if (parsed.value.player_type) filters.playerType = parsed.value.player_type
+      if (parsed.value.multiplayer_type) filters.multiplayerType = parsed.value.multiplayer_type
 
       // Defaults to matching what's being generated.
       const sourceTypes = formData
@@ -155,7 +163,9 @@ export default createController(routes.recommendations, {
             friends={data.friends}
             mediaType={mediaType}
             genres={data.genres}
-          lengthOptions={data.lengthOptions}
+            lengthOptions={data.lengthOptions}
+            playerTypes={data.playerTypes}
+            multiplayerTypes={data.multiplayerTypes}
             displayName={data.displayName}
             error={`Can't generate this run — ${detail}. Everyone included needs something logged for each taste you're basing picks on.`}
           />,
@@ -185,6 +195,8 @@ export default createController(routes.recommendations, {
               mediaType={mediaType}
               genres={data.genres}
               lengthOptions={data.lengthOptions}
+              playerTypes={data.playerTypes}
+              multiplayerTypes={data.multiplayerTypes}
               displayName={data.displayName}
               duplicate={{
                 runId: duplicate.runId,
@@ -199,6 +211,8 @@ export default createController(routes.recommendations, {
                   ['genre', filters.genre ?? ''],
                   ['decade', filters.decade == null ? '' : String(filters.decade)],
                   ['length', filters.length ?? ''],
+                  ['player_type', filters.playerType ?? ''],
+                  ['multiplayer_type', filters.multiplayerType ?? ''],
                   ...sourceTypes.map((type) => ['source', type] as [string, string]),
                   ...friendIds.map((id) => ['friend_ids', String(id)] as [string, string]),
                 ],
@@ -220,6 +234,8 @@ export default createController(routes.recommendations, {
             mediaType={mediaType}
             genres={data.genres}
             lengthOptions={data.lengthOptions}
+            playerTypes={data.playerTypes}
+            multiplayerTypes={data.multiplayerTypes}
             displayName={data.displayName}
             error="You already have a run in progress — give that one a moment to finish first."
           />,

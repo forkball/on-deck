@@ -17,6 +17,13 @@ const REAL_GAME_TYPES = '(0,3,4,8,9,10,11)'
 
 const SEARCH_LIMIT = 20
 
+// The player-type / multiplayer-type filters' vocabulary. Unlike GAME_GENRES,
+// these aren't a straight passthrough of an IGDB reference table: IGDB's
+// game_modes distinguishes co-op from other multiplayer, but has nothing for
+// "free-for-all" specifically, so that option is left out rather than guessed.
+export const GAME_PLAYER_TYPES: string[] = ['singleplayer', 'multiplayer']
+export const GAME_MULTIPLAYER_TYPES: string[] = ['coop', 'versus']
+
 // The genre filter's vocabulary, from /v4/genres.
 export const GAME_GENRES: string[] = [
   'adventure',
@@ -57,6 +64,7 @@ interface IgdbGame {
   cover?: IgdbImage
   screenshots?: IgdbImage[]
   genres?: { name: string }[]
+  game_modes?: { name: string }[]
   involved_companies?: { developer?: boolean; company?: { name?: string } }[]
   platforms?: { name?: string; abbreviation?: string }[]
   // How many people have rated it — fan games and asset flips sit at 0.
@@ -159,8 +167,41 @@ async function igdbQuery<T>(endpoint: string, body: string): Promise<T[]> {
 }
 
 const GAME_FIELDS =
-  'fields name,first_release_date,summary,total_rating_count,cover.url,screenshots.url,genres.name,' +
+  'fields name,first_release_date,summary,total_rating_count,cover.url,screenshots.url,genres.name,game_modes.name,' +
   'involved_companies.developer,involved_companies.company.name,platforms.name,platforms.abbreviation;'
+
+// IGDB's own game_modes vocabulary (from /v4/game_modes). It has no "versus"
+// mode of its own, and its plain "Multiplayer" flag turns out to mean "more
+// than one player," not "competitive" — measured live, It Takes Two and
+// Stardew Valley (both co-op, neither competitive) carry "Multiplayer" right
+// alongside "Co-operative." So "Multiplayer" only counts as versus when
+// "Co-operative" is absent; a game with both real co-op and real competitive
+// modes under-tags as coop-only rather than over-tagging pure co-op as
+// versus, which would actively mislead someone filtering for it.
+const SINGLEPLAYER_MODE = 'Single player'
+const MULTIPLAYER_MODE = 'Multiplayer'
+const COOP_MODE = 'Co-operative'
+// Delivery/scale variants, not intent — each one coexists with either
+// Co-operative or plain Multiplayer, so they only ever widen the general
+// "multiplayer" tag, never the versus/coop split.
+const OTHER_MULTIPLAYER_MODES = ['Split screen', 'Massively Multiplayer Online (MMO)', 'Battle Royale']
+
+// Not exclusive with each other — a game with both a co-op campaign and
+// competitive modes should match a filter on either.
+function derivePlayerTags(gameModes: { name: string }[] | undefined): string[] {
+  const names = (gameModes ?? []).map((mode) => mode.name)
+  const isCoop = names.includes(COOP_MODE)
+  const isMultiplayer =
+    isCoop || names.includes(MULTIPLAYER_MODE) || names.some((name) => OTHER_MULTIPLAYER_MODES.includes(name))
+  const isVersus = names.includes(MULTIPLAYER_MODE) && !isCoop
+
+  const tags: string[] = []
+  if (names.includes(SINGLEPLAYER_MODE)) tags.push('singleplayer')
+  if (isMultiplayer) tags.push('multiplayer')
+  if (isCoop) tags.push('coop')
+  if (isVersus) tags.push('versus')
+  return tags
+}
 
 // IGDB returns a 90x90 t_thumb URL and expects the size to be swapped in the
 // path. Protocol-relative, so it also needs a scheme.
@@ -178,7 +219,7 @@ function toResult(game: IgdbGame, hoursToBeat: number | null): CatalogSearchResu
     externalId: String(game.id),
     title: game.name ?? 'Untitled',
     releaseYear: game.first_release_date ? new Date(game.first_release_date * 1000).getUTCFullYear() : null,
-    tags: (game.genres ?? []).map((genre) => genre.name.toLowerCase()),
+    tags: [...(game.genres ?? []).map((genre) => genre.name.toLowerCase()), ...derivePlayerTags(game.game_modes)],
     posterUrl: image(game.cover?.url, 't_cover_big'),
     popularity: game.total_rating_count ?? 0,
     overview: game.summary?.trim() || null,

@@ -27,11 +27,18 @@ const LENGTH_LABELS: Record<NonNullable<GenerationParams['length']>, string> = {
   long: 'Over 150 min',
 }
 
+const PLAYER_TYPE_LABELS: Record<string, string> = { singleplayer: 'Singleplayer', multiplayer: 'Multiplayer' }
+const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus: 'Versus' }
+
 function describeParams(params: GenerationParams): string[] {
   const lines: string[] = [`Based on: ${params.sourceTypes.map((type) => SOURCE_LABELS[type]).join(', ')}`]
   if (params.genre) lines.push(`Genre: ${params.genre.replace(/^./, (c) => c.toUpperCase())}`)
   if (params.decade != null) lines.push(`Decade: ${params.decade}s`)
   if (params.length) lines.push(`Length: ${LENGTH_LABELS[params.length]}`)
+  if (params.playerType) lines.push(`Player type: ${PLAYER_TYPE_LABELS[params.playerType] ?? params.playerType}`)
+  if (params.multiplayerType) {
+    lines.push(`Multiplayer type: ${MULTIPLAYER_TYPE_LABELS[params.multiplayerType] ?? params.multiplayerType}`)
+  }
   return lines
 }
 

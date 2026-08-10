@@ -1,6 +1,5 @@
 import { clientEntry, css, on } from 'remix/ui'
 
-import { Collapsible } from '../ui/shared/collapsible.tsx'
 import { Field } from '../ui/shared/field.tsx'
 
 export type FriendOption = {
@@ -21,11 +20,19 @@ export type GenerateRecommendationsFormProps = {
   genres: string[]
   // Per media type: "short" is minutes for a film, pages for a book.
   lengthOptions: { value: string; label: string }[]
+  // Games only — empty for every other type, which hides both selects below.
+  playerTypes: string[]
+  multiplayerTypes: string[]
   generateHref: string
   findPeopleHref: string
 }
 
 const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
+
+// Capitalizing 'coop' reads as "Coop," not the intended "Co-op" — small enough
+// vocabularies that a label map beats a formatting rule.
+const PLAYER_TYPE_LABELS: Record<string, string> = { singleplayer: 'Singleplayer', multiplayer: 'Multiplayer' }
+const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus: 'Versus' }
 
 // Shown so the picker reads as "more coming".
 const PLACEHOLDER_SOURCES: string[] = []
@@ -52,12 +59,29 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let mode: 'self' | 'group' = 'self'
     let search = ''
     let page = 1
+    // Drives whether the multiplayer-type sub-select shows at all.
+    let playerType = ''
+    // Tracked rather than left to native <details> alone: a re-render from
+    // any other control in this form (player type included) would otherwise
+    // re-close the filters panel, since its open-ness wouldn't be reflected
+    // anywhere in the freshly rendered JSX.
+    let filtersOpen = false
     // Cross-media sourcing is the deliberate opt-in.
     const selectedSources = new Set<string>([handle.props.mediaType])
 
     return () => {
-      const { friends, mediaType, mediaTypeLabel, sources, genres, lengthOptions, generateHref, findPeopleHref } =
-        handle.props
+      const {
+        friends,
+        mediaType,
+        mediaTypeLabel,
+        sources,
+        genres,
+        lengthOptions,
+        playerTypes,
+        multiplayerTypes,
+        generateHref,
+        findPeopleHref,
+      } = handle.props
       const hasSource = selectedSources.size > 0
 
       const query = search.trim().toLowerCase()
@@ -244,11 +268,18 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
           </div>
 
           <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
-            <Collapsible summary={<span mix={sectionLabel}>Filters (optional)</span>}>
+            <details
+              open={filtersOpen}
+              mix={on('toggle', (event) => {
+                filtersOpen = (event.target as HTMLDetailsElement).open
+                handle.update()
+              })}
+            >
+            <summary mix={[sectionLabel, css({ cursor: 'pointer' })]}>Filters (optional)</summary>
             <div
               mix={css({
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
                 gap: '12px',
               })}
             >
@@ -280,8 +311,39 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   ))}
                 </select>
               </Field>
+              {playerTypes.length > 0 && (
+                <Field label="Player type">
+                  <select
+                    name="player_type"
+                    defaultValue=""
+                    mix={on('change', (event) => {
+                      playerType = (event.target as HTMLSelectElement).value
+                      handle.update()
+                    })}
+                  >
+                    <option value="">Any</option>
+                    {playerTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {PLAYER_TYPE_LABELS[type] ?? type}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+              {playerType === 'multiplayer' && multiplayerTypes.length > 0 && (
+                <Field label="Multiplayer type">
+                  <select name="multiplayer_type" defaultValue="">
+                    <option value="">Any</option>
+                    {multiplayerTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {MULTIPLAYER_TYPE_LABELS[type] ?? type}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
             </div>
-            </Collapsible>
+            </details>
           </div>
 
           <button type="submit" disabled={submitting || !hasSource}>

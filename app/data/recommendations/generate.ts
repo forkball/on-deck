@@ -207,6 +207,8 @@ export async function generateRecommendations(
     if (!titlesLikelyMatch(pick.title, match.title)) continue
     if (filters.genre && !match.tags.includes(filters.genre)) continue
     if (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade)) continue
+    if (filters.playerType && !match.tags.includes(filters.playerType)) continue
+    if (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) continue
 
     // No provider returns the length dimension on search, only on by-id — so
     // this extra round trip is paid only when the lever is set.
@@ -278,6 +280,8 @@ export async function generateRecommendations(
       genre: filters.genre,
       decade: filters.decade,
       length: filters.length,
+      playerType: filters.playerType,
+      multiplayerType: filters.multiplayerType,
       sourceTypes: profileTypes,
     } satisfies GenerationParams,
     results,

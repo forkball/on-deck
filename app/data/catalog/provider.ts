@@ -2,7 +2,7 @@ import type { Db } from '../db.ts'
 import { upsertMediaItem, rematchMediaItem, type MediaType, type RematchMediaItemResult } from '../mediaItems.ts'
 import type { MediaItem } from '../schema.ts'
 import { BOOK_GENRES, getBookById, parseGoogleBooksId, searchBooks } from './googleBooks.ts'
-import { GAME_GENRES, getGameById, parseIgdbId, searchGames } from './igdb.ts'
+import { GAME_GENRES, GAME_MULTIPLAYER_TYPES, GAME_PLAYER_TYPES, getGameById, parseIgdbId, searchGames } from './igdb.ts'
 import {
   getMovieById,
   getTvShowById,
@@ -32,6 +32,10 @@ export interface CatalogProvider {
   getById(externalId: string): Promise<CatalogSearchResult | null>
   // Genre vocabulary offered by the recommendation filter for this type.
   genres: string[]
+  // Games-only: no other provider has a player-count concept, so these are
+  // absent (rather than empty) for every other type.
+  playerTypes?: string[]
+  multiplayerTypes?: string[]
   // Turns what the "wrong match?" form accepts — a pasted URL or bare id —
   // into an external id, or null.
   parseExternalId(input: string): string | null
@@ -99,6 +103,8 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
     search: searchGames,
     getById: getGameById,
     genres: GAME_GENRES,
+    playerTypes: GAME_PLAYER_TYPES,
+    multiplayerTypes: GAME_MULTIPLAYER_TYPES,
     parseExternalId: parseIgdbId,
     matchHint: 'Paste an IGDB game link.',
     lookupFailedError: "Couldn't find that on IGDB — check the link.",
