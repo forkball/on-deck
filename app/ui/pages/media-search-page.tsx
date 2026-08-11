@@ -11,6 +11,7 @@ import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
 import { Document } from '../components/document.tsx'
 import { FloatingDropdown } from '../components/floating-dropdown.tsx'
 import { Nav } from '../components/nav.tsx'
+import { LikedDisplay, LikedInput } from '../components/liked-input.tsx'
 import { StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { StatusSelect } from '../components/status-select.tsx'
 import { Field } from '../shared/field.tsx'
@@ -150,6 +151,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                                 <StarRatingDisplay value={interaction.rating} /> ({interaction.rating})
                               </>
                             )}
+                            {interaction.liked != null && <LikedDisplay value={interaction.liked} />}
                           </p>
                         )}
 
@@ -175,6 +177,14 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                                     name="rating"
                                     idPrefix={`rating-${item.id}`}
                                     defaultValue={interaction?.rating ?? null}
+                                  />
+                                </div>
+                                <div>
+                                  <p mix={css({ margin: '0 0 4px' })}>Verdict</p>
+                                  <LikedInput
+                                    name="liked"
+                                    idPrefix={`liked-${item.id}`}
+                                    defaultValue={interaction?.liked ?? null}
                                   />
                                 </div>
                                 <Field label="Add thoughts">

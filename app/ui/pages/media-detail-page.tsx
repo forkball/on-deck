@@ -15,6 +15,7 @@ import { StatusSelect } from '../components/status-select.tsx'
 import { Collapsible } from '../shared/collapsible.tsx'
 import { Field } from '../shared/field.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
+import { LikedDisplay, LikedInput } from '../components/liked-input.tsx'
 import { StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { backLinkFrom } from '../backLink.ts'
 
@@ -165,6 +166,11 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                           <StarRatingDisplay value={interaction.rating} /> ({interaction.rating})
                         </p>
                       )}
+                      {interaction.liked != null && (
+                        <p mix={css({ margin: '8px 0 0' })}>
+                          <LikedDisplay value={interaction.liked} />
+                        </p>
+                      )}
                       {interaction.notes && <p mix={css({ margin: '8px 0 0', fontStyle: 'italic' })}>"{interaction.notes}"</p>}
                     </>
                   ) : (
@@ -203,6 +209,14 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                           name="rating"
                           idPrefix={`rating-${item.id}`}
                           defaultValue={interaction?.rating ?? null}
+                        />
+                      </div>
+                      <div>
+                        <p mix={css({ margin: '0 0 4px' })}>Verdict</p>
+                        <LikedInput
+                          name="liked"
+                          idPrefix={`liked-${item.id}`}
+                          defaultValue={interaction?.liked ?? null}
                         />
                       </div>
                       <Field label="Notes">

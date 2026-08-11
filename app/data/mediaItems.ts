@@ -170,6 +170,10 @@ export interface LogInteractionInput {
   // data/imports/. The forms always pass one of the other two, which is what
   // makes the picker's "No rating" option stick.
   rating?: number | null
+  // The verdict, on the same three-state rule as `rating` above: undefined
+  // leaves it, null is "hasn't said", true/false is the answer. Independent of
+  // the rating on purpose — either can be given without the other.
+  liked?: boolean | null
   notes: string | null
   // Overrides the consumed_at timestamp instead of stamping "now" — used by
   // the Letterboxd import to preserve the original watch/rating date.
@@ -193,6 +197,16 @@ export function normalizeRating(raw: number | null | undefined): number | null {
   return rounded < 0.5 ? null : rounded
 }
 
+// The verdict control submits one of three values. Anything else — a field
+// that never rendered, a tampered request — reads as "hasn't said" rather than
+// as a dislike, which is the only safe way to be wrong about this.
+export function parseLikedInput(raw: string): boolean | null {
+  const trimmed = raw.trim()
+  if (trimmed === 'yes') return true
+  if (trimmed === 'no') return false
+  return null
+}
+
 // Atomic on (user_id, media_item_id): findOne-then-write races when the
 // Letterboxd import runs 8 of these in parallel and two rows resolve to the
 // same movie. The unique constraint is what makes ON CONFLICT possible.
@@ -214,6 +228,7 @@ export async function logInteraction(
     media_item_id: mediaItemId,
     status: input.status,
     rating: input.rating ?? undefined,
+    liked: input.liked ?? undefined,
     notes: input.notes ?? undefined,
     created_at: now,
     updated_at: activityAt,
@@ -227,9 +242,12 @@ export async function logInteraction(
   }
   // Written only when the caller has an opinion: `??` would fold "no rating"
   // back into "don't touch it", which is what made a rating impossible to
-  // clear once given.
+  // clear once given. Same for the verdict.
   if (input.rating !== undefined) {
     update.rating = input.rating
+  }
+  if (input.liked !== undefined) {
+    update.liked = input.liked
   }
   if (input.status === 'consumed') {
     values.consumed_at = consumedAt
@@ -259,6 +277,7 @@ export async function updateInteraction(
     status: input.status,
     // Same three-state rule as logInteraction: undefined leaves it, null clears it.
     ...(input.rating !== undefined ? { rating: input.rating } : {}),
+    ...(input.liked !== undefined ? { liked: input.liked } : {}),
     notes: input.notes ?? undefined,
     consumed_at: input.status === 'consumed' ? (existing.consumed_at ?? now) : (existing.consumed_at ?? undefined),
     updated_at: now,

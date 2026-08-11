@@ -56,6 +56,11 @@ export const userMediaInteractions = table({
     // and a write clearing the rating doesn't typecheck, which is what let
     // "can't be cleared" survive as long as it did.
     rating: c.decimal(3, 1).nullable(),
+    // Did they like it — asked apart from how they'd score it, because a
+    // verdict and a number are different questions and plenty of people will
+    // give the first without the second. Nullable for the same reason `rating`
+    // is: null is "hasn't said", distinct from false.
+    liked: c.boolean().nullable(),
     notes: c.text(),
     consumed_at: c.integer(),
     created_at: c.integer().notNull(),

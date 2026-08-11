@@ -11,6 +11,7 @@ import {
   getUserInteractionForItem,
   getUserInteractionsForItems,
   logInteraction,
+  parseLikedInput,
   parseRatingInput,
 } from '../data/mediaItems.ts'
 import { INTERACTION_STATUSES, type User } from '../data/schema.ts'
@@ -30,6 +31,7 @@ const SEARCH_INITIAL_VISIBLE = 10
 const logSchema = f.object({
   status: f.field(s.enum_(INTERACTION_STATUSES)),
   rating: f.field(s.defaulted(s.string(), '')),
+  liked: f.field(s.defaulted(s.string(), '')),
   notes: f.field(s.defaulted(s.string(), '')),
   return_to: f.field(s.defaulted(s.string(), '')),
 })
@@ -212,6 +214,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       await logInteraction(db, identity.id, mediaItemId, {
         status: parsed.value.status,
         rating,
+        liked: parseLikedInput(parsed.value.liked),
         notes: parsed.value.notes || null,
       })
 

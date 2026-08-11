@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { DEFAULT_MEDIA_TYPE, parseMediaType, statusLabelsFor } from '../../mediaTypes.ts'
+import { LikedDisplay } from './liked-input.tsx'
 import { StarRatingDisplay } from './star-rating.tsx'
 
 export interface WatchedListItemProps {
@@ -72,6 +73,11 @@ export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
             {interaction.rating != null && (
               <p mix={css({ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0 0' })}>
                 <StarRatingDisplay value={interaction.rating} /> ({interaction.rating})
+              </p>
+            )}
+            {interaction.liked != null && (
+              <p mix={css({ margin: '4px 0 0' })}>
+                <LikedDisplay value={interaction.liked} />
               </p>
             )}
             {interaction.notes && (

@@ -5,7 +5,12 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { deleteInteraction, parseRatingInput, updateInteraction } from '../../data/mediaItems.ts'
+import {
+  deleteInteraction,
+  parseLikedInput,
+  parseRatingInput,
+  updateInteraction,
+} from '../../data/mediaItems.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { INTERACTION_STATUSES, type User } from '../../data/schema.ts'
 import { routes } from '../../routes.ts'
@@ -13,6 +18,7 @@ import { routes } from '../../routes.ts'
 const updateSchema = f.object({
   status: f.field(s.enum_(INTERACTION_STATUSES)),
   rating: f.field(s.defaulted(s.string(), '')),
+  liked: f.field(s.defaulted(s.string(), '')),
   notes: f.field(s.defaulted(s.string(), '')),
   return_to: f.field(s.defaulted(s.string(), '')),
 })
@@ -36,6 +42,7 @@ export default createController(routes.interactions, {
       const updated = await updateInteraction(db, interactionId, auth.identity.id, {
         status: parsed.value.status,
         rating: parseRatingInput(parsed.value.rating),
+        liked: parseLikedInput(parsed.value.liked),
         notes: parsed.value.notes || null,
       })
 

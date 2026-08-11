@@ -8,6 +8,7 @@ import { FrameForm } from '../../browser/frame-form.tsx'
 import { Field } from '../../ui/shared/field.tsx'
 import { Document } from '../../ui/components/document.tsx'
 import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
+import { LikedInput } from '../../ui/components/liked-input.tsx'
 import { StarRatingInput } from '../../ui/components/star-rating.tsx'
 import { StatusSelect } from '../../ui/components/status-select.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
@@ -204,6 +205,14 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                               name="rating"
                               idPrefix={`rec-rating-${item.id}`}
                               defaultValue={interaction?.rating ?? null}
+                            />
+                          </div>
+                          <div>
+                            <p mix={css({ margin: '0 0 4px' })}>Verdict</p>
+                            <LikedInput
+                              name="liked"
+                              idPrefix={`rec-liked-${item.id}`}
+                              defaultValue={interaction?.liked ?? null}
                             />
                           </div>
                           <Field label="Add thoughts">
