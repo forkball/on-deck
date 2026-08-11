@@ -46,7 +46,18 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
                       backgroundColor: notification.read ? 'transparent' : 'rgba(21, 128, 61, 0.06)',
                     })}
                   >
-                    <a href={routes.notifications.read.href({ notificationId: String(notification.id) })}>
+                    {/*
+                      `rmx-document` is load-bearing: the `read` route only ever
+                      redirects (to the follower's profile or the run), it never
+                      renders a notifications-shaped page itself. Without this,
+                      the framework does a client-side frame reload and has
+                      nothing matching to patch the redirected page into, so the
+                      tap appears to do nothing and the list is left stale.
+                    */}
+                    <a
+                      href={routes.notifications.read.href({ notificationId: String(notification.id) })}
+                      rmx-document=""
+                    >
                       <strong>{notification.actorLabel}</strong>{' '}
                       {notification.type === 'follow'
                         ? 'started following you'
