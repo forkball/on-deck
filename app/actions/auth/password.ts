@@ -3,6 +3,12 @@ import { promisify } from 'node:util'
 
 const scrypt = promisify(scryptCallback)
 
+// Enforced wherever a password is chosen — signup and profile editing — so
+// the rule can't hold on one path and not the other. Only new passwords are
+// measured: an existing one is checked against its hash, whatever length it
+// was set under.
+export const PASSWORD_MIN_LENGTH = 8
+
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16)
   const derivedKey = (await scrypt(password, salt, 64)) as Buffer

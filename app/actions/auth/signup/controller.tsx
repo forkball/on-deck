@@ -1,24 +1,37 @@
 import { completeAuth } from 'remix/auth'
 import * as s from 'remix/data-schema'
-import { email, minLength } from 'remix/data-schema/checks'
+import { minLength } from 'remix/data-schema/checks'
 import * as f from 'remix/data-schema/form-data'
 import { Database } from 'remix/data-table'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import { users } from '../../../data/schema.ts'
+import {
+  emailSchema,
+  findUserByEmail,
+  findUserByUsername,
+  USER_FIELD_MESSAGES,
+  userFieldErrors,
+  usernameSchema,
+} from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI } from '../../../mediaTypes.ts'
-import { hashPassword } from '../password.ts'
+import { hashPassword, PASSWORD_MIN_LENGTH } from '../password.ts'
 import { SignupPage } from './page.tsx'
 
 const signupSchema = f.object({
-  email: f.field(s.string().pipe(email())),
-  password: f.field(s.string().pipe(minLength(8))),
-  // Doubles as a login handle (see auth/login/controller.tsx), so it has to
-  // be non-empty and unique like email.
-  display_name: f.field(s.string().pipe(minLength(1))),
+  // Email and username are validated by the same rules the edit-profile form
+  // uses — see data/users.ts.
+  email: f.field(emailSchema),
+  password: f.field(s.string().pipe(minLength(PASSWORD_MIN_LENGTH))),
+  display_name: f.field(usernameSchema),
 })
+
+const SIGNUP_MESSAGES = {
+  ...USER_FIELD_MESSAGES,
+  password: `Passwords must be at least ${PASSWORD_MIN_LENGTH} characters.`,
+}
 
 export default createController(routes.auth.signup, {
   actions: {
@@ -29,37 +42,30 @@ export default createController(routes.auth.signup, {
       const formData = context.get(FormData)
       const parsed = s.parseSafe(signupSchema, formData)
 
+      const values = Object.fromEntries(formData) as Record<string, string>
+
       if (!parsed.success) {
         return context.render(
-          <SignupPage
-            error="Please enter a valid email, a username, and a password of at least 8 characters."
-            values={Object.fromEntries(formData) as Record<string, string>}
-          />,
+          <SignupPage errors={userFieldErrors(parsed.issues, SIGNUP_MESSAGES)} values={values} />,
           { status: 400 },
         )
       }
 
       const db = context.get(Database)
-      const existing = await db.findOne(users, { where: { email: parsed.value.email } })
-      if (existing) {
-        return context.render(
-          <SignupPage
-            error="An account with that email already exists."
-            values={Object.fromEntries(formData) as Record<string, string>}
-          />,
-          { status: 409 },
-        )
+
+      // Both columns are unique, so this is checked twice over: here, to say
+      // which field collided, and by the index, which is what actually holds
+      // under a race.
+      const errors: Record<string, string> = {}
+      if (await findUserByEmail(db, parsed.value.email)) {
+        errors.email = 'An account with that email already exists.'
+      }
+      if (await findUserByUsername(db, parsed.value.display_name)) {
+        errors.display_name = 'That username is already taken.'
       }
 
-      const existingByName = await db.findOne(users, { where: { display_name: parsed.value.display_name } })
-      if (existingByName) {
-        return context.render(
-          <SignupPage
-            error="That username is already taken."
-            values={Object.fromEntries(formData) as Record<string, string>}
-          />,
-          { status: 409 },
-        )
+      if (Object.keys(errors).length > 0) {
+        return context.render(<SignupPage errors={errors} values={values} />, { status: 409 })
       }
 
       const passwordHash = await hashPassword(parsed.value.password)

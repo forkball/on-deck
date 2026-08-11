@@ -34,19 +34,23 @@ export const fieldStyle = css({
 
 const labelTextStyle = css({ fontSize: '13px', color: '#555' })
 const hintStyle = css({ display: 'block', margin: '4px 0 0', fontSize: '12px', color: '#888' })
+const errorStyle = css({ display: 'block', margin: '4px 0 0', fontSize: '12px', color: '#b91c1c' })
 
 export interface FieldProps {
   label: string
   children?: RemixNode
   // Helper text under the control — e.g. explaining what a filter does.
   hint?: RemixNode
+  // Why this field was rejected, rendered under the control. Sits inside the
+  // <label> so a screen reader reads it with the field it belongs to.
+  error?: string
 }
 
 // The single way to render a labelled control. Every text input, select and
 // textarea in the app goes through this so they can't drift apart.
 export function Field(handle: Handle<FieldProps>) {
   return () => {
-    const { label, children, hint } = handle.props
+    const { label, children, hint, error } = handle.props
 
     return (
       <label mix={fieldStyle}>
@@ -54,6 +58,7 @@ export function Field(handle: Handle<FieldProps>) {
           {label}
         </span>
         {children}
+        {error && <span mix={errorStyle}>{error}</span>}
         {hint && <span mix={hintStyle}>{hint}</span>}
       </label>
     )

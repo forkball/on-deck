@@ -23,9 +23,17 @@ const passwordProvider = createCredentialsAuthProvider<{ identifier: string; pas
     return s.parse(loginSchema, formData)
   },
   // `identifier` matches either handle — email and display_name can never
-  // collide since both are unique, so at most one row matches.
+  // collide, since both are unique and usernames may not contain '@' (see
+  // data/users.ts), so at most one row matches.
+  //
+  // Emails are stored lowercased, so the email arm has to lowercase what was
+  // typed or an address entered with capitals finds nothing. Usernames are
+  // stored as written and matched as written.
   async verify({ identifier, password }) {
-    const user = await db.findOne(users, { where: or(eq('email', identifier), eq('display_name', identifier)) })
+    const handle = identifier.trim()
+    const user = await db.findOne(users, {
+      where: or(eq('email', handle.toLowerCase()), eq('display_name', handle)),
+    })
     if (!user || !(await verifyPassword(password, user.password_hash))) {
       return null
     }

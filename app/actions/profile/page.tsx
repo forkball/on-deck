@@ -6,9 +6,7 @@ import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../me
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
-import { Field } from '../../ui/shared/field.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
-import { Modal } from '../../ui/components/modal.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
@@ -130,7 +128,17 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       <Document title="My profile | On Deck">
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>{displayName}</h1>
+          <div mix={css({ display: 'flex', alignItems: 'baseline', gap: '12px' })}>
+            <h1>{displayName}</h1>
+            <a
+              href={routes.profile.edit.index.href()}
+              title="Edit profile"
+              aria-label="Edit profile"
+              mix={css({ fontSize: '20px', textDecoration: 'none' })}
+            >
+              ✎
+            </a>
+          </div>
           <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
             <a href={routes.profile.following.href()}>{followingCount} following</a> ·{' '}
             <a href={routes.profile.followers.href()}>
@@ -139,42 +147,16 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           </p>
           {saved && <p mix={css({ color: '#15803d' })}>Saved.</p>}
 
-          <h2>Bio</h2>
-          <div
-            mix={css({
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              gap: '16px',
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              padding: '16px',
-            })}
-          >
-            {bio ? (
-              <p mix={css({ margin: 0, whiteSpace: 'pre-wrap' })}>{bio}</p>
-            ) : (
-              <p mix={css({ margin: 0, color: '#555' })}>
-                Nothing yet — just for other people to read, it has no effect on your recommendations.
-              </p>
-            )}
-            <Modal id="edit-bio" triggerLabel="Edit" title="Edit your bio">
-              <form
-                method="post"
-                action={routes.profile.updateBio.href()}
-                mix={css({ display: 'flex', flexDirection: 'column', gap: '8px' })}
-              >
-                <input type="hidden" name="_method" value="PUT" />
-                <Field
-                  label="Bio"
-                  hint="Just for other people to read — it has no effect on your recommendations."
-                >
-                  <textarea name="bio" rows={4} defaultValue={bio} placeholder="Tell people a bit about yourself…" />
-                </Field>
-                <button type="submit">Save bio</button>
-              </form>
-            </Modal>
-          </div>
+          {/* Rendered the way other people see it on users/show-page —
+              editing it lives behind the pencil above. */}
+          {bio ? (
+            <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>
+          ) : (
+            <p mix={css({ color: '#555' })}>
+              No bio yet — <a href={routes.profile.edit.index.href()}>add one</a> for other people to read.
+              It has no effect on your recommendations.
+            </p>
+          )}
 
           <MediaTabs
             idPrefix="profile"

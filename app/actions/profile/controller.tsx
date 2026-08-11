@@ -1,7 +1,6 @@
 import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
-import { redirect } from 'remix/response/redirect'
 
 import {
   countFollowers,
@@ -14,7 +13,7 @@ import { countUserMediaLog, listUserMediaLog } from '../../data/mediaItems.ts'
 import { loadMediaSummaries } from '../../data/mediaSummary.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
-import { displayLabel, updateUserBio } from '../../data/users.ts'
+import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType, parseInteractionStatus } from '../../mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
@@ -50,19 +49,6 @@ export default createController(routes.profile, {
           displayName={displayLabel(auth.identity)}
         />,
       )
-    },
-
-    async updateBio(context) {
-      const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
-
-      const formData = context.get(FormData)
-      const bio = String(formData.get('bio') || '').trim()
-
-      const db = context.get(Database)
-      await updateUserBio(db, auth.identity.id, bio)
-
-      return redirect(`${routes.profile.index.href()}?saved=1`, 303)
     },
 
     async watched(context) {

@@ -62,7 +62,10 @@ export const routes = route({
     watched: get('watched'),
     following: get('following'),
     followers: get('followers'),
-    updateBio: put('bio'),
+    // Email, username and bio, on their own page rather than inline on the
+    // profile — the two handles are unique and validated, so editing them
+    // needs somewhere to put per-field errors.
+    edit: form('edit', { formMethod: 'PUT', names: { action: 'update' } }),
     importMovies: route('import-movies', {
       index: get('/'),
       upload: post('/'),
