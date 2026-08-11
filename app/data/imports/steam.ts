@@ -77,7 +77,9 @@ export async function importSteamLibrary(db: Db, userId: number, steamId: string
     const item = await upsertCatalogItem(db, 'game', match)
     await logInteraction(db, userId, item.id, {
       status,
-      rating: null,
+      // Omitted, not null: Steam has no notion of a rating, so re-importing a
+      // library must leave any rating already given here alone rather than
+      // clearing it.
       notes: null,
       // Steam knows how long, never when, so this stays unset.
     })

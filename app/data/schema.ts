@@ -51,7 +51,11 @@ export const userMediaInteractions = table({
     user_id: c.integer().notNull().references('users', 'id'),
     media_item_id: c.integer().notNull().references('media_items', 'id'),
     status: c.enum(INTERACTION_STATUSES).notNull(),
-    rating: c.decimal(3, 1),
+    // Explicitly nullable, because null is a value this column means something
+    // by: unrated, as opposed to rated. Without it the row type says `number`
+    // and a write clearing the rating doesn't typecheck, which is what let
+    // "can't be cleared" survive as long as it did.
+    rating: c.decimal(3, 1).nullable(),
     notes: c.text(),
     consumed_at: c.integer(),
     created_at: c.integer().notNull(),

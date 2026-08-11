@@ -103,7 +103,10 @@ export async function regenerateTasteProfile(
           `in what's above — no invented facts. Also derive liked_tags and disliked_tags: short, ` +
           `lowercase genre/mood/style tags (e.g. "slow-burn", "dystopian", "feel-good") inferred ` +
           `from what they rated highly vs. poorly. A "not_interested" status is one they turned ` +
-          `down without trying — a dislike signal in its own right, carrying no rating.`,
+          `down without trying — a dislike signal in its own right, carrying no rating. ` +
+          `A null rating on any other status means they simply never rated it: infer nothing ` +
+          `about whether they liked it, and never treat it as a low score. Ratings run 0.5 to 5, ` +
+          `so the bottom of the scale is 0.5, not 0.`,
       },
     ],
   })

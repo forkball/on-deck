@@ -86,7 +86,10 @@ export async function importGoodreadsLibrary(
     const item = await upsertMediaItem(db, 'book', match, SOURCE)
     await logInteraction(db, userId, item.id, {
       status: row.status,
-      rating: row.rating,
+      // Goodreads writes 0 for an unrated book, already folded to null on the
+      // way in. Omitted rather than passed through, so re-importing a shelf
+      // can't clear a rating given here after the export was taken.
+      rating: row.rating ?? undefined,
       notes: row.notes,
       // Only "read" rows carry a date.
       consumedAt: row.readAt ?? undefined,

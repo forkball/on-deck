@@ -56,55 +56,76 @@ const STEPS = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5]
 
 // 10 radios in descending DOM order, displayed row-reverse so `:checked ~ label`
 // fills the current star plus every lower one. No JS.
+//
+// An eleventh radio carries "No rating", and deliberately sits outside the star
+// strip rather than becoming a zero-star step on the left of it. Unrated is not
+// the bottom of the scale — plenty of a log is things someone finished and
+// never scored, which says nothing about whether they liked them. Putting it in
+// line with the stars would read as exactly the low score it isn't. It is also
+// the only way back out of a rating: radios can't be unchecked, so without it a
+// rating given once could never be removed.
 export function StarRatingInput(
   handle: Handle<{ name: string; defaultValue: number | null; idPrefix?: string }>,
 ) {
   return () => {
     const { name, defaultValue, idPrefix = name } = handle.props
     const half = STAR_SIZE / 2
+    const noRatingId = `${idPrefix}-none`
 
     return (
-      <span
-        mix={css({
-          display: 'inline-flex',
-          flexDirection: 'row-reverse',
-          verticalAlign: 'middle',
-          '& input': {
-            position: 'absolute',
-            width: 0,
-            height: 0,
-            opacity: 0,
-            pointerEvents: 'none',
-          },
-          '& label': {
-            display: 'inline-block',
-            width: `${half}px`,
-            height: `${STAR_SIZE}px`,
-            overflow: 'hidden',
-            cursor: 'pointer',
-            backgroundImage: 'url(/vendor/stars/star-outline.svg)',
-            backgroundSize: `${STAR_SIZE}px ${STAR_SIZE}px`,
-            backgroundRepeat: 'no-repeat',
-          },
-          '& input:checked ~ label, & input:checked + label': {
-            backgroundImage: 'url(/vendor/stars/star-filled.svg)',
-          },
-        })}
-      >
-        {STEPS.map((step) => {
-          const isRightHalf = Number.isInteger(step)
-          const id = `${idPrefix}-${String(step).replace('.', '_')}`
-          return (
-            <Fragment key={step}>
-              <input type="radio" id={id} name={name} value={step} defaultChecked={defaultValue === step} />
-              <label
-                for={id}
-                title={String(step)}
-                mix={css({ backgroundPosition: isRightHalf ? `-${half}px 0` : '0 0' })}
-              />
-            </Fragment>
-          )
-        })}
+      <span mix={css({ display: 'inline-flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' })}>
+        <span
+          mix={css({
+            display: 'inline-flex',
+            flexDirection: 'row-reverse',
+            verticalAlign: 'middle',
+            '& input': {
+              position: 'absolute',
+              width: 0,
+              height: 0,
+              opacity: 0,
+              pointerEvents: 'none',
+            },
+            '& label': {
+              display: 'inline-block',
+              width: `${half}px`,
+              height: `${STAR_SIZE}px`,
+              overflow: 'hidden',
+              cursor: 'pointer',
+              backgroundImage: 'url(/vendor/stars/star-outline.svg)',
+              backgroundSize: `${STAR_SIZE}px ${STAR_SIZE}px`,
+              backgroundRepeat: 'no-repeat',
+            },
+            '& input:checked ~ label, & input:checked + label': {
+              backgroundImage: 'url(/vendor/stars/star-filled.svg)',
+            },
+          })}
+        >
+          {STEPS.map((step) => {
+            const isRightHalf = Number.isInteger(step)
+            const id = `${idPrefix}-${String(step).replace('.', '_')}`
+            return (
+              <Fragment key={step}>
+                <input type="radio" id={id} name={name} value={step} defaultChecked={defaultValue === step} />
+                <label
+                  for={id}
+                  title={String(step)}
+                  mix={css({ backgroundPosition: isRightHalf ? `-${half}px 0` : '0 0' })}
+                />
+              </Fragment>
+            )
+          })}
+        </span>
+
+        {/* Same radio group, so picking this deselects the stars. It sits
+            outside the strip above, whose `input:checked ~ label` fill rules
+            would otherwise treat it as a step. Checked when nothing is rated,
+            so the form always submits an explicit answer rather than omitting
+            the field — that is what makes clearing a rating reach the server. */}
+        <span mix={css({ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px' })}>
+          <input type="radio" id={noRatingId} name={name} value="" defaultChecked={defaultValue == null} />
+          <label for={noRatingId}>No rating</label>
+        </span>
       </span>
     )
   }

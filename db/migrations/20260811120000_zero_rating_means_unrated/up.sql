@@ -1,0 +1,15 @@
+-- A rating of 0 is not a point on the scale. The picker offers 0.5-5, and
+-- "I never rated this" is a different claim from "I rated this the lowest it
+-- goes" — a log is full of things someone finished and never scored, which
+-- says nothing about whether they liked them. Unrated is now spelled null
+-- everywhere, and the picker has an explicit "No rating" option that writes it.
+--
+-- The 0s already stored came from one place: the Letterboxd import read the
+-- Rating column with Number(), and Number('') is 0, so every blank cell landed
+-- as a zero-star review. Nothing else could write one — Goodreads folded 0 to
+-- null on the way in, Steam wrote null, and the form path clamped anything
+-- below half a star up to 0.5.
+--
+-- Left as ratings these rows keep rendering as a bottom-of-the-scale score the
+-- person never gave, and the recommendation pipeline reads them as dislikes.
+update user_media_interactions set rating = null where rating = 0;

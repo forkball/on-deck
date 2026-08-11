@@ -163,19 +163,34 @@ export interface UserLogEntry {
 
 export interface LogInteractionInput {
   status: InteractionStatus
-  rating: number | null
+  // Three states, not two. `undefined` leaves whatever is already stored
+  // alone; `null` is the user saying "no rating" and clears it. Importers pass
+  // `undefined` for a row they know nothing about, so re-running an import
+  // can't wipe a rating its source never carried — see the callers in
+  // data/imports/. The forms always pass one of the other two, which is what
+  // makes the picker's "No rating" option stick.
+  rating?: number | null
   notes: string | null
   // Overrides the consumed_at timestamp instead of stamping "now" — used by
   // the Letterboxd import to preserve the original watch/rating date.
   consumedAt?: number
 }
 
-// Clamps to 0.5-5 in half-star steps — the picker only submits valid values,
-// but the request could be tampered with.
+// The rating scale runs 0.5-5 in half-star steps. 0 is not the bottom of it:
+// "I never rated this" and "I rated this the lowest it goes" are different
+// claims, and only the second one belongs on the scale. Everything at or
+// below 0 — an empty submission, a tampered request, a blank cell in an
+// export — resolves to null, meaning unrated.
 export function parseRatingInput(raw: string): number | null {
-  const trimmed = raw.trim()
-  if (!trimmed || !Number.isFinite(Number(trimmed))) return null
-  return Math.min(5, Math.max(0.5, Math.round(Number(trimmed) * 2) / 2))
+  return normalizeRating(raw.trim() === '' ? null : Number(raw))
+}
+
+// The single gate every rating passes through, whether it came from the picker
+// or an importer. Anything that isn't a usable point on the scale is unrated.
+export function normalizeRating(raw: number | null | undefined): number | null {
+  if (raw == null || !Number.isFinite(raw)) return null
+  const rounded = Math.min(5, Math.round(raw * 2) / 2)
+  return rounded < 0.5 ? null : rounded
 }
 
 // Atomic on (user_id, media_item_id): findOne-then-write races when the
@@ -207,9 +222,14 @@ export async function logInteraction(
   // status/rating/notes leaves an existing consumed_at alone.
   const update: Partial<UserMediaInteraction> = {
     status: input.status,
-    rating: input.rating ?? undefined,
     notes: input.notes ?? undefined,
     updated_at: activityAt,
+  }
+  // Written only when the caller has an opinion: `??` would fold "no rating"
+  // back into "don't touch it", which is what made a rating impossible to
+  // clear once given.
+  if (input.rating !== undefined) {
+    update.rating = input.rating
   }
   if (input.status === 'consumed') {
     values.consumed_at = consumedAt
@@ -237,7 +257,8 @@ export async function updateInteraction(
   const now = Date.now()
   return db.update(userMediaInteractions, interactionId, {
     status: input.status,
-    rating: input.rating ?? undefined,
+    // Same three-state rule as logInteraction: undefined leaves it, null clears it.
+    ...(input.rating !== undefined ? { rating: input.rating } : {}),
     notes: input.notes ?? undefined,
     consumed_at: input.status === 'consumed' ? (existing.consumed_at ?? now) : (existing.consumed_at ?? undefined),
     updated_at: now,

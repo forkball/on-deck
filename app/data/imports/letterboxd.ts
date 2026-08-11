@@ -1,12 +1,15 @@
 import type { Db } from '../db.ts'
 import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
-import { logInteraction } from '../mediaItems.ts'
+import { logInteraction, normalizeRating } from '../mediaItems.ts'
 import { headerIndex, parseCsv, runBounded } from './csv.ts'
 
 interface RatingRow {
   title: string
   year: number | null
-  rating: number
+  // Null for a row with no score on it. Letterboxd's export leaves the Rating
+  // cell blank rather than writing a 0, and a blank one is a film someone
+  // watched without rating — not a film they gave nothing to.
+  rating: number | null
   watchedAt: number
 }
 
@@ -41,7 +44,10 @@ export async function importLetterboxdRatings(
     const item = await upsertCatalogItem(db, 'movie', match)
     await logInteraction(db, userId, item.id, {
       status: 'consumed',
-      rating: row.rating,
+      // An unrated row leaves an existing rating alone rather than clearing it:
+      // a blank cell in an export is an absence of information, not an
+      // instruction to forget what was rated here.
+      rating: row.rating ?? undefined,
       notes: null,
       consumedAt: row.watchedAt,
     })
@@ -83,9 +89,12 @@ function parseRatingsCsv(text: string): RatingRow[] {
   for (const record of table.slice(1)) {
     if (record.length === 0 || (record.length === 1 && record[0] === '')) continue
 
-    const rating = Number(record[ratingIndex])
+    // `Number('')` is 0, so a blank cell used to import as a zero-star review.
+    // normalizeRating is what turns it back into "unrated"; the row itself is
+    // still a film they watched, so only an unreadable date drops it.
+    const rating = normalizeRating(Number(record[ratingIndex]))
     const watchedAt = Date.parse(record[dateIndex])
-    if (!Number.isFinite(rating) || Number.isNaN(watchedAt)) continue
+    if (Number.isNaN(watchedAt)) continue
 
     const year = yearIndex === -1 ? null : Number(record[yearIndex]) || null
 
