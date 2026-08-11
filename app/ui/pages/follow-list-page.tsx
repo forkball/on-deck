@@ -15,6 +15,10 @@ export interface FollowListPageProps {
   // name links to a profile (you can only view profiles of people you
   // follow, see requireFollowedUser) and drives the Follow/Unfollow button.
   followingByUserId: Map<number, boolean>
+  // The viewer, so their own row can be marked and left without a Follow
+  // button. They legitimately appear in these lists — you are one of the
+  // people who follows the person whose followers you're reading.
+  viewerId: number
   emptyMessage: string
   returnTo: string
   displayName: string
@@ -25,7 +29,8 @@ export interface FollowListPageProps {
 // results, just sourced from a follow list instead of a name search.
 export function FollowListPage(handle: Handle<FollowListPageProps>) {
   return () => {
-    const { title, heading, users, followingByUserId, emptyMessage, returnTo, displayName } = handle.props
+    const { title, heading, users, followingByUserId, viewerId, emptyMessage, returnTo, displayName } =
+      handle.props
 
     return (
       <Document title={`${title} | On Deck`}>
@@ -39,6 +44,7 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
             <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' })}>
               {users.map((user) => {
                 const following = followingByUserId.get(user.id) ?? false
+                const isViewer = user.id === viewerId
                 return (
                   <li
                     key={user.id}
@@ -60,17 +66,21 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
                       <strong>{displayLabel(user)}</strong>
                     )}
 
-                    <form
-                      method="post"
-                      action={
-                        following
-                          ? routes.users.unfollow.href({ userId: String(user.id) })
-                          : routes.users.follow.href({ userId: String(user.id) })
-                      }
-                    >
-                      <input type="hidden" name="return_to" value={returnTo} />
-                      <button type="submit">{following ? 'Unfollow' : 'Follow'}</button>
-                    </form>
+                    {isViewer ? (
+                      <span mix={css({ fontSize: '13px', color: '#555' })}>You</span>
+                    ) : (
+                      <form
+                        method="post"
+                        action={
+                          following
+                            ? routes.users.unfollow.href({ userId: String(user.id) })
+                            : routes.users.follow.href({ userId: String(user.id) })
+                        }
+                      >
+                        <input type="hidden" name="return_to" value={returnTo} />
+                        <button type="submit">{following ? 'Unfollow' : 'Follow'}</button>
+                      </form>
+                    )}
                   </li>
                 )
               })}

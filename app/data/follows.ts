@@ -5,6 +5,13 @@ import { createNotification } from './notifications.ts'
 import { userFollows, users, type User } from './schema.ts'
 
 export async function followUser(db: Db, followerId: number, followedId: number): Promise<void> {
+  // Nobody follows themselves. The button that would do it isn't rendered
+  // any more (see FollowListPage), but this is the check that holds for a
+  // POST made directly, and it sits here rather than in the controller so
+  // every caller gets it. The check constraint behind it makes a row that
+  // got past both unstorable.
+  if (followerId === followedId) return
+
   const existing = await db.findOne(userFollows, {
     where: { follower_id: followerId, followed_id: followedId },
   })

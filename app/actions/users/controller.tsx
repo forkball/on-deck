@@ -162,6 +162,7 @@ export default createController(routes.users, {
           title={`${label}'s following`}
           heading={`Who ${label} follows`}
           users={targetUsers}
+          viewerId={auth.identity.id}
           followingByUserId={new Map(targetUsers.map((u) => [u.id, followingIds.has(u.id)]))}
           emptyMessage={`${label} isn't following anyone yet.`}
           returnTo={routes.users.following.href({ userId: String(userId) })}
@@ -188,6 +189,7 @@ export default createController(routes.users, {
           title={`${label}'s followers`}
           heading={`${label}'s followers`}
           users={targetUsers}
+          viewerId={auth.identity.id}
           followingByUserId={new Map(targetUsers.map((u) => [u.id, followingIds.has(u.id)]))}
           emptyMessage={`No one follows ${label} yet.`}
           returnTo={routes.users.followers.href({ userId: String(userId) })}

@@ -98,6 +98,7 @@ export default createController(routes.profile, {
           title="Following"
           heading="Following"
           users={users}
+          viewerId={auth.identity.id}
           followingByUserId={new Map(users.map((u) => [u.id, followingIds.has(u.id)]))}
           emptyMessage="You're not following anyone yet."
           returnTo={routes.profile.following.href()}
@@ -119,6 +120,7 @@ export default createController(routes.profile, {
           title="Followers"
           heading="Followers"
           users={users}
+          viewerId={auth.identity.id}
           followingByUserId={new Map(users.map((u) => [u.id, followingIds.has(u.id)]))}
           emptyMessage="No one follows you yet."
           returnTo={routes.profile.followers.href()}
