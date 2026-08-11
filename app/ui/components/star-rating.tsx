@@ -1,6 +1,8 @@
 import type { Handle } from 'remix/ui'
 import { css, Fragment } from 'remix/ui'
 
+import { DISLIKED_INPUT_VALUE } from '../../data/mediaItems.ts'
+
 const STAR_SIZE = 24
 
 function StarIcon(handle: Handle<{ variant: 'outline' | 'filled' }>) {
@@ -52,25 +54,91 @@ export function StarRatingDisplay(handle: Handle<{ value: number }>) {
   }
 }
 
+// The read-only counterpart to picking "Didn't like it". Deliberately words
+// rather than an empty star row: a dislike is the absence of a score, and
+// drawing it as five empty stars would say "rated it zero", which is the exact
+// confusion the scale is built to avoid.
+export function DislikedDisplay() {
+  return () => (
+    <span mix={css({ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' })}>
+      Didn't like it
+    </span>
+  )
+}
+
 const STEPS = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5]
 
+// The two word choices, styled as chips. The radios are hidden outright rather
+// than left to render at DoodleCSS's `opacity: 0`, so their state is something
+// the label shows instead of something invisible next to it: an unselected chip
+// is a quiet outline, the selected one is filled and dark.
+const CHOICE_GROUP = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px',
+  fontSize: '13px',
+  '& input': {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    opacity: 0,
+    pointerEvents: 'none',
+  },
+  '& label': {
+    display: 'inline-block',
+    padding: '2px 10px',
+    borderRadius: '999px',
+    border: '1px solid #ccc',
+    color: '#666',
+    cursor: 'pointer',
+    lineHeight: 1.6,
+    whiteSpace: 'nowrap',
+  },
+  '& label:hover': {
+    borderColor: '#999',
+    color: '#3c3c3c',
+  },
+  '& input:checked + label': {
+    borderColor: '#3c3c3c',
+    backgroundColor: '#3c3c3c',
+    color: '#fdf9f0',
+  },
+} as const
+
+// One question with three kinds of answer, in one radio group: a score, no
+// score, or a dislike. They are mutually exclusive because they are answers to
+// the same question — "how did this land" — and a row claiming four stars and
+// a dislike at once would be nonsense. `parseRatingSubmission` unpacks the
+// single submitted value into the two columns that store it.
+//
 // 10 radios in descending DOM order, displayed row-reverse so `:checked ~ label`
 // fills the current star plus every lower one. No JS.
 //
-// An eleventh radio carries "No rating", and deliberately sits outside the star
-// strip rather than becoming a zero-star step on the left of it. Unrated is not
-// the bottom of the scale — plenty of a log is things someone finished and
-// never scored, which says nothing about whether they liked them. Putting it in
-// line with the stars would read as exactly the low score it isn't. It is also
-// the only way back out of a rating: radios can't be unchecked, so without it a
-// rating given once could never be removed.
+// The two word choices sit outside the star strip rather than becoming steps on
+// the left of it. Neither is the bottom of the scale: unrated says nothing about
+// whether someone liked a thing, and a dislike is a refusal to score rather than
+// the lowest score. Rendering either in line with the stars would read as
+// exactly the low number it isn't.
+//
+// "No rating" is also the only way back out of a rating, since a radio can't be
+// unchecked — without it a rating given once could never be removed.
+//
+// The labels carry all the styling because the radios themselves are invisible:
+// DoodleCSS lays them out at 1.5em but they compute to `opacity: 0`, so a bare
+// radio renders as nothing at all and a row of them reads as plain text.
 export function StarRatingInput(
-  handle: Handle<{ name: string; defaultValue: number | null; idPrefix?: string }>,
+  handle: Handle<{ name: string; defaultValue: number | null; idPrefix?: string; disliked?: boolean | null }>,
 ) {
   return () => {
-    const { name, defaultValue, idPrefix = name } = handle.props
+    const { name, defaultValue, idPrefix = name, disliked = null } = handle.props
     const half = STAR_SIZE / 2
     const noRatingId = `${idPrefix}-none`
+    const dislikedId = `${idPrefix}-disliked`
+
+    // A dislike and a score are mutually exclusive, so a disliked row has no
+    // star selected and "No rating" is not what it means either.
+    const isDisliked = disliked === true
+    const isUnrated = !isDisliked && defaultValue == null
 
     return (
       <span mix={css({ display: 'inline-flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' })}>
@@ -117,14 +185,22 @@ export function StarRatingInput(
           })}
         </span>
 
-        {/* Same radio group, so picking this deselects the stars. It sits
-            outside the strip above, whose `input:checked ~ label` fill rules
-            would otherwise treat it as a step. Checked when nothing is rated,
-            so the form always submits an explicit answer rather than omitting
-            the field — that is what makes clearing a rating reach the server. */}
-        <span mix={css({ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px' })}>
-          <input type="radio" id={noRatingId} name={name} value="" defaultChecked={defaultValue == null} />
+        {/* Same radio group, so picking either of these deselects the stars.
+            They sit outside the strip above, whose `input:checked ~ label` fill
+            rules would otherwise treat them as steps. One is always checked, so
+            the form submits an explicit answer rather than omitting the field —
+            that is what lets a rating be cleared at all. */}
+        <span mix={css({ ...CHOICE_GROUP })}>
+          <input type="radio" id={noRatingId} name={name} value="" defaultChecked={isUnrated} />
           <label for={noRatingId}>No rating</label>
+          <input
+            type="radio"
+            id={dislikedId}
+            name={name}
+            value={DISLIKED_INPUT_VALUE}
+            defaultChecked={isDisliked}
+          />
+          <label for={dislikedId}>Didn't like it</label>
         </span>
       </span>
     )

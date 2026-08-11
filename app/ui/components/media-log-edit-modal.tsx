@@ -5,7 +5,6 @@ import type { UserMediaInteraction } from '../../data/schema.ts'
 import type { ActiveMediaType } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
-import { LikedInput } from './liked-input.tsx'
 import { Modal } from './modal.tsx'
 import { StarRatingInput } from './star-rating.tsx'
 import { StatusSelect } from './status-select.tsx'
@@ -46,14 +45,7 @@ export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
                 name="rating"
                 idPrefix={`rating-${interaction.id}`}
                 defaultValue={interaction.rating ?? null}
-              />
-            </div>
-            <div>
-              <p mix={css({ margin: '0 0 4px' })}>Verdict</p>
-              <LikedInput
-                name="liked"
-                idPrefix={`liked-${interaction.id}`}
-                defaultValue={interaction.liked ?? null}
+                disliked={interaction.disliked ?? null}
               />
             </div>
             <Field label="Notes">

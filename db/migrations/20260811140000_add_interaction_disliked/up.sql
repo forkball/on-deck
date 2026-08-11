@@ -1,0 +1,16 @@
+-- The one thing the star scale can't say.
+--
+-- A rating answers "how good was it" with a number, and the whole scale is
+-- 0.5-5. Someone who finished a thing and didn't like it has to either grade
+-- it — the part people skip — or leave it unrated, which now correctly means
+-- they never said. This column is the third answer: didn't like it, no score.
+--
+-- It belongs to the rating question rather than sitting beside it, and the
+-- picker enforces that: stars, unrated and this are one mutually exclusive
+-- choice. So `disliked = true` always travels with `rating is null`, and a row
+-- can never claim four stars and a dislike at once.
+--
+-- Null rather than false for "hasn't said it", to keep the same three-state
+-- shape `rating` uses. Nothing is backfilled: a low rating is a score someone
+-- chose to give, and rewriting it as a dislike would put words in their mouth.
+alter table user_media_interactions add column disliked boolean;

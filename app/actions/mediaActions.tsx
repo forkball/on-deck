@@ -11,8 +11,7 @@ import {
   getUserInteractionForItem,
   getUserInteractionsForItems,
   logInteraction,
-  parseLikedInput,
-  parseRatingInput,
+  parseRatingSubmission,
 } from '../data/mediaItems.ts'
 import { INTERACTION_STATUSES, type User } from '../data/schema.ts'
 import { displayLabel } from '../data/users.ts'
@@ -31,7 +30,6 @@ const SEARCH_INITIAL_VISIBLE = 10
 const logSchema = f.object({
   status: f.field(s.enum_(INTERACTION_STATUSES)),
   rating: f.field(s.defaulted(s.string(), '')),
-  liked: f.field(s.defaulted(s.string(), '')),
   notes: f.field(s.defaulted(s.string(), '')),
   return_to: f.field(s.defaulted(s.string(), '')),
 })
@@ -208,13 +206,14 @@ export function createMediaActions(mediaType: ActiveMediaType) {
         return new Response('Invalid log input', { status: 400 })
       }
 
-      const rating = parseRatingInput(parsed.value.rating)
+      // One field, two columns — see parseRatingSubmission.
+      const { rating, disliked } = parseRatingSubmission(parsed.value.rating)
 
       const db: Db = context.get(Database)
       await logInteraction(db, identity.id, mediaItemId, {
         status: parsed.value.status,
         rating,
-        liked: parseLikedInput(parsed.value.liked),
+        disliked,
         notes: parsed.value.notes || null,
       })
 

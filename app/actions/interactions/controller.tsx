@@ -7,8 +7,7 @@ import { redirect } from 'remix/response/redirect'
 
 import {
   deleteInteraction,
-  parseLikedInput,
-  parseRatingInput,
+  parseRatingSubmission,
   updateInteraction,
 } from '../../data/mediaItems.ts'
 import { requireAuth } from '../../middleware/auth.ts'
@@ -18,7 +17,6 @@ import { routes } from '../../routes.ts'
 const updateSchema = f.object({
   status: f.field(s.enum_(INTERACTION_STATUSES)),
   rating: f.field(s.defaulted(s.string(), '')),
-  liked: f.field(s.defaulted(s.string(), '')),
   notes: f.field(s.defaulted(s.string(), '')),
   return_to: f.field(s.defaulted(s.string(), '')),
 })
@@ -38,11 +36,14 @@ export default createController(routes.interactions, {
         return new Response('Invalid input', { status: 400 })
       }
 
+      // One field, two columns — see parseRatingSubmission.
+      const { rating, disliked } = parseRatingSubmission(parsed.value.rating)
+
       const db = context.get(Database)
       const updated = await updateInteraction(db, interactionId, auth.identity.id, {
         status: parsed.value.status,
-        rating: parseRatingInput(parsed.value.rating),
-        liked: parseLikedInput(parsed.value.liked),
+        rating,
+        disliked,
         notes: parsed.value.notes || null,
       })
 

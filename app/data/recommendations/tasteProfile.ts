@@ -83,7 +83,7 @@ export async function regenerateTasteProfile(
     title: item?.title ?? 'Unknown title',
     status: interaction.status,
     rating: interaction.rating,
-    liked: interaction.liked,
+    disliked: interaction.disliked,
     notes: interaction.notes,
   }))
 
@@ -98,7 +98,7 @@ export async function regenerateTasteProfile(
       {
         role: 'user',
         content:
-          `Here is a person's ${noun} log (status, rating out of 5, whether they liked it, ` +
+          `Here is a person's ${noun} log (status, rating out of 5, whether they disliked it, ` +
           `and any notes they left):\n` +
           `${JSON.stringify(loggedItems, null, 2)}\n\n` +
           `Write a short (2-4 sentence) natural-language summary of their taste, grounded only ` +
@@ -108,10 +108,10 @@ export async function regenerateTasteProfile(
           `down without trying — a dislike signal in its own right, carrying no rating. ` +
           `A null rating on any other status means they simply never rated it: infer nothing ` +
           `about whether they liked it, and never treat it as a low score. Ratings run 0.5 to 5, ` +
-          `so the bottom of the scale is 0.5, not 0. The "liked" field is a separate verdict ` +
-          `they can give with or without a rating: true means they liked it, false means they ` +
-          `didn't, and null means they haven't said. Where it is set, trust it over anything ` +
-          `you would infer from the rating — liked: false with no rating is a firm dislike.`,
+          `so the bottom of the scale is 0.5, not 0. "disliked": true is the third answer to that ` +
+          `same question: they finished it, didn't like it, and declined to put a number on ` +
+          `it. Treat it as a firm dislike — it never carries a rating, and its absence of one ` +
+          `is a refusal to score rather than a low score.`,
       },
     ],
   })
@@ -155,7 +155,7 @@ function logSignature(log: LogEntry[]): string {
         item?.title ?? '',
         interaction.status,
         interaction.rating ?? '',
-        interaction.liked ?? '',
+        interaction.disliked ?? '',
         interaction.notes ?? '',
       ].join('\u0001'),
     )

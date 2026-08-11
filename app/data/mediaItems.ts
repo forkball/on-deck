@@ -170,10 +170,10 @@ export interface LogInteractionInput {
   // data/imports/. The forms always pass one of the other two, which is what
   // makes the picker's "No rating" option stick.
   rating?: number | null
-  // The verdict, on the same three-state rule as `rating` above: undefined
-  // leaves it, null is "hasn't said", true/false is the answer. Independent of
-  // the rating on purpose — either can be given without the other.
-  liked?: boolean | null
+  // The dislike, on the same three-state rule as `rating` above. Not
+  // independent of it: the two are one question with three answers, and
+  // parseRatingSubmission is what keeps them consistent.
+  disliked?: boolean | null
   notes: string | null
   // Overrides the consumed_at timestamp instead of stamping "now" — used by
   // the Letterboxd import to preserve the original watch/rating date.
@@ -197,14 +197,19 @@ export function normalizeRating(raw: number | null | undefined): number | null {
   return rounded < 0.5 ? null : rounded
 }
 
-// The verdict control submits one of three values. Anything else — a field
-// that never rendered, a tampered request — reads as "hasn't said" rather than
-// as a dislike, which is the only safe way to be wrong about this.
-export function parseLikedInput(raw: string): boolean | null {
-  const trimmed = raw.trim()
-  if (trimmed === 'yes') return true
-  if (trimmed === 'no') return false
-  return null
+// The value the picker submits when someone picks "Didn't like it" instead of
+// a star. Not a number, so it can't be confused for one at any point between
+// the form and the column.
+export const DISLIKED_INPUT_VALUE = 'disliked'
+
+// One field in, both columns out. The picker is a single radio group offering
+// three kinds of answer — a score, a dislike, or nothing — so parsing it in one
+// place is what guarantees they stay mutually exclusive. Splitting this across
+// two form fields is exactly how a row ends up claiming four stars and a
+// dislike at the same time.
+export function parseRatingSubmission(raw: string): { rating: number | null; disliked: boolean | null } {
+  if (raw.trim() === DISLIKED_INPUT_VALUE) return { rating: null, disliked: true }
+  return { rating: parseRatingInput(raw), disliked: null }
 }
 
 // Atomic on (user_id, media_item_id): findOne-then-write races when the
@@ -228,7 +233,7 @@ export async function logInteraction(
     media_item_id: mediaItemId,
     status: input.status,
     rating: input.rating ?? undefined,
-    liked: input.liked ?? undefined,
+    disliked: input.disliked ?? undefined,
     notes: input.notes ?? undefined,
     created_at: now,
     updated_at: activityAt,
@@ -246,8 +251,8 @@ export async function logInteraction(
   if (input.rating !== undefined) {
     update.rating = input.rating
   }
-  if (input.liked !== undefined) {
-    update.liked = input.liked
+  if (input.disliked !== undefined) {
+    update.disliked = input.disliked
   }
   if (input.status === 'consumed') {
     values.consumed_at = consumedAt
@@ -277,7 +282,7 @@ export async function updateInteraction(
     status: input.status,
     // Same three-state rule as logInteraction: undefined leaves it, null clears it.
     ...(input.rating !== undefined ? { rating: input.rating } : {}),
-    ...(input.liked !== undefined ? { liked: input.liked } : {}),
+    ...(input.disliked !== undefined ? { disliked: input.disliked } : {}),
     notes: input.notes ?? undefined,
     consumed_at: input.status === 'consumed' ? (existing.consumed_at ?? now) : (existing.consumed_at ?? undefined),
     updated_at: now,
