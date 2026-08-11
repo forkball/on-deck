@@ -1,7 +1,7 @@
 import * as s from 'remix/data-schema'
 import type { Issue } from 'remix/data-schema'
 import { email, maxLength, minLength } from 'remix/data-schema/checks'
-import { and, eq, ilike, ne, or } from 'remix/data-table'
+import { and, eq, ilike, ne } from 'remix/data-table'
 
 import type { Db } from './db.ts'
 import { users, type User } from './schema.ts'
@@ -10,10 +10,13 @@ export function displayLabel(user: Pick<User, 'display_name' | 'email'>): string
   return user.display_name || user.email
 }
 
+// Username only. Matching on email as well meant anyone could confirm which
+// address belonged to an account by typing it, and confirming that a given
+// address is registered is worth more to a stranger than the search is.
 export async function searchUsers(db: Db, query: string, excludeUserId: number): Promise<User[]> {
   const pattern = `%${query}%`
   return db.findMany(users, {
-    where: and(or(ilike('email', pattern), ilike('display_name', pattern)), ne('id', excludeUserId)),
+    where: and(ilike('display_name', pattern), ne('id', excludeUserId)),
     limit: 20,
   })
 }

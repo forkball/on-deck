@@ -76,7 +76,7 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
               name="q"
               value={query}
               autocomplete="off"
-              placeholder="Search by name or email…"
+              placeholder="Search by username…"
               mix={[
                 css({ display: 'block', width: '100%' }),
                 ref((node) => {

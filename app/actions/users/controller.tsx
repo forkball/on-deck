@@ -71,10 +71,11 @@ export default createController(routes.users, {
 
       const db = context.get(Database)
       const results = await searchUsers(db, query, auth.identity.id)
+      // No sublabel: it used to carry the email, which put every matched
+      // account's address in a dropdown anyone could open.
       const suggestions = results.slice(0, SUGGESTION_LIMIT).map((user) => ({
         key: String(user.id),
         label: displayLabel(user),
-        sublabel: user.email,
       }))
 
       return Response.json({ suggestions })
