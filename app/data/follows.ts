@@ -40,6 +40,19 @@ export async function isFollowing(db: Db, followerId: number, followedId: number
   return existing != null
 }
 
+// Public profiles are open to anyone; private ones need a follow (or to be
+// your own). Used to decide between the full profile and the locked one —
+// see UserProfilePage's `locked` prop.
+export async function canViewProfile(
+  db: Db,
+  viewerId: number,
+  target: Pick<User, 'id' | 'is_private'>,
+): Promise<boolean> {
+  if (!target.is_private) return true
+  if (viewerId === target.id) return true
+  return isFollowing(db, viewerId, target.id)
+}
+
 // One query instead of an `isFollowing` call per candidate.
 export async function listFollowingIds(
   db: Db,

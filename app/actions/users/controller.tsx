@@ -6,6 +6,7 @@ import { redirect } from 'remix/response/redirect'
 import type { Db } from '../../data/db.ts'
 import { CONSUMPTION_STATUSES, countUserMediaLog, listUserMediaLog } from '../../data/mediaItems.ts'
 import {
+  canViewProfile,
   countFollowers,
   countFollowing,
   followUser,
@@ -30,12 +31,21 @@ const RECENT_COUNT = 5
 const PAGE_SIZE = 10
 const SUGGESTION_LIMIT = 6
 
-async function requireFollowedUser(db: Db, followerId: number, userId: number): Promise<User | Response> {
-  if (!(await isFollowing(db, followerId, userId))) {
-    return new Response('Forbidden', { status: 403 })
-  }
+async function requireExistingUser(db: Db, userId: number): Promise<User | Response> {
   const user = await db.find(users, userId)
   if (!user) return new Response('Not Found', { status: 404 })
+  return user
+}
+
+// For the sub-pages (watched log, following list, followers list) — unlike
+// the profile itself, these have no locked-but-visible form, so a private
+// profile's just a flat refusal here.
+async function requireViewableProfile(db: Db, viewerId: number, userId: number): Promise<User | Response> {
+  const user = await requireExistingUser(db, userId)
+  if (user instanceof Response) return user
+  if (!(await canViewProfile(db, viewerId, user))) {
+    return new Response('This profile is private.', { status: 403 })
+  }
   return user
 }
 
@@ -89,18 +99,36 @@ export default createController(routes.users, {
       if (userId === auth.identity.id) return redirect(routes.profile.index.href(), 303)
 
       const db = context.get(Database)
-      const target = await requireFollowedUser(db, auth.identity.id, userId)
+      const target = await requireExistingUser(db, userId)
       if (target instanceof Response) return target
+
+      const followingCount = await countFollowing(db, userId)
+      const followersCount = await countFollowers(db, userId)
+      const viewerFollows = await isFollowing(db, auth.identity.id, userId)
+
+      // Private and not followed: still a real profile page (name, follow
+      // counts, a way to follow), just without the bio or media log.
+      if (target.is_private && !viewerFollows) {
+        return context.render(
+          <UserProfilePage
+            user={target}
+            locked
+            viewerFollows={viewerFollows}
+            followingCount={followingCount}
+            followersCount={followersCount}
+            displayName={displayLabel(auth.identity)}
+          />,
+        )
+      }
 
       const media = await loadMediaSummaries(db, userId, RECENT_COUNT)
       const activeTab = parseEnabledMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
-      const followingCount = await countFollowing(db, userId)
-      const followersCount = await countFollowers(db, userId)
-
       return context.render(
         <UserProfilePage
           user={target}
+          locked={false}
+          viewerFollows={viewerFollows}
           media={media}
           activeTab={activeTab}
           bio={target.bio ?? ''}
@@ -117,7 +145,7 @@ export default createController(routes.users, {
 
       const userId = Number(context.params.userId)
       const db = context.get(Database)
-      const target = await requireFollowedUser(db, auth.identity.id, userId)
+      const target = await requireViewableProfile(db, auth.identity.id, userId)
       if (target instanceof Response) return target
 
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
@@ -150,7 +178,7 @@ export default createController(routes.users, {
 
       const userId = Number(context.params.userId)
       const db = context.get(Database)
-      const target = await requireFollowedUser(db, auth.identity.id, userId)
+      const target = await requireViewableProfile(db, auth.identity.id, userId)
       if (target instanceof Response) return target
 
       const label = displayLabel(target)
@@ -177,7 +205,7 @@ export default createController(routes.users, {
 
       const userId = Number(context.params.userId)
       const db = context.get(Database)
-      const target = await requireFollowedUser(db, auth.identity.id, userId)
+      const target = await requireViewableProfile(db, auth.identity.id, userId)
       if (target instanceof Response) return target
 
       const label = displayLabel(target)

@@ -16,9 +16,14 @@ type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
 export interface UserProfilePageProps {
   user: User
-  media: MediaSummaries
-  activeTab: ActiveMediaType
-  bio: string
+  // True when the account is private and the viewer doesn't follow it —
+  // renders the name and follow counts, but withholds the bio and log.
+  locked: boolean
+  viewerFollows: boolean
+  // Absent when `locked` — there's nothing to show them.
+  media?: MediaSummaries
+  activeTab?: ActiveMediaType
+  bio?: string
   followingCount: number
   followersCount: number
   displayName: string
@@ -80,9 +85,30 @@ function LoggedList(
   }
 }
 
+function FollowButton(handle: Handle<{ userId: number; following: boolean; returnTo: string }>) {
+  return () => {
+    const { userId, following, returnTo } = handle.props
+
+    return (
+      <form
+        method="post"
+        action={
+          following
+            ? routes.users.unfollow.href({ userId: String(userId) })
+            : routes.users.follow.href({ userId: String(userId) })
+        }
+      >
+        <input type="hidden" name="return_to" value={returnTo} />
+        <button type="submit">{following ? 'Unfollow' : 'Follow'}</button>
+      </form>
+    )
+  }
+}
+
 export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
   return () => {
-    const { user, media, activeTab, bio, followingCount, followersCount, displayName } = handle.props
+    const { user, locked, viewerFollows, media, activeTab, bio, followingCount, followersCount, displayName } =
+      handle.props
     const label = displayLabel(user)
     const returnTo = routes.users.show.href({ userId: String(user.id) })
 
@@ -90,45 +116,62 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
       <Document title={`${label} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>{label}</h1>
+          <div mix={css({ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px' })}>
+            <h1>{label}</h1>
+            <FollowButton userId={user.id} following={viewerFollows} returnTo={returnTo} />
+          </div>
           <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
-            <a href={routes.users.following.href({ userId: String(user.id) })}>{followingCount} following</a> ·{' '}
-            <a href={routes.users.followers.href({ userId: String(user.id) })}>
-              {followersCount} follower{followersCount === 1 ? '' : 's'}
-            </a>
+            {locked ? (
+              <>
+                {followingCount} following · {followersCount} follower{followersCount === 1 ? '' : 's'}
+              </>
+            ) : (
+              <>
+                <a href={routes.users.following.href({ userId: String(user.id) })}>{followingCount} following</a> ·{' '}
+                <a href={routes.users.followers.href({ userId: String(user.id) })}>
+                  {followersCount} follower{followersCount === 1 ? '' : 's'}
+                </a>
+              </>
+            )}
           </p>
 
-          {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
+          {locked ? (
+            <p>This profile is private. Follow {label} to see their bio and log.</p>
+          ) : (
+            <>
+              {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
 
-          <MediaTabs
-            idPrefix="user-profile"
-            active={activeTab}
-            panels={Object.fromEntries(
-              enabledMediaTypes().map((type) => {
-                const ui = MEDIA_TYPE_UI[type]
-                const { summary, log, total } = media[type]
-                const watchedHref = routes.users.watched.href({ userId: String(user.id) })
+              <MediaTabs
+                idPrefix="user-profile"
+                active={activeTab!}
+                panels={Object.fromEntries(
+                  enabledMediaTypes().map((type) => {
+                    const ui = MEDIA_TYPE_UI[type]
+                    const { summary, log, total } = media![type]
+                    const watchedHref = routes.users.watched.href({ userId: String(user.id) })
 
-                return [
-                  type,
-                  <>
-                    <TasteProfileSummary label={`${label}'s ${ui.attributive} taste profile`} summary={summary} />
-                    <h2>
-                      What {label} has {ui.pastParticiple}
-                    </h2>
-                    <LoggedList
-                      log={log}
-                      total={total}
-                      detailHref={(id) =>
-                        `${ui.hrefs.show(id)}?from=${encodeURIComponent(`${returnTo}?tab=${type}`)}`
-                      }
-                      seeAllHref={type === 'movie' ? watchedHref : `${watchedHref}?type=${type}`}
-                    />
-                  </>,
-                ]
-              }),
-            )}
-          />
+                    return [
+                      type,
+                      <>
+                        <TasteProfileSummary label={`${label}'s ${ui.attributive} taste profile`} summary={summary} />
+                        <h2>
+                          What {label} has {ui.pastParticiple}
+                        </h2>
+                        <LoggedList
+                          log={log}
+                          total={total}
+                          detailHref={(id) =>
+                            `${ui.hrefs.show(id)}?from=${encodeURIComponent(`${returnTo}?tab=${type}`)}`
+                          }
+                          seeAllHref={type === 'movie' ? watchedHref : `${watchedHref}?type=${type}`}
+                        />
+                      </>,
+                    ]
+                  }),
+                )}
+              />
+            </>
+          )}
         </main>
       </Document>
     )

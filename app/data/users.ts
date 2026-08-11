@@ -113,6 +113,9 @@ export interface UserProfileFields {
   // User-authored — see the `bio` column in schema.ts for why it's kept
   // separate from the AI-written taste profile.
   bio: string
+  // Gates the bio and media log behind a follow — see follows.ts,
+  // canViewProfile.
+  is_private: boolean
 }
 
 export async function updateUserProfile(db: Db, userId: number, fields: UserProfileFields): Promise<void> {

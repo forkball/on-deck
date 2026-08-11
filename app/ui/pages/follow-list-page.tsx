@@ -11,9 +11,9 @@ export interface FollowListPageProps {
   title: string
   heading: string
   users: User[]
-  // The viewer's own follow-state for each listed user — gates whether their
-  // name links to a profile (you can only view profiles of people you
-  // follow, see requireFollowedUser) and drives the Follow/Unfollow button.
+  // The viewer's own follow-state for each listed user — gates whether a
+  // private profile's name links anywhere (see canViewProfile; public
+  // profiles link regardless) and drives the Follow/Unfollow button.
   followingByUserId: Map<number, boolean>
   // The viewer, so their own row can be marked and left without a Follow
   // button. They legitimately appear in these lists — you are one of the
@@ -45,6 +45,7 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
               {users.map((user) => {
                 const following = followingByUserId.get(user.id) ?? false
                 const isViewer = user.id === viewerId
+                const canView = !user.is_private || following || isViewer
                 return (
                   <li
                     key={user.id}
@@ -58,7 +59,7 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
                       padding: '12px 16px',
                     })}
                   >
-                    {following ? (
+                    {canView ? (
                       <a href={routes.users.show.href({ userId: String(user.id) })}>
                         <strong>{displayLabel(user)}</strong>
                       </a>

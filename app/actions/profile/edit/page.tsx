@@ -11,7 +11,7 @@ import { Field } from '../../../ui/shared/field.tsx'
 export interface ProfileEditPageProps {
   // What to put back in the inputs: the stored row on a first load, whatever
   // was typed on a rejected submit.
-  values: { email: string; display_name: string; bio: string }
+  values: { email: string; display_name: string; bio: string; is_private: boolean }
   errors?: Record<string, string>
   // Set when the submit was refused for want of a password, so the modal
   // comes back already open with its error showing.
@@ -70,6 +70,23 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
                 placeholder="Tell people a bit about yourself…"
               />
             </Field>
+            {/* Not routed through Field — that stretches inputs to 100%
+                width, which turns a checkbox into a giant square. */}
+            <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
+              <label mix={css({ display: 'flex', alignItems: 'center', gap: '8px' })}>
+                <input
+                  type="checkbox"
+                  name="is_private"
+                  defaultChecked={values.is_private}
+                  mix={css({ width: 'auto' })}
+                />
+                Private profile
+              </label>
+              <span mix={css({ fontSize: '12px', color: '#888' })}>
+                Anyone can still find you by name and see your follow counts. Your bio and log are only
+                visible to people who follow you.
+              </span>
+            </div>
             {/* Both handles are unique and reachable — changing either is
                 what the password confirms. The modal lives inside this form,
                 so its box is one of these fields. */}

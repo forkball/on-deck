@@ -15,6 +15,10 @@ export const users = table({
     // SteamID64 of a linked Steam account, set by the OpenID flow (see
     // data/imports/steamApi.ts). Null until someone connects one.
     steam_id: c.text(),
+    // Gates the bio and media log behind a follow (see follows.ts,
+    // canViewProfile) — everyone still sees the name and follow counts.
+    // Public by default, same as the app's original behavior.
+    is_private: c.boolean().notNull().default(false),
     created_at: c.integer().notNull(),
   },
 })

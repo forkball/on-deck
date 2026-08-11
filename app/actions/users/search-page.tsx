@@ -36,6 +36,9 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
           <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' })}>
             {results.map((user) => {
               const following = followingByUserId.get(user.id) ?? false
+              // Public profiles are viewable by anyone; private ones still
+              // need a follow — see canViewProfile.
+              const canView = !user.is_private || following
               return (
                 <li
                   key={user.id}
@@ -49,7 +52,7 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
                     padding: '12px 16px',
                   })}
                 >
-                  {following ? (
+                  {canView ? (
                     <a href={routes.users.show.href({ userId: String(user.id) })}>
                       <strong>{displayLabel(user)}</strong>
                     </a>

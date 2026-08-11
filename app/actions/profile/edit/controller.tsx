@@ -25,6 +25,9 @@ const profileSchema = f.object({
   email: f.field(emailSchema),
   display_name: f.field(usernameSchema),
   bio: f.field(bioSchema),
+  // Checkboxes send nothing at all when unchecked, rather than "off" — the
+  // missing key is what `defaulted` is catching here.
+  is_private: f.field(s.defaulted(s.string(), '').transform((value) => value !== '')),
   // No shape rules: an empty box is a valid submission — a bio-only edit
   // needs no password — and a filled one is measured against the stored hash
   // rather than against today's rules. Whether it was needed is decided
@@ -33,12 +36,13 @@ const profileSchema = f.object({
 })
 
 // Whatever was typed, so a rejected submit comes back with the person's own
-// text in the inputs rather than the stored row.
+// text (and checkbox state) in the inputs rather than the stored row.
 function submittedValues(formData: FormData) {
   return {
     email: String(formData.get('email') ?? ''),
     display_name: String(formData.get('display_name') ?? ''),
     bio: String(formData.get('bio') ?? ''),
+    is_private: formData.get('is_private') != null,
   }
 }
 
@@ -55,6 +59,7 @@ export default createController(routes.profile.edit, {
             email: auth.identity.email,
             display_name: auth.identity.display_name,
             bio: auth.identity.bio ?? '',
+            is_private: auth.identity.is_private,
           }}
           displayName={displayLabel(auth.identity)}
         />,
@@ -84,7 +89,7 @@ export default createController(routes.profile.edit, {
       if (!parsed.success) return reject(userFieldErrors(parsed.issues), 400)
 
       const db = context.get(Database)
-      const { email, display_name, bio, current_password } = parsed.value
+      const { email, display_name, bio, is_private, current_password } = parsed.value
 
       // The two handles are how the account is reached — an email a reset can
       // be pointed at, a name other people find you under — so changing
@@ -120,7 +125,7 @@ export default createController(routes.profile.edit, {
 
       if (Object.keys(errors).length > 0) return reject(errors, 409)
 
-      await updateUserProfile(db, auth.identity.id, { email, display_name, bio })
+      await updateUserProfile(db, auth.identity.id, { email, display_name, bio, is_private })
 
       return redirect(`${routes.profile.index.href()}?saved=1`, 303)
     },
