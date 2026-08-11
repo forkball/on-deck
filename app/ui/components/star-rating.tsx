@@ -1,6 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css, Fragment } from 'remix/ui'
 
+import { StarRatingClearer } from '../../browser/star-rating-clearer.tsx'
 import { DISLIKED_INPUT_VALUE } from '../../data/mediaItems.ts'
 
 const STAR_SIZE = 24
@@ -61,21 +62,20 @@ export function StarRatingDisplay(handle: Handle<{ value: number }>) {
 export function DislikedDisplay() {
   return () => (
     <span mix={css({ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' })}>
-      Didn't like it
+      Not for me
     </span>
   )
 }
 
 const STEPS = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5]
 
-// The two word choices, styled as chips. The radios are hidden outright rather
-// than left to render at DoodleCSS's `opacity: 0`, so their state is something
-// the label shows instead of something invisible next to it: an unselected chip
-// is a quiet outline, the selected one is filled and dark.
+// The opt-out, styled as a chip. Its radio is hidden outright rather than left
+// to render at DoodleCSS's `opacity: 0`, so the state is something the label
+// shows instead of something invisible next to it: an outline when idle, filled
+// and dark when chosen.
 const CHOICE_GROUP = {
   display: 'inline-flex',
   alignItems: 'center',
-  gap: '6px',
   fontSize: '13px',
   '& input': {
     position: 'absolute',
@@ -86,7 +86,7 @@ const CHOICE_GROUP = {
   },
   '& label': {
     display: 'inline-block',
-    padding: '2px 10px',
+    padding: '4px 18px',
     borderRadius: '999px',
     border: '1px solid #ccc',
     color: '#666',
@@ -114,34 +114,41 @@ const CHOICE_GROUP = {
 // 10 radios in descending DOM order, displayed row-reverse so `:checked ~ label`
 // fills the current star plus every lower one. No JS.
 //
-// The two word choices sit outside the star strip rather than becoming steps on
-// the left of it. Neither is the bottom of the scale: unrated says nothing about
-// whether someone liked a thing, and a dislike is a refusal to score rather than
-// the lowest score. Rendering either in line with the stars would read as
-// exactly the low number it isn't.
+// The opt-out sits outside the star strip rather than becoming a step on the
+// left of it. It is not the bottom of the scale — it is a refusal to score —
+// and rendering it in line with the stars would read as exactly the low number
+// it isn't. The "or" between them says the same thing in words.
 //
-// "No rating" is also the only way back out of a rating, since a radio can't be
-// unchecked — without it a rating given once could never be removed.
+// Unrated has no control of its own: it is simply no star selected, which is
+// also where clicking the current selection lands you. That is what
+// StarRatingClearer is for, and it is the one part of this that needs a script.
 //
-// The labels carry all the styling because the radios themselves are invisible:
+// The label carries the styling because the radios themselves are invisible:
 // DoodleCSS lays them out at 1.5em but they compute to `opacity: 0`, so a bare
-// radio renders as nothing at all and a row of them reads as plain text.
+// radio renders as nothing at all and reads as plain text.
 export function StarRatingInput(
   handle: Handle<{ name: string; defaultValue: number | null; idPrefix?: string; disliked?: boolean | null }>,
 ) {
   return () => {
     const { name, defaultValue, idPrefix = name, disliked = null } = handle.props
     const half = STAR_SIZE / 2
-    const noRatingId = `${idPrefix}-none`
     const dislikedId = `${idPrefix}-disliked`
 
     // A dislike and a score are mutually exclusive, so a disliked row has no
-    // star selected and "No rating" is not what it means either.
+    // star selected.
     const isDisliked = disliked === true
-    const isUnrated = !isDisliked && defaultValue == null
 
     return (
-      <span mix={css({ display: 'inline-flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' })}>
+      <span
+        class="rating-group"
+        mix={css({
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          flexWrap: 'wrap',
+        })}
+      >
         <span
           mix={css({
             display: 'inline-flex',
@@ -185,14 +192,12 @@ export function StarRatingInput(
           })}
         </span>
 
-        {/* Same radio group, so picking either of these deselects the stars.
-            They sit outside the strip above, whose `input:checked ~ label` fill
-            rules would otherwise treat them as steps. One is always checked, so
-            the form submits an explicit answer rather than omitting the field —
-            that is what lets a rating be cleared at all. */}
+        <span mix={css({ fontSize: '13px', color: '#888' })}>or</span>
+
+        {/* Same radio group as the stars, so picking this deselects them. It
+            sits outside the strip above, whose `input:checked ~ label` fill
+            rules would otherwise treat it as a step. */}
         <span mix={css({ ...CHOICE_GROUP })}>
-          <input type="radio" id={noRatingId} name={name} value="" defaultChecked={isUnrated} />
-          <label for={noRatingId}>No rating</label>
           <input
             type="radio"
             id={dislikedId}
@@ -200,8 +205,13 @@ export function StarRatingInput(
             value={DISLIKED_INPUT_VALUE}
             defaultChecked={isDisliked}
           />
-          <label for={dislikedId}>Didn't like it</label>
+          <label for={dislikedId}>Not for me</label>
         </span>
+
+        {/* Nothing selected submits no `rating` field at all, which the log
+            actions default to '' and read as unrated — so clearing needs no
+            control of its own, only this. */}
+        <StarRatingClearer />
       </span>
     )
   }
