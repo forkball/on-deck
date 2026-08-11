@@ -18,20 +18,18 @@ import {
 } from '../../../data/users.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
-import { hashPassword, PASSWORD_MIN_LENGTH, verifyPassword } from '../../auth/password.ts'
+import { verifyPassword } from '../../auth/password.ts'
 import { ProfileEditPage } from './page.tsx'
 
 const profileSchema = f.object({
   email: f.field(emailSchema),
   display_name: f.field(usernameSchema),
   bio: f.field(bioSchema),
-  // The three password boxes carry no shape rules here: an empty one is a
-  // valid submission (it means "unchanged"), and the current one is measured
-  // against the stored hash rather than against today's rules. What they do
-  // have to be is checked in order, which the action does below.
+  // No shape rules: an empty box is a valid submission — a bio-only edit
+  // needs no password — and a filled one is measured against the stored hash
+  // rather than against today's rules. Whether it was needed is decided
+  // below, once it's known what actually changed.
   current_password: f.field(s.defaulted(s.string(), '')),
-  new_password: f.field(s.defaulted(s.string(), '')),
-  confirm_password: f.field(s.defaulted(s.string(), '')),
 })
 
 // Whatever was typed, so a rejected submit comes back with the person's own
@@ -70,12 +68,13 @@ export default createController(routes.profile.edit, {
       const formData = context.get(FormData)
 
       // Every rejection puts the form back with what was typed in it — bar
-      // the password boxes, which submittedValues deliberately never reads.
-      const reject = (errors: Record<string, string>, status: number) =>
+      // the password box, which submittedValues deliberately never reads.
+      const reject = (errors: Record<string, string>, status: number, confirming = false) =>
         context.render(
           <ProfileEditPage
             values={submittedValues(formData)}
             errors={errors}
+            confirming={confirming}
             displayName={displayLabel(auth.identity)}
           />,
           { status },
@@ -85,46 +84,26 @@ export default createController(routes.profile.edit, {
       if (!parsed.success) return reject(userFieldErrors(parsed.issues), 400)
 
       const db = context.get(Database)
-      const { email, display_name, bio, current_password, new_password, confirm_password } = parsed.value
-
-      const changingHandle =
-        email !== auth.identity.email || display_name !== auth.identity.display_name
-      // An empty box means "leave it alone", which is the only way this form
-      // can offer a password change without demanding one on every save.
-      const changingPassword = new_password !== ''
+      const { email, display_name, bio, current_password } = parsed.value
 
       // The two handles are how the account is reached — an email a reset can
-      // be pointed at, a name other people find you under — and the password
-      // is the account itself. Changing any of them means proving you own the
-      // account rather than merely sitting at a browser someone left logged
-      // in. A bio is only text, so editing one costs nothing.
-      if (changingHandle || changingPassword) {
+      // be pointed at, a name other people find you under — so changing
+      // either means proving you own the account rather than merely sitting
+      // at a browser someone left logged in. A bio is only text, so editing
+      // one costs nothing. (The password itself is changed on its own page.)
+      if (email !== auth.identity.email || display_name !== auth.identity.display_name) {
         const confirmed =
           current_password !== '' && (await verifyPassword(current_password, auth.identity.password_hash))
 
         if (!confirmed) {
+          // Reopened rather than merely flagged: with JS off the modal is the
+          // only place the box exists, so a closed one would hide the error
+          // behind a trigger nobody was told to look for.
           return reject(
-            {
-              current_password: current_password
-                ? "That isn't your current password."
-                : 'Enter your current password to confirm this change.',
-            },
+            { current_password: current_password ? "That isn't your current password." : '' },
             403,
+            true,
           )
-        }
-      }
-
-      if (changingPassword) {
-        if (new_password.length < PASSWORD_MIN_LENGTH) {
-          return reject(
-            { new_password: `Passwords must be at least ${PASSWORD_MIN_LENGTH} characters.` },
-            400,
-          )
-        }
-        // Confirmed rather than trusted: a typo here locks the account out,
-        // and the input is masked, so nobody can proofread it.
-        if (new_password !== confirm_password) {
-          return reject({ confirm_password: "Those passwords don't match." }, 400)
         }
       }
 
@@ -141,14 +120,7 @@ export default createController(routes.profile.edit, {
 
       if (Object.keys(errors).length > 0) return reject(errors, 409)
 
-      // One write, so a rejected password change can't leave a renamed
-      // account behind it.
-      await updateUserProfile(db, auth.identity.id, {
-        email,
-        display_name,
-        bio,
-        ...(changingPassword ? { password_hash: await hashPassword(new_password) } : {}),
-      })
+      await updateUserProfile(db, auth.identity.id, { email, display_name, bio })
 
       return redirect(`${routes.profile.index.href()}?saved=1`, 303)
     },

@@ -110,24 +110,17 @@ export interface UserProfileFields {
   // User-authored — see the `bio` column in schema.ts for why it's kept
   // separate from the AI-written taste profile.
   bio: string
-  // Hashed by the caller (actions/auth/password.ts) — nothing here ever sees
-  // a plaintext password. Present only when it is being changed.
-  password_hash?: string
 }
 
-export async function updateUserProfile(
-  db: Db,
-  userId: number,
-  { password_hash, ...fields }: UserProfileFields,
-): Promise<void> {
-  await db.update(users, userId, {
-    ...fields,
-    // `undefined` writes NULL here rather than skipping the field, which is
-    // what clearing a bio has to do...
-    bio: fields.bio || undefined,
-    // ...and is exactly why the hash is spread in only when there is one.
-    // Passing `password_hash: undefined` would blank the column and lock the
-    // account out.
-    ...(password_hash === undefined ? {} : { password_hash }),
-  })
+export async function updateUserProfile(db: Db, userId: number, fields: UserProfileFields): Promise<void> {
+  // `undefined` writes NULL here rather than skipping the field, which is
+  // what clearing a bio has to do.
+  await db.update(users, userId, { ...fields, bio: fields.bio || undefined })
+}
+
+// Its own write, not a field on the one above: the password is changed on its
+// own page, by a form that touches nothing else. Hashed by the caller
+// (actions/auth/password.ts) — nothing here ever sees a plaintext password.
+export async function updateUserPassword(db: Db, userId: number, passwordHash: string): Promise<void> {
+  await db.update(users, userId, { password_hash: passwordHash })
 }

@@ -66,6 +66,10 @@ export const routes = route({
     // profile — the two handles are unique and validated, so editing them
     // needs somewhere to put per-field errors.
     edit: form('edit', { formMethod: 'PUT', names: { action: 'update' } }),
+    // Its own page rather than three more boxes on the edit form: changing a
+    // password has nothing to do with the rest of a profile, and keeping it
+    // apart means the edit form's save isn't also a password save.
+    password: form('password', { formMethod: 'PUT', names: { action: 'update' } }),
     importMovies: route('import-movies', {
       index: get('/'),
       upload: post('/'),

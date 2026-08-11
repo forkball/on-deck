@@ -37,40 +37,54 @@ function modalStyle(id: string): CSSStyle {
 // rules beat layered ones regardless of specificity, so padding set on the
 // label itself is silently discarded.
 export function Modal(
-  handle: Handle<{ id: string; triggerLabel: string; title?: string; fab?: boolean; children?: RemixNode }>,
+  handle: Handle<{
+    id: string
+    // Omitted when nothing opens this by hand — see PasswordConfirmModal,
+    // which is opened by a form submit or by the server rendering it open.
+    triggerLabel?: string
+    title?: string
+    fab?: boolean
+    // Renders already open. The server needs this to put a rejected modal
+    // form back in front of someone — without it a 400 comes back as a page
+    // with the error hidden behind a trigger they'd have to find again.
+    defaultOpen?: boolean
+    children?: RemixNode
+  }>,
 ) {
   return () => {
-    const { id, triggerLabel, title, fab, children } = handle.props
+    const { id, triggerLabel, title, fab, defaultOpen, children } = handle.props
 
     return (
       <div mix={css(modalStyle(id))}>
-        <input type="checkbox" id={id} class="modal-toggle" />
+        <input type="checkbox" id={id} class="modal-toggle" checked={defaultOpen} />
 
-        <label
-          for={id}
-          mix={css(
-            fab
-              ? { position: 'fixed', bottom: '24px', right: '24px', zIndex: 900, cursor: 'pointer' }
-              : { cursor: 'pointer' },
-          )}
-        >
-          <span
-            class="doodle-border"
+        {triggerLabel && (
+          <label
+            for={id}
             mix={css(
               fab
-                ? {
-                    display: 'inline-block',
-                    padding: '14px 22px',
-                    textAlign: 'center',
-                    backgroundColor: '#fdf7f1',
-                    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.3)',
-                  }
-                : { display: 'inline-block', padding: '4px 14px' },
+                ? { position: 'fixed', bottom: '24px', right: '24px', zIndex: 900, cursor: 'pointer' }
+                : { cursor: 'pointer' },
             )}
           >
-            {triggerLabel}
-          </span>
-        </label>
+            <span
+              class="doodle-border"
+              mix={css(
+                fab
+                  ? {
+                      display: 'inline-block',
+                      padding: '14px 22px',
+                      textAlign: 'center',
+                      backgroundColor: '#fdf7f1',
+                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.3)',
+                    }
+                  : { display: 'inline-block', padding: '4px 14px' },
+              )}
+            >
+              {triggerLabel}
+            </span>
+          </label>
+        )}
 
         <div class="modal-overlay">
           <div
