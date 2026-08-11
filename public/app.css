@@ -99,9 +99,13 @@
    the pill draws about a pixel off the text on each side.
 
    Generous at the ends because the 999px radius curves back over them: the text
-   otherwise begins while the border is still closing and reads as touching it. */
+   otherwise begins while the border is still closing and reads as touching it.
+
+   Inline only. The chip's height is fixed to the star size in star-rating.tsx
+   and the line-height centres the text within it, so vertical padding here
+   would only push it back off. */
 .doodle label.rating-choice {
-  padding: 5px 26px;
+  padding: 0 26px;
 }
 
 /* Rating/notes only make sense once something's actually been watched —

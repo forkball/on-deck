@@ -96,7 +96,13 @@ const CHOICE_GROUP = {
     border: '1px solid #ccc',
     color: '#666',
     cursor: 'pointer',
-    lineHeight: 1.6,
+    // Exactly as tall as the stars it sits beside, off the same constant so
+    // the two can't drift apart. `.doodle * { box-sizing: border-box }` makes
+    // this the outer height, and the line-height less the 1px border top and
+    // bottom is what centres the text inside it — vertical padding would fight
+    // DoodleCSS for the property (see app.css), so the height does the work.
+    height: `${STAR_SIZE}px`,
+    lineHeight: `${STAR_SIZE - 2}px`,
     whiteSpace: 'nowrap',
   },
   '& label:hover': {
