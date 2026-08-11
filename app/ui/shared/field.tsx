@@ -30,6 +30,13 @@ export const fieldStyle = css({
     display: 'block',
     width: '100%',
   },
+  // Vertical only. A textarea defaults to `resize: both`, which lets it be
+  // dragged wider than the field it sits in — undoing the `width: 100%` above
+  // and pushing it out past the form. Growing taller is the useful half and
+  // costs the layout nothing.
+  '& textarea': {
+    resize: 'vertical',
+  },
 })
 
 const labelTextStyle = css({ fontSize: '13px', color: '#555' })
