@@ -84,12 +84,14 @@ const CHOICE_GROUP = {
     opacity: 0,
     pointerEvents: 'none',
   },
+  // Padding is deliberately absent here — see `.doodle label.rating-choice` in
+  // app.css. These css() rules are layered and DoodleCSS is not, so its
+  // `.doodle label { padding: .25em 0 }` wins whatever specificity is thrown at
+  // it from here: padding set in this block is silently dropped and the pill
+  // closes to within a pixel of the text. Everything else in here is
+  // uncontested, which is why only padding had to move.
   '& label': {
     display: 'inline-block',
-    // Generous at the ends because the pill radius eats into them: at a
-    // smaller inline padding the text starts where the curve is still
-    // closing, and reads as touching the border even when it isn't.
-    padding: '4px 26px',
     borderRadius: '999px',
     border: '1px solid #ccc',
     color: '#666',
@@ -209,7 +211,9 @@ export function StarRatingInput(
             value={DISLIKED_INPUT_VALUE}
             defaultChecked={isDisliked}
           />
-          <label for={dislikedId}>Not for me</label>
+          <label for={dislikedId} class="rating-choice">
+            Not for me
+          </label>
         </span>
 
         {/* Nothing selected submits no `rating` field at all, which the log

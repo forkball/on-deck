@@ -91,6 +91,19 @@
   padding: 0;
 }
 
+/* The "Not for me" chip in the rating picker. Its border, radius and colours
+   live with the component in star-rating.tsx; only the padding is here, for the
+   same reason as the modal trigger above — `.doodle label { padding: .25em 0 }`
+   sets the inline padding to zero, and a layered css() rule cannot outrank an
+   unlayered one at any specificity. Set there, it is dropped without a word and
+   the pill draws about a pixel off the text on each side.
+
+   Generous at the ends because the 999px radius curves back over them: the text
+   otherwise begins while the border is still closing and reads as touching it. */
+.doodle label.rating-choice {
+  padding: 5px 26px;
+}
+
 /* Rating/notes only make sense once something's actually been watched —
    reacts live to the status <select> with no JS, via :has() + option:checked. */
 .watched-only-fields {
