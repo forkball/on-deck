@@ -61,24 +61,26 @@ export function Modal(
         {triggerLabel && (
           <label
             for={id}
+            class="modal-trigger"
             mix={css(
               fab
                 ? { position: 'fixed', bottom: '24px', right: '24px', zIndex: 900, cursor: 'pointer' }
                 : { cursor: 'pointer' },
             )}
           >
+            {/* Padding comes from app.css, which states one box for every
+                button; setting it here would be layered and lose to it. */}
             <span
-              class="doodle-border"
+              class={fab ? 'doodle-border modal-fab' : 'doodle-border'}
               mix={css(
                 fab
                   ? {
                       display: 'inline-block',
-                      padding: '14px 22px',
                       textAlign: 'center',
                       backgroundColor: '#fdf7f1',
                       boxShadow: '0 4px 14px rgba(0, 0, 0, 0.3)',
                     }
-                  : { display: 'inline-block', padding: '4px 14px' },
+                  : { display: 'inline-block' },
               )}
             >
               {triggerLabel}

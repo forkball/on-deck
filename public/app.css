@@ -41,6 +41,56 @@
   cursor: pointer;
 }
 
+/* Not every button in this app is a <button>: a modal trigger is a <span>
+   inside a <label>, a dropdown trigger is a <summary>, and the home page's
+   calls to action are <a>. All three wear .doodle-border to get the button
+   frame, but DoodleCSS only sets font and colour on the real element —
+   `.doodle button { font-family; font-size: 1em; color: #3c3c3c }` — so the
+   impostors just inherit whatever surrounds them. That made them drift:
+   the <a> ones picked up `.doodle a { color: #1c1c1c; font-weight: bold }`
+   and came out darker and bolder than a real button, while the others sat
+   at whatever colour their container set.
+
+   Stating the same four properties here is what actually makes "a button
+   looks like a button" true, rather than true by coincidence. The rules
+   above already treat the two as one thing for border and cursor; this
+   finishes the job. `.doodle .doodle-border` (0,2,0) outranks `.doodle a`
+   (0,1,1), so the link-buttons follow too. */
+.doodle .doodle-border {
+  font-family: 'Short Stack', cursive;
+  font-size: 1em;
+  font-weight: normal;
+  color: #3c3c3c;
+}
+
+/* Same box, too, or they match in colour and still stand at different
+   heights. DoodleCSS leaves a real <button> on the browser's default padding
+   (~1px 6px) while each impostor carried its own 4px 14px, so a trigger
+   already stood ~6px taller before anything else. Declared in one place
+   rather than per component, which is what makes "all buttons" true. */
+.doodle button,
+.doodle .doodle-border {
+  padding: 4px 14px;
+}
+
+/* The floating-action variant is deliberately larger. Listed after the rule
+   above at equal specificity so it wins, and unlayered like the rest —
+   the css() rules the components use are layered, and layered always loses
+   to unlayered no matter the specificity. */
+.doodle .modal-fab {
+  padding: 14px 22px;
+}
+
+/* The <label> around a modal trigger is a click target, nothing more: it must
+   contribute no box of its own. Without this it adds DoodleCSS's
+   `.doodle label { padding: .25em 0 }` above and below the frame — the other
+   ~8px that made an "Edit" trigger visibly taller than a "Save changes"
+   button. This is the rule modal.tsx's comment refers to; it can only be
+   beaten from an unlayered stylesheet, which is why it's here and not there. */
+.doodle label.modal-trigger {
+  padding: 0;
+}
+
 /* Rating/notes only make sense once something's actually been watched —
    reacts live to the status <select> with no JS, via :has() + option:checked. */
 .watched-only-fields {

@@ -25,7 +25,6 @@ export function FloatingDropdown(
             cursor: 'pointer',
             listStyle: 'none',
             display: 'inline-block',
-            padding: '4px 14px',
             '&::-webkit-details-marker': { display: 'none' },
           })}
         >

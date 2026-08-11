@@ -44,7 +44,6 @@ export function HomePage(
                   boxSizing: "border-box",
                   width: "420px",
                   maxWidth: "100%",
-                  padding: "4px 14px",
                   textAlign: "center",
                   textDecoration: "none",
                 })}
