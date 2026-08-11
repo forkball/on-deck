@@ -86,7 +86,10 @@ const CHOICE_GROUP = {
   },
   '& label': {
     display: 'inline-block',
-    padding: '4px 18px',
+    // Generous at the ends because the pill radius eats into them: at a
+    // smaller inline padding the text starts where the curve is still
+    // closing, and reads as touching the border even when it isn't.
+    padding: '4px 26px',
     borderRadius: '999px',
     border: '1px solid #ccc',
     color: '#666',
