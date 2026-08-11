@@ -117,7 +117,9 @@ const CHOICE_GROUP = {
 // The opt-out sits outside the star strip rather than becoming a step on the
 // left of it. It is not the bottom of the scale — it is a refusal to score —
 // and rendering it in line with the stars would read as exactly the low number
-// it isn't. The "or" between them says the same thing in words.
+// it isn't. The "or" between them says the same thing in words, and the three
+// stay grouped together: pushed to opposite ends of the row they stop reading
+// as one choice, which is the only thing holding them together.
 //
 // Unrated has no control of its own: it is simply no star selected, which is
 // also where clicking the current selection lands you. That is what
@@ -142,9 +144,8 @@ export function StarRatingInput(
       <span
         class="rating-group"
         mix={css({
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
           gap: '12px',
           flexWrap: 'wrap',
         })}
