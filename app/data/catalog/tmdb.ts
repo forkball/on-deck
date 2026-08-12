@@ -64,6 +64,9 @@ export interface TmdbSearchResult {
   // Non-film providers: each medium's length dimension and lead credit.
   pageCount?: number | null
   playtimeHours?: number | null
+  // TV only — its length dimension. Runs the show, not an episode: number of
+  // seasons is what "duration" means for something with no fixed runtime.
+  seasonCount?: number | null
   creator?: string | null
   // Extra artwork beyond the poster, in display order. Games are the reason:
   // their 16:9 screenshots read well as a strip, and no other medium has any.
@@ -224,6 +227,7 @@ interface TmdbTvDetailResponse {
   episode_run_time: number[]
   last_episode_to_air: { runtime: number | null } | null
   created_by: { name?: string }[]
+  number_of_seasons: number | null
 }
 
 // Mirrors getMovieById for TV shows.
@@ -253,6 +257,7 @@ export async function getTvShowById(externalId: string): Promise<TmdbSearchResul
     popularity: r.popularity,
     overview: r.overview?.trim() || null,
     runtimeMinutes: r.episode_run_time[0] ?? r.last_episode_to_air?.runtime ?? null,
+    seasonCount: r.number_of_seasons ?? null,
     creator: r.created_by?.[0]?.name ?? null,
   }
 }

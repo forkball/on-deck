@@ -37,6 +37,7 @@ function buildMetadata(result: TmdbSearchResult, previous?: unknown, fromDetailL
     runtimeMinutes: result.runtimeMinutes ?? prev?.runtimeMinutes ?? null,
     pageCount: result.pageCount ?? prev?.pageCount ?? null,
     playtimeHours: result.playtimeHours ?? prev?.playtimeHours ?? null,
+    seasonCount: result.seasonCount ?? prev?.seasonCount ?? null,
     creator: result.creator ?? prev?.creator ?? null,
     // `??` won't do: an empty array is truthy, so a lookup returning no stills
     // would replace a set we already had.
