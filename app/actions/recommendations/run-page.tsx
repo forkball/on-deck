@@ -12,7 +12,13 @@ import { StarRatingInput } from '../../ui/components/star-rating.tsx'
 import { StatusSelect } from '../../ui/components/status-select.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
-import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, parseMediaType, statusLabelsFor } from '../../mediaTypes.ts'
+import {
+  DEFAULT_MEDIA_TYPE,
+  MEDIA_TYPE_UI,
+  parseMediaType,
+  statusBadgeColor,
+  statusLabelsFor,
+} from '../../mediaTypes.ts'
 
 const SOURCE_LABELS: Record<MediaType, string> = {
   movie: 'Movie taste',
@@ -141,19 +147,20 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                     </a>
                     {releaseYear ? ` (${releaseYear})` : ''}
                     {interaction && (
-                      <span
-                        mix={css({
-                          display: 'inline-block',
-                          marginLeft: '8px',
-                          padding: '2px 8px',
-                          borderRadius: '999px',
-                          fontSize: '11px',
-                          border: '1px solid #15803d',
-                          color: '#15803d',
-                        })}
-                      >
-                        {statusLabelsFor(itemType)[interaction.status] ?? interaction.status}
-                      </span>
+                      <div mix={css({ marginTop: '4px' })}>
+                        <span
+                          mix={css({
+                            display: 'inline-block',
+                            padding: '2px 8px',
+                            borderRadius: '999px',
+                            fontSize: '11px',
+                            border: `1px solid ${statusBadgeColor(interaction.status)}`,
+                            color: statusBadgeColor(interaction.status),
+                          })}
+                        >
+                          {statusLabelsFor(itemType)[interaction.status] ?? interaction.status}
+                        </span>
+                      </div>
                     )}
                     {tags.length > 0 && (
                       <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' })}>

@@ -276,3 +276,18 @@ export function statusLabel(status: string, mediaType?: unknown): string {
 
 export const STATUS_OPTIONS = statusOptionsFor(DEFAULT_MEDIA_TYPE)
 export const STATUS_LABELS = statusLabelsFor(DEFAULT_MEDIA_TYPE)
+
+// One color per status so a badge reads at a glance without the label: green
+// for done, blue for queued, amber for mid-consumption, and "not interested"
+// deliberately out of that progression since it isn't a stage of consuming
+// anything.
+const STATUS_BADGE_COLORS: Record<InteractionStatus, string> = {
+  want_to_consume: '#1d4ed8',
+  in_progress: '#b45309',
+  consumed: '#15803d',
+  not_interested: '#6b7280',
+}
+
+export function statusBadgeColor(status: string): string {
+  return STATUS_BADGE_COLORS[status as InteractionStatus] ?? '#555'
+}
