@@ -25,10 +25,11 @@ import {
 export type CatalogSearchResult = TmdbSearchResult
 
 // Short/medium/long(/very long), in whatever unit a given provider measures —
-// runtime, page count, hours to beat. Defined here rather than with the
-// recommendation filters that read it: the buckets belong to the catalog that
-// interprets them. `very_long` exists only for providers with a 4th tier
-// (currently movies) — the rest just never emit it in their lengthOptions.
+// runtime, page count, hours to beat, season count. Defined here rather than
+// with the recommendation filters that read it: the buckets belong to the
+// catalog that interprets them. `very_long` exists only for providers with a
+// 4th tier (currently movies) — the rest just never emit it in their
+// lengthOptions.
 export type LengthBucket = 'short' | 'medium' | 'long' | 'very_long'
 
 // Everything that differs between one media type's catalog and another's.
@@ -53,9 +54,10 @@ export interface CatalogProvider {
   matchHint: string
   // Shown when the id parsed fine but the catalog had no such entry.
   lookupFailedError: string
-  // In whatever unit the medium is measured in — minutes, pages, hours. Lives
-  // on the provider because one global check can only be right for a single
-  // medium: reading runtimeMinutes unconditionally silently dropped every book.
+  // In whatever unit the medium is measured in — minutes, pages, hours,
+  // seasons. Lives on the provider because one global check can only be right
+  // for a single medium: reading runtimeMinutes unconditionally silently
+  // dropped every book.
   matchesLength(result: CatalogSearchResult, length: LengthBucket): boolean
   // Every bucket this provider offers — the buckets it omits are ones it has no
   // meaning for, so a provider's own list is what `length` may validly be.
@@ -160,20 +162,20 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
     matchHint: 'Paste a TMDB show link or id.',
     lookupFailedError: "Couldn't find that on TMDB — check the link.",
     matchesLength: (result, length) => {
-      const minutes = result.runtimeMinutes
-      if (minutes == null) return false
-      if (length === 'short') return minutes < 90
-      if (length === 'long') return minutes > 150
+      const seasons = result.seasonCount
+      if (seasons == null) return false
+      if (length === 'short') return seasons <= 2
+      if (length === 'long') return seasons > 5
       // See the book entry — very_long isn't offered here either.
-      return length === 'medium' && minutes >= 90 && minutes <= 150
+      return length === 'medium' && seasons >= 3 && seasons <= 5
     },
-    // getTvShowById reads this off episode_run_time, so it's the length of one
-    // episode, not of the show — worth spelling out in the prompt, since the
-    // same numbers as the movie entry mean something quite different here.
+    // A show has no single runtime the way a film does — episode counts and
+    // lengths both vary too much within a series to bucket on. Season count is
+    // the one number that actually reads as "how much of a commitment is this".
     lengthOptions: [
-      { value: 'short', label: 'Under 90 min', phrase: 'an episode runtime under 90 minutes' },
-      { value: 'medium', label: '90–150 min', phrase: 'an episode runtime between 90 and 150 minutes' },
-      { value: 'long', label: 'Over 150 min', phrase: 'an episode runtime over 150 minutes' },
+      { value: 'short', label: '1–2 seasons', phrase: '1 to 2 seasons' },
+      { value: 'medium', label: '3–5 seasons', phrase: 'between 3 and 5 seasons' },
+      { value: 'long', label: '6+ seasons', phrase: '6 or more seasons' },
     ],
   },
 }

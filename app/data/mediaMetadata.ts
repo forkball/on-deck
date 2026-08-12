@@ -10,6 +10,8 @@ export interface MediaMetadata {
   pageCount: number | null
   // Games — hours to beat.
   playtimeHours: number | null
+  // TV — number of seasons.
+  seasonCount: number | null
   // Director, creator or author — one field, since only one is meaningful per
   // type. MEDIA_TYPE_UI.creditLabel names it.
   creator: string | null
@@ -55,6 +57,7 @@ function emptyMetadata(): MediaMetadata {
     runtimeMinutes: null,
     pageCount: null,
     playtimeHours: null,
+    seasonCount: null,
     creator: null,
     images: [],
     platforms: [],
@@ -80,6 +83,7 @@ export function parseMediaMetadata(metadata: unknown): MediaMetadata {
       runtimeMinutes: numberOrNull(parsed.runtimeMinutes),
       pageCount: numberOrNull(parsed.pageCount),
       playtimeHours: numberOrNull(parsed.playtimeHours),
+      seasonCount: numberOrNull(parsed.seasonCount),
       creator: stringOrNull(parsed.creator),
       images: stringArray(parsed.images),
       platforms: stringArray(parsed.platforms),

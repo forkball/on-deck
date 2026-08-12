@@ -12,6 +12,7 @@ import { StarRatingInput } from '../../ui/components/star-rating.tsx'
 import { StatusSelect } from '../../ui/components/status-select.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
+import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import {
   DEFAULT_MEDIA_TYPE,
   MEDIA_TYPE_UI,
@@ -27,18 +28,11 @@ const SOURCE_LABELS: Record<MediaType, string> = {
   game: 'Game taste',
 }
 
-const LENGTH_LABELS: Record<NonNullable<GenerationParams['length']>, string> = {
-  short: '90 min or less',
-  medium: '120 min or less',
-  long: '150 min or less',
-  very_long: 'Over 150 min',
-}
-
 const PLAYER_TYPE_LABELS: Record<string, string> = { singleplayer: 'Singleplayer', multiplayer: 'Multiplayer' }
 const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus: 'Versus' }
 const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series', standalone: 'Standalone' }
 
-function describeParams(params: GenerationParams): string[] {
+function describeParams(params: GenerationParams, mediaType: MediaType): string[] {
   const lines: string[] = [`Based on: ${params.sourceTypes.map((type) => SOURCE_LABELS[type]).join(', ')}`]
   if (params.genre) lines.push(`Genre: ${params.genre.replace(/^./, (c) => c.toUpperCase())}`)
   if (params.decade != null) {
@@ -50,7 +44,10 @@ function describeParams(params: GenerationParams): string[] {
           : `${params.decade}s`
     lines.push(`Decade: ${label}`)
   }
-  if (params.length) lines.push(`Length: ${LENGTH_LABELS[params.length]}`)
+  if (params.length) {
+    const label = getCatalogProvider(mediaType).lengthOptions.find((option) => option.value === params.length)?.label
+    if (label) lines.push(`Length: ${label}`)
+  }
   if (params.playerType) lines.push(`Player type: ${PLAYER_TYPE_LABELS[params.playerType] ?? params.playerType}`)
   if (params.multiplayerType) {
     lines.push(`Multiplayer type: ${MULTIPLAYER_TYPE_LABELS[params.multiplayerType] ?? params.multiplayerType}`)
@@ -74,7 +71,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
       day: 'numeric',
     })
     const forLabel = ['you', ...run.otherMemberLabels].join(', ')
-    const paramLines = describeParams(run.params)
+    const paramLines = describeParams(run.params, run.mediaType)
 
     return (
       <Document title={`${run.name || `Recommendations for ${forLabel}`} | On Deck`}>

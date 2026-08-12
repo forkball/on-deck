@@ -159,6 +159,7 @@ export async function withOverviews(candidates: Candidate[], mediaType: MediaTyp
 export function hasLengthDimension(mediaType: MediaType, result: CatalogSearchResult): boolean {
   if (mediaType === 'book') return result.pageCount != null
   if (mediaType === 'game') return result.playtimeHours != null
+  if (mediaType === 'tv') return result.seasonCount != null
   return result.runtimeMinutes != null
 }
 
@@ -231,6 +232,7 @@ export async function resolveFromCatalog(
         runtimeMinutes: metadata.runtimeMinutes,
         pageCount: metadata.pageCount,
         playtimeHours: metadata.playtimeHours,
+        seasonCount: metadata.seasonCount,
         creator: metadata.creator,
         images: metadata.images,
         platforms: metadata.platforms,
