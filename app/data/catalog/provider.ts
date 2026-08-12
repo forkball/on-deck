@@ -1,5 +1,11 @@
 import type { Db } from '../db.ts'
-import { upsertMediaItem, rematchMediaItem, type MediaType, type RematchMediaItemResult } from '../mediaItems.ts'
+import {
+  markMediaItemEnriched,
+  upsertMediaItem,
+  rematchMediaItem,
+  type MediaType,
+  type RematchMediaItemResult,
+} from '../mediaItems.ts'
 import type { MediaItem } from '../schema.ts'
 import { BOOK_GENRES, BOOK_SERIES_TYPES, getBookById, parseGoogleBooksId, searchBooks } from './googleBooks.ts'
 import { GAME_GENRES, GAME_MULTIPLAYER_TYPES, GAME_PLAYER_TYPES, getGameById, parseIgdbId, searchGames } from './igdb.ts'
@@ -248,7 +254,46 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
 }
 
 export async function upsertCatalogItem(db: Db, type: MediaType, result: CatalogSearchResult): Promise<MediaItem> {
-  return upsertMediaItem(db, type, result, getCatalogProvider(type).sourceName)
+  // Both callers (the import action and the detail page's backfill) hand this a
+  // by-id result, so the row is stamped as enriched.
+  return upsertMediaItem(db, type, result, getCatalogProvider(type).sourceName, true)
+}
+
+// Credits only come back from a by-id lookup, so anything that entered the
+// catalog via search has none. The detail page fills that gap on first view —
+// but off the response path, because the page renders fine without it: the
+// credit line is the only thing that waits, and it appears on the next view.
+//
+// Deduped by item id. media_items rows are shared across users, so a popular
+// item can be opened by several people at once, and each of them firing the
+// same lookup and the same write is pure waste.
+const backfillsInFlight = new Set<number>()
+
+export function backfillCatalogDetail(db: Db, type: MediaType, item: MediaItem): void {
+  if (backfillsInFlight.has(item.id)) return
+  backfillsInFlight.add(item.id)
+
+  void (async () => {
+    try {
+      const provider = getCatalogProvider(type)
+      const detail = await provider.getById(item.external_id)
+
+      // null is a definitive 404 — the id is gone from the catalog, so stamp it
+      // and stop asking. A transient failure throws instead, and is left
+      // unstamped deliberately so the next view retries.
+      if (detail) {
+        await upsertCatalogItem(db, type, detail)
+      } else {
+        await markMediaItemEnriched(db, item)
+      }
+    } catch {
+      // Nothing to report to: the response this was scheduled from is long
+      // sent. Swallowing keeps a catalog outage from taking the process down
+      // on an unhandled rejection.
+    } finally {
+      backfillsInFlight.delete(item.id)
+    }
+  })()
 }
 
 // Re-matches against the same provider the item came from.

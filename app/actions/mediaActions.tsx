@@ -4,7 +4,13 @@ import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
 import { redirect } from 'remix/response/redirect'
 
-import { getCatalogProvider, rematchCatalogItem, searchAndImport, upsertCatalogItem } from '../data/catalog/provider.ts'
+import {
+  backfillCatalogDetail,
+  getCatalogProvider,
+  rematchCatalogItem,
+  searchAndImport,
+  upsertCatalogItem,
+} from '../data/catalog/provider.ts'
 import type { Db } from '../data/db.ts'
 import {
   getMediaItemDetail,
@@ -125,22 +131,17 @@ export function createMediaActions(mediaType: ActiveMediaType) {
 
       const mediaItemId = Number(context.params.mediaItemId)
       const db: Db = context.get(Database)
-      let item = await getMediaItemDetail(db, mediaItemId)
+      const item = await getMediaItemDetail(db, mediaItemId)
       if (!item) return new Response('Not Found', { status: 404 })
 
-      // Credits only come back from a by-id lookup, so anything that entered
-      // via search has none. Filled in on first view rather than making every
-      // search pay for 20 detail requests.
-      //
-      // Also gated on runtimeMinutes, which the same lookup sets: without that,
-      // a film TMDB has no director for would re-request on every view.
+      // Scheduled, not awaited: the credit line is the only thing this fills in
+      // and the page renders without it, so making every first view wait on a
+      // remote round trip bought one line of text at the cost of the whole
+      // response. It lands on the next view instead — and once per item for
+      // everyone, since media_items rows are shared.
       const meta = parseMediaMetadata(item.metadata)
-      if (meta.creator === null && meta.runtimeMinutes === null && item.external_source === provider.sourceName) {
-        const enriched = await provider.getById(item.external_id)
-        if (enriched) {
-          await upsertCatalogItem(db, mediaType, enriched)
-          item = (await getMediaItemDetail(db, mediaItemId)) ?? item
-        }
+      if (meta.enrichedAt === null && item.external_source === provider.sourceName) {
+        backfillCatalogDetail(db, mediaType, item)
       }
 
       const interaction = await getUserInteractionForItem(db, identity.id, mediaItemId)

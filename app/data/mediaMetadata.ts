@@ -21,6 +21,16 @@ export interface MediaMetadata {
   // Lowercased genre labels from the source catalog. Covered by the GIN index
   // on this column, so `metadata @> '{"tags":["horror"]}'` avoids a scan.
   tags: string[]
+  // When a by-id detail lookup was last applied, or null if one never has been.
+  //
+  // Records the *attempt*, not its yield, which is the whole point: the fields
+  // a detail lookup fills in (creator, runtimeMinutes) are legitimately absent
+  // upstream for plenty of entries, so treating "still null" as "never tried"
+  // re-requested them on every single view. TV was worst hit — TMDB leaves
+  // `created_by` empty for a lot of shows and `episode_run_time` empty for most
+  // modern ones, so those two together never became non-null and the lookup
+  // repeated forever.
+  enrichedAt: number | null
 }
 
 function stringArray(value: unknown): string[] {
@@ -49,6 +59,7 @@ function emptyMetadata(): MediaMetadata {
     images: [],
     platforms: [],
     tags: [],
+    enrichedAt: null,
   }
 }
 
@@ -73,6 +84,7 @@ export function parseMediaMetadata(metadata: unknown): MediaMetadata {
       images: stringArray(parsed.images),
       platforms: stringArray(parsed.platforms),
       tags: stringArray(parsed.tags),
+      enrichedAt: numberOrNull(parsed.enrichedAt),
     }
   } catch {
     return emptyMetadata()

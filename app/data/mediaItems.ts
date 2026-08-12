@@ -22,10 +22,15 @@ export type MediaType = MediaItem['type']
 // search result would otherwise null out what a by-id lookup had filled in.
 // Rematch passes no `previous` — it repoints the row at a different work, so
 // carrying the old metadata across would be wrong.
-function buildMetadata(result: TmdbSearchResult, previous?: unknown): MediaMetadata {
+//
+// `fromDetailLookup` says which endpoint `result` came from, since only a by-id
+// lookup earns the enrichedAt stamp; a search hit never carries credits and
+// must not claim to have checked for them.
+function buildMetadata(result: TmdbSearchResult, previous?: unknown, fromDetailLookup = false): MediaMetadata {
   const prev = previous != null ? parseMediaMetadata(previous) : null
 
   return {
+    enrichedAt: fromDetailLookup ? Date.now() : (prev?.enrichedAt ?? null),
     releaseYear: result.releaseYear ?? prev?.releaseYear ?? null,
     posterUrl: result.posterUrl ?? prev?.posterUrl ?? null,
     overview: result.overview ?? prev?.overview ?? null,
@@ -49,12 +54,14 @@ export async function upsertMediaItem(
   result: TmdbSearchResult,
   // Recorded so ids from different providers can't collide.
   source: string,
+  // See buildMetadata — true only when `result` came from a by-id lookup.
+  fromDetailLookup = false,
 ): Promise<MediaItem> {
   const existing = await db.findOne(mediaItems, {
     where: { type, external_source: source, external_id: result.externalId },
   })
 
-  const metadata = buildMetadata(result, existing?.metadata)
+  const metadata = buildMetadata(result, existing?.metadata, fromDetailLookup)
 
   const item = existing
     ? await db.update(mediaItems, existing.id, { metadata, popularity_score: result.popularity })
@@ -73,6 +80,15 @@ export async function upsertMediaItem(
       )
 
   return item
+}
+
+// Stamps enrichedAt without touching anything else, for when the detail lookup
+// completed but had nothing to add — a 404 on the external id. Without this the
+// row would look un-enriched forever and re-request on every view, which is the
+// exact loop enrichedAt exists to close.
+export async function markMediaItemEnriched(db: Db, item: MediaItem): Promise<void> {
+  const metadata = parseMediaMetadata(item.metadata)
+  await db.update(mediaItems, item.id, { metadata: { ...metadata, enrichedAt: Date.now() } })
 }
 
 export type RematchMediaItemResult = { ok: true; item: MediaItem; merged: boolean } | { ok: false; error: string }
@@ -131,7 +147,9 @@ export async function rematchMediaItem(
   const result = await lookupById(externalId)
   if (!result) return { ok: false, error: lookupFailedError }
 
-  const metadata = buildMetadata(result)
+  // A by-id lookup, so the row lands already enriched and the detail page has
+  // no backfill left to schedule.
+  const metadata = buildMetadata(result, undefined, true)
 
   const item = await db.update(mediaItems, mediaItemId, {
     external_source: source,
