@@ -7,21 +7,27 @@ export type UserSearchFormProps = {
   query: string
   searchHref: string
   suggestHref: string
+  // routes.users.show.href({ userId: PROFILE_HREF_PLACEHOLDER }) — the
+  // placeholder gets swapped for the picked suggestion's key client-side.
+  // app/routes.ts can't be imported into the browser bundle (see
+  // scripts/check-browser-bundle.ts), so the server resolves the template.
+  profileHrefTemplate: string
 }
+
+export const PROFILE_HREF_PLACEHOLDER = '__USER_ID__'
 
 // Client-hydrated (see generate-recommendations-form.tsx for the pattern).
 // The <form> still works as a plain GET without JS; this adds a submit
 // spinner plus an autosuggest dropdown (debounced request to suggestHref,
-// its own loading state) — picking a suggestion submits the real search
-// immediately, landing on the results list with its Follow/Unfollow
-// buttons. Mirrors movie-search-form.tsx.
+// its own loading state). Because the suggest endpoint already resolved a
+// pick to an exact user id, selecting one goes straight to their profile
+// rather than resubmitting the search — mirrors movie-search-form.tsx.
 export const UserSearchForm = clientEntry<UserSearchFormProps>(
   import.meta.url,
   function UserSearchForm(handle) {
     let submitting = false
     let query = handle.props.query
     let suggestState: SuggestState = EMPTY_SUGGEST_STATE
-    let inputNode: HTMLInputElement | null = null
 
     const fetcher = createSuggestionFetcher({
       suggestHref: handle.props.suggestHref,
@@ -33,11 +39,10 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
     })
 
     function selectSuggestion(suggestion: Suggestion) {
-      query = suggestion.label
-      suggestState = EMPTY_SUGGEST_STATE
-      if (inputNode) inputNode.value = suggestion.label
-      handle.update()
-      inputNode?.form?.requestSubmit()
+      window.location.href = handle.props.profileHrefTemplate.replace(
+        PROFILE_HREF_PLACEHOLDER,
+        encodeURIComponent(suggestion.key),
+      )
     }
 
     return () => {
@@ -79,9 +84,6 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
               placeholder="Search by username…"
               mix={[
                 css({ display: 'block', width: '100%' }),
-                ref((node) => {
-                  inputNode = node as HTMLInputElement
-                }),
                 on('input', (event) => {
                   query = (event.target as HTMLInputElement).value
                   fetcher.query(query)

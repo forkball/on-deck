@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { UserSearchForm } from '../../browser/user-search-form.tsx'
+import { PROFILE_HREF_PLACEHOLDER, UserSearchForm } from '../../browser/user-search-form.tsx'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
@@ -29,6 +29,7 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
             query={query}
             searchHref={routes.users.search.href()}
             suggestHref={routes.users.suggest.href()}
+            profileHrefTemplate={routes.users.show.href({ userId: PROFILE_HREF_PLACEHOLDER })}
           />
 
           {query && results.length === 0 && <p>No one found for "{query}".</p>}
