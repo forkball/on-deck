@@ -66,6 +66,13 @@ export const routes = route({
     // profile — the two handles are unique and validated, so editing them
     // needs somewhere to put per-field errors.
     edit: form('edit', { formMethod: 'PUT', names: { action: 'update' } }),
+    // Both live on the profile page itself rather than getting a page each —
+    // they're a couple of controls sitting beside the thing they govern, and
+    // neither has per-field errors to find room for.
+    settings: post('settings'),
+    // Per media type, because that's the grain a profile has: one press is one
+    // model call, which is also what makes the daily cap mean what it says.
+    rebuild: post('rebuild/:mediaType'),
     // Its own page rather than three more boxes on the edit form: changing a
     // password has nothing to do with the rest of a profile, and keeping it
     // apart means the edit form's save isn't also a password save.

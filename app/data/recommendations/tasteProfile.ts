@@ -12,6 +12,36 @@ export interface TasteProfileData {
   disliked_tags: string[]
 }
 
+// What the profile is written from. Held on the user rather than passed per
+// call, so the answer is the same wherever a profile gets rebuilt.
+export interface TasteProfileSettings {
+  // How many of the most recent entries reach the prompt. Null is all of them
+  // — the behaviour every profile had before this was a choice.
+  logLimit: number | null
+  // Whether the notes someone wrote on their own entries are sent. They're the
+  // richest thing in the log and the most personal, which is the whole reason
+  // it's a question.
+  useNotes: boolean
+}
+
+// Null last, since "everything" is the end of a scale rather than an option
+// alongside the numbers.
+export const PROFILE_LOG_LIMITS: readonly (number | null)[] = [10, 50, 100, null]
+
+export function profileSettingsFor(user: {
+  profile_log_limit: number | null
+  profile_use_notes: boolean
+}): TasteProfileSettings {
+  return { logLimit: user.profile_log_limit, useNotes: user.profile_use_notes }
+}
+
+// Anything not on the list would be a number nobody could have chosen through
+// the form, so it's read as the default rather than trusted.
+export function parseProfileLogLimit(raw: string): number | null {
+  const parsed = Number(raw)
+  return PROFILE_LOG_LIMITS.includes(parsed) ? parsed : null
+}
+
 export async function getTasteProfile(db: Db, userId: number, mediaType: MediaType) {
   return db.findOne(userTasteProfiles, { where: { user_id: userId, media_type: mediaType } })
 }
@@ -63,30 +93,65 @@ export interface RegeneratedTasteProfile extends UpsertTasteProfileInput {
   log: Awaited<ReturnType<typeof listUserMediaLog>>
 }
 
-// The sole write path for a profile. Returns the log it was built from too, so
-// callers that need it (to exclude already-seen titles) don't re-fetch.
-export async function regenerateTasteProfile(
-  db: Db,
-  userId: number,
-  mediaType: MediaType,
-): Promise<RegeneratedTasteProfile> {
-  const log = await listUserMediaLog(db, userId, { type: mediaType })
+// The rows the prompt is actually built from, which is not the whole log once
+// someone has narrowed it. Kept separate from the log itself because callers
+// need the log entire — exclusions have to know about everything you've seen,
+// not just the slice your profile was written from.
+//
+// The slice takes the head because the log arrives most recent first
+// (updated_at desc, see loadUserLogEntries).
+export function profilePromptRows(log: LogEntry[], settings: TasteProfileSettings) {
+  const scoped = settings.logLimit == null ? log : log.slice(0, settings.logLimit)
 
-  if (log.length === 0) {
-    const empty = { summary: '', liked_tags: [], disliked_tags: [] }
-    // Signed like any other, or an empty log reads as stale on every run.
-    await upsertTasteProfile(db, userId, mediaType, { ...empty, logSignature: logSignature(log) })
-    return { ...empty, log }
-  }
-
-  const noun = mediaTypeUiFor(mediaType).singular
-  const loggedItems = log.map(({ interaction, item }) => ({
+  return scoped.map(({ interaction, item }) => ({
     title: item?.title ?? 'Unknown title',
     status: interaction.status,
     rating: interaction.rating,
     disliked: interaction.disliked,
-    notes: interaction.notes,
+    // Left out entirely rather than sent as null: a column of nulls reads as
+    // "this person never writes anything down", which is a claim about them
+    // rather than about what they chose to share.
+    ...(settings.useNotes ? { notes: interaction.notes } : {}),
   }))
+}
+
+// The sole write path for a profile. Returns the log it was built from too, so
+// callers that need it (to exclude already-seen titles) don't re-fetch — the
+// whole log, not the slice, for the reason above.
+export async function regenerateTasteProfile(
+  db: Db,
+  userId: number,
+  mediaType: MediaType,
+  settings: TasteProfileSettings,
+): Promise<RegeneratedTasteProfile> {
+  const log = await listUserMediaLog(db, userId, { type: mediaType })
+  const loggedItems = profilePromptRows(log, settings)
+
+  if (loggedItems.length === 0) {
+    const empty = { summary: '', liked_tags: [], disliked_tags: [] }
+    // Signed like any other, or an empty log reads as stale on every run.
+    await upsertTasteProfile(db, userId, mediaType, {
+      ...empty,
+      logSignature: logSignature(log, settings),
+    })
+    return { ...empty, log }
+  }
+
+  const noun = mediaTypeUiFor(mediaType).singular
+  // The preamble has to match what was actually sent, or it promises notes
+  // that aren't there and invites the model to wonder where they went.
+  const fields = settings.useNotes
+    ? `status, rating out of 5, whether they disliked it, and any notes they left`
+    : `status, rating out of 5, and whether they disliked it`
+  // Order is information the log has always carried and the prompt has never
+  // mentioned, which left the model reading a sequence as a pile. It matters
+  // more now that a limit can make this the recent part of a longer history.
+  const ordering =
+    settings.logLimit == null
+      ? `They're listed most recently updated first.`
+      : `These are their ${loggedItems.length} most recently updated, listed newest first — ` +
+        `they may well have logged more further back. Weigh the recent ones as the better guide ` +
+        `to where their taste is now.`
 
   const response = await track('profile.model', () =>
     claude.messages.create({
@@ -100,8 +165,7 @@ export async function regenerateTasteProfile(
         {
           role: 'user',
           content:
-            `Here is a person's ${noun} log (status, rating out of 5, whether they disliked it, ` +
-            `and any notes they left):\n` +
+            `Here is a person's ${noun} log (${fields}). ${ordering}\n` +
             `${JSON.stringify(loggedItems, null, 2)}\n\n` +
             `Write a short (2-4 sentence) natural-language summary of their taste, grounded only ` +
             `in what's above — no invented facts. Also derive liked_tags and disliked_tags: short, ` +
@@ -120,7 +184,7 @@ export async function regenerateTasteProfile(
   )
 
   const parsed = parseStructuredResponse<UpsertTasteProfileInput>(response)
-  await upsertTasteProfile(db, userId, mediaType, { ...parsed, logSignature: logSignature(log) })
+  await upsertTasteProfile(db, userId, mediaType, { ...parsed, logSignature: logSignature(log, settings) })
   return { ...parsed, log }
 }
 
@@ -150,8 +214,19 @@ type LogEntry = Awaited<ReturnType<typeof listUserMediaLog>>[number]
 // Timestamps and a row count aren't enough — rematching a title rewrites what
 // the model reads while every interaction row stays as it was. Sorted, so row
 // order can't register as a change.
-function logSignature(log: LogEntry[]): string {
-  const rows = log
+//
+// The settings belong in here for the same reason the rows do: they decide
+// what the prompt contains. Left out, narrowing the log or turning notes off
+// would leave the stored profile looking current, and the setting would appear
+// to do nothing — which reads as a broken feature rather than a stale cache.
+//
+// Signed over the sliced rows, not the whole log, which falls out of the same
+// rule: an entry beyond someone's limit never reaches the prompt, so changing
+// it can't change the answer and shouldn't buy a model call.
+export function logSignature(log: LogEntry[], settings: TasteProfileSettings): string {
+  const scoped = settings.logLimit == null ? log : log.slice(0, settings.logLimit)
+
+  const rows = scoped
     .map(({ interaction, item }) =>
       [
         item?.id ?? 0,
@@ -159,20 +234,27 @@ function logSignature(log: LogEntry[]): string {
         interaction.status,
         interaction.rating ?? '',
         interaction.disliked ?? '',
-        interaction.notes ?? '',
+        // Only when they're sent. Off, an edited note can't change the prompt.
+        settings.useNotes ? (interaction.notes ?? '') : '',
       ].join('\u0001'),
     )
     .sort()
     .join('\u0002')
 
-  return createHash('sha1').update(rows).digest('hex')
+  const preamble = [settings.logLimit ?? 'all', settings.useNotes ? 'notes' : 'no-notes'].join(':')
+
+  return createHash('sha1').update(`${preamble}|${rows}`).digest('hex')
 }
 
 // Profiles written before signatures existed report undefined, so they read as
 // stale and regenerate once.
-function isProfileStale(profile: UserTasteProfile | null, log: LogEntry[]): boolean {
+function isProfileStale(
+  profile: UserTasteProfile | null,
+  log: LogEntry[],
+  settings: TasteProfileSettings,
+): boolean {
   if (!profile) return true
-  return parseStoredProfile(profile).logSignature !== logSignature(log)
+  return parseStoredProfile(profile).logSignature !== logSignature(log, settings)
 }
 
 export interface EnsuredTasteProfile extends RegeneratedTasteProfile {
@@ -187,13 +269,14 @@ export async function ensureTasteProfile(
   db: Db,
   userId: number,
   mediaType: MediaType,
+  settings: TasteProfileSettings,
 ): Promise<EnsuredTasteProfile> {
   const [profile, log] = await Promise.all([
     getTasteProfile(db, userId, mediaType),
     listUserMediaLog(db, userId, { type: mediaType }),
   ])
 
-  if (!isProfileStale(profile, log)) {
+  if (!isProfileStale(profile, log, settings)) {
     const stored = parseStoredProfile(profile!)
     return {
       summary: profile!.summary,
@@ -204,5 +287,5 @@ export async function ensureTasteProfile(
     }
   }
 
-  return { ...(await regenerateTasteProfile(db, userId, mediaType)), regenerated: true }
+  return { ...(await regenerateTasteProfile(db, userId, mediaType, settings)), regenerated: true }
 }

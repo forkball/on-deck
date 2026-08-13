@@ -1,6 +1,19 @@
 import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
+import { redirect } from 'remix/response/redirect'
+
+import {
+  getProfileRebuildAllowance,
+  recordProfileRebuild,
+  timeUntil,
+} from '../../data/recommendations/dailyLimit.ts'
+import {
+  parseProfileLogLimit,
+  profileSettingsFor,
+  regenerateTasteProfile,
+} from '../../data/recommendations/tasteProfile.ts'
+import { updateProfileSettings } from '../../data/users.ts'
 
 import {
   countFollowers,
@@ -37,6 +50,7 @@ export default createController(routes.profile, {
 
       const followingCount = await countFollowing(db, auth.identity.id)
       const followersCount = await countFollowers(db, auth.identity.id)
+      const rebuildAllowance = await getProfileRebuildAllowance(db, auth.identity)
 
       return context.render(
         <ProfilePage
@@ -46,9 +60,61 @@ export default createController(routes.profile, {
           followingCount={followingCount}
           followersCount={followersCount}
           saved={context.url.searchParams.get('saved') === '1'}
+          settings={profileSettingsFor(auth.identity)}
+          rebuildsLeft={rebuildAllowance.unlimited ? null : rebuildAllowance.remaining}
+          rebuilt={context.url.searchParams.get('rebuilt') === '1'}
+          rebuildError={context.url.searchParams.get('rebuildError') ?? undefined}
           displayName={displayLabel(auth.identity)}
         />,
       )
+    },
+
+    async settings(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const formData = context.get(FormData)
+      await updateProfileSettings(context.get(Database), auth.identity.id, {
+        logLimit: parseProfileLogLimit(String(formData.get('log_limit') ?? '')),
+        // An unchecked checkbox sends nothing at all, so the missing key is
+        // the "off" — same shape as is_private on the edit form.
+        useNotes: formData.get('use_notes') != null,
+      })
+
+      // No rebuild here on purpose. Changing what a profile is written from
+      // makes every stored one stale, and the signature already knows that —
+      // rewriting all four on the spot would spend four model calls on a
+      // preference someone might still be adjusting. They're rewritten on the
+      // next run, or now, by the button next to each one.
+      return redirect(`${routes.profile.index.href()}?saved=1`, 303)
+    },
+
+    async rebuild(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const mediaType = parseEnabledMediaType(context.params.mediaType)
+      if (!mediaType) return new Response('Not Found', { status: 404 })
+
+      const db = context.get(Database)
+      const allowance = await getProfileRebuildAllowance(db, auth.identity)
+      if (!allowance.unlimited && allowance.remaining <= 0) {
+        const wait = allowance.resetsAt ? timeUntil(allowance.resetsAt) : 'a while'
+        return redirect(
+          `${routes.profile.index.href()}?tab=${mediaType}&rebuildError=${encodeURIComponent(
+            `You've used all ${allowance.limit} profile rebuilds for today — the next one frees up in ${wait}.`,
+          )}`,
+          303,
+        )
+      }
+
+      // Counted before the call, not after: the spend is the model call, and
+      // one that fails has already been made. Charging on success would make a
+      // failing profile free to retry without limit.
+      await recordProfileRebuild(db, auth.identity.id)
+      await regenerateTasteProfile(db, auth.identity.id, mediaType, profileSettingsFor(auth.identity))
+
+      return redirect(`${routes.profile.index.href()}?tab=${mediaType}&rebuilt=1`, 303)
     },
 
     async watched(context) {
