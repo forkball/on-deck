@@ -8,6 +8,7 @@ import { countUserMediaLog, listUserMediaLog, CONSUMPTION_STATUSES, type MediaTy
 import { createNotification } from '../notifications.ts'
 import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
+import { recordRunAgainstDailyLimit } from './dailyLimit.ts'
 import type { GenerationPhase } from './jobs.ts'
 import {
   filterByLength,
@@ -323,12 +324,20 @@ export async function generateRecommendations(
     }),
   )
 
-  // Both run after the picks exist, with the requester still on the waiting
-  // page, and neither reads what the other writes — so they overlap. Timed
-  // separately because only one of them is on the path to the redirect: if
-  // these turn out to cost anything, notifying is the half that can move
-  // behind it entirely.
-  const [, prunedOldestRun] = await Promise.all([
+  // All three run once the picks exist, with the requester still on the
+  // waiting page, and none of them reads what the others write — so they
+  // overlap rather than queueing.
+  //
+  // Usage is counted against the run that exists, not the request that asked
+  // for it: a run that never made it this far cost the person nothing. See
+  // dailyLimit.ts.
+  //
+  // Timed apart because they aren't equally load-bearing. If these turn out to
+  // cost anything, notifying is the one that can move behind the redirect,
+  // being best-effort either way — where a ledger write that doesn't land is a
+  // run nobody was charged for.
+  const [, , prunedOldestRun] = await Promise.all([
+    track('run.usage', () => recordRunAgainstDailyLimit(db, requestingUserId)),
     track('run.notify', () => notifyMutualFollowers(db, requestingUserId, memberUserIds, runId)),
     track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType)),
   ])

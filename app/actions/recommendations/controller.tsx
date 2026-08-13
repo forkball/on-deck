@@ -9,6 +9,7 @@ import { redirect } from 'remix/response/redirect'
 import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import type { Db } from '../../data/db.ts'
 import { listFollowedUsers } from '../../data/follows.ts'
+import { getDailyRunAllowance, timeUntil } from '../../data/recommendations/dailyLimit.ts'
 import { enqueueJob, getJob, hasActiveJob, PHASE_LABELS } from '../../data/recommendations/jobs.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
@@ -52,13 +53,15 @@ const generateSchema = f.object({
 // From plain (db, user) rather than a request context, so the generate action
 // can re-render this page when it rejects a run.
 async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
-  const [allRuns, allRunsFromOthers, friends] = await Promise.all([
+  const [allRuns, allRunsFromOthers, friends, dailyRuns] = await Promise.all([
     listRecommendationRuns(db, user.id),
     listRecommendationRunsFromOthers(db, user.id),
     listFollowedUsers(db, user.id),
+    getDailyRunAllowance(db, user),
   ])
 
   return {
+    dailyRuns,
     // Matched to the current tab, or a TV run lists under a movie form.
     runs: allRuns.filter((run) => run.mediaType === mediaType),
     runsFromOthers: allRunsFromOthers.filter((run) => run.mediaType === mediaType),
@@ -103,6 +106,7 @@ export default createController(routes.recommendations, {
           multiplayerTypes={data.multiplayerTypes}
           seriesTypes={data.seriesTypes}
           displayName={data.displayName}
+          dailyRuns={data.dailyRuns}
         />,
       )
     },
@@ -187,9 +191,39 @@ export default createController(routes.recommendations, {
             multiplayerTypes={data.multiplayerTypes}
             seriesTypes={data.seriesTypes}
             displayName={data.displayName}
+            dailyRuns={data.dailyRuns}
             error={`Can't generate this run — ${detail}. Everyone included needs something logged for each taste you're basing picks on.`}
           />,
           { status: 400 },
+        )
+      }
+
+      // Ahead of the duplicate check below, and of `force`: someone out of runs
+      // needs telling that, not a "generate anyway" button that can't work.
+      const allowance = await getDailyRunAllowance(db, auth.identity)
+      if (!allowance.unlimited && allowance.remaining === 0) {
+        const data = await loadIndexData(db, auth.identity, mediaType)
+        const wait =
+          allowance.resetsAt == null
+            ? ''
+            : ` The next one frees up in about ${timeUntil(allowance.resetsAt)}.`
+
+        return context.render(
+          <RecommendationsPage
+            runs={data.runs}
+            runsFromOthers={data.runsFromOthers}
+            friends={data.friends}
+            mediaType={mediaType}
+            genres={data.genres}
+            lengthOptions={data.lengthOptions}
+            playerTypes={data.playerTypes}
+            multiplayerTypes={data.multiplayerTypes}
+            seriesTypes={data.seriesTypes}
+            displayName={data.displayName}
+            dailyRuns={data.dailyRuns}
+            error={`You've used all ${allowance.limit} of your recommendation runs for today.${wait}`}
+          />,
+          { status: 429 },
         )
       }
 
@@ -219,6 +253,7 @@ export default createController(routes.recommendations, {
               multiplayerTypes={data.multiplayerTypes}
               seriesTypes={data.seriesTypes}
               displayName={data.displayName}
+              dailyRuns={data.dailyRuns}
               duplicate={{
                 runId: duplicate.runId,
                 name: duplicate.name,
@@ -261,6 +296,7 @@ export default createController(routes.recommendations, {
             multiplayerTypes={data.multiplayerTypes}
             seriesTypes={data.seriesTypes}
             displayName={data.displayName}
+            dailyRuns={data.dailyRuns}
             error="You already have a run in progress — give that one a moment to finish first."
           />,
           { status: 409 },

@@ -60,7 +60,9 @@ does nothing on its own.
   - `app/data/imports/` — log importers (`csv` is shared plumbing) and `steamApi`
   - `app/data/recommendations/` — the generation pipeline: `picks` asks the model,
     `matching` resolves picks to catalog entries, `runs` persists them, `generate`
-    orchestrates those three, `jobs`/`worker` run it in the background
+    orchestrates those three, `jobs`/`worker` run it in the background,
+    `dailyLimit` caps how many runs one account can generate in 24 hours
+    (`users.is_admin` is exempt — granted only by `scripts/set-admin.ts`)
 - `db/` holds migrations, `public/` static files served from the app root
 
 ## Route Ownership

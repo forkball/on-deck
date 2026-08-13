@@ -3,6 +3,7 @@ import { css } from 'remix/ui'
 
 import { GenerateRecommendationsForm } from '../../browser/generate-recommendations-form.tsx'
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
+import { timeUntil, type DailyRunAllowance, type DailyRunsUsed } from '../../data/recommendations/dailyLimit.ts'
 import { MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations/runs.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
@@ -22,6 +23,9 @@ export interface RecommendationsPageProps {
   multiplayerTypes: string[]
   seriesTypes: string[]
   displayName: string
+  // How much of the daily cap is left. Nothing is rendered for admins, who
+  // aren't capped — see data/recommendations/dailyLimit.ts.
+  dailyRuns: DailyRunAllowance
   error?: string
   // Set when the request matched an earlier run the user hasn't taken
   // anything from — see DuplicateNotice.
@@ -70,6 +74,25 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
           </form>
         </div>
       </div>
+    )
+  }
+}
+
+// Counted per person rather than per media type: a run costs the same whatever
+// it is a run of. Rendered even when there is plenty left, so running out is
+// never the first time someone hears there's a cap.
+function DailyRunsNote(handle: Handle<{ dailyRuns: DailyRunsUsed }>) {
+  return () => {
+    const { remaining, limit, resetsAt } = handle.props.dailyRuns
+
+    return (
+      <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
+        {remaining > 0
+          ? `${remaining} of ${limit} recommendation runs left today.`
+          : resetsAt == null
+            ? `No recommendation runs left today.`
+            : `No recommendation runs left today — the next one frees up in about ${timeUntil(resetsAt)}.`}
+      </p>
     )
   }
 }
@@ -131,6 +154,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       multiplayerTypes,
       seriesTypes,
       displayName,
+      dailyRuns,
       error,
       duplicate,
     } = handle.props
@@ -166,6 +190,8 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
               {error}
             </p>
           )}
+
+          {!dailyRuns.unlimited && <DailyRunsNote dailyRuns={dailyRuns} />}
 
           <GenerateRecommendationsForm
             friends={friends.map((friend) => ({ id: friend.id, label: displayLabel(friend) }))}
