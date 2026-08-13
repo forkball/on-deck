@@ -203,18 +203,23 @@ export async function saveRun(db: Db, input: SaveRunInput): Promise<number> {
     { returnRow: true },
   )
 
-  for (const memberId of input.memberUserIds) {
-    await db.create(recommendationRunMembers, { run_id: run.id, user_id: memberId })
-  }
-
-  for (const [index, result] of input.results.entries()) {
-    await db.create(userRecommendations, {
-      run_id: run.id,
-      media_item_id: result.item.id,
-      reason: result.reason,
-      rank: index + 1,
-    })
-  }
+  // Concurrent, and safe to be: every row here belongs to the run just
+  // created, and `rank` carries the ordering explicitly, so no row depends on
+  // another having landed first. Serially this was a round trip per member
+  // plus one per pick, all of it while the requester waits.
+  await Promise.all([
+    ...input.memberUserIds.map((memberId) =>
+      db.create(recommendationRunMembers, { run_id: run.id, user_id: memberId }),
+    ),
+    ...input.results.map((result, index) =>
+      db.create(userRecommendations, {
+        run_id: run.id,
+        media_item_id: result.item.id,
+        reason: result.reason,
+        rank: index + 1,
+      }),
+    ),
+  ])
 
   return run.id
 }

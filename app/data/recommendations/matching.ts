@@ -1,5 +1,5 @@
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
-import { getCatalogProvider, type CatalogSearchResult } from '../catalog/provider.ts'
+import { getCatalogProvider, type CatalogSearchResult, type LengthBucket } from '../catalog/provider.ts'
 import { pool } from '../db.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import type { MediaType } from '../mediaItems.ts'
@@ -139,8 +139,22 @@ export async function verifyPicksAgainstOverviews(
   return candidates.filter((_, index) => verdicts[index] === true)
 }
 
-// Same bound as the Letterboxd importer's.
-const OVERVIEW_CONCURRENCY = 8
+// Same bound as the Letterboxd importer's. Shared by both by-id fan-outs
+// below, since both are the same provider being asked the same kind of
+// question — one ceiling, not two that drift apart.
+const LOOKUP_CONCURRENCY = 8
+
+// A worker pool rather than Promise.all: these run against a rate-limited
+// provider, and a run can carry 25 picks.
+async function forEachWithConcurrency<T>(items: T[], operation: (item: T) => Promise<void>): Promise<void> {
+  let next = 0
+  async function worker(): Promise<void> {
+    while (next < items.length) {
+      await operation(items[next++])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(LOOKUP_CONCURRENCY, items.length) }, worker))
+}
 
 // TMDB returns descriptions on search; Open Library only on the per-work
 // record. Since verifyPicksAgainstOverviews reads them, a missing one would
@@ -149,15 +163,10 @@ export async function withOverviews(candidates: Candidate[], mediaType: MediaTyp
   const missing = candidates.filter(({ match }) => !match.overview)
   if (missing.length === 0) return candidates
 
-  let next = 0
-  async function worker() {
-    while (next < missing.length) {
-      const entry = missing[next++]
-      const detail = await lookupForType(mediaType, entry.match.externalId)
-      if (detail?.overview) entry.match = { ...entry.match, overview: detail.overview }
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(OVERVIEW_CONCURRENCY, missing.length) }, worker))
+  await forEachWithConcurrency(missing, async (entry) => {
+    const detail = await lookupForType(mediaType, entry.match.externalId)
+    if (detail?.overview) entry.match = { ...entry.match, overview: detail.overview }
+  })
 
   return candidates
 }
@@ -168,6 +177,50 @@ export function hasLengthDimension(mediaType: MediaType, result: CatalogSearchRe
   if (mediaType === 'game') return result.playtimeHours != null
   if (mediaType === 'tv') return result.seasonCount != null
   return result.runtimeMinutes != null
+}
+
+// Keeps only the candidates matching the requested length, fetching the
+// dimension for the ones whose search result didn't carry it.
+//
+// No provider returns length on search, only on by-id, so this is a second
+// round of requests — but only for the candidates that need it, and only when
+// the lever is set at all. It used to run inside the filter loop, which made
+// it one request at a time: up to 25 round trips end to end, in the stage the
+// waiting page labels "Checking lengths…".
+export async function filterByLength(
+  candidates: Candidate[],
+  mediaType: MediaType,
+  length: LengthBucket,
+): Promise<Candidate[]> {
+  const provider = getCatalogProvider(mediaType)
+
+  // The stored row often already carries the dimension, making the request
+  // pure cost.
+  const needLookup = new Set(candidates.filter(({ match }) => !hasLengthDimension(mediaType, match)))
+  // Null marks a candidate whose lookup failed — no dimension, no verdict, so
+  // it can't be kept. Held beside the entry rather than mutated into it so the
+  // filter below stays a pure read.
+  const resolved = new Map<Candidate, CatalogSearchResult | null>()
+
+  await forEachWithConcurrency([...needLookup], async (entry) => {
+    resolved.set(entry, await lookupForType(mediaType, entry.match.externalId))
+  })
+
+  const kept: Candidate[] = []
+  for (const entry of candidates) {
+    if (!needLookup.has(entry)) {
+      if (provider.matchesLength(entry.match, length)) kept.push(entry)
+      continue
+    }
+
+    const detail = resolved.get(entry) ?? null
+    if (!detail || !provider.matchesLength(detail, length)) continue
+    // Already paid for, and it carries what search omits. Keeping the search
+    // result instead wrote rows with a null runtime it had just fetched.
+    kept.push({ pick: entry.pick, match: detail })
+  }
+
+  return kept
 }
 
 const YEAR_TOLERANCE = 1

@@ -1,7 +1,7 @@
 import { inList } from 'remix/data-table'
 
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
-import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
+import { upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
 import type { Db } from '../db.ts'
 import { isFollowing } from '../follows.ts'
 import { countUserMediaLog, CONSUMPTION_STATUSES, type MediaType } from '../mediaItems.ts'
@@ -10,8 +10,7 @@ import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
 import type { GenerationPhase } from './jobs.ts'
 import {
-  hasLengthDimension,
-  lookupForType,
+  filterByLength,
   matchesDecade,
   resolveFromCatalog,
   searchForType,
@@ -194,13 +193,14 @@ export async function generateRecommendations(
     }),
   )
 
-  // Only then does the loop below make a second round of requests.
-  if (filters.length) enterPhase('lengths')
-
+  // Everything that can be decided from the search results already in hand.
+  // Nothing here makes a request, so the dedupe settles in pick order rather
+  // than in whatever order a provider answered.
+  //
   // Not capped at TARGET_COUNT: verification below drops some too, so the
   // over-request slack has to reach it or a verification drop under-fills the
   // run rather than spending slack already budgeted for it.
-  const candidates: Candidate[] = []
+  const shortlist: Candidate[] = []
   const seenExternalIds = new Set<string>()
 
   for (const [i, pick] of picks.entries()) {
@@ -221,28 +221,20 @@ export async function generateRecommendations(
     if (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) continue
     if (filters.series && !match.tags.includes(filters.series)) continue
 
-    // No provider returns the length dimension on search, only on by-id — so
-    // this extra round trip is paid only when the lever is set.
-    let resolved = match
-    if (filters.length) {
-      // The stored row often already carries it, making the request pure cost.
-      const provider = getCatalogProvider(mediaType)
-      if (hasLengthDimension(mediaType, match)) {
-        if (!provider.matchesLength(match, filters.length)) continue
-        seenExternalIds.add(match.externalId)
-        candidates.push({ pick, match })
-        continue
-      }
-
-      const detail = await lookupForType(mediaType, match.externalId)
-      if (!detail || !provider.matchesLength(detail, filters.length)) continue
-      // Already paid for, and it carries what search omits. Keeping `match`
-      // instead wrote rows with a null runtime it had just fetched.
-      resolved = detail
-    }
-
+    // Marked before the length verdict, unlike the loop this replaces, which
+    // left a length-rejected entry unmarked and re-tested the next pick
+    // resolving to the same id. Same id, same verdict — so the only thing that
+    // cost was the second lookup.
     seenExternalIds.add(match.externalId)
-    candidates.push({ pick, match: resolved })
+    shortlist.push({ pick, match })
+  }
+
+  // The only filter that can't be answered from what search returned, so it's
+  // the only one that costs a second round of requests.
+  let candidates: Candidate[] = shortlist
+  if (filters.length) {
+    enterPhase('lengths')
+    candidates = await filterByLength(shortlist, mediaType, filters.length)
   }
 
   // A second, semantic pass over the survivors before anything is written.
@@ -268,11 +260,16 @@ export async function generateRecommendations(
     const verified = await verifyPicksAgainstOverviews(await withOverviews(candidates, mediaType), mediaType)
 
     enterPhase('saving')
-    results = []
-    for (const { pick, match } of verified.slice(0, TARGET_COUNT)) {
-      const item = await track('catalog.upsert', () => upsertCatalogItem(db, mediaType, match))
-      results.push({ item, reason: pick.reason, interaction: null })
-    }
+    // Concurrent: these are ten independent rows, and the search page already
+    // fans out about twice this many upserts at once. Promise.all keeps them
+    // in pick order, which is the order they're ranked in.
+    results = await Promise.all(
+      verified.slice(0, TARGET_COUNT).map(async ({ pick, match }) => ({
+        item: await track('catalog.upsert', () => upsertCatalogItem(db, mediaType, match)),
+        reason: pick.reason,
+        interaction: null,
+      })),
+    )
 
     // Ids, not objects — keeps a job row at a few KB.
     checkpoint = {
@@ -302,11 +299,15 @@ export async function generateRecommendations(
     }),
   )
 
-  // Both are timed separately from the save because both run after the picks
-  // exist, while the person is still on the waiting page.
-  await track('run.notify', () => notifyMutualFollowers(db, requestingUserId, memberUserIds, runId))
-
-  const prunedOldestRun = await track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType))
+  // Both run after the picks exist, with the requester still on the waiting
+  // page, and neither reads what the other writes — so they overlap. Timed
+  // separately because only one of them is on the path to the redirect: if
+  // these turn out to cost anything, notifying is the half that can move
+  // behind it entirely.
+  const [, prunedOldestRun] = await Promise.all([
+    track('run.notify', () => notifyMutualFollowers(db, requestingUserId, memberUserIds, runId)),
+    track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType)),
+  ])
 
   return { runId, prunedOldestRun }
 }
