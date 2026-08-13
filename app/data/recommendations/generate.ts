@@ -36,6 +36,7 @@ import {
   type GenerationParams,
   type RecommendationResult,
 } from './runs.ts'
+import { emptyDrops, logPickTally } from './tally.ts'
 import { ensureTasteProfile } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
 
@@ -227,10 +228,15 @@ export async function generateRecommendations(
   // run rather than spending slack already budgeted for it.
   const shortlist: Candidate[] = []
   const seenExternalIds = new Set<string>()
+  // Counted, not stored — see tally.ts for why this is log-only for now.
+  const drops = emptyDrops()
 
   for (const [i, pick] of picks.entries()) {
     const matches: CatalogSearchResult[] = matchesByPick[i]
-    if (matches.length === 0) continue
+    if (matches.length === 0) {
+      drops.unfound++
+      continue
+    }
 
     const match =
       matches.find((m) => m.releaseYear === pick.year) ??
@@ -238,13 +244,32 @@ export async function generateRecommendations(
         (a, b) => Math.abs((a.releaseYear ?? 0) - pick.year) - Math.abs((b.releaseYear ?? 0) - pick.year),
       )[0]
 
-    if (excludedExternalIds.has(match.externalId) || seenExternalIds.has(match.externalId)) continue
-    if (!titlesLikelyMatch(pick.title, match.title)) continue
-    if (filters.genre && !match.tags.includes(filters.genre)) continue
-    if (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade, filters.decadeRelation)) continue
-    if (filters.playerType && !match.tags.includes(filters.playerType)) continue
-    if (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) continue
-    if (filters.series && !match.tags.includes(filters.series)) continue
+    // Split apart from each other, where they used to share a condition. They
+    // read the same to the pipeline and mean opposite things to us: one says
+    // the model suggested something this person has finished with, the other
+    // says it suggested the same entry twice in one run.
+    if (excludedExternalIds.has(match.externalId)) {
+      drops.alreadyLogged++
+      continue
+    }
+    if (seenExternalIds.has(match.externalId)) {
+      drops.duplicate++
+      continue
+    }
+    if (!titlesLikelyMatch(pick.title, match.title)) {
+      drops.titleMismatch++
+      continue
+    }
+    if (
+      (filters.genre && !match.tags.includes(filters.genre)) ||
+      (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade, filters.decadeRelation)) ||
+      (filters.playerType && !match.tags.includes(filters.playerType)) ||
+      (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) ||
+      (filters.series && !match.tags.includes(filters.series))
+    ) {
+      drops.filtered++
+      continue
+    }
 
     // Marked before the length verdict, unlike the loop this replaces, which
     // left a length-rejected entry unmarked and re-tested the next pick
@@ -260,6 +285,9 @@ export async function generateRecommendations(
   if (filters.length) {
     enterPhase('lengths')
     candidates = await filterByLength(shortlist, mediaType, filters.length)
+    // Subtraction, not instrumentation: the stage takes a list and hands back
+    // a shorter one, so the difference is the count.
+    drops.length = shortlist.length - candidates.length
   }
 
   // A second, semantic pass over the survivors before anything is written.
@@ -283,6 +311,7 @@ export async function generateRecommendations(
   } else {
     enterPhase('verifying')
     const verified = await verifyPicksAgainstOverviews(await withOverviews(candidates, mediaType), mediaType)
+    drops.unverified = candidates.length - verified.length
 
     enterPhase('saving')
     // Concurrent: these are ten independent rows, and the search page already
@@ -302,6 +331,16 @@ export async function generateRecommendations(
       verified: results.map((result) => ({ mediaItemId: result.item.id, reason: result.reason })),
     }
     onCheckpoint(checkpoint)
+
+    // Only on this path. A run resuming from a checkpoint skipped verification
+    // entirely, so its gates never all ran — and a tally missing a stage is
+    // worse than none, since it reads as though everything was counted.
+    logPickTally({
+      requested: picks.length,
+      kept: results.length,
+      surplus: verified.length - results.length,
+      dropped: drops,
+    })
   }
 
   const runId = await track('run.save', () =>
