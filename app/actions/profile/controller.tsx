@@ -60,6 +60,7 @@ export default createController(routes.profile, {
           followingCount={followingCount}
           followersCount={followersCount}
           saved={context.url.searchParams.get('saved') === '1'}
+          settings={profileSettingsFor(auth.identity)}
           rebuildsLeft={rebuildAllowance.unlimited ? null : rebuildAllowance.remaining}
           rebuilt={context.url.searchParams.get('rebuilt') === '1'}
           rebuildError={context.url.searchParams.get('rebuildError') ?? undefined}
