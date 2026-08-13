@@ -61,11 +61,15 @@ function TasteProfileSummary(
     updatedAt: number | null
     mediaType: ActiveMediaType
     settings: TasteProfileSettings
+    // Counted the way the rebuild action counts it — rejections excluded. See
+    // loadMediaSummaries.
+    loggedCount: number
     rebuildsLeft: number | null
   }>,
 ) {
   return () => {
-    const { label, summary, updatedAt, mediaType, settings, rebuildsLeft } = handle.props
+    const { label, summary, updatedAt, mediaType, settings, loggedCount, rebuildsLeft } = handle.props
+    const nothingLogged = loggedCount === 0
     const outOfRebuilds = rebuildsLeft != null && rebuildsLeft <= 0
     const source = describeProfileSource(settings, mediaType)
 
@@ -109,14 +113,18 @@ function TasteProfileSummary(
             action={routes.profile.rebuild.href({ mediaType })}
             mix={css({ marginTop: '12px', display: 'flex', gap: '10px', alignItems: 'baseline' })}
           >
-            <button type="submit" disabled={outOfRebuilds}>
+            {/* The action refuses both of these too. This only saves someone
+                spending a click, and a rebuild, on finding that out. */}
+            <button type="submit" disabled={nothingLogged || outOfRebuilds}>
               Rebuild now
             </button>
-            {rebuildsLeft != null && (
+            {(nothingLogged || rebuildsLeft != null) && (
               <span mix={css({ fontSize: '12px', color: '#888' })}>
-                {outOfRebuilds
-                  ? 'No rebuilds left today'
-                  : `${rebuildsLeft} rebuild${rebuildsLeft === 1 ? '' : 's'} left today`}
+                {nothingLogged
+                  ? `Nothing logged to write one from`
+                  : outOfRebuilds
+                    ? 'No rebuilds left today'
+                    : `${rebuildsLeft} rebuild${rebuildsLeft === 1 ? '' : 's'} left today`}
               </span>
             )}
           </form>
@@ -254,6 +262,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                       updatedAt={profileUpdatedAt}
                       mediaType={type}
                       settings={settings}
+                      loggedCount={total}
                       rebuildsLeft={rebuildsLeft}
                     />
                     {/* Each importer only understands one medium, so the

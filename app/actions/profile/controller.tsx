@@ -22,7 +22,7 @@ import {
   listFollowers,
   listFollowingIds,
 } from '../../data/follows.ts'
-import { countUserMediaLog, listUserMediaLog } from '../../data/mediaItems.ts'
+import { CONSUMPTION_STATUSES, countUserMediaLog, listUserMediaLog } from '../../data/mediaItems.ts'
 import { loadMediaSummaries } from '../../data/mediaSummary.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
@@ -106,16 +106,24 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
 
-      // An empty log writes an empty profile without calling the model, so
-      // there's nothing here to charge for — and charging anyway would spend
-      // one of five on a no-op. Reachable by anyone: there's a tab and a
-      // button per media type, and most people use one or two of the four.
-      const logged = await countUserMediaLog(db, auth.identity.id, { type: mediaType })
+      // Rejections don't count, which is the same rule generating uses (see
+      // findMembersMissingSourceLogs). Counting them here instead would let
+      // someone rebuild a profile they then can't generate from: "taste
+      // profile rewritten", followed immediately by "you have no movies
+      // logged". Both true, and together nonsense.
+      //
+      // It also keeps the button honest — the count behind `total` on the
+      // profile page, which decides whether it's clickable, is filtered the
+      // same way.
+      const logged = await countUserMediaLog(db, auth.identity.id, {
+        type: mediaType,
+        statuses: CONSUMPTION_STATUSES,
+      })
       if (logged === 0) {
-        const noun = mediaTypeUiFor(mediaType).attributive
+        const noun = mediaTypeUiFor(mediaType).plural
         return redirect(
           `${routes.profile.index.href()}?tab=${mediaType}&rebuildError=${encodeURIComponent(
-            `There's nothing in your ${noun} log yet, so there's nothing to write a profile from.`,
+            `You have no ${noun} logged yet, so there's nothing to write a profile from.`,
           )}`,
           303,
         )
