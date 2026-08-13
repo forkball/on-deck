@@ -115,6 +115,56 @@ export function profilePromptRows(log: LogEntry[], settings: TasteProfileSetting
   }))
 }
 
+// Everything the model is given, built from rows the settings have already
+// filtered. The settings are applied here in code and never described to the
+// model: it isn't told a limit exists, isn't asked to ignore anything, and
+// can't be relied on to. What someone excluded simply isn't in the request.
+//
+// Exported so that can be checked rather than taken on trust — a test can read
+// the whole string and confirm the withheld text appears nowhere in it.
+export function buildProfilePrompt(
+  loggedItems: ReturnType<typeof profilePromptRows>,
+  mediaType: MediaType,
+  settings: TasteProfileSettings,
+): string {
+  const noun = mediaTypeUiFor(mediaType).singular
+  // Has to match what was actually sent, or it promises notes that aren't
+  // there and invites the model to wonder where they went.
+  const fields = settings.useNotes
+    ? `status, rating out of 5, whether they disliked it, and any notes they left`
+    : `status, rating out of 5, and whether they disliked it`
+  // Order is information the log has always carried and the prompt never
+  // mentioned, which left the model reading a sequence as a pile. It matters
+  // more now that a limit can make this the recent part of a longer history.
+  //
+  // That there is more further back is said plainly, because the alternative
+  // is worse: shown ten entries and told nothing, the model reads ten as the
+  // whole of someone's taste. Saying a thing exists is not the same as
+  // sending it — no excluded title, rating or note appears here.
+  const ordering =
+    settings.logLimit == null
+      ? `They're listed most recently updated first.`
+      : `These are their ${loggedItems.length} most recently updated, listed newest first — ` +
+        `they may well have logged more further back. Weigh the recent ones as the better guide ` +
+        `to where their taste is now.`
+
+  return (
+    `Here is a person's ${noun} log (${fields}). ${ordering}\n` +
+    `${JSON.stringify(loggedItems, null, 2)}\n\n` +
+    `Write a short (2-4 sentence) natural-language summary of their taste, grounded only ` +
+    `in what's above — no invented facts. Also derive liked_tags and disliked_tags: short, ` +
+    `lowercase genre/mood/style tags (e.g. "slow-burn", "dystopian", "feel-good") inferred ` +
+    `from what they rated highly vs. poorly. A "not_interested" status is one they turned ` +
+    `down without trying — a dislike signal in its own right, carrying no rating. ` +
+    `A null rating on any other status means they simply never rated it: infer nothing ` +
+    `about whether they liked it, and never treat it as a low score. Ratings run 0.5 to 5, ` +
+    `so the bottom of the scale is 0.5, not 0. "disliked": true is the third answer to that ` +
+    `same question: they finished it, didn't like it, and declined to put a number on ` +
+    `it. Treat it as a firm dislike — it never carries a rating, and its absence of one ` +
+    `is a refusal to score rather than a low score.`
+  )
+}
+
 // The sole write path for a profile. Returns the log it was built from too, so
 // callers that need it (to exclude already-seen titles) don't re-fetch — the
 // whole log, not the slice, for the reason above.
@@ -137,22 +187,6 @@ export async function regenerateTasteProfile(
     return { ...empty, log }
   }
 
-  const noun = mediaTypeUiFor(mediaType).singular
-  // The preamble has to match what was actually sent, or it promises notes
-  // that aren't there and invites the model to wonder where they went.
-  const fields = settings.useNotes
-    ? `status, rating out of 5, whether they disliked it, and any notes they left`
-    : `status, rating out of 5, and whether they disliked it`
-  // Order is information the log has always carried and the prompt has never
-  // mentioned, which left the model reading a sequence as a pile. It matters
-  // more now that a limit can make this the recent part of a longer history.
-  const ordering =
-    settings.logLimit == null
-      ? `They're listed most recently updated first.`
-      : `These are their ${loggedItems.length} most recently updated, listed newest first — ` +
-        `they may well have logged more further back. Weigh the recent ones as the better guide ` +
-        `to where their taste is now.`
-
   const response = await track('profile.model', () =>
     claude.messages.create({
       model: 'claude-sonnet-5',
@@ -161,25 +195,7 @@ export async function regenerateTasteProfile(
         effort: 'medium',
         format: { type: 'json_schema', schema: PROFILE_SCHEMA },
       },
-      messages: [
-        {
-          role: 'user',
-          content:
-            `Here is a person's ${noun} log (${fields}). ${ordering}\n` +
-            `${JSON.stringify(loggedItems, null, 2)}\n\n` +
-            `Write a short (2-4 sentence) natural-language summary of their taste, grounded only ` +
-            `in what's above — no invented facts. Also derive liked_tags and disliked_tags: short, ` +
-            `lowercase genre/mood/style tags (e.g. "slow-burn", "dystopian", "feel-good") inferred ` +
-            `from what they rated highly vs. poorly. A "not_interested" status is one they turned ` +
-            `down without trying — a dislike signal in its own right, carrying no rating. ` +
-            `A null rating on any other status means they simply never rated it: infer nothing ` +
-            `about whether they liked it, and never treat it as a low score. Ratings run 0.5 to 5, ` +
-            `so the bottom of the scale is 0.5, not 0. "disliked": true is the third answer to that ` +
-            `same question: they finished it, didn't like it, and declined to put a number on ` +
-            `it. Treat it as a firm dislike — it never carries a rating, and its absence of one ` +
-            `is a refusal to score rather than a low score.`,
-        },
-      ],
+      messages: [{ role: 'user', content: buildProfilePrompt(loggedItems, mediaType, settings) }],
     }),
   )
 
