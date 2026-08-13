@@ -83,13 +83,78 @@ export function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolea
   return similarity >= TITLE_SIMILARITY_THRESHOLD
 }
 
-const VERIFY_SCHEMA = {
-  type: 'object' as const,
-  additionalProperties: false,
-  properties: {
-    verdicts: { type: 'array' as const, items: { type: 'boolean' as const } },
-  },
-  required: ['verdicts'],
+// Each verdict carries the entry it's about. The bare boolean array this
+// replaced was paired with its candidate by position, which is an assumption
+// dressed up as data: one verdict too few and every answer after it slid onto
+// the wrong film — keeping one the model had rejected and dropping one it had
+// approved, at the single step whose job is telling near-identical entries
+// apart, with nothing anywhere reporting it.
+//
+// Built per call so the length can be pinned. Nothing in JSON Schema can say
+// "as many as I sent you", but a count known at call time can.
+function verifySchema(count: number) {
+  return {
+    type: 'object' as const,
+    additionalProperties: false,
+    properties: {
+      verdicts: {
+        type: 'array' as const,
+        minItems: count,
+        maxItems: count,
+        items: {
+          type: 'object' as const,
+          additionalProperties: false,
+          properties: {
+            index: { type: 'number' as const },
+            matches: { type: 'boolean' as const },
+          },
+          required: ['index', 'matches'],
+        },
+      },
+    },
+    required: ['verdicts'],
+  }
+}
+
+export interface PickVerdict {
+  index: number
+  matches: boolean
+}
+
+// Split out from the call because this is the half that can be wrong while
+// everything still looks fine — and the half that needs no model to test.
+//
+// Refuses anything it can't read unambiguously rather than filtering on a
+// best guess. A verdict set that doesn't line up means we don't know which
+// film each answer was about, and quietly keeping whatever happened to be
+// true would be the same silent mismatch in a new costume. The job retries,
+// and the picks it already paid for are in the checkpoint.
+export function applyVerdicts(candidates: Candidate[], verdicts: PickVerdict[]): Candidate[] {
+  if (!Array.isArray(verdicts)) throw mismatch(`verdicts came back as ${typeof verdicts}`)
+
+  const byIndex = new Map<number, boolean>()
+
+  for (const { index, matches } of verdicts) {
+    if (!Number.isInteger(index) || index < 0 || index >= candidates.length) {
+      throw mismatch(`verdict for entry ${index}, which wasn't among the ${candidates.length} asked about`)
+    }
+    if (byIndex.has(index)) throw mismatch(`two verdicts for entry ${index}`)
+    byIndex.set(index, matches)
+  }
+
+  if (byIndex.size !== candidates.length) {
+    throw mismatch(`${byIndex.size} of ${candidates.length} entries answered`)
+  }
+
+  return candidates.filter((_, index) => byIndex.get(index) === true)
+}
+
+// Two audiences. The message travels to the waiting page verbatim (worker.ts
+// hands error.message to failJob), so it says what to do about it; the detail
+// that would only puzzle someone there goes to the log.
+function mismatch(detail: string): Error {
+  console.warn(`[generation] verification mismatch: ${detail}`)
+  return new Error('Checking the picks came back incomplete — try generating again.')
 }
 
 // A same-title-same-year-different-film sails through titlesLikelyMatch, since
@@ -117,7 +182,7 @@ export async function verifyPicksAgainstOverviews(
       max_tokens: 2000,
       output_config: {
         effort: 'low',
-        format: { type: 'json_schema', schema: VERIFY_SCHEMA },
+        format: { type: 'json_schema', schema: verifySchema(candidates.length) },
       },
       messages: [
         {
@@ -128,15 +193,16 @@ export async function verifyPicksAgainstOverviews(
             `overview. Confirm whether the ${entryNoun} found is truly the same one you meant, not just a ` +
             `similarly- or identically-titled different one. Small title differences (translation, punctuation, ` +
             `"the" vs no "the") are fine as long as it's the same ${entryNoun}.\n\n${JSON.stringify(items, null, 2)}\n\n` +
-            `Return one boolean per entry, in the same order as given, true only if the ${entryNoun} found is ` +
-            `genuinely the one you meant.`,
+            `Return one verdict per entry, each repeating that entry's "index" from above, with "matches" true ` +
+            `only if the ${entryNoun} found is genuinely the one you meant. Every entry needs exactly one ` +
+            `verdict — order doesn't matter, since the index is what pairs them up.`,
         },
       ],
     }),
   )
 
-  const { verdicts } = parseStructuredResponse<{ verdicts: boolean[] }>(response)
-  return candidates.filter((_, index) => verdicts[index] === true)
+  const { verdicts } = parseStructuredResponse<{ verdicts: PickVerdict[] }>(response)
+  return applyVerdicts(candidates, verdicts)
 }
 
 // Same bound as the Letterboxd importer's. Shared by both by-id fan-outs
