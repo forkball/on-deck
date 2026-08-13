@@ -9,6 +9,7 @@ import { redirect } from 'remix/response/redirect'
 import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import type { Db } from '../../data/db.ts'
 import { listFollowedUsers } from '../../data/follows.ts'
+import { loadLoggedTypesByUser } from '../../data/mediaItems.ts'
 import { getDailyRunAllowance, timeUntil } from '../../data/recommendations/dailyLimit.ts'
 import { enqueueJob, getJob, hasActiveJob, PHASE_LABELS } from '../../data/recommendations/jobs.ts'
 import type { User } from '../../data/schema.ts'
@@ -60,12 +61,21 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     getDailyRunAllowance(db, user),
   ])
 
+  // After the fetch above rather than alongside it, since it needs the ids it
+  // returns. One query for everyone the picker can offer, so the form can grey
+  // out a run before it's requested rather than after it's refused.
+  const loggedByUser = await loadLoggedTypesByUser([user.id, ...friends.map((friend) => friend.id)])
+
   return {
     dailyRuns,
     // Matched to the current tab, or a TV run lists under a movie form.
     runs: allRuns.filter((run) => run.mediaType === mediaType),
     runsFromOthers: allRunsFromOthers.filter((run) => run.mediaType === mediaType),
     friends,
+    loggedTypes: Object.fromEntries(
+      friends.map((friend) => [friend.id, [...(loggedByUser.get(friend.id) ?? [])]]),
+    ),
+    viewerLoggedTypes: [...(loggedByUser.get(user.id) ?? [])],
     genres: getCatalogProvider(mediaType).genres,
     // Label only — `phrase` is prompt copy the form has no use for, and these
     // props are serialized into the page for the client entry.
@@ -99,6 +109,8 @@ export default createController(routes.recommendations, {
           runs={data.runs}
           runsFromOthers={data.runsFromOthers}
           friends={data.friends}
+            loggedTypes={data.loggedTypes}
+            viewerLoggedTypes={data.viewerLoggedTypes}
           mediaType={mediaType}
           genres={data.genres}
           lengthOptions={data.lengthOptions}
@@ -184,6 +196,8 @@ export default createController(routes.recommendations, {
             runs={data.runs}
             runsFromOthers={data.runsFromOthers}
             friends={data.friends}
+            loggedTypes={data.loggedTypes}
+            viewerLoggedTypes={data.viewerLoggedTypes}
             mediaType={mediaType}
             genres={data.genres}
             lengthOptions={data.lengthOptions}
@@ -213,6 +227,8 @@ export default createController(routes.recommendations, {
             runs={data.runs}
             runsFromOthers={data.runsFromOthers}
             friends={data.friends}
+            loggedTypes={data.loggedTypes}
+            viewerLoggedTypes={data.viewerLoggedTypes}
             mediaType={mediaType}
             genres={data.genres}
             lengthOptions={data.lengthOptions}
@@ -246,6 +262,8 @@ export default createController(routes.recommendations, {
               runs={data.runs}
               runsFromOthers={data.runsFromOthers}
               friends={data.friends}
+            loggedTypes={data.loggedTypes}
+            viewerLoggedTypes={data.viewerLoggedTypes}
               mediaType={mediaType}
               genres={data.genres}
               lengthOptions={data.lengthOptions}
@@ -289,6 +307,8 @@ export default createController(routes.recommendations, {
             runs={data.runs}
             runsFromOthers={data.runsFromOthers}
             friends={data.friends}
+            loggedTypes={data.loggedTypes}
+            viewerLoggedTypes={data.viewerLoggedTypes}
             mediaType={mediaType}
             genres={data.genres}
             lengthOptions={data.lengthOptions}

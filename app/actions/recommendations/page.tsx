@@ -16,6 +16,10 @@ export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
   runsFromOthers: RecommendationRunSummary[]
   friends: User[]
+  // Which media types each friend has logged in, keyed by user id, and the
+  // viewer's own. Both feed the form's check that a run could go anywhere.
+  loggedTypes: Record<number, string[]>
+  viewerLoggedTypes: string[]
   mediaType: ActiveMediaType
   genres: string[]
   lengthOptions: { value: string; label: string }[]
@@ -147,6 +151,8 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       runs,
       runsFromOthers,
       friends,
+      loggedTypes,
+      viewerLoggedTypes,
       mediaType,
       genres,
       lengthOptions,
@@ -194,7 +200,12 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
           {!dailyRuns.unlimited && <DailyRunsNote dailyRuns={dailyRuns} />}
 
           <GenerateRecommendationsForm
-            friends={friends.map((friend) => ({ id: friend.id, label: displayLabel(friend) }))}
+            friends={friends.map((friend) => ({
+              id: friend.id,
+              label: displayLabel(friend),
+              loggedTypes: loggedTypes[friend.id] ?? [],
+            }))}
+            viewerLoggedTypes={viewerLoggedTypes}
             mediaType={mediaType}
             mediaTypeLabel={ui.attributive}
             sources={enabledMediaTypes().map((type) => ({

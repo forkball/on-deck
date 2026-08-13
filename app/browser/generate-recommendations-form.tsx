@@ -5,10 +5,17 @@ import { Field } from '../ui/shared/field.tsx'
 export type FriendOption = {
   id: number
   label: string
+  // Media types this person has logged something in, rejections excluded.
+  // Plain strings for the same reason `mediaType` is: the registry lives
+  // outside app/browser and can't be imported here.
+  loggedTypes: string[]
 }
 
 export type GenerateRecommendationsFormProps = {
   friends: FriendOption[]
+  // The requester's own, in the same shape — they're always in the run, so
+  // their gaps stop it just as a friend's do.
+  viewerLoggedTypes: string[]
   // Set by the page's tabs, so just carried through as a hidden field. Plain
   // strings rather than the registry: the browser bundle is limited to
   // app/browser/**, so anything outside has to arrive as a serializable prop.
@@ -73,10 +80,14 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let filtersOpen = false
     // Cross-media sourcing is the deliberate opt-in.
     const selectedSources = new Set<string>([handle.props.mediaType])
+    // Tracked rather than left to the checkboxes alone, because whether the
+    // run can go anywhere depends on who's in it — see `blockedBy` below.
+    const selectedFriends = new Set<number>()
 
     return () => {
       const {
         friends,
+        viewerLoggedTypes,
         mediaType,
         mediaTypeLabel,
         sources,
@@ -89,6 +100,26 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         findPeopleHref,
       } = handle.props
       const hasSource = selectedSources.size > 0
+
+      // The same rule the server applies after submitting (see
+      // findMembersMissingSourceLogs): everyone in the run needs something
+      // logged under every taste it reads. Checked here so the answer arrives
+      // before the click rather than as a rejected page — the server still
+      // decides, and still says no if this is wrong or bypassed.
+      const membersInRun = [
+        { label: 'You', loggedTypes: viewerLoggedTypes },
+        ...(mode === 'group'
+          ? friends.filter((friend) => selectedFriends.has(friend.id))
+          : []),
+      ]
+      const sourceLabel = (value: string) =>
+        sources.find((source) => source.value === value)?.label ?? value
+      const blockedBy = membersInRun
+        .map((member) => ({
+          label: member.label,
+          missing: [...selectedSources].filter((source) => !member.loggedTypes.includes(source)),
+        }))
+        .filter((entry) => entry.missing.length > 0)
 
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
@@ -195,7 +226,18 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                       key={friend.id}
                       mix={css({ display: visibleIds.has(friend.id) ? 'block' : 'none' })}
                     >
-                      <input type="checkbox" name="friend_ids" value={String(friend.id)} /> {friend.label}
+                      <input
+                        type="checkbox"
+                        name="friend_ids"
+                        value={String(friend.id)}
+                        checked={selectedFriends.has(friend.id)}
+                        mix={on('change', (event) => {
+                          if ((event.target as HTMLInputElement).checked) selectedFriends.add(friend.id)
+                          else selectedFriends.delete(friend.id)
+                          handle.update()
+                        })}
+                      />{' '}
+                      {friend.label}
                     </label>
                   ))}
                 </div>
@@ -380,7 +422,20 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             </details>
           </div>
 
-          <button type="submit" disabled={submitting || !hasSource}>
+          {blockedBy.length > 0 && (
+            <p mix={css({ margin: '0 0 12px', fontSize: '13px', color: '#b91c1c' })}>
+              {blockedBy
+                .map(
+                  (entry) =>
+                    `${entry.label} ${entry.label === 'You' ? 'have' : 'has'} nothing logged under ` +
+                    `${entry.missing.map(sourceLabel).join(' or ')}`,
+                )
+                .join(', and ')}
+              . Everyone in the run needs something logged for each taste it reads.
+            </p>
+          )}
+
+          <button type="submit" disabled={submitting || !hasSource || blockedBy.length > 0}>
             {submitting ? 'Starting…' : 'Get recommendations'}
           </button>
         </form>
