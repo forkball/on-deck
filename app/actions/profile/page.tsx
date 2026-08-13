@@ -5,6 +5,7 @@ import type { MediaSummaries } from '../../data/mediaSummary.ts'
 import type { TasteProfileSettings } from '../../data/recommendations/tasteProfile.ts'
 import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
+import { Toast } from '../../ui/components/toast.tsx'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
@@ -208,6 +209,15 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
     return (
       <Document title="My profile | On Deck">
         <Nav authed={true} displayName={displayName} />
+        {/* One at a time: these arrive as query params on a redirect, and no
+            action sets more than one of them. */}
+        {rebuildError ? (
+          <Toast message={rebuildError} variant="error" />
+        ) : rebuilt ? (
+          <Toast message="Taste profile rewritten." />
+        ) : saved ? (
+          <Toast message="Saved." />
+        ) : null}
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
           <div mix={css({ display: 'flex', alignItems: 'baseline', gap: '12px' })}>
             <h1>{displayName}</h1>
@@ -226,9 +236,6 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
               {followersCount} follower{followersCount === 1 ? '' : 's'}
             </a>
           </p>
-          {saved && <p mix={css({ color: '#15803d' })}>Saved.</p>}
-          {rebuilt && <p mix={css({ color: '#15803d' })}>Taste profile rewritten.</p>}
-          {rebuildError && <p mix={css({ color: '#b91c1c' })}>{rebuildError}</p>}
 
           {/* Rendered the way other people see it on users/show-page —
               editing it lives behind the pencil above. */}

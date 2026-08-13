@@ -3,6 +3,7 @@ import { css } from 'remix/ui'
 
 import { BIO_MAX_LENGTH, USERNAME_HINT, USERNAME_MAX_LENGTH } from '../../../data/users.ts'
 import type { TasteProfileSettings } from '../../../data/recommendations/tasteProfile.ts'
+import { Toast } from '../../../ui/components/toast.tsx'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
@@ -42,7 +43,6 @@ function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSetting
     return (
       <section mix={css({ marginTop: '40px', maxWidth: '480px' })}>
         <h2>What my taste profiles are written from</h2>
-        {saved && <p mix={css({ color: '#15803d' })}>Saved.</p>}
         <p mix={css({ margin: '0 0 16px', color: '#555' })}>
           Unlike the bio above, these do change your recommendations — they decide what gets read of
           your log when a taste profile is written.
@@ -107,6 +107,7 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
     return (
       <Document title="Edit profile | On Deck">
         <Nav authed={true} displayName={displayName} />
+        {saved && <Toast message="Taste settings saved." />}
         {/* Same width as the profile page, so this heading lands on the
             same left edge as the name it edits rather than 80px in from it.
             The form keeps its own narrower measure — inputs 640px wide read
