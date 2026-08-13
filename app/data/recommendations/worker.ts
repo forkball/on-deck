@@ -5,12 +5,15 @@ import {
   failJob,
   requeueStaleJobs,
   saveCheckpoint,
+  saveJobTimings,
   setPhase,
   type ClaimedJob,
 } from './jobs.ts'
 import { generateRecommendations, type GenerationCheckpoint } from './generate.ts'
 import type { MediaType } from '../mediaItems.ts'
 import type { RecommendationFilters } from './picks.ts'
+import { saveRunTimings } from './runs.ts'
+import { startTimings, summarizeTimings, type RunTimings } from './timings.ts'
 
 // Drains the recommendation queue through a fixed number of slots. Every
 // in-flight run holds a user's whole log in memory on a 512MB machine and fans
@@ -41,6 +44,11 @@ export function startGenerationWorker(): GenerationWorker {
 
   async function run(job: ClaimedJob): Promise<void> {
     running++
+    // Started before the params check so a job that fails validation still
+    // reports the queue wait it spent getting here.
+    const timings = startTimings({ queuedMs: job.queuedMs, attempt: job.attempt })
+    let runId: number | null = null
+
     try {
       const { memberIds, mediaType, filters, sourceTypes, name } = job.params
 
@@ -52,20 +60,23 @@ export function startGenerationWorker(): GenerationWorker {
         return
       }
 
-      const { runId, prunedOldestRun } = await generateRecommendations(
-        db,
-        job.userId,
-        memberIds,
-        filters as RecommendationFilters,
-        mediaType as MediaType,
-        sourceTypes as MediaType[],
-        name,
-        (phase) => void setPhase(db, job.id, phase).catch(() => {}),
-        job.checkpoint as GenerationCheckpoint,
-        (checkpoint) => void saveCheckpoint(db, job.id, checkpoint).catch(() => {}),
+      const outcome = await timings.run(() =>
+        generateRecommendations(
+          db,
+          job.userId,
+          memberIds,
+          filters as RecommendationFilters,
+          mediaType as MediaType,
+          sourceTypes as MediaType[],
+          name,
+          (phase) => void setPhase(db, job.id, phase).catch(() => {}),
+          job.checkpoint as GenerationCheckpoint,
+          (checkpoint) => void saveCheckpoint(db, job.id, checkpoint).catch(() => {}),
+        ),
       )
 
-      await completeJob(db, job.id, runId, prunedOldestRun)
+      runId = outcome.runId
+      await completeJob(db, job.id, outcome.runId, outcome.prunedOldestRun)
     } catch (error) {
       // An actual error, so retrying would reproduce it. Interrupted jobs never
       // reach here — their machine died — and the staleness sweep recovers them.
@@ -76,7 +87,19 @@ export function startGenerationWorker(): GenerationWorker {
       ).catch(() => {})
     } finally {
       running--
+      // After the job is already marked done: a person waiting on the poll
+      // shouldn't wait on bookkeeping, and a failed write here would otherwise
+      // turn a finished run into a failed one.
+      await recordTimings(job, runId, timings.finish()).catch(() => {})
     }
+  }
+
+  // The log line is the copy anyone actually reads — the stored rows are for
+  // comparing runs against each other later, once there are enough to compare.
+  async function recordTimings(job: ClaimedJob, runId: number | null, measured: RunTimings): Promise<void> {
+    console.info(`[generation] job=${job.id} run=${runId ?? 'none'} ${summarizeTimings(measured)}`)
+    await saveJobTimings(db, job.id, measured)
+    if (runId != null) await saveRunTimings(db, runId, measured)
   }
 
   async function tick(): Promise<void> {

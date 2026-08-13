@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 
 import { claude, parseStructuredResponse } from './claude.ts'
+import { track } from './timings.ts'
 import type { Db } from '../db.ts'
 import { listUserMediaLog, type MediaType } from '../mediaItems.ts'
 import { userTasteProfiles, type UserTasteProfile } from '../schema.ts'
@@ -87,34 +88,36 @@ export async function regenerateTasteProfile(
     notes: interaction.notes,
   }))
 
-  const response = await claude.messages.create({
-    model: 'claude-sonnet-5',
-    max_tokens: 2000,
-    output_config: {
-      effort: 'medium',
-      format: { type: 'json_schema', schema: PROFILE_SCHEMA },
-    },
-    messages: [
-      {
-        role: 'user',
-        content:
-          `Here is a person's ${noun} log (status, rating out of 5, whether they disliked it, ` +
-          `and any notes they left):\n` +
-          `${JSON.stringify(loggedItems, null, 2)}\n\n` +
-          `Write a short (2-4 sentence) natural-language summary of their taste, grounded only ` +
-          `in what's above — no invented facts. Also derive liked_tags and disliked_tags: short, ` +
-          `lowercase genre/mood/style tags (e.g. "slow-burn", "dystopian", "feel-good") inferred ` +
-          `from what they rated highly vs. poorly. A "not_interested" status is one they turned ` +
-          `down without trying — a dislike signal in its own right, carrying no rating. ` +
-          `A null rating on any other status means they simply never rated it: infer nothing ` +
-          `about whether they liked it, and never treat it as a low score. Ratings run 0.5 to 5, ` +
-          `so the bottom of the scale is 0.5, not 0. "disliked": true is the third answer to that ` +
-          `same question: they finished it, didn't like it, and declined to put a number on ` +
-          `it. Treat it as a firm dislike — it never carries a rating, and its absence of one ` +
-          `is a refusal to score rather than a low score.`,
+  const response = await track('profile.model', () =>
+    claude.messages.create({
+      model: 'claude-sonnet-5',
+      max_tokens: 2000,
+      output_config: {
+        effort: 'medium',
+        format: { type: 'json_schema', schema: PROFILE_SCHEMA },
       },
-    ],
-  })
+      messages: [
+        {
+          role: 'user',
+          content:
+            `Here is a person's ${noun} log (status, rating out of 5, whether they disliked it, ` +
+            `and any notes they left):\n` +
+            `${JSON.stringify(loggedItems, null, 2)}\n\n` +
+            `Write a short (2-4 sentence) natural-language summary of their taste, grounded only ` +
+            `in what's above — no invented facts. Also derive liked_tags and disliked_tags: short, ` +
+            `lowercase genre/mood/style tags (e.g. "slow-burn", "dystopian", "feel-good") inferred ` +
+            `from what they rated highly vs. poorly. A "not_interested" status is one they turned ` +
+            `down without trying — a dislike signal in its own right, carrying no rating. ` +
+            `A null rating on any other status means they simply never rated it: infer nothing ` +
+            `about whether they liked it, and never treat it as a low score. Ratings run 0.5 to 5, ` +
+            `so the bottom of the scale is 0.5, not 0. "disliked": true is the third answer to that ` +
+            `same question: they finished it, didn't like it, and declined to put a number on ` +
+            `it. Treat it as a firm dislike — it never carries a rating, and its absence of one ` +
+            `is a refusal to score rather than a low score.`,
+        },
+      ],
+    }),
+  )
 
   const parsed = parseStructuredResponse<UpsertTasteProfileInput>(response)
   await upsertTasteProfile(db, userId, mediaType, { ...parsed, logSignature: logSignature(log) })

@@ -115,6 +115,9 @@ export const recommendationJobs = table({
     run_id: c.integer(),
     pruned_oldest_run: c.integer().notNull(),
     error: c.text(),
+    // Where this attempt's time went, written once it finishes. See
+    // app/data/recommendations/timings.ts.
+    timings: c.text(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
   },
@@ -137,6 +140,9 @@ export const recommendationRuns = table({
     // The levers used, kept with the run so its page shows what was asked for
     // even after filters elsewhere change. See GenerationParams.
     params: c.text().notNull().default('{}'),
+    // Copied off the job once it finishes — the job row is swept minutes
+    // later, and timings are only worth reading next to the params above.
+    timings: c.text(),
   },
 })
 
