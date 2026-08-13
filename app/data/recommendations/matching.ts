@@ -5,6 +5,7 @@ import { parseMediaMetadata } from '../mediaMetadata.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { claude, parseStructuredResponse } from './claude.ts'
 import type { DecadeRelation, Pick } from './picks.ts'
+import { track } from './timings.ts'
 
 // A pick paired with the catalog entry it resolved to.
 export interface Candidate {
@@ -14,12 +15,16 @@ export interface Candidate {
 
 // Via the registry, so an unserved type throws rather than quietly returning
 // film results for a book request.
+//
+// Timed here rather than at each call site: these two are every outbound
+// catalog request the pipeline makes, and which phase was open when one ran is
+// what says whether it was a length check or an overview fetch.
 export function searchForType(mediaType: MediaType, query: string): Promise<CatalogSearchResult[]> {
-  return getCatalogProvider(mediaType).search(query)
+  return track('catalog.search', () => getCatalogProvider(mediaType).search(query))
 }
 
 export function lookupForType(mediaType: MediaType, externalId: string): Promise<CatalogSearchResult | null> {
-  return getCatalogProvider(mediaType).getById(externalId)
+  return track('catalog.lookup', () => getCatalogProvider(mediaType).getById(externalId))
 }
 
 export function matchesDecade(releaseYear: number | null, decade: number, relation: DecadeRelation = 'within'): boolean {
@@ -106,27 +111,29 @@ export async function verifyPicksAgainstOverviews(
     catalog_found: { title: match.title, year: match.releaseYear, overview: match.overview },
   }))
 
-  const response = await claude.messages.create({
-    model: 'claude-sonnet-5',
-    max_tokens: 2000,
-    output_config: {
-      effort: 'low',
-      format: { type: 'json_schema', schema: VERIFY_SCHEMA },
-    },
-    messages: [
-      {
-        role: 'user',
-        content:
-          `You previously suggested some ${noun} by title/year. For each one, we looked it up on ${catalogName} and found ` +
-          `a specific ${entryNoun} — here's what ${catalogName} returned, described by its own title, year, and plot ` +
-          `overview. Confirm whether the ${entryNoun} found is truly the same one you meant, not just a ` +
-          `similarly- or identically-titled different one. Small title differences (translation, punctuation, ` +
-          `"the" vs no "the") are fine as long as it's the same ${entryNoun}.\n\n${JSON.stringify(items, null, 2)}\n\n` +
-          `Return one boolean per entry, in the same order as given, true only if the ${entryNoun} found is ` +
-          `genuinely the one you meant.`,
+  const response = await track('verify.model', () =>
+    claude.messages.create({
+      model: 'claude-sonnet-5',
+      max_tokens: 2000,
+      output_config: {
+        effort: 'low',
+        format: { type: 'json_schema', schema: VERIFY_SCHEMA },
       },
-    ],
-  })
+      messages: [
+        {
+          role: 'user',
+          content:
+            `You previously suggested some ${noun} by title/year. For each one, we looked it up on ${catalogName} and found ` +
+            `a specific ${entryNoun} — here's what ${catalogName} returned, described by its own title, year, and plot ` +
+            `overview. Confirm whether the ${entryNoun} found is truly the same one you meant, not just a ` +
+            `similarly- or identically-titled different one. Small title differences (translation, punctuation, ` +
+            `"the" vs no "the") are fine as long as it's the same ${entryNoun}.\n\n${JSON.stringify(items, null, 2)}\n\n` +
+            `Return one boolean per entry, in the same order as given, true only if the ${entryNoun} found is ` +
+            `genuinely the one you meant.`,
+        },
+      ],
+    }),
+  )
 
   const { verdicts } = parseStructuredResponse<{ verdicts: boolean[] }>(response)
   return candidates.filter((_, index) => verdicts[index] === true)
@@ -188,20 +195,24 @@ export async function resolveFromCatalog(
 
   const wanted = picks.map((pick) => normalizeTitle(pick.title))
 
-  const { rows } = await pool.query<{
-    id: number
-    external_id: string
-    title: string
-    metadata: string
-    popularity_score: number | null
-    normalized: string
-  }>(
-    `select id, external_id, title, metadata, popularity_score,
+  // Timed alongside the provider calls it exists to avoid, so the saving is
+  // legible rather than assumed.
+  const { rows } = await track('catalog.local', () =>
+    pool.query<{
+      id: number
+      external_id: string
+      title: string
+      metadata: string
+      popularity_score: number | null
+      normalized: string
+    }>(
+      `select id, external_id, title, metadata, popularity_score,
             btrim(regexp_replace(regexp_replace(lower(title), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g')) as normalized
        from media_items
       where type = $1
         and btrim(regexp_replace(regexp_replace(lower(title), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g')) = any($2)`,
-    [mediaType, wanted],
+      [mediaType, wanted],
+    ),
   )
   if (rows.length === 0) return resolved
 

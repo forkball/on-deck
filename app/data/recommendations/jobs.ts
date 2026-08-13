@@ -2,6 +2,7 @@ import { lt } from 'remix/data-table'
 
 import { pool, type Db } from '../db.ts'
 import { recommendationJobs, type RecommendationJob } from '../schema.ts'
+import type { RunTimings } from './timings.ts'
 
 // Live progress for an in-flight run. Generating takes tens of seconds, so the
 // request hands back a job id and the wait page polls the stage from here.
@@ -219,6 +220,12 @@ export interface ClaimedJob {
   userId: number
   params: JobParams
   checkpoint: unknown
+  // How long this sat before a worker picked it up. Measured at the claim
+  // rather than at the start of generation, so it stays queue wait and doesn't
+  // absorb whatever the worker does before it starts.
+  queuedMs: number
+  // Post-increment, so the first run of a job reports 1.
+  attempt: number
 }
 
 // SKIP LOCKED is what makes two machines safe: without it both serialise on the
@@ -232,6 +239,8 @@ export async function claimJobs(db: Db, limit: number): Promise<ClaimedJob[]> {
     user_id: number
     params: string
     checkpoint: string | null
+    created_at: number
+    attempts: number
   }>(
     `update recommendation_jobs
         set status = 'running', claimed_at = $1, attempts = attempts + 1, updated_at = $1
@@ -242,7 +251,7 @@ export async function claimJobs(db: Db, limit: number): Promise<ClaimedJob[]> {
          limit $2
          for update skip locked
       )
-      returning id, user_id, params, checkpoint`,
+      returning id, user_id, params, checkpoint, created_at, attempts`,
     [now, limit],
   )
 
@@ -251,5 +260,17 @@ export async function claimJobs(db: Db, limit: number): Promise<ClaimedJob[]> {
     userId: row.user_id,
     params: JSON.parse(row.params) as JobParams,
     checkpoint: row.checkpoint ? JSON.parse(row.checkpoint) : {},
+    // A requeued job's wait is measured from when it was first asked for, not
+    // from the requeue: that's the wait the person actually sat through.
+    queuedMs: Math.max(0, now - Number(row.created_at)),
+    attempt: row.attempts,
   }))
+}
+
+export async function saveJobTimings(db: Db, jobId: string, timings: RunTimings): Promise<void> {
+  await db.updateMany(
+    recommendationJobs,
+    { timings: JSON.stringify(timings), updated_at: Date.now() },
+    { where: { id: jobId } },
+  )
 }

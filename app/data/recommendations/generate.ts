@@ -37,6 +37,7 @@ import {
   type RecommendationResult,
 } from './runs.ts'
 import { ensureTasteProfile } from './tasteProfile.ts'
+import { markPhase, track } from './timings.ts'
 
 const TARGET_COUNT = 10
 
@@ -116,8 +117,17 @@ export async function generateRecommendations(
 ): Promise<GenerateRecommendationsOutcome> {
   const profileTypes: MediaType[] = sourceTypes && sourceTypes.length > 0 ? sourceTypes : [mediaType]
 
+  // Every stage announces itself twice — to whoever is watching the run, and
+  // to the timings — and the two must not drift apart. Going through one
+  // helper is what keeps a new stage from being measured as part of the last
+  // one it forgot to close.
+  const enterPhase = (phase: GenerationPhase): void => {
+    markPhase(phase)
+    onPhase(phase)
+  }
+
   // Each only costs a model call if that member's log has moved.
-  onPhase('profiles')
+  enterPhase('profiles')
   const members = await Promise.all(
     memberUserIds.map(async (memberId) => {
       const [regenerated, user] = await Promise.all([
@@ -167,14 +177,14 @@ export async function generateRecommendations(
   if (checkpoint.picks?.length) {
     picks = checkpoint.picks
   } else {
-    onPhase('picks')
+    enterPhase('picks')
     picks = await requestPicks(profiles, excluded, filters, mediaType, profileTypes)
     checkpoint = { ...checkpoint, picks }
     onCheckpoint(checkpoint)
   }
 
   // Only what isn't already in the catalog costs a provider request.
-  onPhase('matching')
+  enterPhase('matching')
   const fromCatalog = await resolveFromCatalog(mediaType, picks)
 
   const matchesByPick = await Promise.all(
@@ -185,7 +195,7 @@ export async function generateRecommendations(
   )
 
   // Only then does the loop below make a second round of requests.
-  if (filters.length) onPhase('lengths')
+  if (filters.length) enterPhase('lengths')
 
   // Not capped at TARGET_COUNT: verification below drops some too, so the
   // over-request slack has to reach it or a verification drop under-fills the
@@ -245,7 +255,7 @@ export async function generateRecommendations(
     const items = await db.findMany(mediaItems, { where: inList('id', ids) })
     const itemsById = new Map(items.map((item) => [item.id, item]))
 
-    onPhase('saving')
+    enterPhase('saving')
     results = []
     for (const entry of checkpoint.verified) {
       const item = itemsById.get(entry.mediaItemId)
@@ -254,13 +264,13 @@ export async function generateRecommendations(
       results.push({ item, reason: entry.reason, interaction: null })
     }
   } else {
-    onPhase('verifying')
+    enterPhase('verifying')
     const verified = await verifyPicksAgainstOverviews(await withOverviews(candidates, mediaType), mediaType)
 
-    onPhase('saving')
+    enterPhase('saving')
     results = []
     for (const { pick, match } of verified.slice(0, TARGET_COUNT)) {
-      const item = await upsertCatalogItem(db, mediaType, match)
+      const item = await track('catalog.upsert', () => upsertCatalogItem(db, mediaType, match))
       results.push({ item, reason: pick.reason, interaction: null })
     }
 
@@ -272,27 +282,31 @@ export async function generateRecommendations(
     onCheckpoint(checkpoint)
   }
 
-  const runId = await saveRun(db, {
-    requestingUserId,
-    memberUserIds,
-    mediaType,
-    name,
-    params: {
-      genre: filters.genre,
-      decade: filters.decade,
-      decadeRelation: filters.decadeRelation,
-      length: filters.length,
-      playerType: filters.playerType,
-      multiplayerType: filters.multiplayerType,
-      series: filters.series,
-      sourceTypes: profileTypes,
-    } satisfies GenerationParams,
-    results,
-  })
+  const runId = await track('run.save', () =>
+    saveRun(db, {
+      requestingUserId,
+      memberUserIds,
+      mediaType,
+      name,
+      params: {
+        genre: filters.genre,
+        decade: filters.decade,
+        decadeRelation: filters.decadeRelation,
+        length: filters.length,
+        playerType: filters.playerType,
+        multiplayerType: filters.multiplayerType,
+        series: filters.series,
+        sourceTypes: profileTypes,
+      } satisfies GenerationParams,
+      results,
+    }),
+  )
 
-  await notifyMutualFollowers(db, requestingUserId, memberUserIds, runId)
+  // Both are timed separately from the save because both run after the picks
+  // exist, while the person is still on the waiting page.
+  await track('run.notify', () => notifyMutualFollowers(db, requestingUserId, memberUserIds, runId))
 
-  const prunedOldestRun = await pruneOldRuns(db, requestingUserId, mediaType)
+  const prunedOldestRun = await track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType))
 
   return { runId, prunedOldestRun }
 }

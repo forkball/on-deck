@@ -2,6 +2,7 @@ import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { describeLength, getCatalogProvider, type LengthBucket } from '../catalog/provider.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { claude, parseStructuredResponse } from './claude.ts'
+import { track } from './timings.ts'
 
 // One recommendation as the model returns it, before catalog matching.
 export interface Pick {
@@ -164,30 +165,32 @@ export async function requestPicks(
       `this taste profile.${filterInstructions} For each, give your best-guess release year (used only to ` +
       `disambiguate remakes/same-titled entries) and a one-sentence reason tied to their profile.`
 
-  const response = await claude.messages.create({
-    model: 'claude-sonnet-5',
-    max_tokens: (isGroup ? 8000 : 4000) + (hasFilters ? 2000 : 0),
-    output_config: {
-      effort: isGroup ? 'high' : 'medium',
-      format: { type: 'json_schema', schema: PICKS_SCHEMA },
-    },
-    messages: [
-      {
-        role: 'user',
-        content:
-          prompt +
-          `\n\nThey've already seen (do not suggest any of these): ${JSON.stringify(excluded.seen)}` +
-          // Worth its own paragraph rather than being folded into the list
-          // above: a rejection is the one negative signal that came from the
-          // person rather than being inferred, so it should shape the
-          // neighbouring picks too, not just remove these titles.
-          (excluded.rejected.length > 0
-            ? `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
-              `as a signal about what to steer away from more broadly: ${JSON.stringify(excluded.rejected)}`
-            : ''),
+  const response = await track('picks.model', () =>
+    claude.messages.create({
+      model: 'claude-sonnet-5',
+      max_tokens: (isGroup ? 8000 : 4000) + (hasFilters ? 2000 : 0),
+      output_config: {
+        effort: isGroup ? 'high' : 'medium',
+        format: { type: 'json_schema', schema: PICKS_SCHEMA },
       },
-    ],
-  })
+      messages: [
+        {
+          role: 'user',
+          content:
+            prompt +
+            `\n\nThey've already seen (do not suggest any of these): ${JSON.stringify(excluded.seen)}` +
+            // Worth its own paragraph rather than being folded into the list
+            // above: a rejection is the one negative signal that came from the
+            // person rather than being inferred, so it should shape the
+            // neighbouring picks too, not just remove these titles.
+            (excluded.rejected.length > 0
+              ? `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
+                `as a signal about what to steer away from more broadly: ${JSON.stringify(excluded.rejected)}`
+              : ''),
+        },
+      ],
+    }),
+  )
 
   return parseStructuredResponse<{ picks: Pick[] }>(response).picks
 }

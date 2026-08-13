@@ -17,6 +17,7 @@ import {
 } from '../schema.ts'
 import { displayLabel } from '../users.ts'
 import type { DecadeRelation, RecommendationFilters } from './picks.ts'
+import type { RunTimings } from './timings.ts'
 
 export const MAX_RUNS_PER_USER = 3
 
@@ -216,6 +217,12 @@ export async function saveRun(db: Db, input: SaveRunInput): Promise<number> {
   }
 
   return run.id
+}
+
+// Separate from saveRun because the run has to exist before the stages that
+// follow it can be measured — saving is itself one of the phases being timed.
+export async function saveRunTimings(db: Db, runId: number, timings: RunTimings): Promise<void> {
+  await db.updateMany(recommendationRuns, { timings: JSON.stringify(timings) }, { where: { id: runId } })
 }
 
 // Scoped to one media type, so a TV run never prunes an older movie run.
