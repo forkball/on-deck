@@ -19,6 +19,10 @@ export const users = table({
     // canViewProfile) — everyone still sees the name and follow counts.
     // Public by default, same as the app's original behavior.
     is_private: c.boolean().notNull().default(false),
+    // Maintenance role, granted only by scripts/set-admin.ts. Its one effect
+    // today is exemption from the daily recommendation cap — see
+    // app/data/recommendations/dailyLimit.ts.
+    is_admin: c.boolean().notNull().default(false),
     created_at: c.integer().notNull(),
   },
 })
@@ -136,6 +140,19 @@ export const recommendationRuns = table({
   },
 })
 
+// One row per saved run, swept once it leaves the 24-hour window. The ledger
+// behind the daily cap, kept apart from recommendationRuns because those are
+// pruned to MAX_RUNS_PER_USER per media type — a pruned run was still
+// generated, and still cost what it cost. See recommendations/dailyLimit.ts.
+export const recommendationRunUsage = table({
+  name: 'recommendation_run_usage',
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    user_id: c.integer().notNull().references('users', 'id'),
+    created_at: c.integer().notNull(),
+  },
+})
+
 // The requester plus any friends included in the run.
 export const recommendationRunMembers = table({
   name: 'recommendation_run_members',
@@ -193,4 +210,5 @@ export type UserFollow = TableRow<typeof userFollows>
 export type RecommendationRun = TableRow<typeof recommendationRuns>
 export type RecommendationJob = TableRow<typeof recommendationJobs>
 export type RecommendationRunMember = TableRow<typeof recommendationRunMembers>
+export type RecommendationRunUsage = TableRow<typeof recommendationRunUsage>
 export type Notification = TableRow<typeof notifications>

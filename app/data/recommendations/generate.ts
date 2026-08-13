@@ -8,6 +8,7 @@ import { countUserMediaLog, CONSUMPTION_STATUSES, type MediaType } from '../medi
 import { createNotification } from '../notifications.ts'
 import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
+import { recordRunAgainstDailyLimit } from './dailyLimit.ts'
 import type { GenerationPhase } from './jobs.ts'
 import {
   hasLengthDimension,
@@ -289,6 +290,10 @@ export async function generateRecommendations(
     } satisfies GenerationParams,
     results,
   })
+
+  // Against the run that exists, not the request that asked for it — a run
+  // that never made it this far cost the person nothing. See dailyLimit.ts.
+  await recordRunAgainstDailyLimit(db, requestingUserId)
 
   await notifyMutualFollowers(db, requestingUserId, memberUserIds, runId)
 
