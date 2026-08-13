@@ -2,7 +2,7 @@ import { and, eq, inList } from 'remix/data-table'
 
 import { parseMediaMetadata, type MediaMetadata } from './mediaMetadata.ts'
 
-import type { Db } from './db.ts'
+import { pool, type Db } from './db.ts'
 import {
   INTERACTION_STATUSES,
   mediaItems,
@@ -398,4 +398,33 @@ export async function countUserMediaLog(db: Db, userId: number, filter: UserLogF
 
   const entries = await loadUserLogEntries(db, userId)
   return entries.filter((entry) => matchesLogFilter(entry, filter)).length
+}
+
+// Which media types each of these people has actually logged something in.
+// Rejections don't count, the same rule findMembersMissingSourceLogs uses —
+// this is what the recommendations form reads to know whether a run it's about
+// to offer could go anywhere.
+//
+// One query rather than a count per person per type: the form lists everyone
+// you follow, and loadUserLogEntries pulls a whole log per call, so the
+// obvious loop is a full log load per follower per media type.
+//
+// The statuses go in as a parameter rather than as `<> 'not_interested'`, so
+// another kind of refusal added to CONSUMPTION_STATUSES reaches here too.
+export async function loadLoggedTypesByUser(userIds: number[]): Promise<Map<number, Set<MediaType>>> {
+  const byUser = new Map<number, Set<MediaType>>(userIds.map((id) => [id, new Set<MediaType>()]))
+  if (userIds.length === 0) return byUser
+
+  const { rows } = await pool.query<{ user_id: number; type: MediaType }>(
+    `select i.user_id, m.type
+       from user_media_interactions i
+       join media_items m on m.id = i.media_item_id
+      where i.user_id = any($1)
+        and i.status = any($2)
+      group by i.user_id, m.type`,
+    [userIds, [...CONSUMPTION_STATUSES]],
+  )
+
+  for (const row of rows) byUser.get(row.user_id)?.add(row.type)
+  return byUser
 }

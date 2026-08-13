@@ -124,6 +124,22 @@ export async function updateUserProfile(db: Db, userId: number, fields: UserProf
   await db.update(users, userId, { ...fields, bio: fields.bio || undefined })
 }
 
+// Its own write for the same reason the password is: these are set from the
+// profile page, by a form that touches nothing the edit page touches, and
+// folding them in would make a taste-settings save also a save of the email
+// and username sitting in that other form.
+export async function updateProfileSettings(
+  db: Db,
+  userId: number,
+  settings: { logLimit: number | null; useNotes: boolean },
+): Promise<void> {
+  await db.update(users, userId, {
+    // `undefined` is what writes NULL, and null is this column's "all of it".
+    profile_log_limit: settings.logLimit ?? undefined,
+    profile_use_notes: settings.useNotes,
+  })
+}
+
 // Its own write, not a field on the one above: the password is changed on its
 // own page, by a form that touches nothing else. Hashed by the caller
 // (actions/auth/password.ts) — nothing here ever sees a plaintext password.

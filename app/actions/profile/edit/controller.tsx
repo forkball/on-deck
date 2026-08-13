@@ -19,6 +19,7 @@ import {
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
 import { verifyPassword } from '../../auth/password.ts'
+import { profileSettingsFor } from '../../../data/recommendations/tasteProfile.ts'
 import { ProfileEditPage } from './page.tsx'
 
 const profileSchema = f.object({
@@ -61,6 +62,8 @@ export default createController(routes.profile.edit, {
             bio: auth.identity.bio ?? '',
             is_private: auth.identity.is_private,
           }}
+          settings={profileSettingsFor(auth.identity)}
+          saved={context.url.searchParams.get('saved') === '1'}
           displayName={displayLabel(auth.identity)}
         />,
       )
@@ -80,6 +83,7 @@ export default createController(routes.profile.edit, {
             values={submittedValues(formData)}
             errors={errors}
             confirming={confirming}
+            settings={profileSettingsFor(auth.identity)}
             displayName={displayLabel(auth.identity)}
           />,
           { status },

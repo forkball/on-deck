@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
+import type { TasteProfileSettings } from '../../data/recommendations/tasteProfile.ts'
 import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { routes } from '../../routes.ts'
@@ -28,14 +29,49 @@ export interface ProfilePageProps {
   followingCount: number
   followersCount: number
   saved?: boolean
+  settings: TasteProfileSettings
+  // Null when this account has no ceiling.
+  rebuildsLeft: number | null
+  rebuilt?: boolean
+  rebuildError?: string
   displayName: string
 }
 
+// What the settings amount to, in the words someone would use for their own
+// log. Rebuild is a button that spends a model call, so it has to say what it
+// would read before you press it — and the answer lives on another page.
+function describeProfileSource(settings: TasteProfileSettings, mediaType: ActiveMediaType): string {
+  const ui = MEDIA_TYPE_UI[mediaType]
+  // Two different nouns from the registry, because the two phrasings want
+  // different ones: "your whole movie log", but "your last 50 logged movies".
+  const scope =
+    settings.logLimit == null
+      ? `your whole ${ui.attributive} log`
+      : `your last ${settings.logLimit} logged ${ui.plural}`
+
+  return settings.useNotes
+    ? `${scope}, including the notes you've written`
+    : `${scope}, without your notes`
+}
+
 function TasteProfileSummary(
-  handle: Handle<{ label: string; summary: string; updatedAt: number | null }>,
+  handle: Handle<{
+    label: string
+    summary: string
+    updatedAt: number | null
+    mediaType: ActiveMediaType
+    settings: TasteProfileSettings
+    // Counted the way the rebuild action counts it — rejections excluded. See
+    // loadMediaSummaries.
+    loggedCount: number
+    rebuildsLeft: number | null
+  }>,
 ) {
   return () => {
-    const { label, summary, updatedAt } = handle.props
+    const { label, summary, updatedAt, mediaType, settings, loggedCount, rebuildsLeft } = handle.props
+    const nothingLogged = loggedCount === 0
+    const outOfRebuilds = rebuildsLeft != null && rebuildsLeft <= 0
+    const source = describeProfileSource(settings, mediaType)
 
     return (
       <details>
@@ -48,17 +84,50 @@ function TasteProfileSummary(
               <p mix={css({ margin: 0 })}>{summary}</p>
               {updatedAt && (
                 <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
-                  Written from your log as it stood on {new Date(updatedAt).toLocaleDateString()}. It's
-                  rewritten next time you generate, if you've logged anything since.
+                  Written from {source}, as your log stood on{' '}
+                  {new Date(updatedAt).toLocaleDateString()}. It's rewritten next time you generate, if
+                  you've logged anything since.
                 </p>
               )}
             </>
           ) : (
-            <p mix={css({ margin: 0, color: '#555' })}>
-              Nothing yet — <a href={routes.recommendations.index.href()}>get recommendations</a> to have one
-              written from what you've logged.
-            </p>
+            <>
+              <p mix={css({ margin: 0, color: '#555' })}>
+                Nothing yet — <a href={routes.recommendations.index.href()}>get recommendations</a> to have
+                one written from what you've logged.
+              </p>
+              {/* Said in the future tense here, because there's nothing yet to
+                  describe — but it's still what the button below would read. */}
+              <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
+                It'll be written from {source}.
+              </p>
+            </>
           )}
+
+          <p mix={css({ margin: '8px 0 0', fontSize: '12px' })}>
+            <a href={routes.profile.edit.index.href()}>Change what it's written from →</a>
+          </p>
+
+          <form
+            method="post"
+            action={routes.profile.rebuild.href({ mediaType })}
+            mix={css({ marginTop: '12px', display: 'flex', gap: '10px', alignItems: 'baseline' })}
+          >
+            {/* The action refuses both of these too. This only saves someone
+                spending a click, and a rebuild, on finding that out. */}
+            <button type="submit" disabled={nothingLogged || outOfRebuilds}>
+              Rebuild now
+            </button>
+            {(nothingLogged || rebuildsLeft != null) && (
+              <span mix={css({ fontSize: '12px', color: '#888' })}>
+                {nothingLogged
+                  ? `Nothing logged to write one from`
+                  : outOfRebuilds
+                    ? 'No rebuilds left today'
+                    : `${rebuildsLeft} rebuild${rebuildsLeft === 1 ? '' : 's'} left today`}
+              </span>
+            )}
+          </form>
         </div>
       </details>
     )
@@ -120,7 +189,19 @@ function LoggedList(
 
 export function ProfilePage(handle: Handle<ProfilePageProps>) {
   return () => {
-    const { media, activeTab, bio, followingCount, followersCount, saved, displayName } = handle.props
+    const {
+      media,
+      activeTab,
+      bio,
+      followingCount,
+      followersCount,
+      saved,
+      settings,
+      rebuildsLeft,
+      rebuilt,
+      rebuildError,
+      displayName,
+    } = handle.props
     const profileHref = routes.profile.index.href()
     const savedReturnTo = `${profileHref}?saved=1`
 
@@ -146,6 +227,8 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             </a>
           </p>
           {saved && <p mix={css({ color: '#15803d' })}>Saved.</p>}
+          {rebuilt && <p mix={css({ color: '#15803d' })}>Taste profile rewritten.</p>}
+          {rebuildError && <p mix={css({ color: '#b91c1c' })}>{rebuildError}</p>}
 
           {/* Rendered the way other people see it on users/show-page —
               editing it lives behind the pencil above. */}
@@ -177,6 +260,10 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                       label={`My ${ui.attributive} taste profile`}
                       summary={summary}
                       updatedAt={profileUpdatedAt}
+                      mediaType={type}
+                      settings={settings}
+                      loggedCount={total}
+                      rebuildsLeft={rebuildsLeft}
                     />
                     {/* Each importer only understands one medium, so the
                         entry point lives on that medium's tab. */}

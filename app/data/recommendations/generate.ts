@@ -37,7 +37,7 @@ import {
   type RecommendationResult,
 } from './runs.ts'
 import { emptyDrops, logPickTally } from './tally.ts'
-import { ensureTasteProfile } from './tasteProfile.ts'
+import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
 
 const TARGET_COUNT = 10
@@ -131,10 +131,19 @@ export async function generateRecommendations(
   enterPhase('profiles')
   const members = await Promise.all(
     memberUserIds.map(async (memberId) => {
-      const [regenerated, user] = await Promise.all([
-        Promise.all(profileTypes.map((type) => ensureTasteProfile(db, memberId, type))),
-        db.find(users, memberId),
-      ])
+      // The user row comes first now rather than alongside: each member's own
+      // settings decide what their profile is written from, so there's nothing
+      // to build until it's here.
+      const user = await db.find(users, memberId)
+      const settings = user
+        ? profileSettingsFor(user)
+        : // A member who has since been deleted still has profiles on file;
+          // reading them under the defaults beats failing the whole run.
+          { logLimit: null, useNotes: true }
+
+      const regenerated = await Promise.all(
+        profileTypes.map((type) => ensureTasteProfile(db, memberId, type, settings)),
+      )
       return { regenerated, label: user ? displayLabel(user) : `User ${memberId}` }
     }),
   )

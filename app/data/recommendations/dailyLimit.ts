@@ -1,7 +1,7 @@
 import { and, eq, gte, lt } from 'remix/data-table'
 
 import type { Db } from '../db.ts'
-import { recommendationRunUsage, type User } from '../schema.ts'
+import { profileRebuildUsage, recommendationRunUsage, type User } from '../schema.ts'
 
 // Generating is the one thing a person can do here that spends money on their
 // behalf: every run is several model calls plus a fan-out of catalog requests.
@@ -62,6 +62,43 @@ export async function recordRunAgainstDailyLimit(db: Db, userId: number): Promis
   // rather than on a timer, for the reason the job sweep is (see jobs.ts): an
   // idle machine should schedule nothing.
   await db.deleteMany(recommendationRunUsage, {
+    where: and(eq('user_id', userId), lt('created_at', now - LIMIT_WINDOW_MS)),
+  })
+}
+
+// Rebuilding a taste profile by hand is a model call someone can ask for
+// whenever they like, so it needs its own ceiling. Separate from the run cap
+// rather than sharing it: they're different sizes of spend, and a day of
+// tuning your profile shouldn't cost you the recommendations it was for.
+export const PROFILE_REBUILDS_PER_DAY = 5
+
+export async function getProfileRebuildAllowance(db: Db, user: User): Promise<DailyRunAllowance> {
+  // Exempt for the same reason as above — whoever runs the app has to be able
+  // to exercise this without tripping over a limit meant for the bill.
+  if (user.is_admin) return { unlimited: true }
+
+  const rows = await db.findMany(profileRebuildUsage, {
+    where: and(eq('user_id', user.id), gte('created_at', Date.now() - LIMIT_WINDOW_MS)),
+    orderBy: ['created_at', 'asc'],
+  })
+
+  return {
+    unlimited: false,
+    limit: PROFILE_REBUILDS_PER_DAY,
+    used: rows.length,
+    remaining: Math.max(0, PROFILE_REBUILDS_PER_DAY - rows.length),
+    resetsAt: rows.length > 0 ? Number(rows[0].created_at) + LIMIT_WINDOW_MS : null,
+  }
+}
+
+// Spent when the rebuild is asked for, not when it lands — unlike a run, which
+// is charged on save. The difference is deliberate: the cost here is the model
+// call, and a rebuild that fails has already made it.
+export async function recordProfileRebuild(db: Db, userId: number): Promise<void> {
+  const now = Date.now()
+  await db.create(profileRebuildUsage, { user_id: userId, created_at: now })
+
+  await db.deleteMany(profileRebuildUsage, {
     where: and(eq('user_id', userId), lt('created_at', now - LIMIT_WINDOW_MS)),
   })
 }

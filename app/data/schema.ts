@@ -23,6 +23,11 @@ export const users = table({
     // today is exemption from the daily recommendation cap — see
     // app/data/recommendations/dailyLimit.ts.
     is_admin: c.boolean().notNull().default(false),
+    // What the taste profile is written from — see
+    // app/data/recommendations/tasteProfile.ts. Null is the whole log, which
+    // is what every profile was built from before these existed.
+    profile_log_limit: c.integer().nullable(),
+    profile_use_notes: c.boolean().notNull().default(true),
     created_at: c.integer().notNull(),
   },
 })
@@ -159,6 +164,19 @@ export const recommendationRunUsage = table({
   },
 })
 
+// One row per profile rebuild asked for by hand, swept once it leaves the
+// 24-hour window. Separate from recommendationRunUsage because they cap
+// different things: that one counts runs, this counts the model call behind a
+// button someone can press whenever they like.
+export const profileRebuildUsage = table({
+  name: 'profile_rebuild_usage',
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    user_id: c.integer().notNull().references('users', 'id'),
+    created_at: c.integer().notNull(),
+  },
+})
+
 // The requester plus any friends included in the run.
 export const recommendationRunMembers = table({
   name: 'recommendation_run_members',
@@ -217,4 +235,5 @@ export type RecommendationRun = TableRow<typeof recommendationRuns>
 export type RecommendationJob = TableRow<typeof recommendationJobs>
 export type RecommendationRunMember = TableRow<typeof recommendationRunMembers>
 export type RecommendationRunUsage = TableRow<typeof recommendationRunUsage>
+export type ProfileRebuildUsage = TableRow<typeof profileRebuildUsage>
 export type Notification = TableRow<typeof notifications>
