@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { BIO_MAX_LENGTH, USERNAME_HINT, USERNAME_MAX_LENGTH } from '../../../data/users.ts'
+import type { TasteProfileSettings } from '../../../data/recommendations/tasteProfile.ts'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
@@ -16,12 +17,92 @@ export interface ProfileEditPageProps {
   // Set when the submit was refused for want of a password, so the modal
   // comes back already open with its error showing.
   confirming?: boolean
+  settings: TasteProfileSettings
+  // Set when the taste settings below were just saved.
+  saved?: boolean
   displayName: string
+}
+
+const LIMIT_LABELS = new Map<number | null, string>([
+  [10, 'Last 10'],
+  [50, 'Last 50'],
+  [100, 'Last 100'],
+  [null, 'Everything'],
+])
+
+// Its own form, on the same page rather than inside the one above. The edit
+// form asks for a password when the email or username changes, and folding
+// these in would put that prompt in front of someone who only wanted to stop
+// sending their notes — the same reasoning that keeps the password on a page
+// of its own.
+function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSettings; saved?: boolean }>) {
+  return () => {
+    const { settings, saved } = handle.props
+
+    return (
+      <section mix={css({ marginTop: '40px', maxWidth: '480px' })}>
+        <h2>What my taste profiles are written from</h2>
+        {saved && <p mix={css({ color: '#15803d' })}>Saved.</p>}
+        <p mix={css({ margin: '0 0 16px', color: '#555' })}>
+          Unlike the bio above, these do change your recommendations — they decide what gets read of
+          your log when a taste profile is written.
+        </p>
+        <form
+          method="post"
+          action={routes.profile.settings.href()}
+          mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}
+        >
+          <Field
+            label="How much of your log to use"
+            hint="Counted from what you logged most recently. Narrowing it keeps your profile closer to where your taste is now, instead of averaging everything you've ever logged."
+          >
+            <select name="log_limit">
+              {[...LIMIT_LABELS].map(([value, label]) => (
+                <option
+                  key={String(value)}
+                  value={value == null ? 'all' : String(value)}
+                  selected={settings.logLimit === value}
+                >
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          {/* Not routed through Field for the same reason the privacy
+              checkbox above isn't — it stretches inputs to full width. */}
+          <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
+            <label mix={css({ display: 'flex', alignItems: 'center', gap: '8px' })}>
+              <input
+                type="checkbox"
+                name="use_notes"
+                defaultChecked={settings.useNotes}
+                mix={css({ width: 'auto' })}
+              />
+              Use the notes I've written on things I've logged
+            </label>
+            <span mix={css({ fontSize: '12px', color: '#888' })}>
+              Your notes say more about why you liked something than a rating can. Turn this off to keep
+              them to yourself — everything else about the entry is still used.
+            </span>
+          </div>
+
+          <div>
+            <button type="submit">Save taste settings</button>
+          </div>
+          <span mix={css({ fontSize: '12px', color: '#888' })}>
+            Changing these doesn't rewrite anything on its own. Each profile is rewritten next time you
+            generate recommendations, or straight away with the Rebuild button beside it on your profile.
+          </span>
+        </form>
+      </section>
+    )
+  }
 }
 
 export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
   return () => {
-    const { values, errors, confirming, displayName } = handle.props
+    const { values, errors, confirming, settings, saved, displayName } = handle.props
 
     return (
       <Document title="Edit profile | On Deck">
@@ -103,6 +184,8 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
               </a>
             </div>
           </form>
+
+          <TasteProfileSettingsForm settings={settings} saved={saved} />
         </main>
       </Document>
     )

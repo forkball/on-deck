@@ -60,7 +60,6 @@ export default createController(routes.profile, {
           followingCount={followingCount}
           followersCount={followersCount}
           saved={context.url.searchParams.get('saved') === '1'}
-          settings={profileSettingsFor(auth.identity)}
           rebuildsLeft={rebuildAllowance.unlimited ? null : rebuildAllowance.remaining}
           rebuilt={context.url.searchParams.get('rebuilt') === '1'}
           rebuildError={context.url.searchParams.get('rebuildError') ?? undefined}
@@ -85,8 +84,11 @@ export default createController(routes.profile, {
       // makes every stored one stale, and the signature already knows that —
       // rewriting all four on the spot would spend four model calls on a
       // preference someone might still be adjusting. They're rewritten on the
-      // next run, or now, by the button next to each one.
-      return redirect(`${routes.profile.index.href()}?saved=1`, 303)
+      // next run, or now, by the Rebuild button beside each one.
+      //
+      // Back to the form that sent this, not the profile — landing somewhere
+      // else after saving reads as though something bigger happened.
+      return redirect(`${routes.profile.edit.index.href()}?saved=1`, 303)
     },
 
     async rebuild(context) {

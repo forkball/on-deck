@@ -2,7 +2,6 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
-import type { TasteProfileSettings } from '../../data/recommendations/tasteProfile.ts'
 import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { routes } from '../../routes.ts'
@@ -29,92 +28,11 @@ export interface ProfilePageProps {
   followingCount: number
   followersCount: number
   saved?: boolean
-  settings: TasteProfileSettings
   // Null when this account has no ceiling.
   rebuildsLeft: number | null
   rebuilt?: boolean
   rebuildError?: string
   displayName: string
-}
-
-const LIMIT_LABELS = new Map<number | null, string>([
-  [10, 'Last 10'],
-  [50, 'Last 50'],
-  [100, 'Last 100'],
-  [null, 'Everything'],
-])
-
-// The two answers to "what is my profile written from", next to the profiles
-// they govern. Deliberately not on the edit page: that one is who you are to
-// other people, this is what the app reads of you.
-function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSettings }>) {
-  return () => {
-    const { settings } = handle.props
-
-    return (
-      <details mix={css({ marginBottom: '20px' })}>
-        <summary mix={css({ cursor: 'pointer' })}>
-          <h2 mix={css({ display: 'inline' })}>What my taste profiles are written from</h2>
-        </summary>
-        <form
-          method="post"
-          action={routes.profile.settings.href()}
-          mix={css({
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            padding: '16px',
-            marginTop: '12px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '14px',
-          })}
-        >
-          <div>
-            <p mix={css({ margin: '0 0 4px', fontWeight: 700 })}>How much of your log to use</p>
-            <p mix={css({ margin: '0 0 8px', fontSize: '13px', color: '#555' })}>
-              Counted from what you logged most recently. Narrowing it keeps your profile closer to
-              where your taste is now, instead of averaging everything you've ever logged.
-            </p>
-            <select name="log_limit" mix={css({ maxWidth: '220px' })}>
-              {[...LIMIT_LABELS].map(([value, label]) => (
-                <option
-                  key={String(value)}
-                  value={value == null ? 'all' : String(value)}
-                  selected={settings.logLimit === value}
-                >
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label>
-              <input
-                type="checkbox"
-                name="use_notes"
-                defaultChecked={settings.useNotes}
-                mix={css({ width: 'auto' })}
-              />{' '}
-              Use the notes I've written on things I've logged
-            </label>
-            <p mix={css({ margin: '4px 0 0', fontSize: '13px', color: '#555' })}>
-              Your notes say more about why you liked something than a rating can. Turn this off to keep
-              them to yourself — everything else about the entry is still used.
-            </p>
-          </div>
-
-          <div>
-            <button type="submit">Save</button>
-          </div>
-          <p mix={css({ margin: 0, fontSize: '12px', color: '#888' })}>
-            Changing these doesn't rewrite anything on its own. Each profile is rewritten next time you
-            generate recommendations, or straight away with its own Rebuild button.
-          </p>
-        </form>
-      </details>
-    )
-  }
 }
 
 function TasteProfileSummary(
@@ -237,7 +155,6 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       followingCount,
       followersCount,
       saved,
-      settings,
       rebuildsLeft,
       rebuilt,
       rebuildError,
@@ -281,8 +198,6 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
               It has no effect on your recommendations.
             </p>
           )}
-
-          <TasteProfileSettingsForm settings={settings} />
 
           <MediaTabs
             idPrefix="profile"
