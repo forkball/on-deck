@@ -28,7 +28,12 @@ import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType, parseInteractionStatus } from '../../mediaTypes.ts'
+import {
+  DEFAULT_MEDIA_TYPE,
+  mediaTypeUiFor,
+  parseEnabledMediaType,
+  parseInteractionStatus,
+} from '../../mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { ProfilePage } from './page.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
@@ -100,6 +105,22 @@ export default createController(routes.profile, {
       if (!mediaType) return new Response('Not Found', { status: 404 })
 
       const db = context.get(Database)
+
+      // An empty log writes an empty profile without calling the model, so
+      // there's nothing here to charge for — and charging anyway would spend
+      // one of five on a no-op. Reachable by anyone: there's a tab and a
+      // button per media type, and most people use one or two of the four.
+      const logged = await countUserMediaLog(db, auth.identity.id, { type: mediaType })
+      if (logged === 0) {
+        const noun = mediaTypeUiFor(mediaType).attributive
+        return redirect(
+          `${routes.profile.index.href()}?tab=${mediaType}&rebuildError=${encodeURIComponent(
+            `There's nothing in your ${noun} log yet, so there's nothing to write a profile from.`,
+          )}`,
+          303,
+        )
+      }
+
       const allowance = await getProfileRebuildAllowance(db, auth.identity)
       if (!allowance.unlimited && allowance.remaining <= 0) {
         const wait = allowance.resetsAt ? timeUntil(allowance.resetsAt) : 'a while'
