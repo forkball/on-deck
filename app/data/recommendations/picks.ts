@@ -90,6 +90,47 @@ const PICKS_SCHEMA = {
 
 const REQUESTED_COUNT = 15
 
+// How much of the log the prompt is willing to carry. Someone a few years into
+// logging has thousands of titles, and every run was pasting all of them in
+// front of the question it actually wanted answered.
+//
+// Safe to cut because this list isn't what enforces anything: exclusion is
+// applied to the results by catalog id (excludedExternalIds in generate.ts),
+// which stays whole. The worst a trimmed list can do is let the model spend a
+// suggestion on something that then gets dropped — and the run already
+// over-requests to absorb exactly that.
+//
+// Most recent first, which is the order the log arrives in (updated_at desc,
+// see loadUserLogEntries). Recent viewing is what the taste profile is built
+// from, so it's what a taste-matched pick is likeliest to echo back — the
+// titles where the reminder actually earns its space.
+const SEEN_TITLES_IN_PROMPT = 200
+
+// Rejections are steering, not just suppression — the prompt below asks the
+// model to generalise from them — so they're worth more room per entry. This
+// is a backstop against an unbounded prompt rather than a limit anyone is
+// expected to reach: turning something down is far rarer than finishing it.
+const REJECTED_TITLES_IN_PROMPT = 100
+
+export function describeSeen(seen: string[], noun: string): string {
+  if (seen.length === 0) return ''
+
+  const shown = seen.slice(0, SEEN_TITLES_IN_PROMPT)
+  if (shown.length === seen.length) {
+    return `\n\nThey've already seen (do not suggest any of these): ${JSON.stringify(seen)}`
+  }
+
+  // Saying so matters: handed a bare 200 out of 900, the model would read that
+  // as the whole of what they've watched and pitch at someone barely started.
+  // The count is the part that says "go further afield".
+  return (
+    `\n\nThey've logged ${seen.length} ${noun} as seen — here are the ${shown.length} most recent, none of ` +
+    `which you should suggest: ${JSON.stringify(shown)}. Take it as read that there are many more you ` +
+    `haven't been shown: this is someone well past the obvious picks, so favour things they're unlikely to ` +
+    `have already worked through.`
+  )
+}
+
 function buildFilterInstructions(filters: RecommendationFilters, noun: string, mediaType: MediaType): string {
   const clauses: string[] = []
   if (filters.genre) clauses.push(`Only suggest ${noun} in the "${filters.genre}" genre.`)
@@ -178,14 +219,15 @@ export async function requestPicks(
           role: 'user',
           content:
             prompt +
-            `\n\nThey've already seen (do not suggest any of these): ${JSON.stringify(excluded.seen)}` +
+            describeSeen(excluded.seen, noun) +
             // Worth its own paragraph rather than being folded into the list
             // above: a rejection is the one negative signal that came from the
             // person rather than being inferred, so it should shape the
             // neighbouring picks too, not just remove these titles.
             (excluded.rejected.length > 0
               ? `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
-                `as a signal about what to steer away from more broadly: ${JSON.stringify(excluded.rejected)}`
+                `as a signal about what to steer away from more broadly: ` +
+                `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
               : ''),
         },
       ],
