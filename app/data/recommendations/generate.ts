@@ -4,7 +4,7 @@ import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
 import type { Db } from '../db.ts'
 import { isFollowing } from '../follows.ts'
-import { countUserMediaLog, CONSUMPTION_STATUSES, type MediaType } from '../mediaItems.ts'
+import { countUserMediaLog, listUserMediaLog, CONSUMPTION_STATUSES, type MediaType } from '../mediaItems.ts'
 import { createNotification } from '../notifications.ts'
 import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
@@ -147,27 +147,51 @@ export async function generateRecommendations(
           ),
         }))
 
+  // What not to suggest comes from the log of the type being *generated*, not
+  // the types the taste was read from — the two differ whenever someone asks
+  // for one medium based on another.
+  //
+  // Drawing it from the source logs, as this used to, got the common case
+  // right only because source and output are usually the same type. Ask for
+  // movies from book taste and it excluded books: ids from another provider,
+  // so the hard filter below could never match one, leaving the output type's
+  // own log unconsulted and its films free to be recommended back to someone
+  // who had already watched and rated them.
+  //
+  // Nothing of the source log is lost by this. Its signal is the taste profile
+  // — that is what a profile is — and its titles would only mislead here,
+  // since an adaptation shares a name with a book that is not the same thing
+  // to watch.
+  const outputTypeIndex = profileTypes.indexOf(mediaType)
+  const exclusionLogs = await Promise.all(
+    members.map(({ regenerated }, index) =>
+      // Already in hand whenever the output type is one of the sources, which
+      // is every run that doesn't cross media.
+      outputTypeIndex >= 0
+        ? regenerated[outputTypeIndex].log
+        : track('log.exclusions', () => listUserMediaLog(db, memberUserIds[index], { type: mediaType })),
+    ),
+  )
+
   // Two reasons not to suggest something, kept apart because only one of them
   // says anything about taste. The id set is what actually enforces both — the
   // title lists are a prompt hint, and the model is free to ignore them.
   const excluded: ExcludedTitles = { seen: [], rejected: [] }
   const excludedExternalIds = new Set<string>()
-  for (const { regenerated } of members) {
-    for (const profile of regenerated) {
-      for (const { interaction, item } of profile.log) {
-        const titles =
-          interaction.status === 'consumed'
-            ? excluded.seen
-            : interaction.status === 'not_interested'
-              ? excluded.rejected
-              : null
-        // Wanting something, or being partway through it, is no reason to
-        // withhold it — only the two statuses that are finished with it, one
-        // way or the other, exclude anything.
-        if (!titles) continue
-        if (item?.title) titles.push(item.title)
-        if (item?.external_id) excludedExternalIds.add(item.external_id)
-      }
+  for (const log of exclusionLogs) {
+    for (const { interaction, item } of log) {
+      const titles =
+        interaction.status === 'consumed'
+          ? excluded.seen
+          : interaction.status === 'not_interested'
+            ? excluded.rejected
+            : null
+      // Wanting something, or being partway through it, is no reason to
+      // withhold it — only the two statuses that are finished with it, one
+      // way or the other, exclude anything.
+      if (!titles) continue
+      if (item?.title) titles.push(item.title)
+      if (item?.external_id) excludedExternalIds.add(item.external_id)
     }
   }
 
