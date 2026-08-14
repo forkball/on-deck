@@ -45,6 +45,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
     // slot renders as a 124px-tall letterbox. The first still is that same
     // key art, so nothing is lost by dropping the slot.
     const showStills = images.length > 0
+    const currentEntry = ui.catalogEntryUrl(item.external_source, item.external_id)
     const showHref = ui.hrefs.show(item.id)
     const returnTo = from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref
     const backLink = backLinkFrom(from)
@@ -119,6 +120,19 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                     both the error and the field it refers to, leaving the page
                     looking like nothing happened. */}
                 <Collapsible summary={`Wrong ${ui.itemNoun}?`} open={Boolean(rematchError)}>
+                {/* What it points at now, above the field that replaces it —
+                    checking the current entry is the first thing anyone does
+                    here, and the id in the link text is what a pasted link is
+                    compared against. Absent for catalogs whose pages aren't
+                    addressable by the id we store; see catalogEntryUrl. */}
+                {currentEntry && (
+                  <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
+                    Currently matched to{' '}
+                    <a href={currentEntry.url} target="_blank" rel="noopener noreferrer">
+                      {currentEntry.name} entry {item.external_id}
+                    </a>
+                  </p>
+                )}
                 <form
                   method="post"
                   action={ui.hrefs.rematch(item.id)}

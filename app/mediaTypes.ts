@@ -58,6 +58,15 @@ interface StatusVerbs {
   done: string
 }
 
+// The catalog page an item is currently matched to. `name` is the catalog's
+// own name rather than the type's, because they can differ: a book that came
+// in through the Open Library fallback is not a Google Books entry, and saying
+// so is the whole point of showing the link.
+export interface CatalogEntryLink {
+  name: string
+  url: string
+}
+
 interface MediaTypeUi {
   // Plural, unlike MediaType — the single place that mismatch is reconciled.
   slug: string
@@ -78,6 +87,13 @@ interface MediaTypeUi {
   // Sends the "wrong match?" form straight to where the id it asks for lives.
   // Whether the year helps is per-catalog and was measured — see each entry.
   catalogSearchUrl: (title: string, year: number | null) => string
+  // Where the entry this item is *currently* matched to lives, so the "wrong
+  // match?" panel can show what it points at rather than only offering a
+  // search to replace it. Keyed by the row's external_source as well as its
+  // id: a media type can hold ids from more than one catalog (books fall back
+  // to Open Library), and a source that stores an id its own URLs don't use
+  // has no page to link — hence null rather than a guessed address.
+  catalogEntryUrl: (externalSource: string, externalId: string) => CatalogEntryLink | null
   // Deliberately unbranded; the rematch form names the catalog because there
   // you're pasting a link from it.
   searchPlaceholder: string
@@ -121,6 +137,8 @@ export const MEDIA_TYPE_UI = {
     // Year unused: TMDB's web search ignores ?year=, and folding it into the
     // query text measurably worsens matching.
     catalogSearchUrl: (title) => `https://www.themoviedb.org/search/movie?query=${encodeURIComponent(title)}`,
+    catalogEntryUrl: (source, id) =>
+      source === 'tmdb' ? { name: 'TMDB', url: `https://www.themoviedb.org/movie/${encodeURIComponent(id)}` } : null,
     searchPlaceholder: 'Search for a movie…',
     searchHeading: 'Search movies',
     statusVerbs: WATCH_VERBS,
@@ -147,6 +165,8 @@ export const MEDIA_TYPE_UI = {
     rematchPlaceholder: 'Paste a themoviedb.org link or id',
     // See the movie entry — TMDB ignores the year on web search.
     catalogSearchUrl: (title) => `https://www.themoviedb.org/search/tv?query=${encodeURIComponent(title)}`,
+    catalogEntryUrl: (source, id) =>
+      source === 'tmdb' ? { name: 'TMDB', url: `https://www.themoviedb.org/tv/${encodeURIComponent(id)}` } : null,
     searchPlaceholder: 'Search for a TV show…',
     searchHeading: 'Search TV',
     statusVerbs: WATCH_VERBS,
@@ -175,6 +195,20 @@ export const MEDIA_TYPE_UI = {
     // Google Books' web search has no dedicated year filter either.
     catalogSearchUrl: (title, year) =>
       `https://books.google.com/books?q=${encodeURIComponent(year ? `${title} ${year}` : title)}`,
+    // Two sources, because searchBooks falls back to Open Library when Google
+    // Books is down (see googleBooks.ts) — and those rows keep a work key
+    // ("OL45804W"), not a volume id, so linking them at books.google.com would
+    // 404. ?id= is also the exact form parseGoogleBooksId reads back, so the
+    // link below the form and the field above it speak the same language.
+    catalogEntryUrl: (source, id) => {
+      if (source === 'google-books') {
+        return { name: 'Google Books', url: `https://books.google.com/books?id=${encodeURIComponent(id)}` }
+      }
+      if (source === 'openlibrary') {
+        return { name: 'Open Library', url: `https://openlibrary.org/works/${encodeURIComponent(id)}` }
+      }
+      return null
+    },
     searchPlaceholder: 'Search for a book…',
     searchHeading: 'Search books',
     statusVerbs: READ_VERBS,
@@ -200,6 +234,11 @@ export const MEDIA_TYPE_UI = {
     catalogName: 'IGDB',
     rematchPlaceholder: 'Paste an igdb.com link',
     catalogSearchUrl: (title) => `https://www.igdb.com/search?type=1&q=${encodeURIComponent(title)}`,
+    // No link: igdb.com addresses a game by slug, and external_id is always
+    // the numeric id the API returns (see getGameById, which accepts a slug
+    // but stores the id off the response). Guessing a slug from the title is
+    // exactly the kind of wrong answer this panel exists to correct.
+    catalogEntryUrl: () => null,
     searchPlaceholder: 'Search for a game…',
     searchHeading: 'Search games',
     statusVerbs: PLAY_VERBS,
