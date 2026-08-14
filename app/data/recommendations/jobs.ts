@@ -131,6 +131,20 @@ export async function setPhase(db: Db, jobId: string, phase: GenerationPhase): P
   )
 }
 
+// The same heartbeat, without a stage to report — see HEARTBEAT_MS in worker.ts
+// for why a stage isn't enough on its own.
+//
+// Scoped to running rows so a beat that lands after the job stopped can't
+// revive a claim on something finished, failed, or already handed back to the
+// queue.
+export async function touchJobClaim(db: Db, jobId: string): Promise<void> {
+  await db.updateMany(
+    recommendationJobs,
+    { claimed_at: Date.now(), updated_at: Date.now() },
+    { where: { id: jobId, status: 'running' } },
+  )
+}
+
 export async function saveCheckpoint(db: Db, jobId: string, checkpoint: unknown): Promise<void> {
   await db.updateMany(
     recommendationJobs,
@@ -188,9 +202,13 @@ export async function getJob(db: Db, jobId: string, userId: number): Promise<Gen
   return { ...job, queuedAhead: Number(rows[0]?.ahead ?? 0) }
 }
 
-// Comfortably longer than the slowest stage (model calls are tens of seconds),
-// so a working run is never stolen mid-flight.
-const CLAIM_STALE_MS = 3 * 60 * 1000
+// How long a claim survives without a beat. It used to be read as "comfortably
+// longer than the slowest stage", which held only while every stage was
+// shorter than this — and the picks call stopped being, once its budget began
+// scaling with the size of the group. A worker now beats while it works
+// (touchJobClaim, HEARTBEAT_MS), so this is a measure of silence rather than of
+// slowness: nothing for three minutes means the machine is gone.
+export const CLAIM_STALE_MS = 3 * 60 * 1000
 
 // Retried twice, then left failed, so a genuinely broken run can't cycle.
 const MAX_ATTEMPTS = 3

@@ -1,8 +1,7 @@
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { describeLength, getCatalogProvider, type LengthBucket } from '../catalog/provider.ts'
 import type { MediaType } from '../mediaItems.ts'
-import { claude, parseStructuredResponse } from './claude.ts'
-import { track } from './timings.ts'
+import { requestStructured } from './claude.ts'
 
 // One recommendation as the model returns it, before catalog matching.
 export interface Pick {
@@ -88,7 +87,11 @@ const PICKS_SCHEMA = {
   required: ['picks'],
 }
 
-const REQUESTED_COUNT = 15
+// Enough over TARGET_COUNT to survive matching and verification dropping some,
+// and no more. Asking for a long list spends the run's thinking on the tail of
+// it — the picks past the first handful are the ones being reached for, and
+// they were never going to be shown anyway.
+const REQUESTED_COUNT = 12
 
 // How much of the log the prompt is willing to carry. Someone a few years into
 // logging has thousands of titles, and every run was pasting all of them in
@@ -189,7 +192,7 @@ export async function requestPicks(
     filters.playerType != null ||
     filters.multiplayerType != null ||
     filters.series != null
-  const requestedCount = hasFilters ? REQUESTED_COUNT + 10 : REQUESTED_COUNT
+  const requestedCount = hasFilters ? REQUESTED_COUNT + 6 : REQUESTED_COUNT
   const filterInstructions = buildFilterInstructions(filters, noun, mediaType) + sourceInstructions
 
   const prompt = isGroup
@@ -206,33 +209,56 @@ export async function requestPicks(
       `this taste profile.${filterInstructions} For each, give your best-guess release year (used only to ` +
       `disambiguate remakes/same-titled entries) and a one-sentence reason tied to their profile.`
 
-  const response = await track('picks.model', () =>
-    claude.messages.create({
-      model: 'claude-sonnet-5',
-      max_tokens: (isGroup ? 8000 : 4000) + (hasFilters ? 2000 : 0),
-      output_config: {
-        effort: isGroup ? 'high' : 'medium',
-        format: { type: 'json_schema', schema: PICKS_SCHEMA },
-      },
-      messages: [
-        {
-          role: 'user',
-          content:
-            prompt +
-            describeSeen(excluded.seen, noun) +
-            // Worth its own paragraph rather than being folded into the list
-            // above: a rejection is the one negative signal that came from the
-            // person rather than being inferred, so it should shape the
-            // neighbouring picks too, not just remove these titles.
-            (excluded.rejected.length > 0
-              ? `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
-                `as a signal about what to steer away from more broadly: ` +
-                `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
-              : ''),
-        },
-      ],
-    }),
-  )
+  // One budget covers the reasoning and the JSON both, and the reasoning is
+  // what fills it: a group run with filters spent 9,999 of its 10,000 tokens
+  // thinking and came back with no picks at all, two minutes in.
+  //
+  // It scales per person because the work does. This prompt asks for every
+  // candidate to be weighed against every profile, so the thinking behind one
+  // list grows with the size of the group — where a flat group budget gave two
+  // people and eight the same room for four times the work, and the larger
+  // group was the one that ran out. The JSON barely moves by comparison: three
+  // fields a pick, a fixed count of them, and only the reasons lengthen as
+  // they name more people.
+  //
+  // Still loose rather than tuned. 9,999 was a floor on what the thinking
+  // wanted rather than where it would have settled, since the cap cut the
+  // measurement short, so these numbers are buying a clean reading of what it
+  // costs per person before being set properly.
+  //
+  // Capped where a non-streaming request stops being comfortable. Past this a
+  // call wants .stream() and get_final_message() rather than a bigger ceiling,
+  // and the daily-run weighting means groups this size are rare by design.
+  const maxTokens = Math.min(6000 + 3000 * profiles.length + (hasFilters ? 4000 : 0), 32000)
 
-  return parseStructuredResponse<{ picks: Pick[] }>(response).picks
+  const { picks } = await requestStructured<{ picks: Pick[] }>('picks.model', {
+    model: 'claude-sonnet-5',
+    max_tokens: maxTokens,
+    output_config: {
+      // Medium for groups too, where this used to be high: the group prompt
+      // asks for per-person reasoning about tradeoffs across every candidate,
+      // which is the part that ran away.
+      effort: 'medium',
+      format: { type: 'json_schema', schema: PICKS_SCHEMA },
+    },
+    messages: [
+      {
+        role: 'user',
+        content:
+          prompt +
+          describeSeen(excluded.seen, noun) +
+          // Worth its own paragraph rather than being folded into the list
+          // above: a rejection is the one negative signal that came from the
+          // person rather than being inferred, so it should shape the
+          // neighbouring picks too, not just remove these titles.
+          (excluded.rejected.length > 0
+            ? `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
+              `as a signal about what to steer away from more broadly: ` +
+              `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
+            : ''),
+      },
+    ],
+  })
+
+  return picks
 }

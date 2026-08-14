@@ -3,7 +3,8 @@ import { getCatalogProvider, type CatalogSearchResult, type LengthBucket } from 
 import { pool } from '../db.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import type { MediaType } from '../mediaItems.ts'
-import { claude, parseStructuredResponse } from './claude.ts'
+import { requestStructured } from './claude.ts'
+import { GenerationError } from './errors.ts'
 import type { DecadeRelation, Pick } from './picks.ts'
 import { track } from './timings.ts'
 
@@ -90,30 +91,38 @@ export function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolea
 // approved, at the single step whose job is telling near-identical entries
 // apart, with nothing anywhere reporting it.
 //
-// Built per call so the length can be pinned. Nothing in JSON Schema can say
-// "as many as I sent you", but a count known at call time can.
-function verifySchema(count: number) {
-  return {
-    type: 'object' as const,
-    additionalProperties: false,
-    properties: {
-      verdicts: {
-        type: 'array' as const,
-        minItems: count,
-        maxItems: count,
-        items: {
-          type: 'object' as const,
-          additionalProperties: false,
-          properties: {
-            index: { type: 'number' as const },
-            matches: { type: 'boolean' as const },
-          },
-          required: ['index', 'matches'],
+// One shape for every call, rather than built per call around the number of
+// entries. It was built per call to pin the array's length — nothing in JSON
+// Schema can say "as many as I sent you", but a count known at call time can —
+// and that turns out not to be expressible here either: a structured-output
+// schema only accepts 0 or 1 for minItems, and a larger one fails the request
+// outright rather than being ignored (`400 ... 'minItems' values other than 0
+// or 1 are not supported`).
+//
+// Nothing is lost with it gone. The prompt asks for exactly one verdict per
+// entry and applyVerdicts holds the model to that, checking the count, the
+// range and the duplicates rather than trusting any of the three — which it
+// has to do regardless, since a schema the model satisfies by shape can still
+// answer about the wrong entries. That check was always the real guarantee;
+// the schema was restating one part of it.
+const VERIFY_SCHEMA = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    verdicts: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        additionalProperties: false,
+        properties: {
+          index: { type: 'number' as const },
+          matches: { type: 'boolean' as const },
         },
+        required: ['index', 'matches'],
       },
     },
-    required: ['verdicts'],
-  }
+  },
+  required: ['verdicts'],
 }
 
 export interface PickVerdict {
@@ -149,12 +158,12 @@ export function applyVerdicts(candidates: Candidate[], verdicts: PickVerdict[]):
   return candidates.filter((_, index) => byIndex.get(index) === true)
 }
 
-// Two audiences. The message travels to the waiting page verbatim (worker.ts
-// hands error.message to failJob), so it says what to do about it; the detail
-// that would only puzzle someone there goes to the log.
-function mismatch(detail: string): Error {
+// Two audiences. GenerationError is what carries the message to the waiting
+// page — see errors.ts — so it says what to do about it; the detail that would
+// only puzzle someone there goes to the log.
+function mismatch(detail: string): GenerationError {
   console.warn(`[generation] verification mismatch: ${detail}`)
-  return new Error('Checking the picks came back incomplete — try generating again.')
+  return new GenerationError('Checking the picks came back incomplete — try generating again.')
 }
 
 // A same-title-same-year-different-film sails through titlesLikelyMatch, since
@@ -176,32 +185,34 @@ export async function verifyPicksAgainstOverviews(
     catalog_found: { title: match.title, year: match.releaseYear, overview: match.overview },
   }))
 
-  const response = await track('verify.model', () =>
-    claude.messages.create({
-      model: 'claude-sonnet-5',
-      max_tokens: 2000,
-      output_config: {
-        effort: 'low',
-        format: { type: 'json_schema', schema: verifySchema(candidates.length) },
+  const { verdicts } = await requestStructured<{ verdicts: PickVerdict[] }>('verify.model', {
+    model: 'claude-sonnet-5',
+    // Shared with the reasoning, as everywhere else. The verdicts themselves
+    // are the smallest output in the pipeline — an index and a boolean each —
+    // but the judgement behind them is one plot read against one title per
+    // entry, and this call has had no successful run to measure since the
+    // schema stopped it reaching the model at all. Room enough that the first
+    // one reports what it wanted rather than what it was allowed.
+    max_tokens: 6000,
+    output_config: {
+      effort: 'low',
+      format: { type: 'json_schema', schema: VERIFY_SCHEMA },
+    },
+    messages: [
+      {
+        role: 'user',
+        content:
+          `You previously suggested some ${noun} by title/year. For each one, we looked it up on ${catalogName} and found ` +
+          `a specific ${entryNoun} — here's what ${catalogName} returned, described by its own title, year, and plot ` +
+          `overview. Confirm whether the ${entryNoun} found is truly the same one you meant, not just a ` +
+          `similarly- or identically-titled different one. Small title differences (translation, punctuation, ` +
+          `"the" vs no "the") are fine as long as it's the same ${entryNoun}.\n\n${JSON.stringify(items, null, 2)}\n\n` +
+          `Return one verdict per entry, each repeating that entry's "index" from above, with "matches" true ` +
+          `only if the ${entryNoun} found is genuinely the one you meant. Every entry needs exactly one ` +
+          `verdict — order doesn't matter, since the index is what pairs them up.`,
       },
-      messages: [
-        {
-          role: 'user',
-          content:
-            `You previously suggested some ${noun} by title/year. For each one, we looked it up on ${catalogName} and found ` +
-            `a specific ${entryNoun} — here's what ${catalogName} returned, described by its own title, year, and plot ` +
-            `overview. Confirm whether the ${entryNoun} found is truly the same one you meant, not just a ` +
-            `similarly- or identically-titled different one. Small title differences (translation, punctuation, ` +
-            `"the" vs no "the") are fine as long as it's the same ${entryNoun}.\n\n${JSON.stringify(items, null, 2)}\n\n` +
-            `Return one verdict per entry, each repeating that entry's "index" from above, with "matches" true ` +
-            `only if the ${entryNoun} found is genuinely the one you meant. Every entry needs exactly one ` +
-            `verdict — order doesn't matter, since the index is what pairs them up.`,
-        },
-      ],
-    }),
-  )
-
-  const { verdicts } = parseStructuredResponse<{ verdicts: PickVerdict[] }>(response)
+    ],
+  })
   return applyVerdicts(candidates, verdicts)
 }
 

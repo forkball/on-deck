@@ -10,7 +10,7 @@ import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import type { Db } from '../../data/db.ts'
 import { listFollowedUsers } from '../../data/follows.ts'
 import { loadLoggedTypesByUser } from '../../data/mediaItems.ts'
-import { getDailyRunAllowance, timeUntil } from '../../data/recommendations/dailyLimit.ts'
+import { getDailyRunAllowance, runCostFor, timeUntil } from '../../data/recommendations/dailyLimit.ts'
 import { enqueueJob, getJob, hasActiveJob, PHASE_LABELS } from '../../data/recommendations/jobs.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
@@ -215,7 +215,8 @@ export default createController(routes.recommendations, {
       // Ahead of the duplicate check below, and of `force`: someone out of runs
       // needs telling that, not a "generate anyway" button that can't work.
       const allowance = await getDailyRunAllowance(db, auth.identity)
-      if (!allowance.unlimited && allowance.remaining === 0) {
+      const runCost = runCostFor(memberIds.length)
+      if (!allowance.unlimited && allowance.remaining < runCost) {
         const data = await loadIndexData(db, auth.identity, mediaType)
         const wait =
           allowance.resetsAt == null
@@ -237,7 +238,14 @@ export default createController(routes.recommendations, {
             seriesTypes={data.seriesTypes}
             displayName={data.displayName}
             dailyRuns={data.dailyRuns}
-            error={`You've used all ${allowance.limit} of your recommendation runs for today.${wait}`}
+            error={
+              allowance.remaining === 0
+                ? `You've used all ${allowance.limit} of your recommendation runs for today.${wait}`
+                : // Short of the cost rather than out of runs, which is only
+                  // reachable on a group big enough to spend more than one.
+                  `A run for ${memberIds.length} people costs ${runCost} of your ${allowance.limit} daily runs, ` +
+                  `and you have ${allowance.remaining} left. Try again with fewer people, or later.${wait}`
+            }
           />,
           { status: 429 },
         )

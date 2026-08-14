@@ -1,5 +1,6 @@
 import { db } from '../db.ts'
 import {
+  CLAIM_STALE_MS,
   claimJobs,
   completeJob,
   failJob,
@@ -7,8 +8,10 @@ import {
   saveCheckpoint,
   saveJobTimings,
   setPhase,
+  touchJobClaim,
   type ClaimedJob,
 } from './jobs.ts'
+import { GenerationError } from './errors.ts'
 import { generateRecommendations, type GenerationCheckpoint } from './generate.ts'
 import type { MediaType } from '../mediaItems.ts'
 import type { RecommendationFilters } from './picks.ts'
@@ -23,6 +26,11 @@ const DEFAULT_SLOTS = 2
 
 // Short enough that a waiting person doesn't notice the gap.
 const IDLE_POLL_MS = 2000
+
+// Derived rather than picked, so lowering the staleness window can't quietly
+// leave the heartbeat too slow to keep up with it. Several beats per window,
+// since a claim only needs one of them to have landed.
+const HEARTBEAT_MS = Math.floor(CLAIM_STALE_MS / 6)
 
 function slotCount(): number {
   const configured = Number(process.env.WORKER_SLOTS)
@@ -48,6 +56,20 @@ export function startGenerationWorker(): GenerationWorker {
     // reports the queue wait it spent getting here.
     const timings = startTimings({ queuedMs: job.queuedMs, attempt: job.attempt })
     let runId: number | null = null
+
+    // Stages were the only thing refreshing the claim, which held while every
+    // stage was shorter than the staleness window. The picks call isn't: it
+    // sits alone inside its stage, it runs for as long as the model spends on
+    // it, and its budget now scales with the size of the group. A big group
+    // could outlast the window mid-call, get declared dead, and be handed to a
+    // second worker while the first was still paying for it.
+    //
+    // Beating on a timer instead keeps the window meaning what it says — no
+    // beat for CLAIM_STALE_MS means the machine is gone — rather than making
+    // it a bet on the slowest single call.
+    const heartbeat = setInterval(() => {
+      void touchJobClaim(db, job.id).catch(() => {})
+    }, HEARTBEAT_MS)
 
     try {
       const { memberIds, mediaType, filters, sourceTypes, name } = job.params
@@ -80,12 +102,25 @@ export function startGenerationWorker(): GenerationWorker {
     } catch (error) {
       // An actual error, so retrying would reproduce it. Interrupted jobs never
       // reach here — their machine died — and the staleness sweep recovers them.
+      //
+      // Logged before anything else, and logged whatever it is: this is now the
+      // only place the detail of a failed run is kept, since most of it no
+      // longer travels to the page.
+      console.error(`[generation] job=${job.id} failed:`, error)
+
+      // Only a message written for the person reaches them. Everything else in
+      // this pipeline throws for a reader who has the code open — a provider's
+      // response body, a missing environment variable, a stop reason — and
+      // forwarding those verbatim is how a stop reason ended up on a waiting
+      // page. Silence is the safe default here, and a new throw anywhere
+      // downstream gets it without having to know this exists.
       await failJob(
         db,
         job.id,
-        error instanceof Error ? error.message : 'Generating failed. Try again.',
+        error instanceof GenerationError ? error.message : 'Generating failed. Try again.',
       ).catch(() => {})
     } finally {
+      clearInterval(heartbeat)
       running--
       // After the job is already marked done: a person waiting on the poll
       // shouldn't wait on bookkeeping, and a failed write here would otherwise
