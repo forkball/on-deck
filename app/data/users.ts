@@ -23,17 +23,16 @@ export async function searchUsers(db: Db, query: string, excludeUserId: number):
 // --- Field rules -----------------------------------------------------------
 //
 // Signup and profile editing write the same three columns, so the rules live
-// here with the table rather than in either controller — a rule enforced on
-// only one of those paths is the same as no rule.
+// with the table rather than in either controller — a rule enforced on only one
+// path is the same as no rule.
 
 export const USERNAME_MIN_LENGTH = 3
 export const USERNAME_MAX_LENGTH = 30
 export const BIO_MAX_LENGTH = 500
 
-// Usernames double as a login handle alongside email (see
-// auth/login/controller.tsx), which puts both into one namespace: a username
-// shaped like someone else's email address would make that lookup match two
-// rows. Barring '@' is what keeps the two apart.
+// Usernames double as a login handle alongside email, putting both in one
+// namespace: a username shaped like someone's email address would make that
+// lookup match two rows. Barring '@' keeps them apart.
 const USERNAME_PATTERN = /^[a-zA-Z0-9._-]+$/
 
 export const USERNAME_HINT = `${USERNAME_MIN_LENGTH}–${USERNAME_MAX_LENGTH} characters — letters, numbers, and . _ - only.`
@@ -57,9 +56,8 @@ export const bioSchema = s
   .transform((value) => value.trim())
   .pipe(maxLength(BIO_MAX_LENGTH))
 
-// One message per field rather than per failed check: which rule a username
-// broke is rarely what the person wants told back to them, and the hint under
-// the input already spells all of them out.
+// One message per field rather than per failed check — the hint under the input
+// already spells out every rule.
 export const USER_FIELD_MESSAGES: Record<string, string> = {
   email: 'Enter a valid email address.',
   display_name: `Usernames are ${USERNAME_HINT}`,
@@ -123,10 +121,9 @@ export async function updateUserProfile(db: Db, userId: number, fields: UserProf
   await db.update(users, userId, { ...fields, bio: fields.bio || undefined })
 }
 
-// Its own write for the same reason the password is: these are set from the
-// profile page, by a form that touches nothing the edit page touches, and
-// folding them in would make a taste-settings save also a save of the email
-// and username sitting in that other form.
+// Its own write, like the password: set from a form that touches nothing the
+// edit page does, so folding them together would make a taste-settings save also
+// save the email and username sitting in that other form.
 export async function updateProfileSettings(
   db: Db,
   userId: number,
@@ -139,9 +136,8 @@ export async function updateProfileSettings(
   })
 }
 
-// Its own write, not a field on the one above: the password is changed on its
-// own page, by a form that touches nothing else. Hashed by the caller
-// (actions/auth/password.ts) — nothing here ever sees a plaintext password.
+// Its own write, for the same reason. Hashed by the caller — nothing here ever
+// sees a plaintext password.
 export async function updateUserPassword(db: Db, userId: number, passwordHash: string): Promise<void> {
   await db.update(users, userId, { password_hash: passwordHash })
 }

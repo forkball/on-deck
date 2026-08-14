@@ -18,10 +18,9 @@ export function parseMediaType(value: unknown): ActiveMediaType | null {
 
 // Types in the vocabulary that aren't ready to be shown. Empty today.
 //
-// A gated type stays in ACTIVE_MEDIA_TYPES: that tuple is what forces every
-// consumer to have an answer, so hiding a type by removing it would silently
-// delete the guarantee. Opt-in, so forgetting to set the variable hides a
-// half-finished type rather than shipping it.
+// A gated type stays in ACTIVE_MEDIA_TYPES — that tuple forces every consumer to
+// have an answer, so removing one would silently delete the guarantee. Opt-in,
+// so a forgotten variable hides a half-finished type rather than shipping it.
 const EXPERIMENTAL_MEDIA_TYPES: readonly ActiveMediaType[] = []
 
 function experimentalEnabled(): Set<string> {
@@ -44,8 +43,8 @@ export function enabledMediaTypes(): ActiveMediaType[] {
 }
 
 // For anything a visitor supplies. parseMediaType stays ungated because it also
-// reads back existing rows — a logged game needs its status verbs whether or
-// not its tab is showing.
+// reads back existing rows — a logged game needs its verbs whether or not its
+// tab is showing.
 export function parseEnabledMediaType(value: unknown): ActiveMediaType | null {
   const type = parseMediaType(value)
   return type && isMediaTypeEnabled(type) ? type : null
@@ -64,8 +63,7 @@ interface MediaTypeUi {
   // Nouns for prose; the recommendation prompts read these.
   singular: string
   plural: string
-  // Before another noun — "TV taste profile", where tabLabel and singular
-  // both read wrong.
+  // Before another noun — "TV taste profile", where the others read wrong.
   attributive: string
   // For match confirmation — "the same show" beats "the same entry" for TV.
   entryNoun: string
@@ -74,11 +72,10 @@ interface MediaTypeUi {
   // The catalog these items come from, named in user-facing copy.
   catalogName: string
   rematchPlaceholder: string
-  // Sends the "wrong match?" form straight to where the id it asks for lives.
-  // Whether the year helps is per-catalog and was measured — see each entry.
+  // Sends the "wrong match?" form to where the id it asks for lives. Whether the
+  // year helps is per-catalog — see each entry.
   catalogSearchUrl: (title: string, year: number | null) => string
-  // Deliberately unbranded; the rematch form names the catalog because there
-  // you're pasting a link from it.
+  // Unbranded, unlike the rematch form, where you're pasting a link from it.
   searchPlaceholder: string
   // Page heading and <title> on the search route.
   searchHeading: string
@@ -86,8 +83,7 @@ interface MediaTypeUi {
   statusVerbs: StatusVerbs
   // How the primary credit is labelled on a detail page.
   creditLabel: string
-  // "What I've watched" / "read". Separate from statusVerbs.done so copy doesn't
-  // depend on how a status label is capitalised.
+  // Separate from statusVerbs.done so copy doesn't depend on its capitalisation.
   pastParticiple: string
   // Closures, not Route objects: routes.movies.show and routes.tv.show are
   // different generic instantiations, and TypeScript won't call a union of
@@ -245,13 +241,12 @@ export function parseInteractionStatus(value: unknown): InteractionStatus | null
   return INTERACTION_STATUSES.includes(value as InteractionStatus) ? (value as InteractionStatus) : null
 }
 
-// Same four statuses everywhere; only the verbs differ, and they live on the
+// Same four statuses everywhere; only the verbs differ, and those live on the
 // registry above so adding a type doesn't mean editing a second table.
 //
-// "Not interested" takes no verb — you decline a book the same way you decline
-// a film — so it isn't in StatusVerbs. Last, because it's the odd one out:
-// the three before it are stages of consuming something, and this is a refusal
-// to. See INTERACTION_STATUSES.
+// "Not interested" takes no verb — you decline a book as you decline a film — so
+// it isn't in StatusVerbs, and it goes last as the one that isn't a stage of
+// consuming anything.
 export function statusOptionsFor(mediaType: ActiveMediaType): { value: InteractionStatus; label: string }[] {
   const verbs = MEDIA_TYPE_UI[mediaType].statusVerbs
   return [
@@ -275,10 +270,8 @@ export function statusLabel(status: string, mediaType?: unknown): string {
 export const STATUS_OPTIONS = statusOptionsFor(DEFAULT_MEDIA_TYPE)
 export const STATUS_LABELS = statusLabelsFor(DEFAULT_MEDIA_TYPE)
 
-// One color per status so a badge reads at a glance without the label: green
-// for done, blue for queued, amber for mid-consumption, and "not interested"
-// deliberately out of that progression since it isn't a stage of consuming
-// anything.
+// One color per status so a badge reads without its label. "Not interested" sits
+// outside the green/blue/amber progression, not being a stage of anything.
 const STATUS_BADGE_COLORS: Record<InteractionStatus, string> = {
   want_to_consume: '#1d4ed8',
   in_progress: '#b45309',

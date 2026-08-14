@@ -33,9 +33,8 @@ function capitalize(tag: string): string {
   return tag.replace(/^./, (c) => c.toUpperCase())
 }
 
-// Shared by the movie and TV search routes (and books, once wired up).
-// The two former per-type copies were the same document; everything that
-// varies now comes from MEDIA_TYPE_UI.
+// Shared by every media type's search route. Everything that varies comes from
+// MEDIA_TYPE_UI.
 export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
   return () => {
     const { mediaType, query, results, initialVisible, interactionsByItemId, message, displayName } = handle.props

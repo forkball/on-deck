@@ -55,10 +55,8 @@ export function StarRatingDisplay(handle: Handle<{ value: number }>) {
   }
 }
 
-// The read-only counterpart to picking "Didn't like it". Deliberately words
-// rather than an empty star row: a dislike is the absence of a score, and
-// drawing it as five empty stars would say "rated it zero", which is the exact
-// confusion the scale is built to avoid.
+// Words rather than an empty star row: a dislike is the absence of a score, and
+// five empty stars would read as "rated it zero".
 export function DislikedDisplay() {
   return () => (
     <span mix={css({ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' })}>
@@ -69,10 +67,9 @@ export function DislikedDisplay() {
 
 const STEPS = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5]
 
-// The opt-out, styled as a chip. Its radio is hidden outright rather than left
-// to render at DoodleCSS's `opacity: 0`, so the state is something the label
-// shows instead of something invisible next to it: an outline when idle, filled
-// and dark when chosen.
+// The opt-out, styled as a chip. Its radio is hidden outright rather than left at
+// DoodleCSS's `opacity: 0`, so the label carries the state rather than an
+// invisible control beside it.
 const CHOICE_GROUP = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -84,23 +81,18 @@ const CHOICE_GROUP = {
     opacity: 0,
     pointerEvents: 'none',
   },
-  // Padding is deliberately absent here — see `.doodle label.rating-choice` in
-  // app.css. These css() rules are layered and DoodleCSS is not, so its
-  // `.doodle label { padding: .25em 0 }` wins whatever specificity is thrown at
-  // it from here: padding set in this block is silently dropped and the pill
-  // closes to within a pixel of the text. Everything else in here is
-  // uncontested, which is why only padding had to move.
+  // Padding lives in `.doodle label.rating-choice` in app.css, not here: these
+  // css() rules are layered and DoodleCSS is not, so its `label { padding }` wins
+  // at any specificity and padding set here is silently dropped.
   '& label': {
     display: 'inline-block',
     borderRadius: '999px',
     border: '1px solid #ccc',
     color: '#666',
     cursor: 'pointer',
-    // Exactly as tall as the stars it sits beside, off the same constant so
-    // the two can't drift apart. `.doodle * { box-sizing: border-box }` makes
-    // this the outer height, and the line-height less the 1px border top and
-    // bottom is what centres the text inside it — vertical padding would fight
-    // DoodleCSS for the property (see app.css), so the height does the work.
+    // Off the same constant as the stars it sits beside, so the two can't drift.
+    // `box-sizing: border-box` makes this the outer height, and line-height less
+    // the 1px borders centres the text — padding would lose to DoodleCSS here.
     height: `${STAR_SIZE}px`,
     lineHeight: `${STAR_SIZE - 2}px`,
     whiteSpace: 'nowrap',
@@ -116,29 +108,20 @@ const CHOICE_GROUP = {
   },
 } as const
 
-// One question with three kinds of answer, in one radio group: a score, no
-// score, or a dislike. They are mutually exclusive because they are answers to
-// the same question — "how did this land" — and a row claiming four stars and
-// a dislike at once would be nonsense. `parseRatingSubmission` unpacks the
-// single submitted value into the two columns that store it.
+// One question with three kinds of answer in a single radio group: a score, no
+// score, or a dislike. parseRatingSubmission unpacks the one submitted value
+// into the two columns that store it.
 //
 // 10 radios in descending DOM order, displayed row-reverse so `:checked ~ label`
 // fills the current star plus every lower one. No JS.
 //
-// The opt-out sits outside the star strip rather than becoming a step on the
-// left of it. It is not the bottom of the scale — it is a refusal to score —
-// and rendering it in line with the stars would read as exactly the low number
-// it isn't. The "or" between them says the same thing in words, and the three
-// stay grouped together: pushed to opposite ends of the row they stop reading
-// as one choice, which is the only thing holding them together.
+// The opt-out sits outside the star strip: it is a refusal to score, not the
+// bottom of the scale, and in line with the stars it would read as the low number
+// it isn't. Unrated has no control at all — it is simply no star selected, which
+// is where clicking the current selection lands you (StarRatingClearer).
 //
-// Unrated has no control of its own: it is simply no star selected, which is
-// also where clicking the current selection lands you. That is what
-// StarRatingClearer is for, and it is the one part of this that needs a script.
-//
-// The label carries the styling because the radios themselves are invisible:
-// DoodleCSS lays them out at 1.5em but they compute to `opacity: 0`, so a bare
-// radio renders as nothing at all and reads as plain text.
+// The label carries the styling because DoodleCSS computes the radios themselves
+// to `opacity: 0`, so a bare one renders as nothing.
 export function StarRatingInput(
   handle: Handle<{ name: string; defaultValue: number | null; idPrefix?: string; disliked?: boolean | null }>,
 ) {

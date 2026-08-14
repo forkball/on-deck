@@ -15,8 +15,8 @@ const boxedBodyStyle = css({
 export interface CollapsibleProps {
   summary: RemixNode
   children?: RemixNode
-  // Open on first paint. Left closed by default, since the point of a
-  // collapsible is to keep secondary controls out of the way.
+  // Open on first paint. Closed by default — the point is to keep secondary
+  // controls out of the way.
   open?: boolean
   // Wraps the body in the same bordered panel the profile's taste-profile
   // disclosure uses. Off for inline groups that already sit inside a card.

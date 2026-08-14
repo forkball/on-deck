@@ -1,14 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-// Where a generation run's time went: the queue first, then each phase, then
-// the individual awaits inside it.
+// Where a run's time went: the queue, then each phase, then the awaits inside it.
 //
 // Phase durations are wall clock and add up to the run. Step durations are
-// time-in-flight and deliberately don't: eight overview fetches running at once
-// each contribute their full duration to a span they shared. That gap is the
-// point — a step total well above its phase means the fan-out is working, and
-// one that matches its phase means those calls ran one after another. `count`
-// is what makes the two readable apart.
+// time-in-flight and deliberately don't — eight fetches running at once each
+// contribute their full duration to a span they shared. That gap is the point: a
+// step total well above its phase means the fan-out is working, one that matches
+// it means those calls ran in series.
 export interface StepTiming {
   name: string
   ms: number
@@ -26,9 +24,8 @@ export interface RunTimings {
   // Enqueue to claim. Null when generation was called directly rather than
   // through the queue.
   queuedMs: number | null
-  // Which attempt this describes. A resumed job skips whatever its checkpoint
-  // already holds, so its phases come out cheap for a reason that has nothing
-  // to do with speed — without this, a recovered run reads as a fast one.
+  // A resumed job skips whatever its checkpoint holds, so its phases come out
+  // cheap for a reason that has nothing to do with speed.
   attempt: number
   totalMs: number
   phases: PhaseTiming[]
@@ -42,11 +39,10 @@ interface PhaseRecord {
   steps: Map<string, StepTiming>
 }
 
-// Ambient rather than a parameter threaded through the pipeline. The calls
-// worth timing are leaves — a model request, a provider lookup — four modules
-// down from the run that owns them, and giving each of those functions a
-// recorder argument would put measurement in every signature between here and
-// there. One store per run keeps concurrent runs on the same machine apart.
+// Ambient rather than threaded through the pipeline: the calls worth timing are
+// leaves, four modules down from the run that owns them, and a recorder argument
+// would put measurement in every signature between. One store per run keeps
+// concurrent runs on the same machine apart.
 const storage = new AsyncLocalStorage<Recorder>()
 
 class Recorder {
@@ -63,16 +59,15 @@ class Recorder {
     this.phases.push({ name, startedAt: Date.now(), ms: null, steps: new Map() })
   }
 
-  // The phase a step should be filed under is the one open when it *started*.
-  // Reading it at completion would file the last provider call of a stage
-  // against whatever stage began while it was still in the air.
+  // A step is filed under the phase open when it *started*. Reading it at
+  // completion would file a stage's last call against whatever stage began
+  // while it was still in the air.
   currentPhase(): PhaseRecord {
     const open = this.phases.at(-1)
     if (open && open.ms == null) return open
 
-    // Nothing should reach here — the pipeline opens `profiles` before its
-    // first await — but dropping the measurement would be the wrong way to
-    // find that out.
+    // Unreachable while the pipeline opens `profiles` before its first await,
+    // but dropping the measurement is the wrong way to find out otherwise.
     const fallback: PhaseRecord = { name: 'unphased', startedAt: Date.now(), ms: null, steps: new Map() }
     this.phases.push(fallback)
     return fallback

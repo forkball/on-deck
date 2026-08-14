@@ -51,9 +51,9 @@ export async function importSteamLibrary(db: Db, userId: number, steamId: string
   const notFound: string[] = []
 
   // Keyed by resolved catalog game, not Steam entry: Steam lists the same game
-  // twice ("Arkham Asylum" and "Arkham Asylum GOTY Edition") and both resolve
-  // to one IGDB game. Per-entry writes let the last one win, so 964 minutes on
-  // one edition and 0 on the other imported as never played. Playtime is summed.
+  // twice ("Arkham Asylum" and "… GOTY Edition") and both resolve to one IGDB
+  // game. Per-entry writes let the last one win, so playtime on one edition and
+  // none on the other reads as never played. Summed instead.
   const merged = new Map<string, { match: CatalogSearchResult; playtimeMinutes: number }>()
 
   await runBounded(playable, CONCURRENCY, async (game) => {
@@ -100,12 +100,11 @@ export async function importSteamLibrary(db: Db, userId: number, steamId: string
 }
 
 // Stricter than the Goodreads importer's `matches[0]`: Steam gives the exact
-// published name, so anything short of a title match is more likely a wrong
-// game than a lucky one — and a wrong game silently poisons the taste profile.
+// published name, so anything short of a title match is more likely wrong than
+// lucky — and a wrong game silently poisons the taste profile.
 async function matchGame(steamName: string): Promise<CatalogSearchResult | null> {
   // Searched separately rather than re-filtering the first result set: a query
-  // like "Painkiller: Gold" doesn't return plain "Painkiller" at all. On a
-  // 1,125-game library this recovered 16 of 127 unmatched titles.
+  // like "Painkiller: Gold" doesn't return plain "Painkiller" at all.
   for (const query of searchVariants(steamName)) {
     const results = await getCatalogProvider('game').search(query)
     const wanted = normalizeTitle(query)

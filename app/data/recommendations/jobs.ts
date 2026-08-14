@@ -4,11 +4,11 @@ import { pool, type Db } from '../db.ts'
 import { recommendationJobs, type RecommendationJob } from '../schema.ts'
 import type { RunTimings } from './timings.ts'
 
-// Live progress for an in-flight run. Generating takes tens of seconds, so the
+// Live progress for an in-flight run: generating takes tens of seconds, so the
 // request hands back a job id and the wait page polls the stage from here.
 //
-// In the database, not process memory: the app runs two machines, so the POST
-// and the poll that follows it can land on different ones.
+// In the database, not process memory — the POST and the poll that follows it
+// can land on different machines.
 export type GenerationPhase = 'profiles' | 'picks' | 'matching' | 'lengths' | 'verifying' | 'saving'
 
 // Each corresponds to a real await in generateRecommendations — adding a stage
@@ -38,9 +38,8 @@ export interface GenerationJob {
   status: JobStatus
   // Position in line when queued; 0 once running.
   queuedAhead?: number
-  // Only the stages this run will actually hit — the length check happens only
-  // when a length lever is set, and showing a stage that never runs is
-  // invented progress.
+  // Only the stages this run will hit: the length check happens only when that
+  // lever is set, and showing a stage that never runs is invented progress.
   phases: GenerationPhase[]
   phase: GenerationPhase
   // Set once finished; the client navigates here.
@@ -131,12 +130,10 @@ export async function setPhase(db: Db, jobId: string, phase: GenerationPhase): P
   )
 }
 
-// The same heartbeat, without a stage to report — see HEARTBEAT_MS in worker.ts
-// for why a stage isn't enough on its own.
+// The same heartbeat, without a stage to report — see HEARTBEAT_MS in worker.ts.
 //
-// Scoped to running rows so a beat that lands after the job stopped can't
-// revive a claim on something finished, failed, or already handed back to the
-// queue.
+// Scoped to running rows, so a beat landing after the job stopped can't revive a
+// claim on something finished, failed, or already back in the queue.
 export async function touchJobClaim(db: Db, jobId: string): Promise<void> {
   await db.updateMany(
     recommendationJobs,
@@ -235,9 +232,8 @@ export interface ClaimedJob {
   userId: number
   params: JobParams
   checkpoint: unknown
-  // How long this sat before a worker picked it up. Measured at the claim
-  // rather than at the start of generation, so it stays queue wait and doesn't
-  // absorb whatever the worker does before it starts.
+  // Measured at the claim rather than at the start of generation, so it stays
+  // queue wait and doesn't absorb whatever the worker does first.
   queuedMs: number
   // Post-increment, so the first run of a job reports 1.
   attempt: number

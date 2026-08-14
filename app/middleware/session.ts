@@ -15,9 +15,7 @@ export const sessionCookie = createCookie('session', {
   path: '/',
 })
 
-// Session data (just { userId }) lives entirely in the signed cookie itself
-// — no server-side store to keep in sync, so this works correctly no matter
-// how many machines are running. The previous fs-backed storage wrote
-// session files to local disk, which only one machine could ever see;
-// running more than one caused requests to randomly appear logged out.
+// Session data (just { userId }) lives entirely in the signed cookie — no
+// server-side store to keep in sync, which is what makes this correct on more
+// than one machine. Anything disk-backed is visible to only one of them.
 export const sessionStorage = createCookieSessionStorage()

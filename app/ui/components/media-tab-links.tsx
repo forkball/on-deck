@@ -18,7 +18,7 @@ export interface MediaTabLinksProps {
 //
 // `rmx-document` is load-bearing: without it the framework does a client-side
 // frame reload, swapping the DOM but leaving hydrated client entries holding
-// their original props — which had the TV search page firing /movies/suggest.
+// their original props, so the TV search page would fire /movies/suggest.
 export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
   return () => {
     const { current, hrefFor } = handle.props

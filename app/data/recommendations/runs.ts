@@ -24,9 +24,9 @@ export const MAX_RUNS_PER_USER = 3
 export interface RecommendationResult {
   item: MediaItem
   reason: string
-  // Looked up live, not frozen at generation time. The whole row rather than
-  // just its status, so the run page's log control can pre-fill rating and
-  // notes — submitting without them would write null over what's there.
+  // Looked up live, and the whole row rather than just its status: the run
+  // page's log control pre-fills rating and notes, and submitting without them
+  // would write null over what's there.
   interaction: UserMediaInteraction | null
 }
 
@@ -208,10 +208,8 @@ export async function saveRun(db: Db, input: SaveRunInput): Promise<number> {
     { returnRow: true },
   )
 
-  // Concurrent, and safe to be: every row here belongs to the run just
-  // created, and `rank` carries the ordering explicitly, so no row depends on
-  // another having landed first. Serially this was a round trip per member
-  // plus one per pick, all of it while the requester waits.
+  // Safe to run concurrently: every row belongs to the run just created and
+  // `rank` carries the ordering, so none depends on another landing first.
   await Promise.all([
     ...input.memberUserIds.map((memberId) =>
       db.create(recommendationRunMembers, { run_id: run.id, user_id: memberId }),
@@ -306,13 +304,12 @@ export async function listRecommendationRunsFromOthers(db: Db, userId: number): 
 }
 
 // Null (a 404) if the run doesn't exist or this user wasn't in it. Access is
-// membership and membership is permanent — deliberately unlike
+// membership, and membership is permanent — unlike
 // listRecommendationRunsFromOthers, which gates on *current* mutual follow.
 //
-// The two answer different questions: "may I see this run" stays yes because it
-// was built partly from your taste, while the listing is about who you're
-// connected to now. So after unfollowing, a shared run leaves your list but its
-// URL still works. That mismatch is intended.
+// The mismatch is intended: "may I see this run" stays yes because it was built
+// partly from your taste, while the listing is about who you're connected to
+// now. After unfollowing, a shared run leaves your list but its URL still works.
 export async function getRecommendationRun(
   db: Db,
   runId: number,

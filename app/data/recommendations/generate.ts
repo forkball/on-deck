@@ -65,9 +65,8 @@ export interface MissingSourceLogs {
   missing: MediaType[]
 }
 
-// An empty log yields an empty taste profile, so the run would still generate
-// while quietly ignoring that person — a "group" pick reflecting only whoever
-// had logs. Callers block generation on a non-empty result.
+// An empty log yields an empty taste profile, so a run would quietly ignore that
+// person. Callers block generation on a non-empty result.
 export async function findMembersMissingSourceLogs(
   db: Db,
   memberUserIds: number[],
@@ -77,9 +76,8 @@ export async function findMembersMissingSourceLogs(
     memberUserIds.map(async (memberId) => {
       const [user, counts] = await Promise.all([
         db.find(users, memberId),
-        // Rejections don't count: a member whose log for a type is nothing but
-        // "not interested" has given the profile nothing to work from, which
-        // is exactly the case this check exists to catch.
+        // Rejections don't count: a log that is nothing but "not interested"
+        // gives the profile nothing to work from.
         Promise.all(
           sourceTypes.map((type) => countUserMediaLog(db, memberId, { type, statuses: CONSUMPTION_STATUSES })),
         ),
@@ -95,12 +93,12 @@ export async function findMembersMissingSourceLogs(
   return checked.filter((entry) => entry.missing.length > 0)
 }
 
-// One dated run of picks, kept rather than replaced so it stays browsable at
-// /recommendations/:id. Capped at MAX_RUNS_PER_USER, oldest pruned.
+// One dated run of picks, kept rather than replaced so it stays browsable.
+// Capped at MAX_RUNS_PER_USER, oldest pruned.
 //
 // The stages live next door — picks.ts asks the model, matching.ts resolves to
-// catalog entries, runs.ts persists. This owns only their order and what a
-// resume skips.
+// catalog entries, runs.ts persists. This owns their order and what a resume
+// skips.
 export async function generateRecommendations(
   db: Db,
   requestingUserId: number,
@@ -177,29 +175,26 @@ export async function generateRecommendations(
     ),
   )
 
-  // Two reasons not to suggest something, kept apart because only one of them
-  // says anything about taste. The id set is what actually enforces both — the
-  // title lists are a prompt hint, and the model is free to ignore them.
+  // Two reasons not to suggest something. The id set enforces both; the title
+  // lists are a prompt hint the model is free to ignore.
   //
-  // They also count differently across a group, which is what the tallying
-  // below is for. Having seen something excludes it only once most of the group
-  // has: one person out of six is no reason to keep a film from the other five.
-  // A rejection excludes on its own, from anyone — it's the one signal a person
-  // gave deliberately.
+  // They count differently across a group, which is what the tally below is for.
+  // Having seen something excludes it only once most of the group has — one
+  // person out of six is no reason to keep a film from the other five. A
+  // rejection excludes on its own, from anyone.
   const memberCount = exclusionLogs.length
   const seenThreshold = Math.floor(memberCount / 2) + 1
 
   const excluded: ExcludedTitles = { seen: [], rejected: [] }
   const excludedExternalIds = new Set<string>()
 
-  // Keyed by catalog id where there is one, since two people's rows for the
-  // same film are different rows. Title is the fallback and the only key for
-  // anything unmatched, which is also all the prompt list can name.
+  // Keyed by catalog id where there is one, since two people's rows for the same
+  // film are different rows. Title is the fallback, and the only key for anything
+  // unmatched.
   const seenBy = new Map<string, { count: number; title?: string; externalId?: string }>()
 
-  // Rejections need no tally — one is enough to exclude — but they do need the
-  // same key, or a title several people turned down is named once per person
-  // and spends that many of the hundred the prompt will carry.
+  // Rejections need no tally — one is enough — but they need the same key, or a
+  // title several people turned down is named once per person in the prompt.
   const rejectedKeys = new Set<string>()
 
   for (const log of exclusionLogs) {
@@ -208,9 +203,8 @@ export async function generateRecommendations(
     const countedThisMember = new Set<string>()
 
     for (const { interaction, item } of log) {
-      // Wanting something, or being partway through it, is no reason to
-      // withhold it — only the two statuses that are finished with it, one
-      // way or the other, exclude anything.
+      // Only the two statuses that are finished with something exclude it —
+      // wanting it, or being partway through, is no reason to withhold it.
       const key = item?.external_id ?? item?.title
       if (!key) continue
 
@@ -263,13 +257,12 @@ export async function generateRecommendations(
     }),
   )
 
-  // Everything that can be decided from the search results already in hand.
-  // Nothing here makes a request, so the dedupe settles in pick order rather
-  // than in whatever order a provider answered.
+  // Everything decidable from the search results already in hand. Nothing here
+  // makes a request, so the dedupe settles in pick order rather than in whatever
+  // order a provider answered.
   //
   // Not capped at TARGET_COUNT: verification below drops some too, so the
-  // over-request slack has to reach it or a verification drop under-fills the
-  // run rather than spending slack already budgeted for it.
+  // over-request slack has to reach it.
   const shortlist: Candidate[] = []
   const seenExternalIds = new Set<string>()
   // Counted, not stored — see tally.ts for why this is log-only for now.
@@ -309,8 +302,7 @@ export async function generateRecommendations(
       (filters.playerType && !match.tags.includes(filters.playerType)) ||
       (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) ||
       // Platforms ride in their own field rather than as tags, and are compared
-      // by family so "PlayStation" matches whichever PS generation the catalog
-      // lists — the same grouping the chips on a card show.
+      // by family so "PlayStation" matches whichever generation the catalog lists.
       (filters.platform && !platformFamilies(match.platforms ?? []).includes(filters.platform)) ||
       (filters.series && !match.tags.includes(filters.series))
     ) {
@@ -339,8 +331,8 @@ export async function generateRecommendations(
   let results: RecommendationResult[]
 
   if (checkpoint.verified?.length) {
-    // A previous attempt already paid for verification, and wrote its picks to
-    // the catalog before recording them — so rebuild from those rows.
+    // A previous attempt already paid for verification and wrote its picks to
+    // the catalog, so rebuild from those rows.
     const ids = checkpoint.verified.map((entry) => entry.mediaItemId)
     const items = await db.findMany(mediaItems, { where: inList('id', ids) })
     const itemsById = new Map(items.map((item) => [item.id, item]))
@@ -376,9 +368,8 @@ export async function generateRecommendations(
     }
     onCheckpoint(checkpoint)
 
-    // Only on this path. A run resuming from a checkpoint skipped verification
-    // entirely, so its gates never all ran — and a tally missing a stage is
-    // worse than none, since it reads as though everything was counted.
+    // Only on this path: a run resuming from a checkpoint skipped verification,
+    // and a tally missing a stage reads as though everything was counted.
     logPickTally({
       requested: picks.length,
       kept: results.length,

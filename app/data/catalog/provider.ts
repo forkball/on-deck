@@ -32,12 +32,10 @@ import {
 // returns, aliased so non-TMDB providers can satisfy the same contract.
 export type CatalogSearchResult = TmdbSearchResult
 
-// Short/medium/long(/very long), in whatever unit a given provider measures —
-// runtime, page count, hours to beat, season count. Defined here rather than
-// with the recommendation filters that read it: the buckets belong to the
-// catalog that interprets them. `very_long` exists only for providers with a
-// 4th tier (currently movies) — the rest just never emit it in their
-// lengthOptions.
+// Short/medium/long(/very long), in whatever unit a provider measures — runtime,
+// page count, hours to beat, season count. Lives here rather than with the
+// filters that read it: the buckets belong to the catalog interpreting them.
+// `very_long` is emitted only by providers with a 4th tier (currently movies).
 export type LengthBucket = 'short' | 'medium' | 'long' | 'very_long'
 
 // Everything that differs between one media type's catalog and another's.
@@ -49,17 +47,15 @@ export interface CatalogProvider {
   getById(externalId: string): Promise<CatalogSearchResult | null>
   // Genre vocabulary offered by the recommendation filter for this type.
   genres: string[]
-  // Games-only: no other provider has a player-count concept, so these are
-  // absent (rather than empty) for every other type.
+  // Games-only, and absent rather than empty for every other type.
   playerTypes?: string[]
   multiplayerTypes?: string[]
-  // Games-only too: platform *families* rather than raw platform names — see
-  // GAME_PLATFORMS. Nothing else here runs on hardware you either own or don't.
+  // Games-only too: platform *families*, not raw names — see GAME_PLATFORMS.
   platforms?: string[]
   // Books-only — see BOOK_SERIES_TYPES.
   seriesTypes?: string[]
-  // Turns what the "wrong match?" form accepts — a pasted URL or bare id —
-  // into an external id, or null.
+  // Turns what the "wrong match?" form accepts — a URL or bare id — into an
+  // external id, or null.
   parseExternalId(input: string): string | null
   // Shown when parseExternalId rejects the input.
   matchHint: string
@@ -200,23 +196,18 @@ export function getCatalogProvider(type: MediaType): CatalogProvider {
   return provider
 }
 
-// Which types are actually searchable/loggable right now — drives the tabs
-// and the recommendation source picker, so "coming soon" placeholders stay in
-// one place instead of being hardcoded per component.
+// Which types are searchable/loggable right now.
 export function supportedMediaTypes(): MediaType[] {
   return Object.keys(CATALOG_PROVIDERS)
 }
 
-// Searches the provider for `type` and writes every hit into the catalog, so
-// the results are real media_items the user can immediately log against.
-// Repeating a search — which is exactly what pressing "back" from a result
-// does — otherwise re-runs the catalog call and re-upserts every hit, for
-// data that hasn't changed. Cached briefly so that round trip is free.
+// Searches the provider and writes every hit into the catalog, so results are
+// real media_items the user can log against. Cached briefly because pressing
+// "back" from a result repeats the search for data that hasn't changed.
 //
-// Deliberately caches only the catalog half. The viewer's own interactions
-// are fetched fresh on every render (see getUserInteractionsForItems), so
-// logging something and going back still shows the updated status — caching
-// those too is what would make this feel broken.
+// Only the catalog half is cached. The viewer's own interactions are fetched
+// fresh on every render (getUserInteractionsForItems), so logging something and
+// going back still shows the updated status.
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000
 const SEARCH_CACHE_MAX_ENTRIES = 50
 
@@ -244,9 +235,8 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
   // feels. Promise.all preserves input order, so results keep their relevance
   // ranking.
   const imported = await Promise.all(
-    // sourceOverride wins when set — a fallback hit (Google Books down,
-    // served from Open Library instead) carries an id that belongs to a
-    // different provider than the one registered for this type.
+    // sourceOverride wins when set: a fallback hit (Open Library standing in for
+    // Google Books) carries an id from a different provider than the registered one.
     results.map((result) => upsertMediaItem(db, type, result, result.sourceOverride ?? provider.sourceName)),
   )
 
@@ -261,19 +251,16 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
 }
 
 export async function upsertCatalogItem(db: Db, type: MediaType, result: CatalogSearchResult): Promise<MediaItem> {
-  // Both callers (the import action and the detail page's backfill) hand this a
-  // by-id result, so the row is stamped as enriched.
+  // Both callers hand this a by-id result, so the row is stamped as enriched.
   return upsertMediaItem(db, type, result, getCatalogProvider(type).sourceName, true)
 }
 
-// Credits only come back from a by-id lookup, so anything that entered the
-// catalog via search has none. The detail page fills that gap on first view —
-// but off the response path, because the page renders fine without it: the
-// credit line is the only thing that waits, and it appears on the next view.
+// Credits only come back from a by-id lookup, so anything that entered via
+// search has none. Filled in off the response path — the page renders fine
+// without the credit line, which appears on the next view.
 //
-// Deduped by item id. media_items rows are shared across users, so a popular
-// item can be opened by several people at once, and each of them firing the
-// same lookup and the same write is pure waste.
+// Deduped by item id: media_items rows are shared, so a popular item can be
+// opened by several people at once.
 const backfillsInFlight = new Set<number>()
 
 export function backfillCatalogDetail(db: Db, type: MediaType, item: MediaItem): void {
@@ -294,9 +281,8 @@ export function backfillCatalogDetail(db: Db, type: MediaType, item: MediaItem):
         await markMediaItemEnriched(db, item)
       }
     } catch {
-      // Nothing to report to: the response this was scheduled from is long
-      // sent. Swallowing keeps a catalog outage from taking the process down
-      // on an unhandled rejection.
+      // Nothing to report to — the response this was scheduled from is long
+      // sent — and an unhandled rejection would take the process down.
     } finally {
       backfillsInFlight.delete(item.id)
     }

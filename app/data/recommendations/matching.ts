@@ -15,11 +15,8 @@ export interface Candidate {
 }
 
 // Via the registry, so an unserved type throws rather than quietly returning
-// film results for a book request.
-//
-// Timed here rather than at each call site: these two are every outbound
-// catalog request the pipeline makes, and which phase was open when one ran is
-// what says whether it was a length check or an overview fetch.
+// film results for a book request. These two are every outbound catalog request
+// the pipeline makes, so timing them here covers all of it.
 export function searchForType(mediaType: MediaType, query: string): Promise<CatalogSearchResult[]> {
   return track('catalog.search', () => getCatalogProvider(mediaType).search(query))
 }
@@ -61,12 +58,11 @@ function levenshteinDistance(a: string, b: string): number {
 const TITLE_SIMILARITY_THRESHOLD = 0.5
 
 // Catalog titles often carry a subtitle the pick didn't ask for — "The
-// Dispossessed: An Ambiguous Utopia" scores 0.44 and was dropped despite being
-// an exact match. Books hit this constantly, since Open Library joins the two.
+// Dispossessed: An Ambiguous Utopia" scores 0.44 against an exact match. Books
+// hit this constantly.
 //
-// Strips at the separator rather than allowing a prefix match: "Foundation" is
-// a prefix of "Foundation and Empire", a different novel. A colon is a
-// structural marker; a space isn't.
+// Strips at the separator rather than allowing a prefix match: "Foundation" is a
+// prefix of "Foundation and Empire", a different novel.
 function withoutSubtitle(title: string): string {
   const [main] = title.split(/\s*[:–—]\s*/)
   return normalizeTitle(main ?? title)
@@ -143,17 +139,15 @@ export function applyVerdicts(candidates: Candidate[], verdicts: PickVerdict[]):
   return candidates.filter((_, index) => byIndex.get(index) === true)
 }
 
-// Two audiences. GenerationError is what carries the message to the waiting
-// page — see errors.ts — so it says what to do about it; the detail that would
-// only puzzle someone there goes to the log.
+// Two audiences: GenerationError carries a message to the waiting page (see
+// errors.ts), and the detail that would only puzzle them goes to the log.
 function mismatch(detail: string): GenerationError {
   console.warn(`[generation] verification mismatch: ${detail}`)
   return new GenerationError('Checking the picks came back incomplete — try generating again.')
 }
 
 // A same-title-same-year-different-film sails through titlesLikelyMatch, since
-// only the plot can tell them apart. Asks Claude, which knows what it meant, to
-// confirm against the catalog's overview — one batched call for the list.
+// only the plot can tell them apart. One batched call for the whole list.
 export async function verifyPicksAgainstOverviews(
   candidates: Candidate[],
   mediaType: MediaType = 'movie',
@@ -198,9 +192,7 @@ export async function verifyPicksAgainstOverviews(
   return applyVerdicts(candidates, verdicts)
 }
 
-// Same bound as the Letterboxd importer's. Shared by both by-id fan-outs
-// below, since both are the same provider being asked the same kind of
-// question — one ceiling, not two that drift apart.
+// Shared by both by-id fan-outs below — one ceiling, not two that drift apart.
 const LOOKUP_CONCURRENCY = 8
 
 // A worker pool rather than Promise.all: these run against a rate-limited
@@ -215,9 +207,8 @@ async function forEachWithConcurrency<T>(items: T[], operation: (item: T) => Pro
   await Promise.all(Array.from({ length: Math.min(LOOKUP_CONCURRENCY, items.length) }, worker))
 }
 
-// TMDB returns descriptions on search; Open Library only on the per-work
-// record. Since verifyPicksAgainstOverviews reads them, a missing one would
-// make it rubber-stamp every book.
+// TMDB returns descriptions on search; Open Library only on the per-work record.
+// Without one, verifyPicksAgainstOverviews rubber-stamps every book.
 export async function withOverviews(candidates: Candidate[], mediaType: MediaType): Promise<Candidate[]> {
   const missing = candidates.filter(({ match }) => !match.overview)
   if (missing.length === 0) return candidates
@@ -251,12 +242,10 @@ export async function filterByLength(
 ): Promise<Candidate[]> {
   const provider = getCatalogProvider(mediaType)
 
-  // The stored row often already carries the dimension, making the request
-  // pure cost.
+  // The stored row often already carries the dimension.
   const needLookup = new Set(candidates.filter(({ match }) => !hasLengthDimension(mediaType, match)))
-  // Null marks a candidate whose lookup failed — no dimension, no verdict, so
-  // it can't be kept. Held beside the entry rather than mutated into it so the
-  // filter below stays a pure read.
+  // Null marks a failed lookup: no dimension, no verdict, so it can't be kept.
+  // Held beside the entry so the filter below stays a pure read.
   const resolved = new Map<Candidate, CatalogSearchResult | null>()
 
   await forEachWithConcurrency([...needLookup], async (entry) => {
@@ -283,16 +272,15 @@ export async function filterByLength(
 const YEAR_TOLERANCE = 1
 
 // Resolves picks against the catalog we already hold, so a provider is only
-// asked about titles we've never seen — 21% of picks written so far were
-// already there, and that share grows as the catalog fills.
+// asked about titles we've never seen (~21% of picks are already there).
 //
 // The match is tight on purpose: normalised title equality *and* release year
-// within one. Same-titled works from different eras (Dune 1984 and 2021) are
-// exactly what a looser rule confuses, and one year never spans them.
+// within one, since a looser rule confuses same-titled works from different eras
+// (Dune 1984 and 2021).
 //
-// A row with no overview counts as a miss, since verifyPicksAgainstOverviews
-// judges on plot text and skipping the provider would skip the only check that
-// catches a wrong match. Books hit this constantly — 12% carry an overview.
+// A row with no overview counts as a miss — verifyPicksAgainstOverviews judges
+// on plot text, so skipping the provider would skip the only check that catches
+// a wrong match. Only ~12% of books carry one.
 //
 // Raw SQL because the normalisation has to happen in the database. Matches
 // normalizeTitle exactly.

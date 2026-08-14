@@ -29,9 +29,8 @@ export interface MediaDetailPageProps {
   merged?: boolean
 }
 
-// Shared by the movie and TV detail routes (and books, once wired up).
-// Everything type-specific comes from MEDIA_TYPE_UI — the two former
-// per-type copies differed only in six strings and their route namespace.
+// Shared by every media type's detail route. Everything type-specific comes
+// from MEDIA_TYPE_UI.
 export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
   return () => {
     const { mediaType, item, interaction, from, displayName, rematchError, rematched, merged } =
@@ -40,10 +39,9 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
     const { releaseYear, posterUrl, overview, creator, images, platforms, tags } = parseMediaMetadata(
       item.metadata,
     )
-    // A medium with stills shows them instead of a poster, because it has no
-    // poster to show: RAWG serves 16:9 key art, which in a 220px portrait
-    // slot renders as a 124px-tall letterbox. The first still is that same
-    // key art, so nothing is lost by dropping the slot.
+    // A medium with stills shows them instead of a poster, having none to show:
+    // 16:9 key art in a 220px portrait slot renders as a letterbox, and the
+    // first still is that same art, so nothing is lost by dropping the slot.
     const showStills = images.length > 0
     const showHref = ui.hrefs.show(item.id)
     const returnTo = from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref
