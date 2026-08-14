@@ -10,18 +10,11 @@ const claude = new Anthropic()
 // the one that doesn't.
 const TIGHT_BUDGET_RATIO = 0.9
 
-// One budget covers the reasoning and the JSON both. `thinking` is unset and
-// the model these calls run on thinks by default, so max_tokens caps the two
-// together and a call can spend the whole allowance thinking, leaving nothing
-// for the answer it was asked for. That makes the split the number to read:
-// think against the budget is what the reasoning took, and out minus think
-// roughly what the JSON needed — which is what says how much higher a budget
-// would have to go.
-//
-// Nothing already here reports it. Thinking blocks come back with their text
-// omitted, so the response body is no evidence of what the thinking cost, and
-// the durations in timings.ts measure how long a call took rather than how
-// close it came to its ceiling.
+// One budget covers the reasoning and the JSON both: `thinking` is unset and
+// these models think by default, so max_tokens caps the two together and a call
+// can spend its whole allowance thinking, leaving nothing for the answer. The
+// split is the number to read — `think` is what the reasoning took, and out
+// minus think roughly what the JSON needed.
 function recordUsage(name: string, maxTokens: number, response: Anthropic.Message): void {
   const { usage } = response
   const share = Math.round((usage.output_tokens / maxTokens) * 100)
@@ -42,20 +35,18 @@ function recordUsage(name: string, maxTokens: number, response: Anthropic.Messag
 }
 
 // Every call here uses structured output and expects a single text block of
-// JSON. They go through one function so that each one names its step and its
-// budget exactly once: the step because the usage line and the timing line are
-// only readable together if they agree on what to call the call, and the budget
-// because the API reports what a call spent and never what it was allowed, so
-// the ceiling has to come from the request to be measured against.
+// JSON. One function so each names its step once — the usage line and the
+// timing line are only readable together if they agree on what to call it — and
+// so the budget is read off the request, which is the only place it appears
+// (the API reports what a call spent, never what it was allowed).
 export async function requestStructured<T>(
   name: string,
   params: Anthropic.MessageCreateParamsNonStreaming,
 ): Promise<T> {
   const response = await track(name, () => claude.messages.create(params))
 
-  // Ahead of the checks below rather than after them, since the calls that fail
-  // here are the ones whose numbers explain why and both ways out of this
-  // function throw.
+  // Ahead of the checks below: both ways out of this function throw, and a call
+  // that fails them is the one whose numbers explain why.
   recordUsage(name, params.max_tokens, response)
 
   const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text')

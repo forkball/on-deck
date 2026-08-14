@@ -11,10 +11,9 @@ import { css } from 'remix/ui'
 // display. DoodleCSS sets `.doodle label { display: inline-block }` outside
 // any @layer, and unlayered declarations beat layered ones regardless of
 // specificity — so `display: flex` here is silently discarded and the label
-// stays inline-block, i.e. shrink-to-fit. A child's `width: 100%` then
-// resolves against that shrunken box, which is why the control came out
-// narrow. Doodle sets no *width* on labels, so setting it explicitly is the
-// one instruction that survives.
+// stays inline-block, i.e. shrink-to-fit, leaving a child's `width: 100%` to
+// resolve against that shrunken box. Doodle sets no *width* on labels, so
+// setting it explicitly is the one instruction that survives.
 //
 // Stacking then falls out without flex: the label text is inline, the
 // control is block, and a block element always starts on its own line.

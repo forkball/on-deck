@@ -66,18 +66,15 @@ export interface CatalogProvider {
   // Shown when the id parsed fine but the catalog had no such entry.
   lookupFailedError: string
   // In whatever unit the medium is measured in — minutes, pages, hours,
-  // seasons. Lives on the provider because one global check can only be right
-  // for a single medium: reading runtimeMinutes unconditionally silently
-  // dropped every book.
+  // seasons. Lives on the provider because one global check can only ever be
+  // right for a single medium.
   matchesLength(result: CatalogSearchResult, length: LengthBucket): boolean
   // Every bucket this provider offers — the buckets it omits are ones it has no
   // meaning for, so a provider's own list is what `length` may validly be.
   //
-  // `label` is for the form, `phrase` for the pick prompt, and they live on the
-  // same entry so a bucket can't reach one and not the other. They used to be
-  // separate, and the prompt's copy was movie-shaped for every medium: asking
-  // for long books requested books "with a runtime of 150 minutes or less" —
-  // wrong unit, and backwards, since long books are the ones over 500 pages.
+  // `label` is for the form, `phrase` for the pick prompt. They live on the same
+  // entry so a bucket can't reach one and not the other, which is what keeps the
+  // prompt from asking for a book "with a runtime of 150 minutes or less".
   lengthOptions: { value: LengthBucket; label: string; phrase: string }[]
 }
 
@@ -242,14 +239,10 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
   const provider = getCatalogProvider(type)
   const results = await provider.search(query)
 
-  // Concurrently, not in series. The catalog call itself is fast (~90ms for
-  // TMDB); what made search feel slow was upserting ~20 results one after
-  // another against a remote database, so the page waited on the sum of
-  // every round-trip instead of the slowest one. Results keep their original
-  // relevance order because Promise.all preserves input order.
-  // Genre tags used to be returned alongside each item, because they lived in
-  // a separate table the caller had no other way to reach. They ride in the
-  // item's own metadata now, so the row is the whole result.
+  // Concurrently, not in series: the catalog call is fast (~90ms for TMDB), so
+  // it's the ~20 upserts against a remote database that decide how slow this
+  // feels. Promise.all preserves input order, so results keep their relevance
+  // ranking.
   const imported = await Promise.all(
     // sourceOverride wins when set — a fallback hit (Google Books down,
     // served from Open Library instead) carries an id that belongs to a

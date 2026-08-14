@@ -84,27 +84,14 @@ export function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolea
   return similarity >= TITLE_SIMILARITY_THRESHOLD
 }
 
-// Each verdict carries the entry it's about. The bare boolean array this
-// replaced was paired with its candidate by position, which is an assumption
-// dressed up as data: one verdict too few and every answer after it slid onto
-// the wrong film — keeping one the model had rejected and dropping one it had
-// approved, at the single step whose job is telling near-identical entries
-// apart, with nothing anywhere reporting it.
+// Each verdict carries the index of the entry it's about, so answers pair up by
+// id rather than by position — a verdict list one short would otherwise slide
+// every answer after it onto the wrong film.
 //
-// One shape for every call, rather than built per call around the number of
-// entries. It was built per call to pin the array's length — nothing in JSON
-// Schema can say "as many as I sent you", but a count known at call time can —
-// and that turns out not to be expressible here either: a structured-output
-// schema only accepts 0 or 1 for minItems, and a larger one fails the request
-// outright rather than being ignored (`400 ... 'minItems' values other than 0
-// or 1 are not supported`).
-//
-// Nothing is lost with it gone. The prompt asks for exactly one verdict per
-// entry and applyVerdicts holds the model to that, checking the count, the
-// range and the duplicates rather than trusting any of the three — which it
-// has to do regardless, since a schema the model satisfies by shape can still
-// answer about the wrong entries. That check was always the real guarantee;
-// the schema was restating one part of it.
+// The schema can't pin the array's length: structured output only accepts 0 or
+// 1 for minItems, and a larger one fails the request outright (`400 ...
+// 'minItems' values other than 0 or 1 are not supported`). applyVerdicts is
+// what holds the model to one verdict per entry.
 const VERIFY_SCHEMA = {
   type: 'object' as const,
   additionalProperties: false,
@@ -130,14 +117,12 @@ export interface PickVerdict {
   matches: boolean
 }
 
-// Split out from the call because this is the half that can be wrong while
-// everything still looks fine — and the half that needs no model to test.
+// Split out from the call so it can be tested without a model.
 //
-// Refuses anything it can't read unambiguously rather than filtering on a
-// best guess. A verdict set that doesn't line up means we don't know which
-// film each answer was about, and quietly keeping whatever happened to be
-// true would be the same silent mismatch in a new costume. The job retries,
-// and the picks it already paid for are in the checkpoint.
+// Refuses anything it can't read unambiguously rather than filtering on a best
+// guess: a verdict set that doesn't line up means we don't know which film each
+// answer was about. The job retries, and the picks it already paid for are in
+// the checkpoint.
 export function applyVerdicts(candidates: Candidate[], verdicts: PickVerdict[]): Candidate[] {
   if (!Array.isArray(verdicts)) throw mismatch(`verdicts came back as ${typeof verdicts}`)
 
@@ -175,8 +160,8 @@ export async function verifyPicksAgainstOverviews(
 ): Promise<Candidate[]> {
   if (candidates.length === 0) return []
 
-  // From the registry: a hardcoded "TMDB" told Claude the wrong source for
-  // games, inside the one prompt whose job is telling similar things apart.
+  // From the registry — this prompt's whole job is telling similar entries
+  // apart, so it has to name the catalog the entry actually came from.
   const { plural: noun, entryNoun, catalogName } = mediaTypeUiFor(mediaType)
 
   const items = candidates.map(({ pick, match }, index) => ({
@@ -187,12 +172,9 @@ export async function verifyPicksAgainstOverviews(
 
   const { verdicts } = await requestStructured<{ verdicts: PickVerdict[] }>('verify.model', {
     model: 'claude-sonnet-5',
-    // Shared with the reasoning, as everywhere else. The verdicts themselves
-    // are the smallest output in the pipeline — an index and a boolean each —
-    // but the judgement behind them is one plot read against one title per
-    // entry, and this call has had no successful run to measure since the
-    // schema stopped it reaching the model at all. Room enough that the first
-    // one reports what it wanted rather than what it was allowed.
+    // Shared with the reasoning, as everywhere else. The verdicts themselves are
+    // tiny — an index and a boolean each — but the judgement behind them is one
+    // plot read against one title per entry.
     max_tokens: 6000,
     output_config: {
       effort: 'low',
@@ -261,9 +243,7 @@ export function hasLengthDimension(mediaType: MediaType, result: CatalogSearchRe
 //
 // No provider returns length on search, only on by-id, so this is a second
 // round of requests — but only for the candidates that need it, and only when
-// the lever is set at all. It used to run inside the filter loop, which made
-// it one request at a time: up to 25 round trips end to end, in the stage the
-// waiting page labels "Checking lengths…".
+// the lever is set at all. The fan-out is bounded, not serial.
 export async function filterByLength(
   candidates: Candidate[],
   mediaType: MediaType,
@@ -292,8 +272,8 @@ export async function filterByLength(
 
     const detail = resolved.get(entry) ?? null
     if (!detail || !provider.matchesLength(detail, length)) continue
-    // Already paid for, and it carries what search omits. Keeping the search
-    // result instead wrote rows with a null runtime it had just fetched.
+    // The detail result, not the search one: it carries the dimension that was
+    // just paid for, which search omits.
     kept.push({ pick: entry.pick, match: detail })
   }
 

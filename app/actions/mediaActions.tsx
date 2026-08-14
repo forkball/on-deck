@@ -134,10 +134,9 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       const item = await getMediaItemDetail(db, mediaItemId)
       if (!item) return new Response('Not Found', { status: 404 })
 
-      // Scheduled, not awaited: the credit line is the only thing this fills in
-      // and the page renders without it, so making every first view wait on a
-      // remote round trip bought one line of text at the cost of the whole
-      // response. It lands on the next view instead — and once per item for
+      // Scheduled, not awaited: the credit line is all this fills in and the
+      // page renders without it, so it lands on the next view rather than making
+      // every first view wait on a remote round trip. Once per item for
       // everyone, since media_items rows are shared.
       const meta = parseMediaMetadata(item.metadata)
       if (meta.enrichedAt === null && item.external_source === provider.sourceName) {

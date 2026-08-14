@@ -95,20 +95,17 @@ const PICKS_SCHEMA = {
 // they were never going to be shown anyway.
 const REQUESTED_COUNT = 12
 
-// How much of the log the prompt is willing to carry. Someone a few years into
-// logging has thousands of titles, and every run was pasting all of them in
-// front of the question it actually wanted answered.
+// How much of the log the prompt is willing to carry — someone a few years into
+// logging has thousands of titles.
 //
-// Safe to cut because this list isn't what enforces anything: exclusion is
-// applied to the results by catalog id (excludedExternalIds in generate.ts),
-// which stays whole. The worst a trimmed list can do is let the model spend a
-// suggestion on something that then gets dropped — and the run already
-// over-requests to absorb exactly that.
+// Safe to trim because this list enforces nothing: exclusion is applied to the
+// results by catalog id (excludedExternalIds in generate.ts), which stays whole.
+// The worst a short list does is let the model spend a suggestion on something
+// that then gets dropped, which the over-request already absorbs.
 //
-// Most recent first, which is the order the log arrives in (updated_at desc,
-// see loadUserLogEntries). Recent viewing is what the taste profile is built
-// from, so it's what a taste-matched pick is likeliest to echo back — the
-// titles where the reminder actually earns its space.
+// Most recent first, the order the log arrives in (updated_at desc, see
+// loadUserLogEntries) — recent viewing is what the taste profile is built from,
+// so it's what a pick is likeliest to echo back.
 const SEEN_TITLES_IN_PROMPT = 200
 
 // Rejections are steering, not just suppression — the prompt below asks the
@@ -148,9 +145,8 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string, m
       clauses.push(`Only suggest ${noun} originally released in the ${filters.decade}s.`)
     }
   }
-  // Described by the medium's own bucket, not a runtime for everything: asking
-  // for long books used to request a runtime under 150 minutes, so the model
-  // returned short books and the hard filter then dropped nearly all of them.
+  // Described by the medium's own bucket, never a runtime for everything — see
+  // lengthOptions in provider.ts, where each bucket carries its own phrasing.
   if (filters.length) {
     const phrase = describeLength(getCatalogProvider(mediaType), filters.length)
     if (phrase) clauses.push(`Only suggest ${noun} with ${phrase}.`)
@@ -216,35 +212,26 @@ export async function requestPicks(
       `this taste profile.${filterInstructions} For each, give your best-guess release year (used only to ` +
       `disambiguate remakes/same-titled entries) and a one-sentence reason tied to their profile.`
 
-  // One budget covers the reasoning and the JSON both, and the reasoning is
-  // what fills it: a group run with filters spent 9,999 of its 10,000 tokens
-  // thinking and came back with no picks at all, two minutes in.
+  // One budget covers the reasoning and the JSON both, and the reasoning is what
+  // fills it — a run that exhausts the budget thinking comes back with no picks
+  // at all.
   //
-  // It scales per person because the work does. This prompt asks for every
-  // candidate to be weighed against every profile, so the thinking behind one
-  // list grows with the size of the group — where a flat group budget gave two
-  // people and eight the same room for four times the work, and the larger
-  // group was the one that ran out. The JSON barely moves by comparison: three
-  // fields a pick, a fixed count of them, and only the reasons lengthen as
-  // they name more people.
-  //
-  // Still loose rather than tuned. 9,999 was a floor on what the thinking
-  // wanted rather than where it would have settled, since the cap cut the
-  // measurement short, so these numbers are buying a clean reading of what it
-  // costs per person before being set properly.
+  // It scales per person because the work does: this prompt asks for every
+  // candidate to be weighed against every profile, so the thinking grows with
+  // the size of the group. The JSON barely moves by comparison — three fields a
+  // pick, a fixed count of them, and only the reasons lengthen.
   //
   // Capped where a non-streaming request stops being comfortable. Past this a
   // call wants .stream() and get_final_message() rather than a bigger ceiling,
-  // and the daily-run weighting means groups this size are rare by design.
+  // and the daily-run weighting makes groups this size rare by design.
   const maxTokens = Math.min(6000 + 3000 * profiles.length + (hasFilters ? 4000 : 0), 32000)
 
   const { picks } = await requestStructured<{ picks: Pick[] }>('picks.model', {
     model: 'claude-sonnet-5',
     max_tokens: maxTokens,
     output_config: {
-      // Medium for groups too, where this used to be high: the group prompt
-      // asks for per-person reasoning about tradeoffs across every candidate,
-      // which is the part that ran away.
+      // Medium for groups too. The group prompt already asks for per-person
+      // reasoning across every candidate, which is the part that runs away.
       effort: 'medium',
       format: { type: 'json_schema', schema: PICKS_SCHEMA },
     },

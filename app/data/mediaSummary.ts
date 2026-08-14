@@ -18,8 +18,8 @@ export type MediaSummaries = Record<ActiveMediaType, MediaTypeSummary>
 // hand-roll a fetch per type. Adding a type to ACTIVE_MEDIA_TYPES populates
 // both for free.
 export async function loadMediaSummaries(db: Db, userId: number, recentCount: number): Promise<MediaSummaries> {
-  // Fetched once and partitioned in memory: per-type list+count calls meant six
-  // passes over identical rows, which is what made this slow as logs grew.
+  // Fetched once and partitioned in memory: per-type list+count calls would be
+  // one pass over identical rows per media type.
   const [logEntries, profiles] = await Promise.all([
     loadUserLogEntries(db, userId),
     Promise.all(ACTIVE_MEDIA_TYPES.map((type) => getTasteProfile(db, userId, type))),

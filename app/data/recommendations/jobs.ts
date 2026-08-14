@@ -202,12 +202,10 @@ export async function getJob(db: Db, jobId: string, userId: number): Promise<Gen
   return { ...job, queuedAhead: Number(rows[0]?.ahead ?? 0) }
 }
 
-// How long a claim survives without a beat. It used to be read as "comfortably
-// longer than the slowest stage", which held only while every stage was
-// shorter than this — and the picks call stopped being, once its budget began
-// scaling with the size of the group. A worker now beats while it works
-// (touchJobClaim, HEARTBEAT_MS), so this is a measure of silence rather than of
-// slowness: nothing for three minutes means the machine is gone.
+// How long a claim survives without a beat. A measure of silence, not of
+// slowness: a worker beats while it works (touchJobClaim, HEARTBEAT_MS), so
+// nothing for three minutes means the machine is gone — however long the stage
+// it was in would legitimately have taken.
 export const CLAIM_STALE_MS = 3 * 60 * 1000
 
 // Retried twice, then left failed, so a genuinely broken run can't cycle.
@@ -215,11 +213,10 @@ const MAX_ATTEMPTS = 3
 
 // A running job whose heartbeat stopped means its machine died.
 //
-// A null claim is deliberately not stale. Treating it as stale (via
-// coalesce(claimed_at, 0)) meant that during a rolling deploy, a job written
-// the old way by a machine on the previous release was immediately taken by a
-// new-release machine and run with nothing to run. Unrecognised rows are left
-// to the TTL sweep.
+// A null claim is deliberately not stale — `claimed_at is not null`, never
+// coalesce(claimed_at, 0). During a rolling deploy that would let a new-release
+// machine seize a row written by the previous release and run it with nothing
+// to run. Unrecognised rows are left to the TTL sweep.
 export async function requeueStaleJobs(db: Db): Promise<number> {
   const { rowCount } = await pool.query(
     `update recommendation_jobs

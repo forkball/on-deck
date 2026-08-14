@@ -52,19 +52,17 @@ const PLACEHOLDER_SOURCES: string[] = []
 
 const FRIENDS_PAGE_SIZE = 8
 
-// Submitting redirects almost immediately to a page reporting the real stage,
-// so this only covers that hop: the button disables itself so a second submit
-// can't start a second run. Nothing here guesses at progress.
-//
-// Comments here ship to the browser with the bundle, so this names neither the
-// model vendor nor the catalog.
+// Submitting redirects almost immediately to a page reporting the real stage, so
+// this only covers that hop: the button disables itself so a second submit can't
+// start a second run. Nothing here guesses at progress.
 //
 // The friend picker filters and pages client-side, but every checkbox stays
 // mounted and only its visibility toggles — so a selection made before paging
 // away isn't silently dropped from the submitted form.
 //
 // URLs arrive as plain string props: the browser bundle is limited to
-// app/browser/**, and routes.ts lives outside it.
+// app/browser/**, and routes.ts lives outside it. Comments in this file ship
+// with the bundle, so keep vendor and catalog names out of them.
 export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFormProps>(
   import.meta.url,
   function GenerateRecommendationsForm(handle) {

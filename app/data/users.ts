@@ -10,9 +10,8 @@ export function displayLabel(user: Pick<User, 'display_name' | 'email'>): string
   return user.display_name || user.email
 }
 
-// Username only. Matching on email as well meant anyone could confirm which
-// address belonged to an account by typing it, and confirming that a given
-// address is registered is worth more to a stranger than the search is.
+// Username only, never email: matching on address lets a stranger confirm that
+// a given one is registered, which is worth more to them than the search is.
 export async function searchUsers(db: Db, query: string, excludeUserId: number): Promise<User[]> {
   const pattern = `%${query}%`
   return db.findMany(users, {

@@ -5,19 +5,18 @@ import { profileRebuildUsage, recommendationRunUsage, type User } from '../schem
 
 // Generating is the one thing a person can do here that spends money on their
 // behalf: every run is several model calls plus a fan-out of catalog requests.
-// The queue already bounds how much of that runs at once — one job per user,
-// two slots per machine (see jobs.ts, worker.ts) — but nothing bounded how much
-// of it a single account could buy over a day. This does.
+// The queue bounds how much of that runs at once — one job per user, two slots
+// per machine (see jobs.ts, worker.ts); this bounds how much one account can buy
+// over a day.
 export const RUNS_PER_DAY = 5
 
-// A group run costs more to produce than a solo one and the difference grows
-// with the group: the picks call is asked to weigh every candidate against
-// every profile, so the reasoning behind one set of picks scales with how many
-// people are in it. One slot per run charged everyone the solo price for that.
+// A group run costs more to produce than a solo one, and the difference grows
+// with the group: the picks call weighs every candidate against every profile,
+// so the reasoning scales with how many people are in it.
 //
-// Half the headcount, rounded up, so a pair still costs what one person does
-// and each additional couple adds a slot: 4 people spend 2 of the day's runs,
-// 6 spend 3, 10 spend 5.
+// Half the headcount, rounded up, so a pair still costs what one person does and
+// each additional couple adds a slot: 4 people spend 2 of the day's runs, 6
+// spend 3, 10 spend 5.
 export function runCostFor(memberCount: number): number {
   return Math.max(1, Math.ceil(memberCount / 2))
 }

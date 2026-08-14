@@ -16,8 +16,7 @@ export function parseMediaType(value: unknown): ActiveMediaType | null {
   return ACTIVE_MEDIA_TYPES.includes(value as ActiveMediaType) ? (value as ActiveMediaType) : null
 }
 
-// Types in the vocabulary that aren't ready to be shown. Empty today, and free
-// while unused.
+// Types in the vocabulary that aren't ready to be shown. Empty today.
 //
 // A gated type stays in ACTIVE_MEDIA_TYPES: that tuple is what forces every
 // consumer to have an answer, so hiding a type by removing it would silently
@@ -221,8 +220,7 @@ export function mediaTypeUi(type: ActiveMediaType): MediaTypeUi {
 }
 
 // For code holding a MediaType off a database row. Row types widen the column
-// to `string`, so those callers can't index MEDIA_TYPE_UI directly — which is
-// why the prompts each used to keep a private copy of the noun table.
+// to `string`, so those callers can't index MEDIA_TYPE_UI directly.
 export function mediaTypeUiFor(type: MediaType): MediaTypeUi {
   return MEDIA_TYPE_UI[parseMediaType(type) ?? DEFAULT_MEDIA_TYPE]
 }

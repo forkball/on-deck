@@ -66,8 +66,7 @@ export const userMediaInteractions = table({
     status: c.enum(INTERACTION_STATUSES).notNull(),
     // Explicitly nullable, because null is a value this column means something
     // by: unrated, as opposed to rated. Without it the row type says `number`
-    // and a write clearing the rating doesn't typecheck, which is what let
-    // "can't be cleared" survive as long as it did.
+    // and a write clearing the rating doesn't typecheck.
     rating: c.decimal(3, 1).nullable(),
     // The third answer to the rating question, alongside a score and silence:
     // didn't like it, declining to put a number on it. Part of the same

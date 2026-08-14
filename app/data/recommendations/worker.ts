@@ -57,16 +57,11 @@ export function startGenerationWorker(): GenerationWorker {
     const timings = startTimings({ queuedMs: job.queuedMs, attempt: job.attempt })
     let runId: number | null = null
 
-    // Stages were the only thing refreshing the claim, which held while every
-    // stage was shorter than the staleness window. The picks call isn't: it
-    // sits alone inside its stage, it runs for as long as the model spends on
-    // it, and its budget now scales with the size of the group. A big group
-    // could outlast the window mid-call, get declared dead, and be handed to a
-    // second worker while the first was still paying for it.
-    //
-    // Beating on a timer instead keeps the window meaning what it says — no
-    // beat for CLAIM_STALE_MS means the machine is gone — rather than making
-    // it a bet on the slowest single call.
+    // On a timer rather than per stage. A single stage can outlast the
+    // staleness window — the picks call runs for as long as the model spends on
+    // it, and its budget scales with the size of the group — so stages alone
+    // would let a live job be declared dead and handed to a second worker.
+    // Beating keeps CLAIM_STALE_MS meaning what it says: no beat, no machine.
     const heartbeat = setInterval(() => {
       void touchJobClaim(db, job.id).catch(() => {})
     }, HEARTBEAT_MS)
@@ -74,9 +69,7 @@ export function startGenerationWorker(): GenerationWorker {
     try {
       const { memberIds, mediaType, filters, sourceTypes, name } = job.params
 
-      // Guessing at defaults would silently generate something nobody asked
-      // for; without this it surfaced as "Cannot read properties of undefined"
-      // from deep inside generation.
+      // Guessing at defaults would silently generate something nobody asked for.
       if (!Array.isArray(memberIds) || memberIds.length === 0 || !mediaType) {
         await failJob(db, job.id, "This run's settings couldn't be read. Try generating it again.")
         return
@@ -103,17 +96,13 @@ export function startGenerationWorker(): GenerationWorker {
       // An actual error, so retrying would reproduce it. Interrupted jobs never
       // reach here — their machine died — and the staleness sweep recovers them.
       //
-      // Logged before anything else, and logged whatever it is: this is now the
-      // only place the detail of a failed run is kept, since most of it no
-      // longer travels to the page.
+      // Logged whatever it is: this is the only place the detail of a failed run
+      // is kept, since it doesn't travel to the page.
       console.error(`[generation] job=${job.id} failed:`, error)
 
-      // Only a message written for the person reaches them. Everything else in
-      // this pipeline throws for a reader who has the code open — a provider's
-      // response body, a missing environment variable, a stop reason — and
-      // forwarding those verbatim is how a stop reason ended up on a waiting
-      // page. Silence is the safe default here, and a new throw anywhere
-      // downstream gets it without having to know this exists.
+      // Only a message written for the person reaches them; everything else gets
+      // the generic line. See errors.ts — silence is the safe default, so a new
+      // throw downstream inherits it without knowing this exists.
       await failJob(
         db,
         job.id,

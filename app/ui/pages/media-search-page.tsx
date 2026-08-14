@@ -50,9 +50,8 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
           <MediaTabLinks
             current={mediaType}
             // Switching type starts a fresh search rather than carrying the
-            // query across. A title rarely means the same thing in two
-            // catalogs, so the old behaviour usually just showed a page of
-            // irrelevant results under the new tab.
+            // query across: a title rarely means the same thing in two
+            // catalogs, so carrying it just fills the new tab with noise.
             hrefFor={(type) => MEDIA_TYPE_UI[type].hrefs.search()}
           />
           <h1 mix={css({ margin: '0 0 16px' })}>{ui.searchHeading}</h1>

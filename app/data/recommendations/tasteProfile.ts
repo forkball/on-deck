@@ -132,14 +132,11 @@ export function buildProfilePrompt(
   const fields = settings.useNotes
     ? `status, rating out of 5, whether they disliked it, and any notes they left`
     : `status, rating out of 5, and whether they disliked it`
-  // Order is information the log has always carried and the prompt never
-  // mentioned, which left the model reading a sequence as a pile. It matters
-  // more now that a limit can make this the recent part of a longer history.
-  //
-  // That there is more further back is said plainly, because the alternative
-  // is worse: shown ten entries and told nothing, the model reads ten as the
-  // whole of someone's taste. Saying a thing exists is not the same as
-  // sending it — no excluded title, rating or note appears here.
+  // Order is information the log carries, so the prompt says what it is —
+  // otherwise the model reads a sequence as a pile. Under a limit it also says
+  // plainly that there is more further back: shown ten entries and told nothing,
+  // the model takes ten for the whole of someone's taste. Saying a thing exists
+  // is not the same as sending it — no excluded title, rating or note is here.
   const ordering =
     settings.logLimit == null
       ? `They're listed most recently updated first.`
@@ -188,14 +185,11 @@ export async function regenerateTasteProfile(
 
   const parsed = await requestStructured<UpsertTasteProfileInput>('profile.model', {
     model: 'claude-sonnet-5',
-    // Shared with the reasoning, which is the half that fills a budget here —
-    // see picks.ts, where 2,000-era arithmetic met adaptive thinking and lost.
-    // A profile's own output is small and fixed (a summary and two tag lists),
-    // but the thinking behind it grows with the log it reads, and someone who
-    // has chosen to send all of theirs sends all of it. Loose rather than
-    // tuned: this is a ceiling, so it costs nothing on a call that doesn't
-    // reach it, and the point of the room is a think= reading that isn't
-    // clipped by the ceiling that produced it.
+    // Shared with the reasoning, which is the half that fills a budget here. A
+    // profile's own output is small and fixed (a summary and two tag lists), but
+    // the thinking behind it grows with the log it reads, and someone sending
+    // all of theirs sends all of it. A loose ceiling costs nothing on a call
+    // that doesn't reach it, and keeps the think= reading unclipped.
     max_tokens: 8000,
     output_config: {
       effort: 'medium',
@@ -235,14 +229,12 @@ type LogEntry = Awaited<ReturnType<typeof listUserMediaLog>>[number]
 // the model reads while every interaction row stays as it was. Sorted, so row
 // order can't register as a change.
 //
-// The settings belong in here for the same reason the rows do: they decide
-// what the prompt contains. Left out, narrowing the log or turning notes off
-// would leave the stored profile looking current, and the setting would appear
-// to do nothing — which reads as a broken feature rather than a stale cache.
+// The settings are in here for the same reason the rows are: they decide what
+// the prompt contains, so changing one has to invalidate the stored profile.
 //
-// Signed over the sliced rows, not the whole log, which falls out of the same
-// rule: an entry beyond someone's limit never reaches the prompt, so changing
-// it can't change the answer and shouldn't buy a model call.
+// Signed over the sliced rows, not the whole log, by the same rule: an entry
+// beyond someone's limit never reaches the prompt, so changing it can't change
+// the answer and shouldn't buy a model call.
 export function logSignature(log: LogEntry[], settings: TasteProfileSettings): string {
   const scoped = settings.logLimit == null ? log : log.slice(0, settings.logLimit)
 

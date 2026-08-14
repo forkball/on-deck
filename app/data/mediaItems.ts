@@ -182,12 +182,10 @@ export interface UserLogEntry {
 
 export interface LogInteractionInput {
   status: InteractionStatus
-  // Three states, not two. `undefined` leaves whatever is already stored
-  // alone; `null` is the user saying "no rating" and clears it. Importers pass
-  // `undefined` for a row they know nothing about, so re-running an import
-  // can't wipe a rating its source never carried — see the callers in
-  // data/imports/. The forms always pass one of the other two, which is what
-  // makes the picker's "No rating" option stick.
+  // Three states, not two. `undefined` leaves whatever is already stored alone;
+  // `null` is the user saying "no rating" and clears it. Importers pass
+  // `undefined` for a row they know nothing about, so re-running an import can't
+  // wipe a rating its source never carried — see the callers in data/imports/.
   rating?: number | null
   // The dislike, on the same three-state rule as `rating` above. Not
   // independent of it: the two are one question with three answers, and
@@ -264,9 +262,9 @@ export async function logInteraction(
     notes: input.notes ?? undefined,
     updated_at: activityAt,
   }
-  // Written only when the caller has an opinion: `??` would fold "no rating"
-  // back into "don't touch it", which is what made a rating impossible to
-  // clear once given. Same for the verdict.
+  // Written only when the caller has an opinion. `??` won't do: it folds "no
+  // rating" back into "don't touch it", leaving a rating impossible to clear.
+  // Same for the verdict.
   if (input.rating !== undefined) {
     update.rating = input.rating
   }
@@ -335,8 +333,8 @@ export async function getUserInteractionForItem(db: Db, userId: number, mediaIte
   return db.findOne(userMediaInteractions, { where: { user_id: userId, media_item_id: mediaItemId } })
 }
 
-// Two queries regardless of log size. Fetching items per-row is an N+1 that
-// took a 400-item log to ~10s on the profile page, which runs this six times.
+// Two queries regardless of log size — fetching items per-row is an N+1, and
+// the profile page runs this once per media type.
 //
 // The type filter stays in JS because userMediaInteractions has no `type`
 // column — it lives on the joined media_items row.
@@ -405,9 +403,9 @@ export async function countUserMediaLog(db: Db, userId: number, filter: UserLogF
 // this is what the recommendations form reads to know whether a run it's about
 // to offer could go anywhere.
 //
-// One query rather than a count per person per type: the form lists everyone
-// you follow, and loadUserLogEntries pulls a whole log per call, so the
-// obvious loop is a full log load per follower per media type.
+// One query rather than a count per person per type: the form lists everyone you
+// follow, and loadUserLogEntries pulls a whole log per call, so the obvious loop
+// is a full log load per follower per media type.
 //
 // The statuses go in as a parameter rather than as `<> 'not_interested'`, so
 // another kind of refusal added to CONSUMPTION_STATUSES reaches here too.
