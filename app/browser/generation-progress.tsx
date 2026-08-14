@@ -1,5 +1,5 @@
 import type { Handle } from 'remix/ui'
-import { clientEntry, css, on } from 'remix/ui'
+import { clientEntry, css, ref } from 'remix/ui'
 
 // Polls for the stage a run is actually in. Not on a timer: every label here
 // comes from the server having entered that stage, so progress can't run
@@ -69,25 +69,35 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
     let failed: string | null = null
     let lostContact = false
 
-    async function poll() {
+    // handle.update() hands back a promise the runtime settles on the next
+    // render, and rejects it when there's no renderer to schedule against.
+    // Called bare from the loop below, that rejection had nothing to catch it,
+    // and an unhandled rejection ends the process rather than the request.
+    // Swallowed instead: a dropped update costs a frame, and the state it was
+    // announcing is read out of this closure by whichever render comes next.
+    function render(): void {
+      void handle.update().catch(() => {})
+    }
+
+    async function poll(signal: AbortSignal) {
       let consecutiveFailures = 0
 
-      while (!handle.signal.aborted) {
+      while (!signal.aborted) {
         // Backs off as failures mount.
         const wait = POLL_MS * Math.min(1 + consecutiveFailures, 5)
         await new Promise((resolve) => setTimeout(resolve, wait))
-        if (handle.signal.aborted) return
+        if (signal.aborted) return
 
         try {
           const response = await fetch(handle.props.statusHref, {
             headers: { Accept: 'application/json' },
-            signal: handle.signal,
+            signal,
           })
 
           // A swept job is gone for good.
           if (response.status === 404) {
             failed = "This run is no longer available. It may have finished a while ago."
-            handle.update()
+            render()
             return
           }
           if (!response.ok) {
@@ -108,7 +118,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
 
           if (status.error) {
             failed = status.error
-            handle.update()
+            render()
             return
           }
 
@@ -122,7 +132,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             queueState = status.status
             phase = status.phase
             ahead = status.queuedAhead
-            handle.update()
+            render()
           }
         } catch {
           consecutiveFailures++
@@ -133,51 +143,68 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
 
     function giveUp() {
       lostContact = true
-      handle.update()
+      render()
     }
-
-    void poll()
 
     return () => {
       const { phases, labels } = handle.props
-      const current = phases.indexOf(phase)
 
-      if (failed) return <p mix={css({ color: '#b91c1c' })}>{failed}</p>
+      function panel() {
+        if (failed) return <p mix={css({ color: '#b91c1c' })}>{failed}</p>
 
-      if (lostContact) {
+        if (lostContact) {
+          return (
+            <p mix={css({ color: '#b91c1c' })}>
+              Lost contact with the server. Your picks are probably still being put together —{' '}
+              <a href="">reload</a> to check.
+            </p>
+          )
+        }
+
+        // Its own state, not a dimmed first step — the run hasn't started.
+        if (queueState === 'queued') {
+          return (
+            <p mix={css({ color: '#555' })}>
+              Waiting to start
+              {ahead != null && ahead > 0 ? ` — ${ahead} ${ahead === 1 ? 'run' : 'runs'} ahead of yours` : ''}
+              …
+            </p>
+          )
+        }
+
+        const current = phases.indexOf(phase)
+
         return (
-          <p mix={css({ color: '#b91c1c' })}>
-            Lost contact with the server. Your picks are probably still being put together —{' '}
-            <a href="">reload</a> to check.
-          </p>
+          <ul mix={listStyle}>
+            {phases.map((step, index) => {
+              const done = index < current
+              const active = index === current
+
+              return (
+                <li key={step} mix={done ? doneStepStyle : active ? activeStepStyle : stepStyle}>
+                  <span aria-hidden="true">{done ? '✓' : active ? '◐' : '○'}</span>
+                  <span>{labels[step]}</span>
+                </li>
+              )
+            })}
+          </ul>
         )
       }
 
-      // Its own state, not a dimmed first step — the run hasn't started.
-      if (queueState === 'queued') {
-        return (
-          <p mix={css({ color: '#555' })}>
-            Waiting to start
-            {ahead != null && ahead > 0 ? ` — ${ahead} ${ahead === 1 ? 'run' : 'runs'} ahead of yours` : ''}
-            …
-          </p>
-        )
-      }
-
+      // Polling starts here rather than in the setup above, which is the whole
+      // point of this wrapper. The setup runs on the server too, to build the
+      // first paint; a loop started there fetches a relative URL that can't
+      // resolve, gives up after eight tries, and takes the server process down
+      // with it. A ref only ever fires in a browser, against a real node.
+      //
+      // It has to be a wrapper and not the panel itself: ref fires on insert
+      // and aborts on remove, and the panel swaps between a paragraph and a
+      // list as the run moves. Hung on that, every swap would abort the loop
+      // mid-run and start another. This element is the one thing on the page
+      // that survives all of it — display: contents so that being here changes
+      // nothing about how the panel lays out.
       return (
-        <ul mix={listStyle}>
-          {phases.map((step, index) => {
-            const done = index < current
-            const active = index === current
-
-            return (
-              <li key={step} mix={done ? doneStepStyle : active ? activeStepStyle : stepStyle}>
-                <span aria-hidden="true">{done ? '✓' : active ? '◐' : '○'}</span>
-                <span>{labels[step]}</span>
-              </li>
-            )
-          })}
-        </ul>
+        <div mix={[css({ display: 'contents' }), ref((_node, signal) => void poll(signal))]}>{panel()}</div>
       )
     }
   },
