@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { SteamImportResult } from '../../../data/imports/steam.ts'
+import { Toast } from '../../../ui/components/toast.tsx'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
@@ -77,10 +78,10 @@ export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
     return (
       <Document title="Import from Steam | On Deck">
         <Nav authed={true} displayName={displayName} />
+        {connected && <Toast message="Steam account connected." />}
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
           <h1>Import from Steam</h1>
 
-          {connected && <p mix={css({ color: '#15803d' })}>Steam account connected.</p>}
           {error && <p mix={css({ color: '#b91c1c' })}>{error}</p>}
 
           {result ? (

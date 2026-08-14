@@ -8,6 +8,7 @@ import { MEDIA_TYPE_UI, statusLabelsFor, type ActiveMediaType } from '../../medi
 import { FrameForm } from '../../browser/frame-form.tsx'
 import { LazyList } from '../../browser/lazy-list.tsx'
 import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
+import { Toast } from '../components/toast.tsx'
 import { Document } from '../components/document.tsx'
 import { FloatingDropdown } from '../components/floating-dropdown.tsx'
 import { Nav } from '../components/nav.tsx'
@@ -44,6 +45,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
     return (
       <Document title={`${ui.searchHeading} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
+        {message && <Toast message={message} />}
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
           <MediaTabLinks
             current={mediaType}
@@ -54,7 +56,6 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
             hrefFor={(type) => MEDIA_TYPE_UI[type].hrefs.search()}
           />
           <h1 mix={css({ margin: '0 0 16px' })}>{ui.searchHeading}</h1>
-          {message && <p mix={css({ color: '#15803d' })}>{message}</p>}
           <MovieSearchForm
             query={query}
             searchHref={ui.hrefs.search()}

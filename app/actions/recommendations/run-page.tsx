@@ -3,6 +3,7 @@ import { css } from 'remix/ui'
 
 import type { GenerationParams, RecommendationRunDetail } from '../../data/recommendations/runs.ts'
 import type { MediaType } from '../../data/mediaItems.ts'
+import { Toast } from '../../ui/components/toast.tsx'
 import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
 import { Field } from '../../ui/shared/field.tsx'
@@ -76,12 +77,10 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
     return (
       <Document title={`${run.name || `Recommendations for ${forLabel}`} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
+        {prunedOldestRun && (
+          <Toast message="You can keep up to 3 recommendation runs at a time, so your oldest one was removed." />
+        )}
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          {prunedOldestRun && (
-            <p mix={css({ color: '#15803d' })}>
-              You can keep up to 3 recommendation runs at a time, so your oldest one was removed.
-            </p>
-          )}
           <h1>{run.name || `Recommendations for ${forLabel}`}</h1>
           <p mix={css({ color: '#555' })}>
             {date}
