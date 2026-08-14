@@ -186,7 +186,13 @@ export async function verifyPicksAgainstOverviews(
 
   const { verdicts } = await requestStructured<{ verdicts: PickVerdict[] }>('verify.model', {
     model: 'claude-sonnet-5',
-    max_tokens: 2000,
+    // Shared with the reasoning, as everywhere else. The verdicts themselves
+    // are the smallest output in the pipeline — an index and a boolean each —
+    // but the judgement behind them is one plot read against one title per
+    // entry, and this call has had no successful run to measure since the
+    // schema stopped it reaching the model at all. Room enough that the first
+    // one reports what it wanted rather than what it was allowed.
+    max_tokens: 6000,
     output_config: {
       effort: 'low',
       format: { type: 'json_schema', schema: VERIFY_SCHEMA },
