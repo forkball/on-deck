@@ -8,7 +8,15 @@ import {
 } from '../mediaItems.ts'
 import type { MediaItem } from '../schema.ts'
 import { BOOK_GENRES, BOOK_SERIES_TYPES, getBookById, parseGoogleBooksId, searchBooks } from './googleBooks.ts'
-import { GAME_GENRES, GAME_MULTIPLAYER_TYPES, GAME_PLAYER_TYPES, getGameById, parseIgdbId, searchGames } from './igdb.ts'
+import {
+  GAME_GENRES,
+  GAME_MULTIPLAYER_TYPES,
+  GAME_PLATFORMS,
+  GAME_PLAYER_TYPES,
+  getGameById,
+  parseIgdbId,
+  searchGames,
+} from './igdb.ts'
 import {
   getMovieById,
   getTvShowById,
@@ -45,6 +53,9 @@ export interface CatalogProvider {
   // absent (rather than empty) for every other type.
   playerTypes?: string[]
   multiplayerTypes?: string[]
+  // Games-only too: platform *families* rather than raw platform names — see
+  // GAME_PLATFORMS. Nothing else here runs on hardware you either own or don't.
+  platforms?: string[]
   // Books-only — see BOOK_SERIES_TYPES.
   seriesTypes?: string[]
   // Turns what the "wrong match?" form accepts — a pasted URL or bare id —
@@ -136,6 +147,7 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
     genres: GAME_GENRES,
     playerTypes: GAME_PLAYER_TYPES,
     multiplayerTypes: GAME_MULTIPLAYER_TYPES,
+    platforms: GAME_PLATFORMS,
     parseExternalId: parseIgdbId,
     matchHint: 'Paste an IGDB game link.',
     lookupFailedError: "Couldn't find that on IGDB — check the link.",

@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { DEFAULT_MEDIA_TYPE, parseMediaType, statusLabelsFor } from '../../mediaTypes.ts'
+import { PlatformList } from './platform-list.tsx'
 import { DislikedDisplay, StarRatingDisplay } from './star-rating.tsx'
 
 export interface WatchedListItemProps {
@@ -16,7 +17,9 @@ export interface WatchedListItemProps {
 export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
   return () => {
     const { interaction, item, detailHref, actions } = handle.props
-    const { posterUrl } = item ? parseMediaMetadata(item.metadata) : { posterUrl: null }
+    const { posterUrl, platforms } = item
+      ? parseMediaMetadata(item.metadata)
+      : { posterUrl: null, platforms: [] }
     // Derived from the row's own item rather than threaded in: a logged
     // book must read "Read", not "Watched".
     const statusLabels = statusLabelsFor(parseMediaType(item?.type) ?? DEFAULT_MEDIA_TYPE)
@@ -69,6 +72,9 @@ export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
               <strong>{item?.title ?? 'Unknown title'}</strong>
             </a>
             <p mix={css({ margin: '4px 0 0' })}>{statusLabels[interaction.status] ?? interaction.status}</p>
+            {/* Games only in practice — every other type carries no platforms,
+                and the list renders nothing for an empty one. */}
+            <PlatformList platforms={platforms} />
             {interaction.rating != null && (
               <p mix={css({ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0 0' })}>
                 <StarRatingDisplay value={interaction.rating} /> ({interaction.rating})

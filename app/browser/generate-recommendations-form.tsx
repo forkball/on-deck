@@ -30,6 +30,9 @@ export type GenerateRecommendationsFormProps = {
   // Games only — empty for every other type, which hides both selects below.
   playerTypes: string[]
   multiplayerTypes: string[]
+  // Games only too — platform families ("PlayStation", not "PS5"), so one
+  // choice covers whichever generation the catalog happens to list.
+  platforms: string[]
   // Books only — empty for every other type, which hides the select below.
   seriesTypes: string[]
   generateHref: string
@@ -95,6 +98,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         lengthOptions,
         playerTypes,
         multiplayerTypes,
+        platforms,
         seriesTypes,
         generateHref,
         findPeopleHref,
@@ -401,6 +405,18 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                     {multiplayerTypes.map((type) => (
                       <option key={type} value={type}>
                         {MULTIPLAYER_TYPE_LABELS[type] ?? type}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+              {platforms.length > 0 && (
+                <Field label="Platform">
+                  <select name="platform" defaultValue="">
+                    <option value="">Any</option>
+                    {platforms.map((platform) => (
+                      <option key={platform} value={platform}>
+                        {platform}
                       </option>
                     ))}
                   </select>

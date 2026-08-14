@@ -49,6 +49,8 @@ export interface GenerationParams {
   // Games only — see GAME_PLAYER_TYPES / GAME_MULTIPLAYER_TYPES.
   playerType?: string
   multiplayerType?: string
+  // Games only — a platform family, see GAME_PLATFORMS.
+  platform?: string
   // Books only — see BOOK_SERIES_TYPES.
   series?: string
   sourceTypes: MediaType[]
@@ -77,6 +79,7 @@ function parseParams(run: RecommendationRun): GenerationParams {
       length: parsed.length,
       playerType: parsed.playerType,
       multiplayerType: parsed.multiplayerType,
+      platform: parsed.platform,
       series: parsed.series,
       sourceTypes: parsed.sourceTypes && parsed.sourceTypes.length > 0 ? parsed.sourceTypes : [run.media_type],
     }
@@ -96,6 +99,7 @@ function paramsKey(filters: RecommendationFilters, sourceTypes: MediaType[], mem
     filters.length ?? null,
     filters.playerType ?? null,
     filters.multiplayerType ?? null,
+    filters.platform ?? null,
     filters.series ?? null,
     [...sourceTypes].sort(),
     // A group run with different people is a different request, even with
@@ -133,6 +137,7 @@ export async function findUnusedDuplicateRun(
         length: params.length,
         playerType: params.playerType,
         multiplayerType: params.multiplayerType,
+        platform: params.platform,
         series: params.series,
       },
       params.sourceTypes,

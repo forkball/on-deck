@@ -12,6 +12,7 @@ import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
 import { StarRatingInput } from '../../ui/components/star-rating.tsx'
 import { StatusSelect } from '../../ui/components/status-select.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
+import { PlatformList } from '../../ui/components/platform-list.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import {
@@ -53,6 +54,7 @@ function describeParams(params: GenerationParams, mediaType: MediaType): string[
   if (params.multiplayerType) {
     lines.push(`Multiplayer type: ${MULTIPLAYER_TYPE_LABELS[params.multiplayerType] ?? params.multiplayerType}`)
   }
+  if (params.platform) lines.push(`Platform: ${params.platform}`)
   if (params.series) lines.push(`Series: ${SERIES_TYPE_LABELS[params.series] ?? params.series}`)
   return lines
 }
@@ -99,7 +101,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
             })}
           >
             {run.results.map(({ item, reason, interaction }) => {
-              const { releaseYear, posterUrl, tags } = parseMediaMetadata(item.metadata)
+              const { releaseYear, posterUrl, tags, platforms } = parseMediaMetadata(item.metadata)
               const itemType = parseMediaType(item.type) ?? DEFAULT_MEDIA_TYPE
               const itemUi = MEDIA_TYPE_UI[itemType]
               // Where a log submitted from this row comes back to, and what
@@ -176,6 +178,9 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                         ))}
                       </div>
                     )}
+                    {/* Empty for everything but games, so no other type
+                        renders a gap here. */}
+                    <PlatformList platforms={platforms} />
                     <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: '#555' })}>{reason}</p>
                   </div>
                   {/* Right-hand column, so the control lines up down the list

@@ -25,6 +25,8 @@ export interface RecommendationsPageProps {
   lengthOptions: { value: string; label: string }[]
   playerTypes: string[]
   multiplayerTypes: string[]
+  // Games only — platform families, empty for every other type.
+  platforms: string[]
   seriesTypes: string[]
   displayName: string
   // How much of the daily cap is left. Nothing is rendered for admins, who
@@ -158,6 +160,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       lengthOptions,
       playerTypes,
       multiplayerTypes,
+      platforms,
       seriesTypes,
       displayName,
       dailyRuns,
@@ -216,6 +219,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             lengthOptions={lengthOptions}
             playerTypes={playerTypes}
             multiplayerTypes={multiplayerTypes}
+            platforms={platforms}
             seriesTypes={seriesTypes}
             generateHref={routes.recommendations.generate.href()}
             findPeopleHref={routes.users.search.href()}
