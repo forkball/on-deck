@@ -90,30 +90,38 @@ export function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolea
 // approved, at the single step whose job is telling near-identical entries
 // apart, with nothing anywhere reporting it.
 //
-// Built per call so the length can be pinned. Nothing in JSON Schema can say
-// "as many as I sent you", but a count known at call time can.
-function verifySchema(count: number) {
-  return {
-    type: 'object' as const,
-    additionalProperties: false,
-    properties: {
-      verdicts: {
-        type: 'array' as const,
-        minItems: count,
-        maxItems: count,
-        items: {
-          type: 'object' as const,
-          additionalProperties: false,
-          properties: {
-            index: { type: 'number' as const },
-            matches: { type: 'boolean' as const },
-          },
-          required: ['index', 'matches'],
+// One shape for every call, rather than built per call around the number of
+// entries. It was built per call to pin the array's length — nothing in JSON
+// Schema can say "as many as I sent you", but a count known at call time can —
+// and that turns out not to be expressible here either: a structured-output
+// schema only accepts 0 or 1 for minItems, and a larger one fails the request
+// outright rather than being ignored (`400 ... 'minItems' values other than 0
+// or 1 are not supported`).
+//
+// Nothing is lost with it gone. The prompt asks for exactly one verdict per
+// entry and applyVerdicts holds the model to that, checking the count, the
+// range and the duplicates rather than trusting any of the three — which it
+// has to do regardless, since a schema the model satisfies by shape can still
+// answer about the wrong entries. That check was always the real guarantee;
+// the schema was restating one part of it.
+const VERIFY_SCHEMA = {
+  type: 'object' as const,
+  additionalProperties: false,
+  properties: {
+    verdicts: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        additionalProperties: false,
+        properties: {
+          index: { type: 'number' as const },
+          matches: { type: 'boolean' as const },
         },
+        required: ['index', 'matches'],
       },
     },
-    required: ['verdicts'],
-  }
+  },
+  required: ['verdicts'],
 }
 
 export interface PickVerdict {
@@ -181,7 +189,7 @@ export async function verifyPicksAgainstOverviews(
     max_tokens: 2000,
     output_config: {
       effort: 'low',
-      format: { type: 'json_schema', schema: verifySchema(candidates.length) },
+      format: { type: 'json_schema', schema: VERIFY_SCHEMA },
     },
     messages: [
       {
