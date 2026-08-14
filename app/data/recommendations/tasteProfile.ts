@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto'
 
-import { claude, parseStructuredResponse } from './claude.ts'
-import { track } from './timings.ts'
+import { requestStructured } from './claude.ts'
 import type { Db } from '../db.ts'
 import { listUserMediaLog, type MediaType } from '../mediaItems.ts'
 import { userTasteProfiles, type UserTasteProfile } from '../schema.ts'
@@ -187,19 +186,16 @@ export async function regenerateTasteProfile(
     return { ...empty, log }
   }
 
-  const response = await track('profile.model', () =>
-    claude.messages.create({
-      model: 'claude-sonnet-5',
-      max_tokens: 2000,
-      output_config: {
-        effort: 'medium',
-        format: { type: 'json_schema', schema: PROFILE_SCHEMA },
-      },
-      messages: [{ role: 'user', content: buildProfilePrompt(loggedItems, mediaType, settings) }],
-    }),
-  )
+  const parsed = await requestStructured<UpsertTasteProfileInput>('profile.model', {
+    model: 'claude-sonnet-5',
+    max_tokens: 2000,
+    output_config: {
+      effort: 'medium',
+      format: { type: 'json_schema', schema: PROFILE_SCHEMA },
+    },
+    messages: [{ role: 'user', content: buildProfilePrompt(loggedItems, mediaType, settings) }],
+  })
 
-  const parsed = parseStructuredResponse<UpsertTasteProfileInput>(response)
   await upsertTasteProfile(db, userId, mediaType, { ...parsed, logSignature: logSignature(log, settings) })
   return { ...parsed, log }
 }

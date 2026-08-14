@@ -3,7 +3,7 @@ import { getCatalogProvider, type CatalogSearchResult, type LengthBucket } from 
 import { pool } from '../db.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import type { MediaType } from '../mediaItems.ts'
-import { claude, parseStructuredResponse } from './claude.ts'
+import { requestStructured } from './claude.ts'
 import type { DecadeRelation, Pick } from './picks.ts'
 import { track } from './timings.ts'
 
@@ -176,32 +176,28 @@ export async function verifyPicksAgainstOverviews(
     catalog_found: { title: match.title, year: match.releaseYear, overview: match.overview },
   }))
 
-  const response = await track('verify.model', () =>
-    claude.messages.create({
-      model: 'claude-sonnet-5',
-      max_tokens: 2000,
-      output_config: {
-        effort: 'low',
-        format: { type: 'json_schema', schema: verifySchema(candidates.length) },
+  const { verdicts } = await requestStructured<{ verdicts: PickVerdict[] }>('verify.model', {
+    model: 'claude-sonnet-5',
+    max_tokens: 2000,
+    output_config: {
+      effort: 'low',
+      format: { type: 'json_schema', schema: verifySchema(candidates.length) },
+    },
+    messages: [
+      {
+        role: 'user',
+        content:
+          `You previously suggested some ${noun} by title/year. For each one, we looked it up on ${catalogName} and found ` +
+          `a specific ${entryNoun} — here's what ${catalogName} returned, described by its own title, year, and plot ` +
+          `overview. Confirm whether the ${entryNoun} found is truly the same one you meant, not just a ` +
+          `similarly- or identically-titled different one. Small title differences (translation, punctuation, ` +
+          `"the" vs no "the") are fine as long as it's the same ${entryNoun}.\n\n${JSON.stringify(items, null, 2)}\n\n` +
+          `Return one verdict per entry, each repeating that entry's "index" from above, with "matches" true ` +
+          `only if the ${entryNoun} found is genuinely the one you meant. Every entry needs exactly one ` +
+          `verdict — order doesn't matter, since the index is what pairs them up.`,
       },
-      messages: [
-        {
-          role: 'user',
-          content:
-            `You previously suggested some ${noun} by title/year. For each one, we looked it up on ${catalogName} and found ` +
-            `a specific ${entryNoun} — here's what ${catalogName} returned, described by its own title, year, and plot ` +
-            `overview. Confirm whether the ${entryNoun} found is truly the same one you meant, not just a ` +
-            `similarly- or identically-titled different one. Small title differences (translation, punctuation, ` +
-            `"the" vs no "the") are fine as long as it's the same ${entryNoun}.\n\n${JSON.stringify(items, null, 2)}\n\n` +
-            `Return one verdict per entry, each repeating that entry's "index" from above, with "matches" true ` +
-            `only if the ${entryNoun} found is genuinely the one you meant. Every entry needs exactly one ` +
-            `verdict — order doesn't matter, since the index is what pairs them up.`,
-        },
-      ],
-    }),
-  )
-
-  const { verdicts } = parseStructuredResponse<{ verdicts: PickVerdict[] }>(response)
+    ],
+  })
   return applyVerdicts(candidates, verdicts)
 }
 
