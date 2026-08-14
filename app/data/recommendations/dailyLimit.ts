@@ -10,6 +10,18 @@ import { profileRebuildUsage, recommendationRunUsage, type User } from '../schem
 // of it a single account could buy over a day. This does.
 export const RUNS_PER_DAY = 5
 
+// A group run costs more to produce than a solo one and the difference grows
+// with the group: the picks call is asked to weigh every candidate against
+// every profile, so the reasoning behind one set of picks scales with how many
+// people are in it. One slot per run charged everyone the solo price for that.
+//
+// Half the headcount, rounded up, so a pair still costs what one person does
+// and each additional couple adds a slot: 4 people spend 2 of the day's runs,
+// 6 spend 3, 10 spend 5.
+export function runCostFor(memberCount: number): number {
+  return Math.max(1, Math.ceil(memberCount / 2))
+}
+
 // Rolling, not a calendar day. A midnight reset is 10 runs in the ten minutes
 // either side of it, and it lands at a different local time for everyone, so
 // "you're out until tomorrow" would be a lie for most of the people reading it.
@@ -54,9 +66,16 @@ export async function getDailyRunAllowance(db: Db, user: User): Promise<DailyRun
 // Attempts can't be banked against that, either. Only one job per user is ever
 // in flight (hasActiveJob), so at most one uncounted run exists at a time, and
 // the check below it happens before that job is queued.
-export async function recordRunAgainstDailyLimit(db: Db, userId: number): Promise<void> {
+// `cost` is how many of the day's runs this one spends — see runCostFor. Booked
+// as that many rows rather than as a quantity on one, so everything reading this
+// ledger keeps counting rows: the allowance above, the sweep below, and the
+// oldest-row timestamp that says when a slot comes back. A weighted run frees
+// its slots the way it spent them, together.
+export async function recordRunAgainstDailyLimit(db: Db, userId: number, cost = 1): Promise<void> {
   const now = Date.now()
-  await db.create(recommendationRunUsage, { user_id: userId, created_at: now })
+  for (let i = 0; i < cost; i++) {
+    await db.create(recommendationRunUsage, { user_id: userId, created_at: now })
+  }
 
   // Rows outside the window can never change an answer again. Swept on write
   // rather than on a timer, for the reason the job sweep is (see jobs.ts): an

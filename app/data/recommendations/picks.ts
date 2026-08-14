@@ -87,7 +87,11 @@ const PICKS_SCHEMA = {
   required: ['picks'],
 }
 
-const REQUESTED_COUNT = 15
+// Enough over TARGET_COUNT to survive matching and verification dropping some,
+// and no more. Asking for a long list spends the run's thinking on the tail of
+// it — the picks past the first handful are the ones being reached for, and
+// they were never going to be shown anyway.
+const REQUESTED_COUNT = 12
 
 // How much of the log the prompt is willing to carry. Someone a few years into
 // logging has thousands of titles, and every run was pasting all of them in
@@ -188,7 +192,7 @@ export async function requestPicks(
     filters.playerType != null ||
     filters.multiplayerType != null ||
     filters.series != null
-  const requestedCount = hasFilters ? REQUESTED_COUNT + 10 : REQUESTED_COUNT
+  const requestedCount = hasFilters ? REQUESTED_COUNT + 6 : REQUESTED_COUNT
   const filterInstructions = buildFilterInstructions(filters, noun, mediaType) + sourceInstructions
 
   const prompt = isGroup
@@ -207,17 +211,29 @@ export async function requestPicks(
 
   // One budget covers the reasoning and the JSON both, and the reasoning is
   // what fills it: a group run with filters spent 9,999 of its 10,000 tokens
-  // thinking and came back with no picks at all, two minutes in. The effort
-  // below is the demand side of that. These ceilings are the supply, and
-  // they're deliberately loose — 9,999 is a floor on what the thinking wanted
-  // rather than where it would have settled, because the cap cut the
-  // measurement short, so the first job of these numbers is to buy an unclipped
-  // one. The JSON is the smaller half by far: three fields a pick, so roughly
-  // 800 tokens for 15 of them and 1,900 for 25 with a group's longer reasons.
-  // Worth tightening once the usage lines show where thinking actually lands.
+  // thinking and came back with no picks at all, two minutes in.
+  //
+  // It scales per person because the work does. This prompt asks for every
+  // candidate to be weighed against every profile, so the thinking behind one
+  // list grows with the size of the group — where a flat group budget gave two
+  // people and eight the same room for four times the work, and the larger
+  // group was the one that ran out. The JSON barely moves by comparison: three
+  // fields a pick, a fixed count of them, and only the reasons lengthen as
+  // they name more people.
+  //
+  // Still loose rather than tuned. 9,999 was a floor on what the thinking
+  // wanted rather than where it would have settled, since the cap cut the
+  // measurement short, so these numbers are buying a clean reading of what it
+  // costs per person before being set properly.
+  //
+  // Capped where a non-streaming request stops being comfortable. Past this a
+  // call wants .stream() and get_final_message() rather than a bigger ceiling,
+  // and the daily-run weighting means groups this size are rare by design.
+  const maxTokens = Math.min(6000 + 3000 * profiles.length + (hasFilters ? 4000 : 0), 32000)
+
   const { picks } = await requestStructured<{ picks: Pick[] }>('picks.model', {
     model: 'claude-sonnet-5',
-    max_tokens: (isGroup ? 12000 : 6000) + (hasFilters ? 4000 : 0),
+    max_tokens: maxTokens,
     output_config: {
       // Medium for groups too, where this used to be high: the group prompt
       // asks for per-person reasoning about tradeoffs across every candidate,
