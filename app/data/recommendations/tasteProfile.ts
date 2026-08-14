@@ -188,7 +188,15 @@ export async function regenerateTasteProfile(
 
   const parsed = await requestStructured<UpsertTasteProfileInput>('profile.model', {
     model: 'claude-sonnet-5',
-    max_tokens: 2000,
+    // Shared with the reasoning, which is the half that fills a budget here —
+    // see picks.ts, where 2,000-era arithmetic met adaptive thinking and lost.
+    // A profile's own output is small and fixed (a summary and two tag lists),
+    // but the thinking behind it grows with the log it reads, and someone who
+    // has chosen to send all of theirs sends all of it. Loose rather than
+    // tuned: this is a ceiling, so it costs nothing on a call that doesn't
+    // reach it, and the point of the room is a think= reading that isn't
+    // clipped by the ceiling that produced it.
+    max_tokens: 8000,
     output_config: {
       effort: 'medium',
       format: { type: 'json_schema', schema: PROFILE_SCHEMA },

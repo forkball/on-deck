@@ -211,6 +211,11 @@ export async function generateRecommendations(
   // anything unmatched, which is also all the prompt list can name.
   const seenBy = new Map<string, { count: number; title?: string; externalId?: string }>()
 
+  // Rejections need no tally — one is enough to exclude — but they do need the
+  // same key, or a title several people turned down is named once per person
+  // and spends that many of the hundred the prompt will carry.
+  const rejectedKeys = new Set<string>()
+
   for (const log of exclusionLogs) {
     // Per member, so one person's duplicate rows can't carry a title over the
     // threshold on their own.
@@ -224,8 +229,11 @@ export async function generateRecommendations(
       if (!key) continue
 
       if (interaction.status === 'not_interested') {
-        if (item?.title) excluded.rejected.push(item.title)
         if (item?.external_id) excludedExternalIds.add(item.external_id)
+        if (item?.title && !rejectedKeys.has(key)) {
+          rejectedKeys.add(key)
+          excluded.rejected.push(item.title)
+        }
         continue
       }
       if (interaction.status !== 'consumed') continue

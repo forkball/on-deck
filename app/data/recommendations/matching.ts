@@ -4,6 +4,7 @@ import { pool } from '../db.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { requestStructured } from './claude.ts'
+import { GenerationError } from './errors.ts'
 import type { DecadeRelation, Pick } from './picks.ts'
 import { track } from './timings.ts'
 
@@ -157,12 +158,12 @@ export function applyVerdicts(candidates: Candidate[], verdicts: PickVerdict[]):
   return candidates.filter((_, index) => byIndex.get(index) === true)
 }
 
-// Two audiences. The message travels to the waiting page verbatim (worker.ts
-// hands error.message to failJob), so it says what to do about it; the detail
-// that would only puzzle someone there goes to the log.
-function mismatch(detail: string): Error {
+// Two audiences. GenerationError is what carries the message to the waiting
+// page — see errors.ts — so it says what to do about it; the detail that would
+// only puzzle someone there goes to the log.
+function mismatch(detail: string): GenerationError {
   console.warn(`[generation] verification mismatch: ${detail}`)
-  return new Error('Checking the picks came back incomplete — try generating again.')
+  return new GenerationError('Checking the picks came back incomplete — try generating again.')
 }
 
 // A same-title-same-year-different-film sails through titlesLikelyMatch, since
@@ -186,7 +187,13 @@ export async function verifyPicksAgainstOverviews(
 
   const { verdicts } = await requestStructured<{ verdicts: PickVerdict[] }>('verify.model', {
     model: 'claude-sonnet-5',
-    max_tokens: 2000,
+    // Shared with the reasoning, as everywhere else. The verdicts themselves
+    // are the smallest output in the pipeline — an index and a boolean each —
+    // but the judgement behind them is one plot read against one title per
+    // entry, and this call has had no successful run to measure since the
+    // schema stopped it reaching the model at all. Room enough that the first
+    // one reports what it wanted rather than what it was allowed.
+    max_tokens: 6000,
     output_config: {
       effort: 'low',
       format: { type: 'json_schema', schema: VERIFY_SCHEMA },
