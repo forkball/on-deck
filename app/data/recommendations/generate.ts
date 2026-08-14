@@ -8,7 +8,7 @@ import { countUserMediaLog, listUserMediaLog, CONSUMPTION_STATUSES, type MediaTy
 import { createNotification } from '../notifications.ts'
 import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
-import { recordRunAgainstDailyLimit } from './dailyLimit.ts'
+import { recordRunAgainstDailyLimit, runCostFor } from './dailyLimit.ts'
 import type { GenerationPhase } from './jobs.ts'
 import {
   filterByLength,
@@ -40,7 +40,10 @@ import { emptyDrops, logPickTally } from './tally.ts'
 import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
 
-const TARGET_COUNT = 10
+// Down from ten. A run reaches to fill its count, and the last few were the
+// ones doing the reaching — asked for fewer, the model spends what it has on
+// picks it can actually justify instead of padding out a list.
+const TARGET_COUNT = 8
 
 // What a partially-finished run has already bought. Small on purpose: ids, not
 // objects — the rows they name are written before the checkpoint records them.
@@ -187,23 +190,61 @@ export async function generateRecommendations(
   // Two reasons not to suggest something, kept apart because only one of them
   // says anything about taste. The id set is what actually enforces both — the
   // title lists are a prompt hint, and the model is free to ignore them.
+  //
+  // They also count differently across a group, which is the point of the
+  // tallying below. Having seen something excludes it once most of the group
+  // has: one person out of six having watched a film is no reason to keep it
+  // from the other five, and excluding on a single viewing shrank the pool
+  // fastest exactly where it was already thinnest — every member added ruled
+  // out everything they'd ever seen. A rejection still excludes on its own,
+  // from anyone. It's the one signal a person gave deliberately, and putting
+  // something in front of the group that a member has explicitly turned down
+  // is worse than repeating something they've watched.
+  const memberCount = exclusionLogs.length
+  const seenThreshold = Math.floor(memberCount / 2) + 1
+
   const excluded: ExcludedTitles = { seen: [], rejected: [] }
   const excludedExternalIds = new Set<string>()
+
+  // Keyed by catalog id where there is one, since two people's rows for the
+  // same film are different rows. Title is the fallback and the only key for
+  // anything unmatched, which is also all the prompt list can name.
+  const seenBy = new Map<string, { count: number; title?: string; externalId?: string }>()
+
   for (const log of exclusionLogs) {
+    // Per member, so one person's duplicate rows can't carry a title over the
+    // threshold on their own.
+    const countedThisMember = new Set<string>()
+
     for (const { interaction, item } of log) {
-      const titles =
-        interaction.status === 'consumed'
-          ? excluded.seen
-          : interaction.status === 'not_interested'
-            ? excluded.rejected
-            : null
       // Wanting something, or being partway through it, is no reason to
       // withhold it — only the two statuses that are finished with it, one
       // way or the other, exclude anything.
-      if (!titles) continue
-      if (item?.title) titles.push(item.title)
-      if (item?.external_id) excludedExternalIds.add(item.external_id)
+      const key = item?.external_id ?? item?.title
+      if (!key) continue
+
+      if (interaction.status === 'not_interested') {
+        if (item?.title) excluded.rejected.push(item.title)
+        if (item?.external_id) excludedExternalIds.add(item.external_id)
+        continue
+      }
+      if (interaction.status !== 'consumed') continue
+
+      if (countedThisMember.has(key)) continue
+      countedThisMember.add(key)
+
+      const tally = seenBy.get(key) ?? { count: 0 }
+      tally.count += 1
+      tally.title ??= item?.title ?? undefined
+      tally.externalId ??= item?.external_id ?? undefined
+      seenBy.set(key, tally)
     }
+  }
+
+  for (const { count, title, externalId } of seenBy.values()) {
+    if (count < seenThreshold) continue
+    if (title) excluded.seen.push(title)
+    if (externalId) excludedExternalIds.add(externalId)
   }
 
   // The most expensive call in a run, so the first worth never paying twice.
@@ -385,7 +426,7 @@ export async function generateRecommendations(
   // being best-effort either way — where a ledger write that doesn't land is a
   // run nobody was charged for.
   const [, , prunedOldestRun] = await Promise.all([
-    track('run.usage', () => recordRunAgainstDailyLimit(db, requestingUserId)),
+    track('run.usage', () => recordRunAgainstDailyLimit(db, requestingUserId, runCostFor(memberUserIds.length))),
     track('run.notify', () => notifyMutualFollowers(db, requestingUserId, memberUserIds, runId)),
     track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType)),
   ])
