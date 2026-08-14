@@ -1,6 +1,7 @@
 import { inList } from 'remix/data-table'
 
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
+import { platformFamilies } from '../catalog/igdb.ts'
 import { upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
 import type { Db } from '../db.ts'
 import { isFollowing } from '../follows.ts'
@@ -323,6 +324,10 @@ export async function generateRecommendations(
       (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade, filters.decadeRelation)) ||
       (filters.playerType && !match.tags.includes(filters.playerType)) ||
       (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) ||
+      // Platforms ride in their own field rather than as tags, and are compared
+      // by family so "PlayStation" matches whichever PS generation the catalog
+      // lists — the same grouping the chips on a card show.
+      (filters.platform && !platformFamilies(match.platforms ?? []).includes(filters.platform)) ||
       (filters.series && !match.tags.includes(filters.series))
     ) {
       drops.filtered++
@@ -414,6 +419,7 @@ export async function generateRecommendations(
         length: filters.length,
         playerType: filters.playerType,
         multiplayerType: filters.multiplayerType,
+        platform: filters.platform,
         series: filters.series,
         sourceTypes: profileTypes,
       } satisfies GenerationParams,

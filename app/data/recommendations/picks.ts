@@ -62,6 +62,8 @@ export interface RecommendationFilters {
   // Games only — see GAME_PLAYER_TYPES / GAME_MULTIPLAYER_TYPES.
   playerType?: string
   multiplayerType?: string
+  // Games only — a platform family, see GAME_PLATFORMS.
+  platform?: string
   // Books only — see BOOK_SERIES_TYPES.
   series?: string
 }
@@ -159,6 +161,10 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string, m
   if (filters.multiplayerType === 'versus') {
     clauses.push(`Only suggest ${noun} with a competitive (versus) multiplayer mode.`)
   }
+  // A family, so the phrasing has to stay loose: "on PlayStation" covers a PS2
+  // exclusive and a current-gen release alike, and the catalog check after this
+  // is what actually decides.
+  if (filters.platform) clauses.push(`Only suggest ${noun} playable on ${filters.platform}.`)
   if (filters.series === 'series') clauses.push(`Only suggest ${noun} that are part of a series.`)
   if (filters.series === 'standalone') clauses.push(`Only suggest standalone ${noun}, not part of a series.`)
   return clauses.length > 0 ? ` ${clauses.join(' ')}` : ''
@@ -191,6 +197,7 @@ export async function requestPicks(
     filters.length != null ||
     filters.playerType != null ||
     filters.multiplayerType != null ||
+    filters.platform != null ||
     filters.series != null
   const requestedCount = hasFilters ? REQUESTED_COUNT + 6 : REQUESTED_COUNT
   const filterInstructions = buildFilterInstructions(filters, noun, mediaType) + sourceInstructions

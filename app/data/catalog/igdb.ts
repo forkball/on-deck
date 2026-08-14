@@ -24,6 +24,38 @@ const SEARCH_LIMIT = 20
 export const GAME_PLAYER_TYPES: string[] = ['singleplayer', 'multiplayer']
 export const GAME_MULTIPLAYER_TYPES: string[] = ['coop', 'versus']
 
+// The platform filter's vocabulary. Families rather than IGDB's raw platform
+// list: Hades alone returns eight entries, and nobody filters for "PS4 but not
+// PS5" — the question is which box it runs on. Ordered, so two games never
+// list the same platforms in a different order.
+const PLATFORM_FAMILIES: { label: string; match: RegExp }[] = [
+  { label: 'PC', match: /^(PC|Win|DOS)/i },
+  { label: 'PlayStation', match: /^(PS|PlayStation|PSVR|Vita)/i },
+  { label: 'Xbox', match: /^(XBOX|X360|XONE|Series X)/i },
+  { label: 'Nintendo', match: /^(Switch|Wii|NES|SNES|N64|GB|GBA|NDS|3DS|GameCube|NGC)/i },
+  { label: 'Mobile', match: /^(iOS|Android|iPad|iPhone)/i },
+  { label: 'Mac', match: /^Mac/i },
+  { label: 'Linux', match: /^Linux/i },
+]
+
+export const GAME_PLATFORMS: string[] = PLATFORM_FAMILIES.map((family) => family.label)
+
+// Lossy at render and at filter time only; the full platform list stays in the
+// item's metadata. Unrecognised names pass through rather than being dropped,
+// so a game on something exotic still says so.
+export function platformFamilies(platforms: string[]): string[] {
+  const found = new Set<string>()
+  const unmatched: string[] = []
+
+  for (const platform of platforms) {
+    const family = PLATFORM_FAMILIES.find((candidate) => candidate.match.test(platform))
+    if (family) found.add(family.label)
+    else if (!unmatched.includes(platform)) unmatched.push(platform)
+  }
+
+  return [...PLATFORM_FAMILIES.filter((family) => found.has(family.label)).map((family) => family.label), ...unmatched]
+}
+
 // The genre filter's vocabulary, from /v4/genres.
 export const GAME_GENRES: string[] = [
   'adventure',
