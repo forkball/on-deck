@@ -11,6 +11,7 @@ import {
   touchJobClaim,
   type ClaimedJob,
 } from './jobs.ts'
+import { GenerationError } from './errors.ts'
 import { generateRecommendations, type GenerationCheckpoint } from './generate.ts'
 import type { MediaType } from '../mediaItems.ts'
 import type { RecommendationFilters } from './picks.ts'
@@ -101,10 +102,22 @@ export function startGenerationWorker(): GenerationWorker {
     } catch (error) {
       // An actual error, so retrying would reproduce it. Interrupted jobs never
       // reach here — their machine died — and the staleness sweep recovers them.
+      //
+      // Logged before anything else, and logged whatever it is: this is now the
+      // only place the detail of a failed run is kept, since most of it no
+      // longer travels to the page.
+      console.error(`[generation] job=${job.id} failed:`, error)
+
+      // Only a message written for the person reaches them. Everything else in
+      // this pipeline throws for a reader who has the code open — a provider's
+      // response body, a missing environment variable, a stop reason — and
+      // forwarding those verbatim is how a stop reason ended up on a waiting
+      // page. Silence is the safe default here, and a new throw anywhere
+      // downstream gets it without having to know this exists.
       await failJob(
         db,
         job.id,
-        error instanceof Error ? error.message : 'Generating failed. Try again.',
+        error instanceof GenerationError ? error.message : 'Generating failed. Try again.',
       ).catch(() => {})
     } finally {
       clearInterval(heartbeat)
