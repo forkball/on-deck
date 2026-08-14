@@ -205,11 +205,24 @@ export async function requestPicks(
       `this taste profile.${filterInstructions} For each, give your best-guess release year (used only to ` +
       `disambiguate remakes/same-titled entries) and a one-sentence reason tied to their profile.`
 
+  // One budget covers the reasoning and the JSON both, and the reasoning is
+  // what fills it: a group run with filters spent 9,999 of its 10,000 tokens
+  // thinking and came back with no picks at all, two minutes in. The effort
+  // below is the demand side of that. These ceilings are the supply, and
+  // they're deliberately loose — 9,999 is a floor on what the thinking wanted
+  // rather than where it would have settled, because the cap cut the
+  // measurement short, so the first job of these numbers is to buy an unclipped
+  // one. The JSON is the smaller half by far: three fields a pick, so roughly
+  // 800 tokens for 15 of them and 1,900 for 25 with a group's longer reasons.
+  // Worth tightening once the usage lines show where thinking actually lands.
   const { picks } = await requestStructured<{ picks: Pick[] }>('picks.model', {
     model: 'claude-sonnet-5',
-    max_tokens: (isGroup ? 8000 : 4000) + (hasFilters ? 2000 : 0),
+    max_tokens: (isGroup ? 12000 : 6000) + (hasFilters ? 4000 : 0),
     output_config: {
-      effort: isGroup ? 'high' : 'medium',
+      // Medium for groups too, where this used to be high: the group prompt
+      // asks for per-person reasoning about tradeoffs across every candidate,
+      // which is the part that ran away.
+      effort: 'medium',
       format: { type: 'json_schema', schema: PICKS_SCHEMA },
     },
     messages: [
