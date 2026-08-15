@@ -5,35 +5,20 @@ import { Field } from '../ui/shared/field.tsx'
 export type FriendOption = {
   id: number
   label: string
-  // Media types this person has logged something in, rejections excluded.
-  // Plain strings for the same reason `mediaType` is: the registry lives
-  // outside app/browser and can't be imported here.
   loggedTypes: string[]
 }
 
 export type GenerateRecommendationsFormProps = {
   friends: FriendOption[]
-  // The requester's own, in the same shape — they're always in the run, so
-  // their gaps stop it just as a friend's do.
   viewerLoggedTypes: string[]
-  // Set by the page's tabs, so just carried through as a hidden field. Plain
-  // strings rather than the registry: the browser bundle is limited to
-  // app/browser/**, so anything outside has to arrive as a serializable prop.
   mediaType: string
-  // e.g. "movie" / "TV" — used attributively in "you'll still get X picks".
   mediaTypeLabel: string
-  // Computed server-side from the registry, which this entry can't import.
   sources: { value: string; label: string }[]
   genres: string[]
-  // Per media type: "short" is minutes for a film, pages for a book.
   lengthOptions: { value: string; label: string }[]
-  // Games only — empty for every other type, which hides both selects below.
   playerTypes: string[]
   multiplayerTypes: string[]
-  // Games only too — platform families ("PlayStation", not "PS5"), so one
-  // choice covers whichever generation the catalog happens to list.
   platforms: string[]
-  // Books only — empty for every other type, which hides the select below.
   seriesTypes: string[]
   generateHref: string
   findPeopleHref: string
@@ -41,13 +26,10 @@ export type GenerateRecommendationsFormProps = {
 
 const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
 
-// Capitalizing 'coop' reads as "Coop," not the intended "Co-op" — small enough
-// vocabularies that a label map beats a formatting rule.
 const PLAYER_TYPE_LABELS: Record<string, string> = { singleplayer: 'Singleplayer', multiplayer: 'Multiplayer' }
 const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus: 'Versus' }
 const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series', standalone: 'Standalone' }
 
-// Shown so the picker reads as "more coming".
 const PLACEHOLDER_SOURCES: string[] = []
 
 const FRIENDS_PAGE_SIZE = 8
@@ -70,19 +52,12 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let mode: 'self' | 'group' = 'self'
     let search = ''
     let page = 1
-    // Drives whether the multiplayer-type sub-select shows at all.
     let playerType = ''
-    // Drives whether the "relative to decade" sub-select shows at all.
     let decade = ''
-    // Tracked rather than left to native <details> alone: a re-render from
-    // any other control in this form (player type included) would otherwise
-    // re-close the filters panel, since its open-ness wouldn't be reflected
-    // anywhere in the freshly rendered JSX.
+    // Tracked rather than left to native <details>: any re-render in this form
+    // would otherwise re-close the panel, its open-ness being nowhere in the JSX.
     let filtersOpen = false
-    // Cross-media sourcing is the deliberate opt-in.
     const selectedSources = new Set<string>([handle.props.mediaType])
-    // Tracked rather than left to the checkboxes alone, because whether the
-    // run can go anywhere depends on who's in it — see `blockedBy` below.
     const selectedFriends = new Set<number>()
 
     return () => {
@@ -103,11 +78,6 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       } = handle.props
       const hasSource = selectedSources.size > 0
 
-      // The same rule the server applies after submitting (see
-      // findMembersMissingSourceLogs): everyone in the run needs something
-      // logged under every taste it reads. Checked here so the answer arrives
-      // before the click rather than as a rejected page — the server still
-      // decides, and still says no if this is wrong or bypassed.
       const membersInRun = [
         { label: 'You', loggedTypes: viewerLoggedTypes },
         ...(mode === 'group'
@@ -275,8 +245,6 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             )}
           </div>
 
-          {/* Which type this run is for is set by the page's tabs, not here
-              — carried through as a hidden field so the POST still says so. */}
           <input type="hidden" name="mediaType" value={mediaType} />
 
           <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>

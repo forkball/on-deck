@@ -1,8 +1,6 @@
-// Uses the v3 API key as a query param.
 
 const TMDB_API_BASE = 'https://api.themoviedb.org/3'
 
-// Static — rarely changes, and avoids an API round trip.
 const GENRE_ID_TO_NAME: Record<number, string> = {
   28: 'action',
   12: 'adventure',
@@ -25,7 +23,6 @@ const GENRE_ID_TO_NAME: Record<number, string> = {
   37: 'western',
 }
 
-// Every genre this app knows about, for the recommendation filter's dropdown.
 export const MOVIE_GENRES: string[] = Object.values(GENRE_ID_TO_NAME).sort()
 
 // TV genres are numbered differently on TMDB, and the ids that do overlap with
@@ -59,19 +56,12 @@ export interface TmdbSearchResult {
   posterUrl: string | null
   popularity: number
   overview: string | null
-  // Only via getMovieById — TMDB's search endpoint omits runtime.
   runtimeMinutes: number | null
-  // Non-film providers: each medium's length dimension and lead credit.
   pageCount?: number | null
   playtimeHours?: number | null
-  // TV only — its length dimension. Runs the show, not an episode: number of
-  // seasons is what "duration" means for something with no fixed runtime.
   seasonCount?: number | null
   creator?: string | null
-  // Extra artwork beyond the poster, in display order. Games are the reason:
-  // their 16:9 screenshots read well as a strip, and no other medium has any.
   images?: string[] | null
-  // Games only.
   platforms?: string[] | null
   // Set only when a result's actual provenance differs from the provider
   // that produced it — currently just Google Books falling back to Open
@@ -136,7 +126,6 @@ interface TmdbTvSearchResponse {
   }[]
 }
 
-// Mirrors searchMovies; TV differs only in field names and genre ids.
 export async function searchTv(query: string): Promise<TmdbSearchResult[]> {
   const apiKey = process.env.TMDB_API_KEY
   if (!apiKey) {
@@ -176,12 +165,9 @@ interface TmdbMovieDetailResponse {
   popularity: number
   overview: string
   runtime: number | null
-  // From append_to_response=credits, folded into the same request.
   credits?: { crew?: { job?: string; name?: string }[] }
 }
 
-// Used when autosuggest already resolved a pick, so selecting it doesn't need
-// a second title search that could resolve to a different movie.
 export async function getMovieById(externalId: string): Promise<TmdbSearchResult | null> {
   const apiKey = process.env.TMDB_API_KEY
   if (!apiKey) {
@@ -230,7 +216,6 @@ interface TmdbTvDetailResponse {
   number_of_seasons: number | null
 }
 
-// Mirrors getMovieById for TV shows.
 export async function getTvShowById(externalId: string): Promise<TmdbSearchResult | null> {
   const apiKey = process.env.TMDB_API_KEY
   if (!apiKey) {
@@ -262,8 +247,6 @@ export async function getTvShowById(externalId: string): Promise<TmdbSearchResul
   }
 }
 
-// Accepts a bare id or a full themoviedb.org URL, since pasting the URL is the
-// natural thing to do. `segment` is 'movie' or 'tv' to match the right path.
 export function parseTmdbId(input: string, segment: 'movie' | 'tv'): string | null {
   const trimmed = input.trim()
   if (/^\d+$/.test(trimmed)) return trimmed

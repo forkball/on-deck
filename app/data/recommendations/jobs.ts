@@ -4,15 +4,12 @@ import { pool, type Db } from '../db.ts'
 import { recommendationJobs, type RecommendationJob } from '../schema.ts'
 import type { RunTimings } from './timings.ts'
 
-// Live progress for an in-flight run: generating takes tens of seconds, so the
-// request hands back a job id and the wait page polls the stage from here.
-//
-// In the database, not process memory — the POST and the poll that follows it
-// can land on different machines.
+// In the database, not process memory: the POST and the poll that follows it can
+// land on different machines.
 export type GenerationPhase = 'profiles' | 'picks' | 'matching' | 'lengths' | 'verifying' | 'saving'
 
-// Each corresponds to a real await in generateRecommendations — adding a stage
-// there means adding it here too.
+// One per real await in generateRecommendations — adding a stage there means
+// adding it here too.
 export const PHASE_LABELS: Record<GenerationPhase, string> = {
   profiles: 'Reading what everyone has logged…',
   picks: 'Choosing picks…',
@@ -36,13 +33,11 @@ export type JobStatus = 'queued' | 'running' | 'done' | 'failed'
 export interface GenerationJob {
   userId: number
   status: JobStatus
-  // Position in line when queued; 0 once running.
   queuedAhead?: number
-  // Only the stages this run will hit: the length check happens only when that
-  // lever is set, and showing a stage that never runs is invented progress.
+  // Only the stages this run will hit — the length check runs only when that
+  // lever is set.
   phases: GenerationPhase[]
   phase: GenerationPhase
-  // Set once finished; the client navigates here.
   runId?: number
   prunedOldestRun?: boolean
   error?: string
@@ -50,8 +45,7 @@ export interface GenerationJob {
   updatedAt: number
 }
 
-// Long enough for the poll that follows a finish to still find it. Swept on
-// write rather than on a timer, so an idle machine schedules nothing.
+// Long enough for the poll that follows a finish to still find it.
 const JOB_TTL_MS = 10 * 60 * 1000
 
 async function sweep(db: Db): Promise<void> {
@@ -77,7 +71,6 @@ function toJob(row: RecommendationJob): GenerationJob {
   }
 }
 
-// Everything a worker needs to run a job it never received.
 export interface JobParams {
   memberIds: number[]
   mediaType: string
@@ -121,8 +114,8 @@ export async function hasActiveJob(db: Db, userId: number): Promise<boolean> {
 }
 
 export async function setPhase(db: Db, jobId: string, phase: GenerationPhase): Promise<void> {
-  // claimed_at doubles as a heartbeat, so the staleness sweep won't reclaim a
-  // job that's still reporting stages.
+  // claimed_at doubles as a heartbeat — without it the sweep reclaims a job
+  // that is still reporting stages.
   await db.updateMany(
     recommendationJobs,
     { phase, claimed_at: Date.now(), updated_at: Date.now() },
@@ -130,8 +123,6 @@ export async function setPhase(db: Db, jobId: string, phase: GenerationPhase): P
   )
 }
 
-// The same heartbeat, without a stage to report — see HEARTBEAT_MS in worker.ts.
-//
 // Scoped to running rows, so a beat landing after the job stopped can't revive a
 // claim on something finished, failed, or already back in the queue.
 export async function touchJobClaim(db: Db, jobId: string): Promise<void> {
@@ -171,8 +162,6 @@ export async function failJob(db: Db, jobId: string, error: string): Promise<voi
   )
 }
 
-// For an interrupted run, not a broken one: the next attempt resumes from the
-// checkpoint.
 export async function requeueJob(db: Db, jobId: string): Promise<void> {
   await db.updateMany(
     recommendationJobs,
@@ -189,8 +178,7 @@ export async function getJob(db: Db, jobId: string, userId: number): Promise<Gen
   const job = toJob(row)
   if (job.status !== 'queued') return job
 
-  // Older queued jobs *and* whatever is already running — counting only the
-  // queued ones reports "0 ahead" with four runs in progress.
+  // Running rows count too, or this reports "0 ahead" with four runs in flight.
   const { rows } = await pool.query<{ ahead: string }>(
     `select count(*)::text as ahead from recommendation_jobs
       where status = 'running' or (status = 'queued' and created_at < $1)`,
@@ -199,21 +187,17 @@ export async function getJob(db: Db, jobId: string, userId: number): Promise<Gen
   return { ...job, queuedAhead: Number(rows[0]?.ahead ?? 0) }
 }
 
-// How long a claim survives without a beat. A measure of silence, not of
-// slowness: a worker beats while it works (touchJobClaim, HEARTBEAT_MS), so
-// nothing for three minutes means the machine is gone — however long the stage
-// it was in would legitimately have taken.
+// How long a claim survives without a beat. A measure of silence, not slowness:
+// a worker beats while it works (touchJobClaim), so this must not be read as a
+// bound on how long a stage may legitimately take.
 export const CLAIM_STALE_MS = 3 * 60 * 1000
 
-// Retried twice, then left failed, so a genuinely broken run can't cycle.
 const MAX_ATTEMPTS = 3
 
-// A running job whose heartbeat stopped means its machine died.
-//
 // A null claim is deliberately not stale — `claimed_at is not null`, never
 // coalesce(claimed_at, 0). During a rolling deploy that would let a new-release
-// machine seize a row written by the previous release and run it with nothing
-// to run. Unrecognised rows are left to the TTL sweep.
+// machine seize a row written by the previous release and run it with nothing to
+// run. Unrecognised rows are left to the TTL sweep.
 export async function requeueStaleJobs(db: Db): Promise<number> {
   const { rowCount } = await pool.query(
     `update recommendation_jobs
@@ -232,10 +216,7 @@ export interface ClaimedJob {
   userId: number
   params: JobParams
   checkpoint: unknown
-  // Measured at the claim rather than at the start of generation, so it stays
-  // queue wait and doesn't absorb whatever the worker does first.
   queuedMs: number
-  // Post-increment, so the first run of a job reports 1.
   attempt: number
 }
 
@@ -271,8 +252,6 @@ export async function claimJobs(db: Db, limit: number): Promise<ClaimedJob[]> {
     userId: row.user_id,
     params: JSON.parse(row.params) as JobParams,
     checkpoint: row.checkpoint ? JSON.parse(row.checkpoint) : {},
-    // A requeued job's wait is measured from when it was first asked for, not
-    // from the requeue: that's the wait the person actually sat through.
     queuedMs: Math.max(0, now - Number(row.created_at)),
     attempt: row.attempts,
   }))

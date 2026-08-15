@@ -17,7 +17,7 @@ export type MediaType = MediaItem['type']
 // `previous` makes this a merge, not an overwrite: a search payload carries no
 // credits, runtime or description, so re-importing over an enriched row would
 // null out what a by-id lookup filled in. Rematch passes none — it repoints the
-// row at a different work. Only a by-id lookup earns the enrichedAt stamp.
+// row at a different work.
 function buildMetadata(result: TmdbSearchResult, previous?: unknown, fromDetailLookup = false): MediaMetadata {
   const prev = previous != null ? parseMediaMetadata(previous) : null
 
@@ -43,7 +43,6 @@ export async function upsertMediaItem(
   db: Db,
   type: MediaType,
   result: TmdbSearchResult,
-  // Recorded so ids from different providers can't collide.
   source: string,
   fromDetailLookup = false,
 ): Promise<MediaItem> {
@@ -72,8 +71,8 @@ export async function upsertMediaItem(
   return item
 }
 
-// For a detail lookup that 404'd: stamps enrichedAt and nothing else, so the row
-// stops looking un-enriched and re-requesting on every view.
+// For a detail lookup that 404'd — without the stamp the row re-requests on
+// every view forever.
 export async function markMediaItemEnriched(db: Db, item: MediaItem): Promise<void> {
   const metadata = parseMediaMetadata(item.metadata)
   await db.update(mediaItems, item.id, { metadata: { ...metadata, enrichedAt: Date.now() } })
@@ -82,7 +81,7 @@ export async function markMediaItemEnriched(db: Db, item: MediaItem): Promise<vo
 export type RematchMediaItemResult = { ok: true; item: MediaItem; merged: boolean } | { ok: false; error: string }
 
 // The unique (user_id, media_item_id) constraint won't allow keeping both logs,
-// so where a user has one on each item the more recently updated wins.
+// so the more recently updated wins.
 async function mergeInteractionsInto(db: Db, fromMediaItemId: number, toMediaItemId: number): Promise<void> {
   const interactions = await db.findMany(userMediaInteractions, { where: { media_item_id: fromMediaItemId } })
 
@@ -101,9 +100,8 @@ async function mergeInteractionsInto(db: Db, fromMediaItemId: number, toMediaIte
   }
 }
 
-// Re-points an item at a different catalog entry, in place so interactions stay
-// attached to the same id. Tags are fully replaced — the old ones described the
-// wrong work. A target already in the catalog is merged into instead.
+// In place, so interactions stay attached to the same id. Tags are fully
+// replaced — the old ones described the wrong work.
 export async function rematchMediaItem(
   db: Db,
   type: MediaType,
@@ -147,8 +145,8 @@ export async function rematchMediaItem(
 
 export type InteractionStatus = (typeof INTERACTION_STATUSES)[number]
 
-// Every status except the rejection. Derived rather than listed again, so a
-// status added later is included by default.
+// Derived rather than listed again, so a status added later is included by
+// default — only another kind of refusal needs excluding here.
 export const CONSUMPTION_STATUSES: readonly InteractionStatus[] = INTERACTION_STATUSES.filter(
   (status) => status !== 'not_interested',
 )
@@ -169,32 +167,27 @@ export interface LogInteractionInput {
   // one question with three answers. parseRatingSubmission keeps them consistent.
   disliked?: boolean | null
   notes: string | null
-  // Overrides consumed_at instead of stamping "now", so an import can preserve
-  // the original date.
   consumedAt?: number
 }
 
-// The scale runs 0.5-5 in half-star steps. 0 is not the bottom of it: "never
-// rated" and "rated the lowest it goes" are different claims, so anything at or
-// below 0 resolves to null, meaning unrated.
+// 0 is not the bottom of the scale: "never rated" and "rated the lowest it goes"
+// are different claims, so anything at or below 0 resolves to null.
 export function parseRatingInput(raw: string): number | null {
   return normalizeRating(raw.trim() === '' ? null : Number(raw))
 }
 
-// The single gate every rating passes through, from the picker or an importer.
 export function normalizeRating(raw: number | null | undefined): number | null {
   if (raw == null || !Number.isFinite(raw)) return null
   const rounded = Math.min(5, Math.round(raw * 2) / 2)
   return rounded < 0.5 ? null : rounded
 }
 
-// What the picker submits for "Didn't like it". Not a number, so it can't be
-// confused for one between the form and the column.
+// Not a number, so it can't be confused for one between form and column.
 export const DISLIKED_INPUT_VALUE = 'disliked'
 
-// One field in, both columns out. The picker is a single radio group with three
-// kinds of answer, so parsing it in one place is what keeps them mutually
-// exclusive — split across two fields, a row can claim four stars and a dislike.
+// One field in, both columns out. Parsing in one place is what keeps them
+// mutually exclusive — split across two fields, a row can claim four stars and a
+// dislike at once.
 export function parseRatingSubmission(raw: string): { rating: number | null; disliked: boolean | null } {
   if (raw.trim() === DISLIKED_INPUT_VALUE) return { rating: null, disliked: true }
   return { rating: parseRatingInput(raw), disliked: null }
@@ -210,9 +203,8 @@ export async function logInteraction(
 ) {
   const now = Date.now()
   const consumedAt = input.consumedAt ?? now
-  // updated_at drives the watched-list sort and its "logged on" date, so a
-  // caller backdating via consumedAt has to win here too — otherwise every
-  // imported movie reads as "logged today". created_at stays the insert time.
+  // updated_at drives the watched-list sort, so a caller backdating via
+  // consumedAt has to win here too or every imported row reads as "logged today".
   const activityAt = input.consumedAt ?? now
 
   const values: Partial<UserMediaInteraction> = {
@@ -225,8 +217,7 @@ export async function logInteraction(
     created_at: now,
     updated_at: activityAt,
   }
-  // Omitted rather than set when not marking consumed, so a later edit to
-  // status/rating/notes leaves an existing consumed_at alone.
+  // Omitted when not marking consumed, so a later edit leaves consumed_at alone.
   const update: Partial<UserMediaInteraction> = {
     status: input.status,
     notes: input.notes ?? undefined,
@@ -285,7 +276,6 @@ export async function getMediaItemDetail(db: Db, mediaItemId: number): Promise<M
   return (await db.find(mediaItems, mediaItemId)) ?? null
 }
 
-// One query instead of one per item, for a whole page of search results.
 export async function getUserInteractionsForItems(db: Db, userId: number, mediaItemIds: number[]) {
   if (mediaItemIds.length === 0) return new Map<number, UserMediaInteraction>()
 
@@ -299,11 +289,10 @@ export async function getUserInteractionForItem(db: Db, userId: number, mediaIte
   return db.findOne(userMediaInteractions, { where: { user_id: userId, media_item_id: mediaItemId } })
 }
 
-// Two queries regardless of log size — fetching items per-row is an N+1, and
-// the profile page runs this once per media type.
+// Two queries regardless of log size — per-row item fetches are an N+1.
 //
-// The type filter stays in JS because userMediaInteractions has no `type`
-// column — it lives on the joined media_items row.
+// The type filter stays in JS because userMediaInteractions has no `type` column;
+// it lives on the joined media_items row.
 export async function loadUserLogEntries(db: Db, userId: number): Promise<UserLogEntry[]> {
   const interactions = await db.findMany(userMediaInteractions, {
     where: { user_id: userId },
@@ -321,13 +310,12 @@ export async function loadUserLogEntries(db: Db, userId: number): Promise<UserLo
   }))
 }
 
-// Both fields stay in JS rather than becoming a where-clause: `type` has to (see
-// loadUserLogEntries), and keeping `statuses` beside it means one predicate
-// answers for the list and the count alike, so rows and pagination agree.
+// Both stay in JS: `type` has to (see loadUserLogEntries), and keeping
+// `statuses` beside it means one predicate answers for the list and the count
+// alike, so a page's rows and its pagination can't disagree.
 export interface UserLogFilter {
   type?: MediaType
-  // All of them when unset. Callers presenting the log as "what I've engaged
-  // with" pass CONSUMPTION_STATUSES, where a rejection doesn't belong.
+  // All of them when unset.
   statuses?: readonly InteractionStatus[]
 }
 
@@ -351,8 +339,7 @@ export async function listUserMediaLog(
 }
 
 export async function countUserMediaLog(db: Db, userId: number, filter: UserLogFilter = {}): Promise<number> {
-  // An unfiltered count is the one the database can answer on its own — every
-  // other shape needs the joined item row or a partitioned pass anyway.
+  // The only shape the database can answer without the joined item row.
   if (!filter.type && !filter.statuses) {
     return db.count(userMediaInteractions, { where: { user_id: userId } })
   }
@@ -361,9 +348,7 @@ export async function countUserMediaLog(db: Db, userId: number, filter: UserLogF
   return entries.filter((entry) => matchesLogFilter(entry, filter)).length
 }
 
-// Which media types each of these people has logged something in, so the
-// recommendations form can grey out a run before it's requested. Rejections
-// don't count, the same rule findMembersMissingSourceLogs uses.
+// Rejections don't count, the same rule findMembersMissingSourceLogs uses.
 //
 // One query rather than a count per person per type: loadUserLogEntries pulls a
 // whole log per call, so the obvious loop is one full load per follower per type.

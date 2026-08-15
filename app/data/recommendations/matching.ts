@@ -8,15 +8,13 @@ import { GenerationError } from './errors.ts'
 import type { DecadeRelation, Pick } from './picks.ts'
 import { track } from './timings.ts'
 
-// A pick paired with the catalog entry it resolved to.
 export interface Candidate {
   pick: Pick
   match: CatalogSearchResult
 }
 
-// Via the registry, so an unserved type throws rather than quietly returning
-// film results for a book request. These two are every outbound catalog request
-// the pipeline makes, so timing them here covers all of it.
+// These two are every outbound catalog request the pipeline makes, so timing
+// them here covers all of it.
 export function searchForType(mediaType: MediaType, query: string): Promise<CatalogSearchResult[]> {
   return track('catalog.search', () => getCatalogProvider(mediaType).search(query))
 }
@@ -52,15 +50,10 @@ function levenshteinDistance(a: string, b: string): number {
   return dp[a.length][b.length]
 }
 
-// Lenient on purpose: real catalog titles differ from a natural-language ask in
-// punctuation, "the"/no "the", or translation. Catches "wrong film entirely";
-// verifyPicksAgainstOverviews catches same-title-same-year-different-film.
+// Lenient on purpose — verifyPicksAgainstOverviews is what catches a
+// same-title-same-year-different-film.
 const TITLE_SIMILARITY_THRESHOLD = 0.5
 
-// Catalog titles often carry a subtitle the pick didn't ask for — "The
-// Dispossessed: An Ambiguous Utopia" scores 0.44 against an exact match. Books
-// hit this constantly.
-//
 // Strips at the separator rather than allowing a prefix match: "Foundation" is a
 // prefix of "Foundation and Empire", a different novel.
 function withoutSubtitle(title: string): string {
@@ -113,12 +106,9 @@ export interface PickVerdict {
   matches: boolean
 }
 
-// Split out from the call so it can be tested without a model.
-//
 // Refuses anything it can't read unambiguously rather than filtering on a best
 // guess: a verdict set that doesn't line up means we don't know which film each
-// answer was about. The job retries, and the picks it already paid for are in
-// the checkpoint.
+// answer was about.
 export function applyVerdicts(candidates: Candidate[], verdicts: PickVerdict[]): Candidate[] {
   if (!Array.isArray(verdicts)) throw mismatch(`verdicts came back as ${typeof verdicts}`)
 

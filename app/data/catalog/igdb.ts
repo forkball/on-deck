@@ -5,7 +5,6 @@ import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
 const IGDB_API = 'https://api.igdb.com/v4'
 const TWITCH_TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
 
-// IGDB serves 4 requests/second.
 export const IGDB_MAX_CONCURRENCY = 4
 
 // game_type values from /v4/game_types that count as "a game someone played".
@@ -37,8 +36,6 @@ const PLATFORM_FAMILIES: { label: string; match: RegExp }[] = [
 
 export const GAME_PLATFORMS: string[] = PLATFORM_FAMILIES.map((family) => family.label)
 
-// Lossy at render and filter time only — the full list stays in the item's
-// metadata. Unrecognised names pass through, so something exotic still says so.
 export function platformFamilies(platforms: string[]): string[] {
   const found = new Set<string>()
   const unmatched: string[] = []
@@ -52,7 +49,6 @@ export function platformFamilies(platforms: string[]): string[] {
   return [...PLATFORM_FAMILIES.filter((family) => found.has(family.label)).map((family) => family.label), ...unmatched]
 }
 
-// The genre filter's vocabulary, from /v4/genres.
 export const GAME_GENRES: string[] = [
   'adventure',
   'arcade',
@@ -86,7 +82,6 @@ interface IgdbImage {
 interface IgdbGame {
   id: number
   name?: string
-  // Unix seconds.
   first_release_date?: number
   summary?: string | null
   cover?: IgdbImage
@@ -95,13 +90,11 @@ interface IgdbGame {
   game_modes?: { name: string }[]
   involved_companies?: { developer?: boolean; company?: { name?: string } }[]
   platforms?: { name?: string; abbreviation?: string }[]
-  // How many people have rated it — fan games and asset flips sit at 0.
   total_rating_count?: number
 }
 
 interface IgdbTimeToBeat {
   game_id: number
-  // All in seconds.
   normally?: number
   hastily?: number
   completely?: number
@@ -111,7 +104,6 @@ interface IgdbTimeToBeat {
 // bearer token, cached here and renewed on demand.
 let cachedToken: { value: string; expiresAt: number } | null = null
 
-// A minute of slack, so a token that expires mid-flight isn't sent.
 const TOKEN_SKEW_MS = 60_000
 
 async function accessToken(): Promise<string> {
@@ -164,8 +156,6 @@ async function claimRateLimitSlot(): Promise<void> {
   if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
 }
 
-// IGDB takes APICalypse in the request body — its own query language, not
-// JSON and not query parameters.
 async function igdbQuery<T>(endpoint: string, body: string): Promise<T[]> {
   const token = await accessToken()
   await claimRateLimitSlot()
@@ -205,13 +195,8 @@ const GAME_FIELDS =
 const SINGLEPLAYER_MODE = 'Single player'
 const MULTIPLAYER_MODE = 'Multiplayer'
 const COOP_MODE = 'Co-operative'
-// Delivery/scale variants, not intent — each one coexists with either
-// Co-operative or plain Multiplayer, so they only ever widen the general
-// "multiplayer" tag, never the versus/coop split.
 const OTHER_MULTIPLAYER_MODES = ['Split screen', 'Massively Multiplayer Online (MMO)', 'Battle Royale']
 
-// Not exclusive with each other — a game with both a co-op campaign and
-// competitive modes should match a filter on either.
 function derivePlayerTags(gameModes: { name: string }[] | undefined): string[] {
   const names = (gameModes ?? []).map((mode) => mode.name)
   const isCoop = names.includes(COOP_MODE)
@@ -264,8 +249,6 @@ function developerOf(game: IgdbGame): string | null {
   return developer?.company?.name ?? null
 }
 
-// Time-to-beat lives on its own endpoint keyed by game id, so it's fetched
-// once for a whole page of results rather than per game.
 async function hoursToBeatFor(gameIds: number[]): Promise<Map<number, number>> {
   if (gameIds.length === 0) return new Map()
 
@@ -276,8 +259,6 @@ async function hoursToBeatFor(gameIds: number[]): Promise<Map<number, number>> {
 
   const hours = new Map<number, number>()
   for (const row of rows) {
-    // `normally` is the headline figure; fall back so a completionist-only
-    // time still yields a length.
     const seconds = row.normally ?? row.hastily ?? row.completely
     if (seconds) hours.set(row.game_id, Math.round(seconds / 3600))
   }
@@ -334,8 +315,6 @@ function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
-// Fuzzy search misses exact titles surprisingly often ("For the King" returns
-// unrelated games) while `where slug = …` finds them immediately.
 export function slugifyTitle(title: string): string {
   return title
     .toLowerCase()
@@ -350,11 +329,9 @@ export function parseIgdbId(input: string): string | null {
   const trimmed = input.trim()
   if (/^\d+$/.test(trimmed)) return trimmed
 
-  // Only /games/ — a link to a company or franchise page isn't a game.
   const slug = trimmed.match(/igdb\.com\/games\/([a-z0-9-]+)/i)
   if (slug) return slug[1].toLowerCase()
 
-  // The API form, in case anyone is working from the docs.
   const apiId = trimmed.match(/api\.igdb\.com\/v\d+\/games\/(\d+)/i)
   return apiId ? apiId[1] : null
 }

@@ -6,14 +6,11 @@ import { logInteraction, type LogInteractionInput } from '../mediaItems.ts'
 import { fetchSteamLibrary, type SteamGame } from './steamApi.ts'
 
 export interface SteamImportResult {
-  // Everything Steam returned, before filtering.
   totalGames: number
-  // Entries that aren't games (soundtracks, demos, dedicated servers).
   skipped: number
   imported: number
   played: number
   unplayed: number
-  // Titles IGDB had no confident match for.
   notFound: string[]
 }
 
@@ -21,28 +18,16 @@ export interface SteamImportResult {
 // than the CSV importers' bound because IGDB serves only 4 requests/second.
 const CONCURRENCY = IGDB_MAX_CONCURRENCY
 
-// Soundtracks, demos, server binaries, editors. IGDB would either miss these or
-// match the parent game and log it twice.
 const NOT_A_GAME =
   /\b(soundtrack|ost|demo|playtest|beta|dedicated server|sdk|benchmark|artbook|art book|season pass|dlc|editor|mod tools|trailer|wallpaper)\b/i
 
-// Only tried after the full name fails, so "Skyrim Special Edition" still wins
-// where IGDB lists it separately.
 const EDITION_SUFFIX =
   /\b(game of the year|goty|definitive|complete|deluxe|ultimate|enhanced|remastered|special|anniversary|legendary|collection|gold|platinum|premium|classic|directors cut)\b.*$/
 
-// Steam disambiguates re-releases in parentheses ("Mass Effect (2007)") where
-// IGDB carries the plain name.
 const TRAILING_PARENTHETICAL = /\s*\([^)]*\)\s*$/
 
-// Every entry carries `playtime_forever`, so status is derived rather than
-// assumed: never launched means it's on the pile, any playtime means played.
-//
-// Games resolve through IGDB rather than being stored as Steam rows, so one
-// game found by search and by import is a single catalog entry.
 export async function importSteamLibrary(db: Db, userId: number, steamId: string): Promise<SteamImportResult> {
   const outcome = await fetchSteamLibrary(steamId)
-  // Already written for a person to read.
   if (!outcome.ok) throw new Error(outcome.message)
 
   const games = outcome.games
@@ -91,7 +76,6 @@ export async function importSteamLibrary(db: Db, userId: number, steamId: string
   return {
     totalGames: games.length,
     skipped: games.length - playable.length,
-    // Distinct games, so lower than the number of Steam entries matched.
     imported: merged.size,
     played,
     unplayed,
@@ -116,15 +100,12 @@ async function matchGame(steamName: string): Promise<CatalogSearchResult | null>
   return null
 }
 
-// Progressively less specific. The rest cost an extra request each, and are
-// only reached by titles that would otherwise be reported unmatched.
 function searchVariants(steamName: string): string[] {
   const variants = [steamName]
 
   const withoutYear = steamName.replace(TRAILING_PARENTHETICAL, '').trim()
   if (withoutYear && withoutYear !== steamName) variants.push(withoutYear)
 
-  // Normalized, since punctuation between title and suffix varies.
   const normalized = normalizeTitle(withoutYear)
   const base = normalized.replace(EDITION_SUFFIX, '').trim()
   if (base && base !== normalized) variants.push(base)

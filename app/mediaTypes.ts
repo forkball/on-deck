@@ -2,16 +2,12 @@ import type { InteractionStatus, MediaType } from './data/mediaItems.ts'
 import { INTERACTION_STATUSES } from './data/schema.ts'
 import { routes } from './routes.ts'
 
-// The types wired up end to end. Adding one here makes the `satisfies` below
-// enumerate every place that owes it an answer.
 export const ACTIVE_MEDIA_TYPES = ['movie', 'tv', 'book', 'game'] as const
 
 export type ActiveMediaType = (typeof ACTIVE_MEDIA_TYPES)[number]
 
 export const DEFAULT_MEDIA_TYPE: ActiveMediaType = 'movie'
 
-// Narrows an untrusted string. Null rather than a default, so each caller
-// decides whether "unknown" means fall back or reject.
 export function parseMediaType(value: unknown): ActiveMediaType | null {
   return ACTIVE_MEDIA_TYPES.includes(value as ActiveMediaType) ? (value as ActiveMediaType) : null
 }
@@ -37,7 +33,6 @@ export function isMediaTypeEnabled(type: ActiveMediaType): boolean {
   return experimentalEnabled().has(type)
 }
 
-// Read at call time, so the environment can differ per deployment.
 export function enabledMediaTypes(): ActiveMediaType[] {
   return ACTIVE_MEDIA_TYPES.filter(isMediaTypeEnabled)
 }
@@ -57,33 +52,22 @@ interface StatusVerbs {
 }
 
 interface MediaTypeUi {
-  // Plural, unlike MediaType — the single place that mismatch is reconciled.
   slug: string
   tabLabel: string
-  // Nouns for prose; the recommendation prompts read these.
   singular: string
   plural: string
-  // Before another noun — "TV taste profile", where the others read wrong.
   attributive: string
-  // For match confirmation — "the same show" beats "the same entry" for TV.
   entryNoun: string
-  // Conversational: "Wrong show?" rather than singular's "Wrong TV show?".
   itemNoun: string
-  // The catalog these items come from, named in user-facing copy.
   catalogName: string
   rematchPlaceholder: string
   // Sends the "wrong match?" form to where the id it asks for lives. Whether the
   // year helps is per-catalog — see each entry.
   catalogSearchUrl: (title: string, year: number | null) => string
-  // Unbranded, unlike the rematch form, where you're pasting a link from it.
   searchPlaceholder: string
-  // Page heading and <title> on the search route.
   searchHeading: string
-  // Verbs differ per medium: you watch a film but read a book.
   statusVerbs: StatusVerbs
-  // How the primary credit is labelled on a detail page.
   creditLabel: string
-  // Separate from statusVerbs.done so copy doesn't depend on its capitalisation.
   pastParticiple: string
   // Closures, not Route objects: routes.movies.show and routes.tv.show are
   // different generic instantiations, and TypeScript won't call a union of
@@ -221,22 +205,17 @@ export function mediaTypeUiFor(type: MediaType): MediaTypeUi {
   return MEDIA_TYPE_UI[parseMediaType(type) ?? DEFAULT_MEDIA_TYPE]
 }
 
-// For prose about a type that may have come from the DB widened to `string`.
 export function mediaTypeLabel(value: unknown): string {
   const type = parseMediaType(value)
   return type ? MEDIA_TYPE_UI[type].tabLabel : String(value)
 }
 
-// Separate from parseMediaType so callers holding a DB MediaType don't have to
-// launder it through `unknown`.
 export function isActiveMediaType(type: MediaType): type is ActiveMediaType {
   return parseMediaType(type) !== null
 }
 
 export type { InteractionStatus }
 
-// Narrows an untrusted string, like parseMediaType. Null rather than a
-// default, and every caller so far reads that as "no status filter".
 export function parseInteractionStatus(value: unknown): InteractionStatus | null {
   return INTERACTION_STATUSES.includes(value as InteractionStatus) ? (value as InteractionStatus) : null
 }
@@ -261,7 +240,6 @@ export function statusLabelsFor(mediaType: ActiveMediaType): Record<string, stri
   return Object.fromEntries(statusOptionsFor(mediaType).map((o) => [o.value, o.label]))
 }
 
-// For mixed lists that render a status without knowing its medium.
 export function statusLabel(status: string, mediaType?: unknown): string {
   const type = parseMediaType(mediaType) ?? DEFAULT_MEDIA_TYPE
   return statusLabelsFor(type)[status] ?? status
@@ -270,8 +248,6 @@ export function statusLabel(status: string, mediaType?: unknown): string {
 export const STATUS_OPTIONS = statusOptionsFor(DEFAULT_MEDIA_TYPE)
 export const STATUS_LABELS = statusLabelsFor(DEFAULT_MEDIA_TYPE)
 
-// One color per status so a badge reads without its label. "Not interested" sits
-// outside the green/blue/amber progression, not being a stage of anything.
 const STATUS_BADGE_COLORS: Record<InteractionStatus, string> = {
   want_to_consume: '#1d4ed8',
   in_progress: '#b45309',

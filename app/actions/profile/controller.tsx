@@ -50,7 +50,6 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
       const media = await loadMediaSummaries(db, auth.identity.id, RECENT_COUNT)
-      // Which tab to open on — set when returning from a detail page.
       const activeTab = parseEnabledMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
       const followingCount = await countFollowing(db, auth.identity.id)
@@ -86,14 +85,6 @@ export default createController(routes.profile, {
         useNotes: formData.get('use_notes') != null,
       })
 
-      // No rebuild here on purpose. Changing what a profile is written from
-      // makes every stored one stale, and the signature already knows that —
-      // rewriting all four on the spot would spend four model calls on a
-      // preference someone might still be adjusting. They're rewritten on the
-      // next run, or now, by the Rebuild button beside each one.
-      //
-      // Back to the form that sent this, not the profile — landing somewhere
-      // else after saving reads as though something bigger happened.
       return redirect(`${routes.profile.edit.index.href()}?saved=1`, 303)
     },
 
@@ -106,15 +97,6 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
 
-      // Rejections don't count, which is the same rule generating uses (see
-      // findMembersMissingSourceLogs). Counting them here instead would let
-      // someone rebuild a profile they then can't generate from: "taste
-      // profile rewritten", followed immediately by "you have no movies
-      // logged". Both true, and together nonsense.
-      //
-      // It also keeps the button honest — the count behind `total` on the
-      // profile page, which decides whether it's clickable, is filtered the
-      // same way.
       const logged = await countUserMediaLog(db, auth.identity.id, {
         type: mediaType,
         statuses: CONSUMPTION_STATUSES,
@@ -156,9 +138,6 @@ export default createController(routes.profile, {
       const db = context.get(Database)
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
       const mediaType = parseEnabledMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
-      // Unlike the profile page, this one shows every status — it's the full
-      // log, including what you've declined, which is the only place you can
-      // find those again to undo them. Null means no filter.
       const status = parseInteractionStatus(context.url.searchParams.get('status'))
       const filter = { type: mediaType, statuses: status ? [status] : undefined }
 

@@ -46,8 +46,6 @@ const doneStepStyle = css({
   fontSize: '14px',
 })
 
-// A type alias, not an interface — client entry props need SerializableProps'
-// index signature, which an interface doesn't provide.
 export type GenerationProgressProps = {
   statusHref: string
   initialLabel: string
@@ -79,7 +77,6 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       let consecutiveFailures = 0
 
       while (!signal.aborted) {
-        // Backs off as failures mount.
         const wait = POLL_MS * Math.min(1 + consecutiveFailures, 5)
         await new Promise((resolve) => setTimeout(resolve, wait))
         if (signal.aborted) return
@@ -90,7 +87,6 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             signal,
           })
 
-          // A swept job is gone for good.
           if (response.status === 404) {
             failed = "This run is no longer available. It may have finished a while ago."
             render()
@@ -118,7 +114,6 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             return
           }
 
-          // Stop rather than polling a finished job.
           if (status.done && status.href) {
             window.location.href = status.href
             return
@@ -157,7 +152,6 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
           )
         }
 
-        // Its own state, not a dimmed first step — the run hasn't started.
         if (queueState === 'queued') {
           return (
             <p mix={css({ color: '#555' })}>

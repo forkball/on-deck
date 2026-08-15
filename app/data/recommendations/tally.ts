@@ -1,33 +1,19 @@
-// Where a run's suggestions went. The pipeline over-requests and puts the picks
-// through a series of gates, any of which can quietly take one — so a short run
-// looks identical to a broken one, and neither says which gate did it.
-//
-// Log-only: nothing is stored or shown. The open question is only whether runs
-// come up short at all.
+// Log-only: nothing is stored or shown.
 export interface PickDrops {
-  // Nothing in the catalog under that title at all.
   unfound: number
-  // Already in the log for this media type — seen, or turned down.
   alreadyLogged: number
-  // A second pick that resolved to an entry an earlier one already took.
   duplicate: number
-  // Found something, but not the thing that was meant.
   titleMismatch: number
-  // Failed one of the tag filters the request set.
   filtered: number
-  // Outside the requested length bucket.
   length: number
-  // Verification said the catalog entry isn't the one the model meant.
   unverified: number
 }
 
 export interface PickTally {
-  // What the model actually returned.
   requested: number
-  // What made it into the run.
   kept: number
-  // Survived every gate and was trimmed by the target count. Not a loss — this
-  // is the over-request working — so it's kept apart from the drops.
+  // Trimmed by the target count, not dropped by a gate — kept apart so a healthy
+  // run doesn't read as bleeding picks.
   surplus: number
   dropped: PickDrops
 }
@@ -48,14 +34,12 @@ export function totalDropped(drops: PickDrops): number {
   return Object.values(drops).reduce((sum, count) => sum + count, 0)
 }
 
-// Every pick lands in exactly one bucket. If that doesn't hold a gate is going
-// uncounted, which is worse than no numbers at all — so the line says so.
+// Every pick must land in exactly one bucket; anything else means a gate is
+// going uncounted, so the line says so rather than appearing to balance.
 export function unaccountedFor(tally: PickTally): number {
   return tally.requested - tally.kept - tally.surplus - totalDropped(tally.dropped)
 }
 
-// Logged where it's counted rather than returned up to the worker: this is
-// complete the moment the picks are, unlike timings.
 export function logPickTally(tally: PickTally): void {
   console.info(`[generation] ${summarizePickTally(tally)}`)
 }
@@ -70,8 +54,7 @@ const DROP_LABELS: Record<keyof PickDrops, string> = {
   unverified: 'unverified',
 }
 
-// One line, shaped like the timings one so both can be pulled from the log
-// together. Zero-count gates are left off as noise.
+// Shaped like the timings line so both can be pulled from the log together.
 export function summarizePickTally(tally: PickTally): string {
   const parts = [`picks ${tally.requested} → kept ${tally.kept}`]
   if (tally.surplus > 0) parts.push(`surplus ${tally.surplus}`)

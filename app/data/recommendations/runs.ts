@@ -24,9 +24,8 @@ export const MAX_RUNS_PER_USER = 3
 export interface RecommendationResult {
   item: MediaItem
   reason: string
-  // Looked up live, and the whole row rather than just its status: the run
-  // page's log control pre-fills rating and notes, and submitting without them
-  // would write null over what's there.
+  // The whole row, not just its status: the run page's log control pre-fills
+  // rating and notes, and submitting without them writes null over what's there.
   interaction: UserMediaInteraction | null
 }
 
@@ -38,20 +37,15 @@ export interface RecommendationRunSummary {
   name: string | null
 }
 
-// sourceTypes always has at least one entry — runs generated before it was
-// tracked fall back to [mediaType] in parseParams.
+// sourceTypes always has at least one entry — see parseParams.
 export interface GenerationParams {
   genre?: string
   decade?: number
-  // Defaults to 'within' when `decade` is set — see matchesDecade.
   decadeRelation?: DecadeRelation
   length?: LengthBucket
-  // Games only — see GAME_PLAYER_TYPES / GAME_MULTIPLAYER_TYPES.
   playerType?: string
   multiplayerType?: string
-  // Games only — a platform family, see GAME_PLATFORMS.
   platform?: string
-  // Books only — see BOOK_SERIES_TYPES.
   series?: string
   sourceTypes: MediaType[]
 }
@@ -62,7 +56,6 @@ export interface RecommendationRunDetail extends RecommendationRunSummary {
   params: GenerationParams
 }
 
-// An earlier run with these levers that the user hasn't acted on.
 export interface UnusedDuplicateRun {
   runId: number
   name: string | null
@@ -88,9 +81,8 @@ function parseParams(run: RecommendationRun): GenerationParams {
   }
 }
 
-// Canonical, so two requests that mean the same thing compare equal.
-// JSON.stringify of the params object won't do: key order, dropped
-// `undefined`s and checkbox order all vary independently of meaning.
+// JSON.stringify of the params object won't do: key order, dropped `undefined`s
+// and checkbox order all vary independently of meaning.
 function paramsKey(filters: RecommendationFilters, sourceTypes: MediaType[], memberIds: number[]): string {
   return JSON.stringify([
     filters.genre ?? null,
@@ -102,15 +94,12 @@ function paramsKey(filters: RecommendationFilters, sourceTypes: MediaType[], mem
     filters.platform ?? null,
     filters.series ?? null,
     [...sourceTypes].sort(),
-    // A group run with different people is a different request, even with
-    // identical filters.
     [...memberIds].sort((a, b) => a - b),
   ])
 }
 
-// "Acted on" means logging one of its own picks — deliberately not "has
-// anything been logged since", which unrelated activity would satisfy. A run
-// with everything still unlogged means a second list would go unfinished too.
+// "Acted on" means logging one of this run's own picks — not "has anything been
+// logged since", which unrelated activity would satisfy.
 export async function findUnusedDuplicateRun(
   db: Db,
   userId: number,
@@ -145,9 +134,7 @@ export async function findUnusedDuplicateRun(
     )
     if (key !== wanted) continue
 
-    // Only the latest run with these levers counts: once you've worked through
-    // it, asking again is a real request, and being sent back to an older
-    // untouched one would be worse than useless.
+    // Only the latest run with these levers counts.
     const picks = await db.findMany(userRecommendations, { where: { run_id: run.id } })
     if (picks.length === 0) return null
 
@@ -168,8 +155,6 @@ export async function findUnusedDuplicateRun(
   return null
 }
 
-// Relative to `viewerId`, who isn't necessarily the requester — any member can
-// view a run.
 async function listOtherMemberLabels(db: Db, viewerId: number, run: RecommendationRun): Promise<string[]> {
   const memberRows = await db.findMany(recommendationRunMembers, { where: { run_id: run.id } })
   const otherMemberIds = memberRows.map((m) => m.user_id).filter((id) => id !== viewerId)
@@ -189,7 +174,6 @@ export interface SaveRunInput {
   requestingUserId: number
   memberUserIds: number[]
   mediaType: MediaType
-  // Optional user-given label for the run, e.g. "Cozy weekend picks".
   name?: string
   params: GenerationParams
   results: RecommendationResult[]
@@ -208,8 +192,6 @@ export async function saveRun(db: Db, input: SaveRunInput): Promise<number> {
     { returnRow: true },
   )
 
-  // Safe to run concurrently: every row belongs to the run just created and
-  // `rank` carries the ordering, so none depends on another landing first.
   await Promise.all([
     ...input.memberUserIds.map((memberId) =>
       db.create(recommendationRunMembers, { run_id: run.id, user_id: memberId }),
@@ -227,14 +209,11 @@ export async function saveRun(db: Db, input: SaveRunInput): Promise<number> {
   return run.id
 }
 
-// Separate from saveRun because the run has to exist before the stages that
-// follow it can be measured — saving is itself one of the phases being timed.
 export async function saveRunTimings(db: Db, runId: number, timings: RunTimings): Promise<void> {
   await db.updateMany(recommendationRuns, { timings: JSON.stringify(timings) }, { where: { id: runId } })
 }
 
 // Scoped to one media type, so a TV run never prunes an older movie run.
-// Members and picks go with it via ON DELETE CASCADE.
 export async function pruneOldRuns(db: Db, userId: number, mediaType: MediaType): Promise<boolean> {
   const runs = await db.findMany(recommendationRuns, {
     where: { user_id: userId, media_type: mediaType },
@@ -264,9 +243,8 @@ export async function listRecommendationRuns(db: Db, userId: number): Promise<Re
   )
 }
 
-// Group runs someone else requested this user into. Restricted to mutual
-// follows — being added to someone's run isn't consent to show up on their
-// page. See getRecommendationRun for why this is stricter than the access check.
+// Restricted to mutual follows — being added to someone's run isn't consent to
+// show up on their page. Deliberately stricter than getRecommendationRun.
 export async function listRecommendationRunsFromOthers(db: Db, userId: number): Promise<RecommendationRunSummary[]> {
   const memberships = await db.findMany(recommendationRunMembers, { where: { user_id: userId } })
   if (memberships.length === 0) return []
@@ -303,13 +281,10 @@ export async function listRecommendationRunsFromOthers(db: Db, userId: number): 
   )
 }
 
-// Null (a 404) if the run doesn't exist or this user wasn't in it. Access is
-// membership, and membership is permanent — unlike
-// listRecommendationRunsFromOthers, which gates on *current* mutual follow.
-//
-// The mismatch is intended: "may I see this run" stays yes because it was built
-// partly from your taste, while the listing is about who you're connected to
-// now. After unfollowing, a shared run leaves your list but its URL still works.
+// Access is membership, and membership is permanent — unlike
+// listRecommendationRunsFromOthers, which gates on *current* mutual follow. The
+// mismatch is intended: after unfollowing, a shared run leaves your list but its
+// URL still works.
 export async function getRecommendationRun(
   db: Db,
   runId: number,

@@ -20,12 +20,6 @@ export async function searchUsers(db: Db, query: string, excludeUserId: number):
   })
 }
 
-// --- Field rules -----------------------------------------------------------
-//
-// Signup and profile editing write the same three columns, so the rules live
-// with the table rather than in either controller — a rule enforced on only one
-// path is the same as no rule.
-
 export const USERNAME_MIN_LENGTH = 3
 export const USERNAME_MAX_LENGTH = 30
 export const BIO_MAX_LENGTH = 500
@@ -56,24 +50,18 @@ export const bioSchema = s
   .transform((value) => value.trim())
   .pipe(maxLength(BIO_MAX_LENGTH))
 
-// One message per field rather than per failed check — the hint under the input
-// already spells out every rule.
 export const USER_FIELD_MESSAGES: Record<string, string> = {
   email: 'Enter a valid email address.',
   display_name: `Usernames are ${USERNAME_HINT}`,
   bio: `Bios are limited to ${BIO_MAX_LENGTH} characters.`,
 }
 
-// A form-data issue's path is the field name it came from (see
-// data-schema/form-data), but Standard Schema types it as a segment that may
-// also be an object.
 function issueField(issue: Issue): string {
   const segment = issue.path?.[0]
   if (segment == null) return ''
   return typeof segment === 'object' ? String(segment.key) : String(segment)
 }
 
-// Keyed by field name so a page can render each message under its own input.
 export function userFieldErrors(
   issues: readonly Issue[],
   messages: Record<string, string> = USER_FIELD_MESSAGES,
@@ -85,8 +73,6 @@ export function userFieldErrors(
   }
   return errors
 }
-
-// --- Lookups and writes ----------------------------------------------------
 
 // `excludeUserId` is what makes these usable while editing: saving the form
 // without touching your email must not report your own row as a conflict.
@@ -107,11 +93,7 @@ export async function findUserByUsername(db: Db, value: string, excludeUserId?: 
 export interface UserProfileFields {
   email: string
   display_name: string
-  // User-authored — see the `bio` column in schema.ts for why it's kept
-  // separate from the AI-written taste profile.
   bio: string
-  // Gates the bio and media log behind a follow — see follows.ts,
-  // canViewProfile.
   is_private: boolean
 }
 
@@ -121,9 +103,6 @@ export async function updateUserProfile(db: Db, userId: number, fields: UserProf
   await db.update(users, userId, { ...fields, bio: fields.bio || undefined })
 }
 
-// Its own write, like the password: set from a form that touches nothing the
-// edit page does, so folding them together would make a taste-settings save also
-// save the email and username sitting in that other form.
 export async function updateProfileSettings(
   db: Db,
   userId: number,
@@ -136,8 +115,6 @@ export async function updateProfileSettings(
   })
 }
 
-// Its own write, for the same reason. Hashed by the caller — nothing here ever
-// sees a plaintext password.
 export async function updateUserPassword(db: Db, userId: number, passwordHash: string): Promise<void> {
   await db.update(users, userId, { password_hash: passwordHash })
 }

@@ -1,17 +1,8 @@
 import { clientEntry, ref } from 'remix/ui'
 
-// A leaf sentinel, not a wrapper — like FloatingDropdownCloser, the <form> it
-// enhances is server-rendered markup (StatusSelect, StarRatingInput, ...) that
-// a client-only bundle can't import or re-render, so it can't be taken as a
-// prop the way ProfileMenu takes its menu links. Instead this reaches up to
-// the <form> that already exists in the server-rendered HTML and
-// progressively enhances its submit.
-//
-// With JS off nothing is attached and the <form> posts natively — the
-// server's redirect does a full navigation exactly as before. With JS on, the
-// submit becomes a fetch, the enclosing Modal/FloatingDropdown (if any)
-// closes, and the page updates via a top-frame reload instead of a
-// navigation.
+// Reaches up to the server-rendered <form> it sits in rather than wrapping it —
+// the form's fields are server UI a client bundle can't import. With JS off
+// nothing attaches and the form posts natively.
 export const FrameForm = clientEntry(import.meta.url, function FrameForm(handle) {
   return () => (
     <span

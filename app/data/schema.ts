@@ -9,18 +9,12 @@ export const users = table({
     password_hash: c.text().notNull(),
     // Doubles as the login handle alongside email — see auth/login/controller.tsx.
     display_name: c.text().notNull().unique(),
-    // User-authored. Deliberately never fed into taste profiles — only the log
-    // drives those.
     bio: c.text(),
-    // SteamID64, set by the OpenID flow. Null until someone connects one.
     steam_id: c.text(),
     // Gates the bio and media log behind a follow (see follows.ts,
     // canViewProfile) — everyone still sees the name and follow counts.
     is_private: c.boolean().notNull().default(false),
-    // Maintenance role, granted only by scripts/set-admin.ts. Its one effect
-    // today is exemption from the daily recommendation cap.
     is_admin: c.boolean().notNull().default(false),
-    // What the taste profile is written from. Null is the whole log.
     profile_log_limit: c.integer().nullable(),
     profile_use_notes: c.boolean().notNull().default(true),
     created_at: c.integer().notNull(),
@@ -72,14 +66,11 @@ export const userMediaInteractions = table({
   },
 })
 
-// The persisted taste profile, distinct from the raw interaction log above.
 export const userTasteProfiles = table({
   name: 'user_taste_profiles',
   primaryKey: ['user_id', 'media_type'],
   columns: {
     user_id: c.integer().notNull().references('users', 'id'),
-    // One row per (user, media_type) — cross-media taste mixing is an explicit
-    // opt-in, not the default.
     media_type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
     profile: c.text().notNull().default('{}'), // JSON string: { liked_tags: string[], disliked_tags: string[] }
     summary: c.text(),
@@ -87,8 +78,6 @@ export const userTasteProfiles = table({
   },
 })
 
-// Live progress for an in-flight run. In the database rather than process
-// memory because the app runs on more than one machine.
 export const recommendationJobs = table({
   name: 'recommendation_jobs',
   columns: {
@@ -96,10 +85,7 @@ export const recommendationJobs = table({
     user_id: c.integer().notNull().references('users', 'id'),
     // queued | running | done | failed
     status: c.text().notNull(),
-    // Everything needed to run this on a machine that never saw the request.
     params: c.text().notNull(),
-    // Output of each finished stage, so a resumed job doesn't repeat work it
-    // already paid for. Null until the first stage completes.
     checkpoint: c.text(),
     claimed_at: c.integer(),
     attempts: c.integer().notNull(),
@@ -108,14 +94,12 @@ export const recommendationJobs = table({
     run_id: c.integer(),
     pruned_oldest_run: c.integer().notNull(),
     error: c.text(),
-    // Where this attempt's time went, written once it finishes.
     timings: c.text(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
   },
 })
 
-// One "get recommendations" click, kept forever so past runs stay browsable.
 export const recommendationRuns = table({
   name: 'recommendation_runs',
   columns: {
@@ -125,19 +109,12 @@ export const recommendationRuns = table({
     // (sourceTypes). MAX_RUNS_PER_USER is scoped per media_type.
     media_type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
     created_at: c.integer().notNull(),
-    // Optional user-given label; falls back to the date in the UI.
     name: c.text(),
-    // The levers used, kept so the run's page shows what was asked for even
-    // after filters elsewhere change.
     params: c.text().notNull().default('{}'),
-    // Copied off the job before its row is swept, minutes later.
     timings: c.text(),
   },
 })
 
-// The ledger behind the daily cap, swept once a row leaves the 24-hour window.
-// Kept apart from recommendationRuns because those are pruned per media type,
-// and a pruned run still cost what it cost.
 export const recommendationRunUsage = table({
   name: 'recommendation_run_usage',
   columns: {
@@ -147,8 +124,6 @@ export const recommendationRunUsage = table({
   },
 })
 
-// The same ledger for hand-triggered profile rebuilds, capped separately: that
-// one counts runs, this counts a model call behind a button.
 export const profileRebuildUsage = table({
   name: 'profile_rebuild_usage',
   columns: {
@@ -158,7 +133,6 @@ export const profileRebuildUsage = table({
   },
 })
 
-// The requester plus any friends included in the run.
 export const recommendationRunMembers = table({
   name: 'recommendation_run_members',
   primaryKey: ['run_id', 'user_id'],
@@ -168,7 +142,6 @@ export const recommendationRunMembers = table({
   },
 })
 
-// The AI-generated picks belonging to one run.
 export const userRecommendations = table({
   name: 'user_recommendations',
   columns: {
@@ -180,7 +153,6 @@ export const userRecommendations = table({
   },
 })
 
-// One-directional follow — no accept step. See app/data/follows.ts.
 export const userFollows = table({
   name: 'user_follows',
   primaryKey: ['follower_id', 'followed_id'],
@@ -191,7 +163,6 @@ export const userFollows = table({
   },
 })
 
-// Created when a group run's requester and another member mutually follow.
 export const notifications = table({
   name: 'notifications',
   columns: {

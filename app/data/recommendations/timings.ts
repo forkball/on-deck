@@ -1,12 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-// Where a run's time went: the queue, then each phase, then the awaits inside it.
-//
 // Phase durations are wall clock and add up to the run. Step durations are
-// time-in-flight and deliberately don't — eight fetches running at once each
-// contribute their full duration to a span they shared. That gap is the point: a
-// step total well above its phase means the fan-out is working, one that matches
-// it means those calls ran in series.
+// time-in-flight and deliberately don't — concurrent calls each contribute their
+// full duration to a span they shared, so a step total above its phase is the
+// fan-out working. `count` is what makes the two readable apart.
 export interface StepTiming {
   name: string
   ms: number
@@ -16,16 +13,13 @@ export interface StepTiming {
 export interface PhaseTiming {
   name: string
   ms: number
-  // Sorted slowest-first, since that's the only order anyone reads them in.
   steps: StepTiming[]
 }
 
 export interface RunTimings {
-  // Enqueue to claim. Null when generation was called directly rather than
-  // through the queue.
   queuedMs: number | null
-  // A resumed job skips whatever its checkpoint holds, so its phases come out
-  // cheap for a reason that has nothing to do with speed.
+  // A resumed job skips what its checkpoint holds, so its phases come out cheap
+  // for a reason that has nothing to do with speed.
   attempt: number
   totalMs: number
   phases: PhaseTiming[]
@@ -34,15 +28,12 @@ export interface RunTimings {
 interface PhaseRecord {
   name: string
   startedAt: number
-  // Null while the phase is still open.
   ms: number | null
   steps: Map<string, StepTiming>
 }
 
-// Ambient rather than threaded through the pipeline: the calls worth timing are
-// leaves, four modules down from the run that owns them, and a recorder argument
-// would put measurement in every signature between. One store per run keeps
-// concurrent runs on the same machine apart.
+// One store per run, which is what keeps concurrent runs on the same machine
+// from recording into each other.
 const storage = new AsyncLocalStorage<Recorder>()
 
 class Recorder {
@@ -59,15 +50,13 @@ class Recorder {
     this.phases.push({ name, startedAt: Date.now(), ms: null, steps: new Map() })
   }
 
-  // A step is filed under the phase open when it *started*. Reading it at
-  // completion would file a stage's last call against whatever stage began
-  // while it was still in the air.
+  // A step is filed under the phase open when it *started* — reading it at
+  // completion files a stage's last call against whatever stage began while it
+  // was still in the air.
   currentPhase(): PhaseRecord {
     const open = this.phases.at(-1)
     if (open && open.ms == null) return open
 
-    // Unreachable while the pipeline opens `profiles` before its first await,
-    // but dropping the measurement is the wrong way to find out otherwise.
     const fallback: PhaseRecord = { name: 'unphased', startedAt: Date.now(), ms: null, steps: new Map() }
     this.phases.push(fallback)
     return fallback
@@ -104,10 +93,8 @@ class Recorder {
 }
 
 export interface TimingRecorder {
-  // Everything inside becomes the active run for markPhase/track.
   run: <T>(operation: () => Promise<T>) => Promise<T>
-  // Safe to call after a failure, and worth doing: a run that died on a hung
-  // provider is exactly the one whose timings answer why.
+  // Safe to call after a failure, and worth doing.
   finish: () => RunTimings
 }
 
@@ -119,8 +106,6 @@ export function startTimings(options: { queuedMs: number | null; attempt: number
   }
 }
 
-// No-ops outside a timed run, so nothing has to know whether it's being
-// measured.
 export function markPhase(name: string): void {
   storage.getStore()?.openPhase(name)
 }
@@ -134,21 +119,17 @@ export async function track<T>(name: string, operation: () => Promise<T>): Promi
   try {
     return await operation()
   } finally {
-    // In `finally` — a call that threw still spent the time, and the throwing
-    // ones are usually the slow ones.
+    // In `finally`: a call that threw still spent the time.
     recorder.recordStep(phase, name, Date.now() - startedAt)
   }
 }
 
-// Milliseconds below a second, because the database steps live down there and
-// rounding them all to "0.0s" would hide the exact thing they were added to
-// show. Seconds above it, since nobody reads a model call as 24173ms.
+// Milliseconds below a second — the database steps live down there, and rounding
+// them to "0.0s" hides what they were added to show.
 function duration(ms: number): string {
   return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`
 }
 
-// One line, built to be grepped out of the logs and skimmed: phases in the
-// order they ran, each followed by its own steps.
 export function summarizeTimings(timings: RunTimings): string {
   const parts = [
     `total ${duration(timings.totalMs)}`,

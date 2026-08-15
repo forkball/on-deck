@@ -24,7 +24,6 @@ import { startTimings, summarizeTimings, type RunTimings } from './timings.ts'
 // belong to other services, so more workers past a point makes things worse.
 const DEFAULT_SLOTS = 2
 
-// Short enough that a waiting person doesn't notice the gap.
 const IDLE_POLL_MS = 2000
 
 // Derived rather than picked, so lowering the staleness window can't quietly
@@ -39,7 +38,6 @@ function slotCount(): number {
 
 export interface GenerationWorker {
   stop: () => void
-  // Exposed for tests, which need to drive a tick rather than wait on a timer.
   tick: () => Promise<void>
   inFlight: () => number
 }
@@ -52,8 +50,6 @@ export function startGenerationWorker(): GenerationWorker {
 
   async function run(job: ClaimedJob): Promise<void> {
     running++
-    // Started before the params check so a job that fails validation still
-    // reports the queue wait it spent getting here.
     const timings = startTimings({ queuedMs: job.queuedMs, attempt: job.attempt })
     let runId: number | null = null
 
@@ -118,8 +114,6 @@ export function startGenerationWorker(): GenerationWorker {
     }
   }
 
-  // The log line is the copy anyone actually reads — the stored rows are for
-  // comparing runs against each other later, once there are enough to compare.
   async function recordTimings(job: ClaimedJob, runId: number | null, measured: RunTimings): Promise<void> {
     console.info(`[generation] job=${job.id} run=${runId ?? 'none'} ${summarizeTimings(measured)}`)
     await saveJobTimings(db, job.id, measured)
@@ -132,10 +126,8 @@ export function startGenerationWorker(): GenerationWorker {
     try {
       await requeueStaleJobs(db)
       const jobs = await claimJobs(db, slots - running)
-      // Not awaited — the loop has to stay responsive as slots free up.
       for (const job of jobs) void run(job)
     } catch {
-      // The next tick retries; a transient database blip shouldn't kill the loop.
     }
   }
 

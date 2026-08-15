@@ -3,9 +3,6 @@ import { del, form, get, put, post, route } from 'remix/routes'
 export const routes = route({
   assets: get('/assets/*path'),
   home: '/',
-  // The nav's "Media" link — redirects to /movies/search or /tv/search
-  // based on whichever type the user was last looking at (see
-  // middleware/mediaType.ts), so it doesn't always bounce back to movies.
   media: get('media'),
   auth: route('auth', {
     signup: form('signup'),
@@ -49,10 +46,6 @@ export const routes = route({
     log: post(':mediaItemId/log'),
     rematch: post(':mediaItemId/rematch'),
   }),
-  // Not media-type-specific — a logged interaction is just a (user, media
-  // item) row regardless of whether that item is a movie or a TV show, so
-  // both the movie and TV detail/edit UIs post here rather than each having
-  // their own copy.
   interactions: route('interactions', {
     update: put(':interactionId'),
     destroy: del(':interactionId'),
@@ -62,20 +55,9 @@ export const routes = route({
     watched: get('watched'),
     following: get('following'),
     followers: get('followers'),
-    // Email, username and bio, on their own page rather than inline on the
-    // profile — the two handles are unique and validated, so editing them
-    // needs somewhere to put per-field errors.
     edit: form('edit', { formMethod: 'PUT', names: { action: 'update' } }),
-    // Both live on the profile page itself rather than getting a page each —
-    // they're a couple of controls sitting beside the thing they govern, and
-    // neither has per-field errors to find room for.
     settings: post('settings'),
-    // Per media type, because that's the grain a profile has: one press is one
-    // model call, which is also what makes the daily cap mean what it says.
     rebuild: post('rebuild/:mediaType'),
-    // Its own page rather than three more boxes on the edit form: changing a
-    // password has nothing to do with the rest of a profile, and keeping it
-    // apart means the edit form's save isn't also a password save.
     password: form('password', { formMethod: 'PUT', names: { action: 'update' } }),
     importMovies: route('import-movies', {
       index: get('/'),
@@ -101,8 +83,6 @@ export const routes = route({
   recommendations: route('recommendations', {
     index: get('/'),
     generate: post('/'),
-    // The wait while a run is generating, and the endpoint it polls. Both
-    // keyed by a persisted job id (see data/recommendations/jobs.ts).
     generating: get('generating/:jobId'),
     status: get('status/:jobId'),
     show: get(':runId'),

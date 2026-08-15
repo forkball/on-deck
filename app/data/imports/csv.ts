@@ -1,5 +1,3 @@
-// Shared plumbing for the Letterboxd and Goodreads importers — only the column
-// mapping differs between them.
 
 // Minimal RFC 4180 parser. Quoted fields matter: both exports use them for any
 // title containing a comma ("Synecdoche, New York").
