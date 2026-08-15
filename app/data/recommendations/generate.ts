@@ -41,13 +41,10 @@ import { emptyDrops, logPickTally } from './tally.ts'
 import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
 
-// Down from ten. A run reaches to fill its count, and the last few were the
-// ones doing the reaching — asked for fewer, the model spends what it has on
-// picks it can actually justify instead of padding out a list.
 const TARGET_COUNT = 8
 
-// What a partially-finished run has already bought. Small on purpose: ids, not
-// objects — the rows they name are written before the checkpoint records them.
+// Ids, not objects: the rows they name are written before the checkpoint
+// records them, and a job row has to stay small.
 export interface GenerationCheckpoint {
   picks?: Pick[]
   verified?: { mediaItemId: number; reason: string }[]
@@ -55,20 +52,17 @@ export interface GenerationCheckpoint {
 
 export interface GenerateRecommendationsOutcome {
   runId: number
-  // Whether this run pushed the user over MAX_RUNS_PER_USER.
   prunedOldestRun: boolean
 }
 
 export interface MissingSourceLogs {
   userId: number
   label: string
-  // The requested source types this person has nothing logged under.
   missing: MediaType[]
 }
 
-// An empty log yields an empty taste profile, so the run would still generate
-// while quietly ignoring that person — a "group" pick reflecting only whoever
-// had logs. Callers block generation on a non-empty result.
+// Callers must block generation on a non-empty result: an empty log yields an
+// empty profile, and the run would silently ignore that person.
 export async function findMembersMissingSourceLogs(
   db: Db,
   memberUserIds: number[],
@@ -78,9 +72,8 @@ export async function findMembersMissingSourceLogs(
     memberUserIds.map(async (memberId) => {
       const [user, counts] = await Promise.all([
         db.find(users, memberId),
-        // Rejections don't count: a member whose log for a type is nothing but
-        // "not interested" has given the profile nothing to work from, which
-        // is exactly the case this check exists to catch.
+        // Rejections don't count — a log of nothing but "not interested" gives
+        // the profile nothing to work from.
         Promise.all(
           sourceTypes.map((type) => countUserMediaLog(db, memberId, { type, statuses: CONSUMPTION_STATUSES })),
         ),
@@ -96,48 +89,33 @@ export async function findMembersMissingSourceLogs(
   return checked.filter((entry) => entry.missing.length > 0)
 }
 
-// One dated run of picks, kept rather than replaced so it stays browsable at
-// /recommendations/:id. Capped at MAX_RUNS_PER_USER, oldest pruned.
-//
-// The stages live next door — picks.ts asks the model, matching.ts resolves to
-// catalog entries, runs.ts persists. This owns only their order and what a
-// resume skips.
 export async function generateRecommendations(
   db: Db,
   requestingUserId: number,
   memberUserIds: number[],
   filters: RecommendationFilters = {},
   mediaType: MediaType = 'movie',
-  // Independent of what's being generated — "movies based on my TV taste" is a
-  // legitimate ask. Defaults to matching the output type.
+  // Independent of what's being generated. Defaults to the output type.
   sourceTypes?: MediaType[],
-  // Optional user-given label for the run, e.g. "Cozy weekend picks".
   name?: string,
-  // Every call site sits immediately before the await it describes.
   onPhase: (phase: GenerationPhase) => void = () => {},
-  // Resume support: a stage whose output is already in `checkpoint` is skipped,
-  // so an interrupted run doesn't buy the same model call twice.
+  // A stage whose output is already in `checkpoint` is skipped, so an
+  // interrupted run doesn't buy the same model call twice.
   checkpoint: GenerationCheckpoint = {},
   onCheckpoint: (checkpoint: GenerationCheckpoint) => void = () => {},
 ): Promise<GenerateRecommendationsOutcome> {
   const profileTypes: MediaType[] = sourceTypes && sourceTypes.length > 0 ? sourceTypes : [mediaType]
 
-  // Every stage announces itself twice — to whoever is watching the run, and
-  // to the timings — and the two must not drift apart. Going through one
-  // helper is what keeps a new stage from being measured as part of the last
-  // one it forgot to close.
+  // Both announcements go through here, or a new stage gets measured as part of
+  // the last one that forgot to close.
   const enterPhase = (phase: GenerationPhase): void => {
     markPhase(phase)
     onPhase(phase)
   }
 
-  // Each only costs a model call if that member's log has moved.
   enterPhase('profiles')
   const members = await Promise.all(
     memberUserIds.map(async (memberId) => {
-      // The user row comes first now rather than alongside: each member's own
-      // settings decide what their profile is written from, so there's nothing
-      // to build until it's here.
       const user = await db.find(users, memberId)
       const settings = user
         ? profileSettingsFor(user)
@@ -162,70 +140,43 @@ export async function generateRecommendations(
           ),
         }))
 
-  // What not to suggest comes from the log of the type being *generated*, not
-  // the types the taste was read from — the two differ whenever someone asks
-  // for one medium based on another.
-  //
-  // Drawing it from the source logs, as this used to, got the common case
-  // right only because source and output are usually the same type. Ask for
-  // movies from book taste and it excluded books: ids from another provider,
-  // so the hard filter below could never match one, leaving the output type's
-  // own log unconsulted and its films free to be recommended back to someone
-  // who had already watched and rated them.
-  //
-  // Nothing of the source log is lost by this. Its signal is the taste profile
-  // — that is what a profile is — and its titles would only mislead here,
-  // since an adaptation shares a name with a book that is not the same thing
-  // to watch.
+  // Must come from the log of the type being *generated*, not the types the
+  // taste was read from: only the output type's ids can match the hard filter
+  // below, so drawing this from the source logs lets a cross-media run
+  // recommend something already watched and rated.
   const outputTypeIndex = profileTypes.indexOf(mediaType)
   const exclusionLogs = await Promise.all(
     members.map(({ regenerated }, index) =>
-      // Already in hand whenever the output type is one of the sources, which
-      // is every run that doesn't cross media.
       outputTypeIndex >= 0
         ? regenerated[outputTypeIndex].log
         : track('log.exclusions', () => listUserMediaLog(db, memberUserIds[index], { type: mediaType })),
     ),
   )
 
-  // Two reasons not to suggest something, kept apart because only one of them
-  // says anything about taste. The id set is what actually enforces both — the
-  // title lists are a prompt hint, and the model is free to ignore them.
+  // The id set is what enforces both; the title lists are a prompt hint the
+  // model is free to ignore.
   //
-  // They also count differently across a group, which is the point of the
-  // tallying below. Having seen something excludes it once most of the group
-  // has: one person out of six having watched a film is no reason to keep it
-  // from the other five, and excluding on a single viewing shrank the pool
-  // fastest exactly where it was already thinnest — every member added ruled
-  // out everything they'd ever seen. A rejection still excludes on its own,
-  // from anyone. It's the one signal a person gave deliberately, and putting
-  // something in front of the group that a member has explicitly turned down
-  // is worse than repeating something they've watched.
+  // Seen excludes only once most of the group has; a rejection excludes on its
+  // own, from anyone.
   const memberCount = exclusionLogs.length
   const seenThreshold = Math.floor(memberCount / 2) + 1
 
   const excluded: ExcludedTitles = { seen: [], rejected: [] }
   const excludedExternalIds = new Set<string>()
 
-  // Keyed by catalog id where there is one, since two people's rows for the
-  // same film are different rows. Title is the fallback and the only key for
-  // anything unmatched, which is also all the prompt list can name.
+  // Keyed by catalog id: two people's rows for the same film are different rows.
+  // Title is the fallback, and the only key for anything unmatched.
   const seenBy = new Map<string, { count: number; title?: string; externalId?: string }>()
 
-  // Rejections need no tally — one is enough to exclude — but they do need the
-  // same key, or a title several people turned down is named once per person
-  // and spends that many of the hundred the prompt will carry.
+  // Same key as the tally, or a title several people turned down is named once
+  // per person in the prompt.
   const rejectedKeys = new Set<string>()
 
   for (const log of exclusionLogs) {
-    // Per member, so one person's duplicate rows can't carry a title over the
-    // threshold on their own.
+    // Per member, so one person's duplicate rows can't cross the threshold alone.
     const countedThisMember = new Set<string>()
 
     for (const { interaction, item } of log) {
-      // Wanting something, or being partway through it, is no reason to
-      // withhold it — only the two statuses that are finished with it, one
-      // way or the other, exclude anything.
       const key = item?.external_id ?? item?.title
       if (!key) continue
 
@@ -256,7 +207,6 @@ export async function generateRecommendations(
     if (externalId) excludedExternalIds.add(externalId)
   }
 
-  // The most expensive call in a run, so the first worth never paying twice.
   let picks: Pick[]
   if (checkpoint.picks?.length) {
     picks = checkpoint.picks
@@ -267,7 +217,6 @@ export async function generateRecommendations(
     onCheckpoint(checkpoint)
   }
 
-  // Only what isn't already in the catalog costs a provider request.
   enterPhase('matching')
   const fromCatalog = await resolveFromCatalog(mediaType, picks)
 
@@ -278,16 +227,10 @@ export async function generateRecommendations(
     }),
   )
 
-  // Everything that can be decided from the search results already in hand.
-  // Nothing here makes a request, so the dedupe settles in pick order rather
-  // than in whatever order a provider answered.
-  //
   // Not capped at TARGET_COUNT: verification below drops some too, so the
-  // over-request slack has to reach it or a verification drop under-fills the
-  // run rather than spending slack already budgeted for it.
+  // over-request slack has to reach it.
   const shortlist: Candidate[] = []
   const seenExternalIds = new Set<string>()
-  // Counted, not stored — see tally.ts for why this is log-only for now.
   const drops = emptyDrops()
 
   for (const [i, pick] of picks.entries()) {
@@ -303,10 +246,6 @@ export async function generateRecommendations(
         (a, b) => Math.abs((a.releaseYear ?? 0) - pick.year) - Math.abs((b.releaseYear ?? 0) - pick.year),
       )[0]
 
-    // Split apart from each other, where they used to share a condition. They
-    // read the same to the pipeline and mean opposite things to us: one says
-    // the model suggested something this person has finished with, the other
-    // says it suggested the same entry twice in one run.
     if (excludedExternalIds.has(match.externalId)) {
       drops.alreadyLogged++
       continue
@@ -324,9 +263,7 @@ export async function generateRecommendations(
       (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade, filters.decadeRelation)) ||
       (filters.playerType && !match.tags.includes(filters.playerType)) ||
       (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) ||
-      // Platforms ride in their own field rather than as tags, and are compared
-      // by family so "PlayStation" matches whichever PS generation the catalog
-      // lists — the same grouping the chips on a card show.
+      // Platforms are their own field, not tags, and compare by family.
       (filters.platform && !platformFamilies(match.platforms ?? []).includes(filters.platform)) ||
       (filters.series && !match.tags.includes(filters.series))
     ) {
@@ -334,31 +271,20 @@ export async function generateRecommendations(
       continue
     }
 
-    // Marked before the length verdict, unlike the loop this replaces, which
-    // left a length-rejected entry unmarked and re-tested the next pick
-    // resolving to the same id. Same id, same verdict — so the only thing that
-    // cost was the second lookup.
     seenExternalIds.add(match.externalId)
     shortlist.push({ pick, match })
   }
 
-  // The only filter that can't be answered from what search returned, so it's
-  // the only one that costs a second round of requests.
   let candidates: Candidate[] = shortlist
   if (filters.length) {
     enterPhase('lengths')
     candidates = await filterByLength(shortlist, mediaType, filters.length)
-    // Subtraction, not instrumentation: the stage takes a list and hands back
-    // a shorter one, so the difference is the count.
     drops.length = shortlist.length - candidates.length
   }
 
-  // A second, semantic pass over the survivors before anything is written.
   let results: RecommendationResult[]
 
   if (checkpoint.verified?.length) {
-    // A previous attempt already paid for verification, and wrote its picks to
-    // the catalog before recording them — so rebuild from those rows.
     const ids = checkpoint.verified.map((entry) => entry.mediaItemId)
     const items = await db.findMany(mediaItems, { where: inList('id', ids) })
     const itemsById = new Map(items.map((item) => [item.id, item]))
@@ -377,9 +303,7 @@ export async function generateRecommendations(
     drops.unverified = candidates.length - verified.length
 
     enterPhase('saving')
-    // Concurrent: these are ten independent rows, and the search page already
-    // fans out about twice this many upserts at once. Promise.all keeps them
-    // in pick order, which is the order they're ranked in.
+    // Promise.all keeps pick order, which is the order they're ranked in.
     results = await Promise.all(
       verified.slice(0, TARGET_COUNT).map(async ({ pick, match }) => ({
         item: await track('catalog.upsert', () => upsertCatalogItem(db, mediaType, match)),
@@ -388,16 +312,14 @@ export async function generateRecommendations(
       })),
     )
 
-    // Ids, not objects — keeps a job row at a few KB.
     checkpoint = {
       ...checkpoint,
       verified: results.map((result) => ({ mediaItemId: result.item.id, reason: result.reason })),
     }
     onCheckpoint(checkpoint)
 
-    // Only on this path. A run resuming from a checkpoint skipped verification
-    // entirely, so its gates never all ran — and a tally missing a stage is
-    // worse than none, since it reads as though everything was counted.
+    // Only on this path — a resumed run skipped verification, and a tally
+    // missing a stage reads as though everything was counted.
     logPickTally({
       requested: picks.length,
       kept: results.length,
@@ -427,18 +349,8 @@ export async function generateRecommendations(
     }),
   )
 
-  // All three run once the picks exist, with the requester still on the
-  // waiting page, and none of them reads what the others write — so they
-  // overlap rather than queueing.
-  //
-  // Usage is counted against the run that exists, not the request that asked
-  // for it: a run that never made it this far cost the person nothing. See
-  // dailyLimit.ts.
-  //
-  // Timed apart because they aren't equally load-bearing. If these turn out to
-  // cost anything, notifying is the one that can move behind the redirect,
-  // being best-effort either way — where a ledger write that doesn't land is a
-  // run nobody was charged for.
+  // Usage is counted here, against the run that exists, not against the request:
+  // a run that never made it this far cost nothing.
   const [, , prunedOldestRun] = await Promise.all([
     track('run.usage', () => recordRunAgainstDailyLimit(db, requestingUserId, runCostFor(memberUserIds.length))),
     track('run.notify', () => notifyMutualFollowers(db, requestingUserId, memberUserIds, runId)),
@@ -448,8 +360,8 @@ export async function generateRecommendations(
   return { runId, prunedOldestRun }
 }
 
-// Only members who mutually follow the requester — the picker already requires
-// one direction; this requires the follow back before pinging them.
+// Mutual follows only — the picker requires one direction, this requires the
+// follow back before pinging anyone.
 async function notifyMutualFollowers(
   db: Db,
   requestingUserId: number,

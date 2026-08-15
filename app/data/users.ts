@@ -10,9 +10,8 @@ export function displayLabel(user: Pick<User, 'display_name' | 'email'>): string
   return user.display_name || user.email
 }
 
-// Username only. Matching on email as well meant anyone could confirm which
-// address belonged to an account by typing it, and confirming that a given
-// address is registered is worth more to a stranger than the search is.
+// Username only, never email: matching on address lets a stranger confirm that
+// a given one is registered, which is worth more to them than the search is.
 export async function searchUsers(db: Db, query: string, excludeUserId: number): Promise<User[]> {
   const pattern = `%${query}%`
   return db.findMany(users, {
@@ -21,20 +20,13 @@ export async function searchUsers(db: Db, query: string, excludeUserId: number):
   })
 }
 
-// --- Field rules -----------------------------------------------------------
-//
-// Signup and profile editing write the same three columns, so the rules live
-// here with the table rather than in either controller — a rule enforced on
-// only one of those paths is the same as no rule.
-
 export const USERNAME_MIN_LENGTH = 3
 export const USERNAME_MAX_LENGTH = 30
 export const BIO_MAX_LENGTH = 500
 
-// Usernames double as a login handle alongside email (see
-// auth/login/controller.tsx), which puts both into one namespace: a username
-// shaped like someone else's email address would make that lookup match two
-// rows. Barring '@' is what keeps the two apart.
+// Usernames double as a login handle alongside email, putting both in one
+// namespace: a username shaped like someone's email address would make that
+// lookup match two rows. Barring '@' keeps them apart.
 const USERNAME_PATTERN = /^[a-zA-Z0-9._-]+$/
 
 export const USERNAME_HINT = `${USERNAME_MIN_LENGTH}–${USERNAME_MAX_LENGTH} characters — letters, numbers, and . _ - only.`
@@ -58,25 +50,18 @@ export const bioSchema = s
   .transform((value) => value.trim())
   .pipe(maxLength(BIO_MAX_LENGTH))
 
-// One message per field rather than per failed check: which rule a username
-// broke is rarely what the person wants told back to them, and the hint under
-// the input already spells all of them out.
 export const USER_FIELD_MESSAGES: Record<string, string> = {
   email: 'Enter a valid email address.',
   display_name: `Usernames are ${USERNAME_HINT}`,
   bio: `Bios are limited to ${BIO_MAX_LENGTH} characters.`,
 }
 
-// A form-data issue's path is the field name it came from (see
-// data-schema/form-data), but Standard Schema types it as a segment that may
-// also be an object.
 function issueField(issue: Issue): string {
   const segment = issue.path?.[0]
   if (segment == null) return ''
   return typeof segment === 'object' ? String(segment.key) : String(segment)
 }
 
-// Keyed by field name so a page can render each message under its own input.
 export function userFieldErrors(
   issues: readonly Issue[],
   messages: Record<string, string> = USER_FIELD_MESSAGES,
@@ -88,8 +73,6 @@ export function userFieldErrors(
   }
   return errors
 }
-
-// --- Lookups and writes ----------------------------------------------------
 
 // `excludeUserId` is what makes these usable while editing: saving the form
 // without touching your email must not report your own row as a conflict.
@@ -110,11 +93,7 @@ export async function findUserByUsername(db: Db, value: string, excludeUserId?: 
 export interface UserProfileFields {
   email: string
   display_name: string
-  // User-authored — see the `bio` column in schema.ts for why it's kept
-  // separate from the AI-written taste profile.
   bio: string
-  // Gates the bio and media log behind a follow — see follows.ts,
-  // canViewProfile.
   is_private: boolean
 }
 
@@ -124,10 +103,6 @@ export async function updateUserProfile(db: Db, userId: number, fields: UserProf
   await db.update(users, userId, { ...fields, bio: fields.bio || undefined })
 }
 
-// Its own write for the same reason the password is: these are set from the
-// profile page, by a form that touches nothing the edit page touches, and
-// folding them in would make a taste-settings save also a save of the email
-// and username sitting in that other form.
 export async function updateProfileSettings(
   db: Db,
   userId: number,
@@ -140,9 +115,6 @@ export async function updateProfileSettings(
   })
 }
 
-// Its own write, not a field on the one above: the password is changed on its
-// own page, by a form that touches nothing else. Hashed by the caller
-// (actions/auth/password.ts) — nothing here ever sees a plaintext password.
 export async function updateUserPassword(db: Db, userId: number, passwordHash: string): Promise<void> {
   await db.update(users, userId, { password_hash: passwordHash })
 }

@@ -5,29 +5,25 @@ import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
 const IGDB_API = 'https://api.igdb.com/v4'
 const TWITCH_TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
 
-// IGDB serves 4 requests/second.
 export const IGDB_MAX_CONCURRENCY = 4
 
 // game_type values from /v4/game_types that count as "a game someone played".
-// Excluding mods/DLC/expansions/episodes/seasons/packs/updates matters:
-// otherwise "hollow knight" returns an unofficial Vita port, catalogued as a
-// mod, above the real game. Bundles and ports stay in — people own games under
-// those names ("Tony Hawk's Pro Skater 1+2").
+// Excluding mods/DLC/expansions/packs matters: "hollow knight" otherwise returns
+// an unofficial Vita port above the real game. Bundles stay in — people own
+// games under those names ("Tony Hawk's Pro Skater 1+2").
 const REAL_GAME_TYPES = '(0,3,4,8,9,10,11)'
 
 const SEARCH_LIMIT = 20
 
-// The player-type / multiplayer-type filters' vocabulary. Unlike GAME_GENRES,
-// these aren't a straight passthrough of an IGDB reference table: IGDB's
-// game_modes distinguishes co-op from other multiplayer, but has nothing for
-// "free-for-all" specifically, so that option is left out rather than guessed.
+// The player-type / multiplayer-type vocabulary. Not a passthrough of an IGDB
+// reference table like GAME_GENRES: game_modes distinguishes co-op from other
+// multiplayer but has nothing for "free-for-all", so that option is left out.
 export const GAME_PLAYER_TYPES: string[] = ['singleplayer', 'multiplayer']
 export const GAME_MULTIPLAYER_TYPES: string[] = ['coop', 'versus']
 
-// The platform filter's vocabulary. Families rather than IGDB's raw platform
-// list: Hades alone returns eight entries, and nobody filters for "PS4 but not
-// PS5" — the question is which box it runs on. Ordered, so two games never
-// list the same platforms in a different order.
+// Families rather than IGDB's raw platform list: Hades alone returns eight
+// entries, and the question is which box it runs on, not "PS4 but not PS5".
+// Ordered, so two games never list the same platforms differently.
 const PLATFORM_FAMILIES: { label: string; match: RegExp }[] = [
   { label: 'PC', match: /^(PC|Win|DOS)/i },
   { label: 'PlayStation', match: /^(PS|PlayStation|PSVR|Vita)/i },
@@ -40,9 +36,6 @@ const PLATFORM_FAMILIES: { label: string; match: RegExp }[] = [
 
 export const GAME_PLATFORMS: string[] = PLATFORM_FAMILIES.map((family) => family.label)
 
-// Lossy at render and at filter time only; the full platform list stays in the
-// item's metadata. Unrecognised names pass through rather than being dropped,
-// so a game on something exotic still says so.
 export function platformFamilies(platforms: string[]): string[] {
   const found = new Set<string>()
   const unmatched: string[] = []
@@ -56,7 +49,6 @@ export function platformFamilies(platforms: string[]): string[] {
   return [...PLATFORM_FAMILIES.filter((family) => found.has(family.label)).map((family) => family.label), ...unmatched]
 }
 
-// The genre filter's vocabulary, from /v4/genres.
 export const GAME_GENRES: string[] = [
   'adventure',
   'arcade',
@@ -90,7 +82,6 @@ interface IgdbImage {
 interface IgdbGame {
   id: number
   name?: string
-  // Unix seconds.
   first_release_date?: number
   summary?: string | null
   cover?: IgdbImage
@@ -99,23 +90,20 @@ interface IgdbGame {
   game_modes?: { name: string }[]
   involved_companies?: { developer?: boolean; company?: { name?: string } }[]
   platforms?: { name?: string; abbreviation?: string }[]
-  // How many people have rated it — fan games and asset flips sit at 0.
   total_rating_count?: number
 }
 
 interface IgdbTimeToBeat {
   game_id: number
-  // All in seconds.
   normally?: number
   hastily?: number
   completely?: number
 }
 
-// Unlike the other providers, IGDB has no static key: the Twitch id/secret are
-// exchanged for a ~56-day bearer token, cached here and renewed on demand.
+// IGDB has no static key: the Twitch id/secret are exchanged for a ~56-day
+// bearer token, cached here and renewed on demand.
 let cachedToken: { value: string; expiresAt: number } | null = null
 
-// A minute of slack, so a token that expires mid-flight isn't sent.
 const TOKEN_SKEW_MS = 60_000
 
 async function accessToken(): Promise<string> {
@@ -147,9 +135,8 @@ async function accessToken(): Promise<string> {
 
 // Bounding caller concurrency isn't enough — four workers making two requests
 // per item sustain ~8/s and get 429'd — so the pacing lives here, where every
-// caller inherits it. `nextSlot` only advances synchronously, so concurrent
-// callers can't be handed the same slot. Divided by machine count because each
-// process enforces its own share of the limit.
+// caller inherits it. `nextSlot` advances synchronously, so two callers can't be
+// handed the same slot. Divided by machine count: each process enforces a share.
 const IGDB_REQUESTS_PER_SECOND = 4
 
 function machineCount(): number {
@@ -169,8 +156,6 @@ async function claimRateLimitSlot(): Promise<void> {
   if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
 }
 
-// IGDB takes APICalypse in the request body — its own query language, not
-// JSON and not query parameters.
 async function igdbQuery<T>(endpoint: string, body: string): Promise<T[]> {
   const token = await accessToken()
   await claimRateLimitSlot()
@@ -202,24 +187,16 @@ const GAME_FIELDS =
   'fields name,first_release_date,summary,total_rating_count,cover.url,screenshots.url,genres.name,game_modes.name,' +
   'involved_companies.developer,involved_companies.company.name,platforms.name,platforms.abbreviation;'
 
-// IGDB's own game_modes vocabulary (from /v4/game_modes). It has no "versus"
-// mode of its own, and its plain "Multiplayer" flag turns out to mean "more
-// than one player," not "competitive" — measured live, It Takes Two and
-// Stardew Valley (both co-op, neither competitive) carry "Multiplayer" right
-// alongside "Co-operative." So "Multiplayer" only counts as versus when
-// "Co-operative" is absent; a game with both real co-op and real competitive
-// modes under-tags as coop-only rather than over-tagging pure co-op as
-// versus, which would actively mislead someone filtering for it.
+// IGDB's game_modes vocabulary (/v4/game_modes) has no "versus" mode, and its
+// plain "Multiplayer" means "more than one player", not "competitive" — It Takes
+// Two and Stardew Valley carry it alongside "Co-operative". So Multiplayer only
+// counts as versus when Co-operative is absent: a game with both under-tags as
+// coop rather than misleading someone filtering for versus.
 const SINGLEPLAYER_MODE = 'Single player'
 const MULTIPLAYER_MODE = 'Multiplayer'
 const COOP_MODE = 'Co-operative'
-// Delivery/scale variants, not intent — each one coexists with either
-// Co-operative or plain Multiplayer, so they only ever widen the general
-// "multiplayer" tag, never the versus/coop split.
 const OTHER_MULTIPLAYER_MODES = ['Split screen', 'Massively Multiplayer Online (MMO)', 'Battle Royale']
 
-// Not exclusive with each other — a game with both a co-op campaign and
-// competitive modes should match a filter on either.
 function derivePlayerTags(gameModes: { name: string }[] | undefined): string[] {
   const names = (gameModes ?? []).map((mode) => mode.name)
   const isCoop = names.includes(COOP_MODE)
@@ -272,8 +249,6 @@ function developerOf(game: IgdbGame): string | null {
   return developer?.company?.name ?? null
 }
 
-// Time-to-beat lives on its own endpoint keyed by game id, so it's fetched
-// once for a whole page of results rather than per game.
 async function hoursToBeatFor(gameIds: number[]): Promise<Map<number, number>> {
   if (gameIds.length === 0) return new Map()
 
@@ -284,8 +259,6 @@ async function hoursToBeatFor(gameIds: number[]): Promise<Map<number, number>> {
 
   const hours = new Map<number, number>()
   for (const row of rows) {
-    // `normally` is the headline figure; fall back so a completionist-only
-    // time still yields a length.
     const seconds = row.normally ?? row.hastily ?? row.completely
     if (seconds) hours.set(row.game_id, Math.round(seconds / 3600))
   }
@@ -315,8 +288,8 @@ export async function searchGames(query: string): Promise<CatalogSearchResult[]>
   return ranked.map((game) => toResult(game, hours.get(game.id) ?? null))
 }
 
-// Takes a numeric id or a slug. Either way external_id comes from the response,
-// so a slug never reaches the database.
+// Numeric id or slug. Either way external_id comes from the response, so a slug
+// never reaches the database.
 export async function getGameById(externalId: string): Promise<CatalogSearchResult | null> {
   const value = externalId.trim()
   if (!value) return null
@@ -342,8 +315,6 @@ function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
-// Fuzzy search misses exact titles surprisingly often ("For the King" returns
-// unrelated games) while `where slug = …` finds them immediately.
 export function slugifyTitle(title: string): string {
   return title
     .toLowerCase()
@@ -351,18 +322,16 @@ export function slugifyTitle(title: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-// Pulls a game reference out of whatever someone pasted — normally the page
-// URL (igdb.com/games/hollow-knight), but a bare numeric id works too. The
-// character class keeps quotes out of the APICalypse literal built from it.
+// Pulls a game reference out of whatever someone pasted — a page URL, or a bare
+// numeric id. The character class keeps quotes out of the APICalypse literal
+// built from it.
 export function parseIgdbId(input: string): string | null {
   const trimmed = input.trim()
   if (/^\d+$/.test(trimmed)) return trimmed
 
-  // Only /games/ — a link to a company or franchise page isn't a game.
   const slug = trimmed.match(/igdb\.com\/games\/([a-z0-9-]+)/i)
   if (slug) return slug[1].toLowerCase()
 
-  // The API form, in case anyone is working from the docs.
   const apiId = trimmed.match(/api\.igdb\.com\/v\d+\/games\/(\d+)/i)
   return apiId ? apiId[1] : null
 }

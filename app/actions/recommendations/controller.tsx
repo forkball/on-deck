@@ -52,8 +52,6 @@ const generateSchema = f.object({
   name: f.field(s.defaulted(s.string(), '')),
 })
 
-// From plain (db, user) rather than a request context, so the generate action
-// can re-render this page when it rejects a run.
 async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
   const [allRuns, allRunsFromOthers, friends, dailyRuns] = await Promise.all([
     listRecommendationRuns(db, user.id),
@@ -69,7 +67,6 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
 
   return {
     dailyRuns,
-    // Matched to the current tab, or a TV run lists under a movie form.
     runs: allRuns.filter((run) => run.mediaType === mediaType),
     runsFromOthers: allRunsFromOthers.filter((run) => run.mediaType === mediaType),
     friends,
@@ -78,8 +75,6 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     ),
     viewerLoggedTypes: [...(loggedByUser.get(user.id) ?? [])],
     genres: getCatalogProvider(mediaType).genres,
-    // Label only — `phrase` is prompt copy the form has no use for, and these
-    // props are serialized into the page for the client entry.
     lengthOptions: getCatalogProvider(mediaType).lengthOptions.map(({ value, label }) => ({ value, label })),
     playerTypes: getCatalogProvider(mediaType).playerTypes ?? [],
     multiplayerTypes: getCatalogProvider(mediaType).multiplayerTypes ?? [],
@@ -96,9 +91,6 @@ export default createController(routes.recommendations, {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
-      // An explicit ?mediaType= wins; otherwise the type last remembered from
-      // Media, so arriving via the nav link stays put instead of resetting to
-      // movies. Remembered either way, so Media picks up a choice made here.
       const mediaType =
         parseEnabledMediaType(context.url.searchParams.get('mediaType')) ?? getRememberedMediaType(context)
       context.get(Session).set('mediaType', mediaType)
@@ -167,7 +159,6 @@ export default createController(routes.recommendations, {
       if (parsed.value.platform) filters.platform = parsed.value.platform
       if (parsed.value.series) filters.series = parsed.value.series
 
-      // Defaults to matching what's being generated.
       const sourceTypes = formData
         .getAll('source')
         .map((value) => String(value))
@@ -176,13 +167,9 @@ export default createController(routes.recommendations, {
 
       const db = context.get(Database)
       const memberIds = [auth.identity.id, ...friendIds]
-      // MediaType widens to string through the row types; narrow once here.
       const mediaType = parseEnabledMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
-      // Mirrors generateRecommendations' own default, so the guard below checks
-      // the profiles the run would actually use.
       const profileTypes = sourceTypes.length > 0 ? sourceTypes : [mediaType]
 
-      // An empty log yields an empty profile, silently ignoring that person.
       const missing = await findMembersMissingSourceLogs(db, memberIds, profileTypes)
       if (missing.length > 0) {
         const detail = missing
@@ -217,8 +204,6 @@ export default createController(routes.recommendations, {
         )
       }
 
-      // Ahead of the duplicate check below, and of `force`: someone out of runs
-      // needs telling that, not a "generate anyway" button that can't work.
       const allowance = await getDailyRunAllowance(db, auth.identity)
       const runCost = runCostFor(memberIds.length)
       if (!allowance.unlimited && allowance.remaining < runCost) {
@@ -247,9 +232,7 @@ export default createController(routes.recommendations, {
             error={
               allowance.remaining === 0
                 ? `You've used all ${allowance.limit} of your recommendation runs for today.${wait}`
-                : // Short of the cost rather than out of runs, which is only
-                  // reachable on a group big enough to spend more than one.
-                  `A run for ${memberIds.length} people costs ${runCost} of your ${allowance.limit} daily runs, ` +
+                : `A run for ${memberIds.length} people costs ${runCost} of your ${allowance.limit} daily runs, ` +
                   `and you have ${allowance.remaining} left. Try again with fewer people, or later.${wait}`
             }
           />,
@@ -257,8 +240,6 @@ export default createController(routes.recommendations, {
         )
       }
 
-      // Same levers as a run they haven't acted on — ask before spending a
-      // model call on a second unfinished list. `force` gets past this.
       if (!formData.get('force')) {
         const duplicate = await findUnusedDuplicateRun(
           db,
@@ -291,8 +272,6 @@ export default createController(routes.recommendations, {
                 runId: duplicate.runId,
                 name: duplicate.name,
                 createdAt: duplicate.createdAt,
-                // So "generate anyway" doesn't depend on the form still
-                // being filled in.
                 fields: [
                   ['mediaType', mediaType],
                   ['mode', parsed.value.mode],
@@ -314,8 +293,6 @@ export default createController(routes.recommendations, {
         }
       }
 
-      // Queued, not started: generation is long and fans out into rate-limited
-      // services, so a fixed-slot worker runs it. See recommendations/worker.ts.
       if (await hasActiveJob(db, auth.identity.id)) {
         const data = await loadIndexData(db, auth.identity, mediaType)
         return context.render(
@@ -356,8 +333,6 @@ export default createController(routes.recommendations, {
       return redirect(routes.recommendations.generating.href({ jobId }), 303)
     },
 
-    // Server-rendered with the current stage, so it says something true before
-    // any polling — and keeps working without JS via its meta refresh.
     async generating(context) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -384,7 +359,6 @@ export default createController(routes.recommendations, {
       )
     },
 
-    // JSON rather than HTML — the client entry swaps a caption, not a page.
     async status(context) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })

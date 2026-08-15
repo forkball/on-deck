@@ -2,27 +2,21 @@ import type { InteractionStatus, MediaType } from './data/mediaItems.ts'
 import { INTERACTION_STATUSES } from './data/schema.ts'
 import { routes } from './routes.ts'
 
-// The types wired up end to end. Adding one here makes the `satisfies` below
-// enumerate every place that owes it an answer.
 export const ACTIVE_MEDIA_TYPES = ['movie', 'tv', 'book', 'game'] as const
 
 export type ActiveMediaType = (typeof ACTIVE_MEDIA_TYPES)[number]
 
 export const DEFAULT_MEDIA_TYPE: ActiveMediaType = 'movie'
 
-// Narrows an untrusted string. Null rather than a default, so each caller
-// decides whether "unknown" means fall back or reject.
 export function parseMediaType(value: unknown): ActiveMediaType | null {
   return ACTIVE_MEDIA_TYPES.includes(value as ActiveMediaType) ? (value as ActiveMediaType) : null
 }
 
-// Types in the vocabulary that aren't ready to be shown. Empty today, and free
-// while unused.
+// Types in the vocabulary that aren't ready to be shown. Empty today.
 //
-// A gated type stays in ACTIVE_MEDIA_TYPES: that tuple is what forces every
-// consumer to have an answer, so hiding a type by removing it would silently
-// delete the guarantee. Opt-in, so forgetting to set the variable hides a
-// half-finished type rather than shipping it.
+// A gated type stays in ACTIVE_MEDIA_TYPES — that tuple forces every consumer to
+// have an answer, so removing one would silently delete the guarantee. Opt-in,
+// so a forgotten variable hides a half-finished type rather than shipping it.
 const EXPERIMENTAL_MEDIA_TYPES: readonly ActiveMediaType[] = []
 
 function experimentalEnabled(): Set<string> {
@@ -39,14 +33,13 @@ export function isMediaTypeEnabled(type: ActiveMediaType): boolean {
   return experimentalEnabled().has(type)
 }
 
-// Read at call time, so the environment can differ per deployment.
 export function enabledMediaTypes(): ActiveMediaType[] {
   return ACTIVE_MEDIA_TYPES.filter(isMediaTypeEnabled)
 }
 
 // For anything a visitor supplies. parseMediaType stays ungated because it also
-// reads back existing rows — a logged game needs its status verbs whether or
-// not its tab is showing.
+// reads back existing rows — a logged game needs its verbs whether or not its
+// tab is showing.
 export function parseEnabledMediaType(value: unknown): ActiveMediaType | null {
   const type = parseMediaType(value)
   return type && isMediaTypeEnabled(type) ? type : null
@@ -59,36 +52,22 @@ interface StatusVerbs {
 }
 
 interface MediaTypeUi {
-  // Plural, unlike MediaType — the single place that mismatch is reconciled.
   slug: string
   tabLabel: string
-  // Nouns for prose; the recommendation prompts read these.
   singular: string
   plural: string
-  // Before another noun — "TV taste profile", where tabLabel and singular
-  // both read wrong.
   attributive: string
-  // For match confirmation — "the same show" beats "the same entry" for TV.
   entryNoun: string
-  // Conversational: "Wrong show?" rather than singular's "Wrong TV show?".
   itemNoun: string
-  // The catalog these items come from, named in user-facing copy.
   catalogName: string
   rematchPlaceholder: string
-  // Sends the "wrong match?" form straight to where the id it asks for lives.
-  // Whether the year helps is per-catalog and was measured — see each entry.
+  // Sends the "wrong match?" form to where the id it asks for lives. Whether the
+  // year helps is per-catalog — see each entry.
   catalogSearchUrl: (title: string, year: number | null) => string
-  // Deliberately unbranded; the rematch form names the catalog because there
-  // you're pasting a link from it.
   searchPlaceholder: string
-  // Page heading and <title> on the search route.
   searchHeading: string
-  // Verbs differ per medium: you watch a film but read a book.
   statusVerbs: StatusVerbs
-  // How the primary credit is labelled on a detail page.
   creditLabel: string
-  // "What I've watched" / "read". Separate from statusVerbs.done so copy doesn't
-  // depend on how a status label is capitalised.
   pastParticiple: string
   // Closures, not Route objects: routes.movies.show and routes.tv.show are
   // different generic instantiations, and TypeScript won't call a union of
@@ -221,39 +200,32 @@ export function mediaTypeUi(type: ActiveMediaType): MediaTypeUi {
 }
 
 // For code holding a MediaType off a database row. Row types widen the column
-// to `string`, so those callers can't index MEDIA_TYPE_UI directly — which is
-// why the prompts each used to keep a private copy of the noun table.
+// to `string`, so those callers can't index MEDIA_TYPE_UI directly.
 export function mediaTypeUiFor(type: MediaType): MediaTypeUi {
   return MEDIA_TYPE_UI[parseMediaType(type) ?? DEFAULT_MEDIA_TYPE]
 }
 
-// For prose about a type that may have come from the DB widened to `string`.
 export function mediaTypeLabel(value: unknown): string {
   const type = parseMediaType(value)
   return type ? MEDIA_TYPE_UI[type].tabLabel : String(value)
 }
 
-// Separate from parseMediaType so callers holding a DB MediaType don't have to
-// launder it through `unknown`.
 export function isActiveMediaType(type: MediaType): type is ActiveMediaType {
   return parseMediaType(type) !== null
 }
 
 export type { InteractionStatus }
 
-// Narrows an untrusted string, like parseMediaType. Null rather than a
-// default, and every caller so far reads that as "no status filter".
 export function parseInteractionStatus(value: unknown): InteractionStatus | null {
   return INTERACTION_STATUSES.includes(value as InteractionStatus) ? (value as InteractionStatus) : null
 }
 
-// Same four statuses everywhere; only the verbs differ, and they live on the
+// Same four statuses everywhere; only the verbs differ, and those live on the
 // registry above so adding a type doesn't mean editing a second table.
 //
-// "Not interested" takes no verb — you decline a book the same way you decline
-// a film — so it isn't in StatusVerbs. Last, because it's the odd one out:
-// the three before it are stages of consuming something, and this is a refusal
-// to. See INTERACTION_STATUSES.
+// "Not interested" takes no verb — you decline a book as you decline a film — so
+// it isn't in StatusVerbs, and it goes last as the one that isn't a stage of
+// consuming anything.
 export function statusOptionsFor(mediaType: ActiveMediaType): { value: InteractionStatus; label: string }[] {
   const verbs = MEDIA_TYPE_UI[mediaType].statusVerbs
   return [
@@ -268,7 +240,6 @@ export function statusLabelsFor(mediaType: ActiveMediaType): Record<string, stri
   return Object.fromEntries(statusOptionsFor(mediaType).map((o) => [o.value, o.label]))
 }
 
-// For mixed lists that render a status without knowing its medium.
 export function statusLabel(status: string, mediaType?: unknown): string {
   const type = parseMediaType(mediaType) ?? DEFAULT_MEDIA_TYPE
   return statusLabelsFor(type)[status] ?? status
@@ -277,10 +248,6 @@ export function statusLabel(status: string, mediaType?: unknown): string {
 export const STATUS_OPTIONS = statusOptionsFor(DEFAULT_MEDIA_TYPE)
 export const STATUS_LABELS = statusLabelsFor(DEFAULT_MEDIA_TYPE)
 
-// One color per status so a badge reads at a glance without the label: green
-// for done, blue for queued, amber for mid-consumption, and "not interested"
-// deliberately out of that progression since it isn't a stage of consuming
-// anything.
 const STATUS_BADGE_COLORS: Record<InteractionStatus, string> = {
   want_to_consume: '#1d4ed8',
   in_progress: '#b45309',

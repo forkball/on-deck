@@ -1,38 +1,19 @@
-// Where a run's suggestions went. The pipeline asks for more picks than it
-// needs and puts them through a series of gates, any of which can quietly take
-// one — so a run that comes back short looks identical to one that came back
-// broken, and neither says which gate did it.
-//
-// Log-only for now, deliberately. Nothing is stored and nothing is shown to
-// anyone: the open question is whether runs come up short at all, which a few
-// days of log lines answers for a fraction of the work of answering it
-// properly.
+// Log-only: nothing is stored or shown.
 export interface PickDrops {
-  // Nothing in the catalog under that title at all.
   unfound: number
-  // Already in the log for this media type — seen, or turned down.
   alreadyLogged: number
-  // A second pick that resolved to an entry an earlier one already took.
   duplicate: number
-  // Found something, but not the thing that was meant.
   titleMismatch: number
-  // Failed one of the tag filters the request set.
   filtered: number
-  // Outside the requested length bucket.
   length: number
-  // Verification said the catalog entry isn't the one the model meant.
   unverified: number
 }
 
 export interface PickTally {
-  // What the model actually returned.
   requested: number
-  // What made it into the run.
   kept: number
-  // Survived every gate and was trimmed by the target count. Not a loss —
-  // this is the over-request working — and kept apart from the drops for
-  // exactly that reason. Counting it as a casualty would make every healthy
-  // run look like it was bleeding picks.
+  // Trimmed by the target count, not dropped by a gate — kept apart so a healthy
+  // run doesn't read as bleeding picks.
   surplus: number
   dropped: PickDrops
 }
@@ -53,18 +34,12 @@ export function totalDropped(drops: PickDrops): number {
   return Object.values(drops).reduce((sum, count) => sum + count, 0)
 }
 
-// Every pick the model returned ended up in exactly one of these buckets. If
-// that doesn't hold, a gate is going uncounted and the numbers below are
-// quietly wrong — which is worse than not having them, so the line says so
-// rather than reading as though it balanced.
+// Every pick must land in exactly one bucket; anything else means a gate is
+// going uncounted, so the line says so rather than appearing to balance.
 export function unaccountedFor(tally: PickTally): number {
   return tally.requested - tally.kept - tally.surplus - totalDropped(tally.dropped)
 }
 
-// Logged where it's counted rather than returned up to the worker the way
-// timings are. Timings can only be finalised after generation returns; this is
-// complete the moment the picks are, and widening the pipeline's return type
-// for something no code reads would buy nothing.
 export function logPickTally(tally: PickTally): void {
   console.info(`[generation] ${summarizePickTally(tally)}`)
 }
@@ -79,9 +54,7 @@ const DROP_LABELS: Record<keyof PickDrops, string> = {
   unverified: 'unverified',
 }
 
-// One line, in the same shape as the timings one so both can be pulled out of
-// the log together. Zero-count gates are left off — on a run with no filters
-// set, a column of zeroes is just noise around the two numbers that moved.
+// Shaped like the timings line so both can be pulled from the log together.
 export function summarizePickTally(tally: PickTally): string {
   const parts = [`picks ${tally.requested} → kept ${tally.kept}`]
   if (tally.surplus > 0) parts.push(`surplus ${tally.surplus}`)

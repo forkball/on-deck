@@ -28,68 +28,48 @@ import {
   type TmdbSearchResult,
 } from './tmdb.ts'
 
-// The provider-agnostic name for a catalog hit — structurally what TMDB
-// returns, aliased so non-TMDB providers can satisfy the same contract.
+// Structurally what TMDB returns, aliased so other providers satisfy one shape.
 export type CatalogSearchResult = TmdbSearchResult
 
-// Short/medium/long(/very long), in whatever unit a given provider measures —
-// runtime, page count, hours to beat, season count. Defined here rather than
-// with the recommendation filters that read it: the buckets belong to the
-// catalog that interprets them. `very_long` exists only for providers with a
-// 4th tier (currently movies) — the rest just never emit it in their
-// lengthOptions.
+// In whatever unit a provider measures. `very_long` is emitted only by providers
+// with a 4th tier (currently movies).
 export type LengthBucket = 'short' | 'medium' | 'long' | 'very_long'
 
-// Everything that differs between one media type's catalog and another's.
-// Anything not here is type-agnostic and lives in mediaItems.ts.
+// Everything that differs per media type. Anything not here is type-agnostic and
+// lives in mediaItems.ts.
 export interface CatalogProvider {
-  // Recorded as media_items.external_source, so ids can't collide.
+  // Recorded as media_items.external_source, so ids from different providers
+  // can't collide.
   sourceName: string
   search(query: string): Promise<CatalogSearchResult[]>
   getById(externalId: string): Promise<CatalogSearchResult | null>
-  // Genre vocabulary offered by the recommendation filter for this type.
   genres: string[]
-  // Games-only: no other provider has a player-count concept, so these are
-  // absent (rather than empty) for every other type.
   playerTypes?: string[]
   multiplayerTypes?: string[]
-  // Games-only too: platform *families* rather than raw platform names — see
-  // GAME_PLATFORMS. Nothing else here runs on hardware you either own or don't.
+  // Platform *families*, not raw names — see GAME_PLATFORMS.
   platforms?: string[]
-  // Books-only — see BOOK_SERIES_TYPES.
   seriesTypes?: string[]
-  // Turns what the "wrong match?" form accepts — a pasted URL or bare id —
-  // into an external id, or null.
   parseExternalId(input: string): string | null
-  // Shown when parseExternalId rejects the input.
   matchHint: string
-  // Shown when the id parsed fine but the catalog had no such entry.
   lookupFailedError: string
-  // In whatever unit the medium is measured in — minutes, pages, hours,
-  // seasons. Lives on the provider because one global check can only be right
-  // for a single medium: reading runtimeMinutes unconditionally silently
-  // dropped every book.
+  // On the provider because one global check can only be right for one medium.
   matchesLength(result: CatalogSearchResult, length: LengthBucket): boolean
-  // Every bucket this provider offers — the buckets it omits are ones it has no
-  // meaning for, so a provider's own list is what `length` may validly be.
+  // A provider's own list is what `length` may validly be — omitted buckets are
+  // ones it has no meaning for.
   //
-  // `label` is for the form, `phrase` for the pick prompt, and they live on the
-  // same entry so a bucket can't reach one and not the other. They used to be
-  // separate, and the prompt's copy was movie-shaped for every medium: asking
-  // for long books requested books "with a runtime of 150 minutes or less" —
-  // wrong unit, and backwards, since long books are the ones over 500 pages.
+  // `label` is for the form, `phrase` for the pick prompt, on one entry so a
+  // bucket can't reach one and not the other.
   lengthOptions: { value: LengthBucket; label: string; phrase: string }[]
 }
 
-// Fits after "Only suggest books with …". Null when this medium doesn't offer
-// the bucket at all, in which case there's nothing truthful to ask for.
+// Fits after "Only suggest books with …". Null when the medium doesn't offer the
+// bucket, in which case there is nothing truthful to ask for.
 export function describeLength(provider: CatalogProvider, length: LengthBucket): string | null {
   return provider.lengthOptions.find((option) => option.value === length)?.phrase ?? null
 }
 
-// Keyed by MediaType, which widens to `string` through the row types — so this
-// is deliberately partial, and callers fail loudly rather than substituting
-// movies for a type with no provider.
+// Keyed by MediaType, which widens to `string` through the row types, so this is
+// deliberately partial — see getCatalogProvider.
 const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
   movie: {
     sourceName: 'tmdb',
@@ -107,8 +87,8 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
       if (length === 'long') return minutes <= 150
       return minutes > 150
     },
-    // Ceilings rather than bands, unlike every other provider here: each option
-    // is "no longer than this", so they nest deliberately.
+    // Ceilings rather than bands, unlike every other provider here — each option
+    // is "no longer than this", so they nest.
     lengthOptions: [
       { value: 'short', label: '90 min or less', phrase: 'a runtime of 90 minutes or less' },
       { value: 'medium', label: '120 min or less', phrase: 'a runtime of 120 minutes or less' },
@@ -130,8 +110,7 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
       if (pages == null) return false
       if (length === 'short') return pages < 250
       if (length === 'long') return pages > 500
-      // Explicit, so a bucket this provider doesn't offer (very_long) matches
-      // nothing rather than falling into the middle band.
+      // Explicit, so very_long matches nothing rather than the middle band.
       return length === 'medium' && pages >= 250 && pages <= 500
     },
     lengthOptions: [
@@ -156,7 +135,6 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
       if (hours == null || hours === 0) return false
       if (length === 'short') return hours < 10
       if (length === 'long') return hours > 30
-      // See the book entry — very_long isn't offered here either.
       return length === 'medium' && hours >= 10 && hours <= 30
     },
     lengthOptions: [
@@ -178,12 +156,8 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
       if (seasons == null) return false
       if (length === 'short') return seasons <= 2
       if (length === 'long') return seasons > 5
-      // See the book entry — very_long isn't offered here either.
       return length === 'medium' && seasons >= 3 && seasons <= 5
     },
-    // A show has no single runtime the way a film does — episode counts and
-    // lengths both vary too much within a series to bucket on. Season count is
-    // the one number that actually reads as "how much of a commitment is this".
     lengthOptions: [
       { value: 'short', label: '1–2 seasons', phrase: '1 to 2 seasons' },
       { value: 'medium', label: '3–5 seasons', phrase: 'between 3 and 5 seasons' },
@@ -196,30 +170,23 @@ export function findCatalogProvider(type: MediaType): CatalogProvider | undefine
   return CATALOG_PROVIDERS[type]
 }
 
-// Better to throw than quietly recommend movies to someone who asked for books.
+// Throws rather than quietly recommending movies to someone who asked for books.
 export function getCatalogProvider(type: MediaType): CatalogProvider {
   const provider = findCatalogProvider(type)
   if (!provider) throw new Error(`No catalog provider registered for media type "${type}".`)
   return provider
 }
 
-// Which types are actually searchable/loggable right now — drives the tabs
-// and the recommendation source picker, so "coming soon" placeholders stay in
-// one place instead of being hardcoded per component.
 export function supportedMediaTypes(): MediaType[] {
   return Object.keys(CATALOG_PROVIDERS)
 }
 
-// Searches the provider for `type` and writes every hit into the catalog, so
-// the results are real media_items the user can immediately log against.
-// Repeating a search — which is exactly what pressing "back" from a result
-// does — otherwise re-runs the catalog call and re-upserts every hit, for
-// data that hasn't changed. Cached briefly so that round trip is free.
+// Writes every hit into the catalog, so results are real media_items the user can
+// log against.
 //
-// Deliberately caches only the catalog half. The viewer's own interactions
-// are fetched fresh on every render (see getUserInteractionsForItems), so
-// logging something and going back still shows the updated status — caching
-// those too is what would make this feel broken.
+// Only the catalog half is cached. The viewer's own interactions are fetched
+// fresh on every render, or logging something and going back would show a stale
+// status.
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000
 const SEARCH_CACHE_MAX_ENTRIES = 50
 
@@ -233,7 +200,6 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
   const key = cacheKey(type, query)
   const cached = searchCache.get(key)
   if (cached && Date.now() - cached.storedAt < SEARCH_CACHE_TTL_MS) {
-    // Refresh insertion order so the eviction below is least-recently-used.
     searchCache.delete(key)
     searchCache.set(key, cached)
     return cached.results
@@ -242,24 +208,15 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
   const provider = getCatalogProvider(type)
   const results = await provider.search(query)
 
-  // Concurrently, not in series. The catalog call itself is fast (~90ms for
-  // TMDB); what made search feel slow was upserting ~20 results one after
-  // another against a remote database, so the page waited on the sum of
-  // every round-trip instead of the slowest one. Results keep their original
-  // relevance order because Promise.all preserves input order.
-  // Genre tags used to be returned alongside each item, because they lived in
-  // a separate table the caller had no other way to reach. They ride in the
-  // item's own metadata now, so the row is the whole result.
+  // Promise.all preserves input order, so results keep their relevance ranking.
   const imported = await Promise.all(
-    // sourceOverride wins when set — a fallback hit (Google Books down,
-    // served from Open Library instead) carries an id that belongs to a
-    // different provider than the one registered for this type.
+    // sourceOverride wins when set: a fallback hit carries an id from a different
+    // provider than the one registered for this type.
     results.map((result) => upsertMediaItem(db, type, result, result.sourceOverride ?? provider.sourceName)),
   )
 
   searchCache.set(key, { storedAt: Date.now(), results: imported })
   if (searchCache.size > SEARCH_CACHE_MAX_ENTRIES) {
-    // Map preserves insertion order, so the first key is the oldest touch.
     const oldest = searchCache.keys().next().value
     if (oldest !== undefined) searchCache.delete(oldest)
   }
@@ -268,19 +225,12 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
 }
 
 export async function upsertCatalogItem(db: Db, type: MediaType, result: CatalogSearchResult): Promise<MediaItem> {
-  // Both callers (the import action and the detail page's backfill) hand this a
-  // by-id result, so the row is stamped as enriched.
   return upsertMediaItem(db, type, result, getCatalogProvider(type).sourceName, true)
 }
 
-// Credits only come back from a by-id lookup, so anything that entered the
-// catalog via search has none. The detail page fills that gap on first view —
-// but off the response path, because the page renders fine without it: the
-// credit line is the only thing that waits, and it appears on the next view.
-//
-// Deduped by item id. media_items rows are shared across users, so a popular
-// item can be opened by several people at once, and each of them firing the
-// same lookup and the same write is pure waste.
+// Off the response path — the page renders fine without the credit line, which
+// appears on the next view. Deduped by item id, since media_items rows are
+// shared and one item can be opened by several people at once.
 const backfillsInFlight = new Set<number>()
 
 export function backfillCatalogDetail(db: Db, type: MediaType, item: MediaItem): void {
@@ -292,25 +242,21 @@ export function backfillCatalogDetail(db: Db, type: MediaType, item: MediaItem):
       const provider = getCatalogProvider(type)
       const detail = await provider.getById(item.external_id)
 
-      // null is a definitive 404 — the id is gone from the catalog, so stamp it
-      // and stop asking. A transient failure throws instead, and is left
-      // unstamped deliberately so the next view retries.
+      // null is a definitive 404, so stamp it and stop asking. A transient
+      // failure throws instead and is left unstamped, so the next view retries.
       if (detail) {
         await upsertCatalogItem(db, type, detail)
       } else {
         await markMediaItemEnriched(db, item)
       }
     } catch {
-      // Nothing to report to: the response this was scheduled from is long
-      // sent. Swallowing keeps a catalog outage from taking the process down
-      // on an unhandled rejection.
+      // Nothing to report to, and an unhandled rejection takes the process down.
     } finally {
       backfillsInFlight.delete(item.id)
     }
   })()
 }
 
-// Re-matches against the same provider the item came from.
 export async function rematchCatalogItem(
   db: Db,
   type: MediaType,

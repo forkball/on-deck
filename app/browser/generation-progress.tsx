@@ -1,17 +1,15 @@
 import type { Handle } from 'remix/ui'
 import { clientEntry, css, ref } from 'remix/ui'
 
-// Polls for the stage a run is actually in. Not on a timer: every label here
-// comes from the server having entered that stage, so progress can't run
-// backwards the way invented captions on a loop did.
+// Polls for the stage a run is actually in. Every label comes from the server
+// having entered that stage, so progress can't run backwards or be invented.
 //
-// Comments here ship to the browser with the bundle, so this names neither the
-// model vendor nor the catalog.
+// Comments in this file ship with the bundle — keep vendor and catalog names out.
 const POLL_MS = 1200
 
 // A poll can fail for reasons unrelated to the run — a deploy, a dropped
-// connection. Returning on the first one froze the page on its last stage while
-// the run finished fine behind it.
+// connection — so giving up on the first one would freeze the page on its last
+// stage while the run finishes fine behind it.
 const MAX_CONSECUTIVE_FAILURES = 8
 
 const listStyle = css({
@@ -48,8 +46,6 @@ const doneStepStyle = css({
   fontSize: '14px',
 })
 
-// A type alias, not an interface — client entry props need SerializableProps'
-// index signature, which an interface doesn't provide.
 export type GenerationProgressProps = {
   statusHref: string
   initialLabel: string
@@ -69,12 +65,10 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
     let failed: string | null = null
     let lostContact = false
 
-    // handle.update() hands back a promise the runtime settles on the next
-    // render, and rejects it when there's no renderer to schedule against.
-    // Called bare from the loop below, that rejection had nothing to catch it,
-    // and an unhandled rejection ends the process rather than the request.
-    // Swallowed instead: a dropped update costs a frame, and the state it was
-    // announcing is read out of this closure by whichever render comes next.
+    // handle.update() returns a promise that rejects when there's no renderer to
+    // schedule against, and called bare from the loop below that rejection has
+    // nothing to catch it. A dropped update only costs a frame — the state it
+    // was announcing is read out of this closure by the next render.
     function render(): void {
       void handle.update().catch(() => {})
     }
@@ -83,7 +77,6 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       let consecutiveFailures = 0
 
       while (!signal.aborted) {
-        // Backs off as failures mount.
         const wait = POLL_MS * Math.min(1 + consecutiveFailures, 5)
         await new Promise((resolve) => setTimeout(resolve, wait))
         if (signal.aborted) return
@@ -94,7 +87,6 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             signal,
           })
 
-          // A swept job is gone for good.
           if (response.status === 404) {
             failed = "This run is no longer available. It may have finished a while ago."
             render()
@@ -122,7 +114,6 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             return
           }
 
-          // Stop rather than polling a finished job.
           if (status.done && status.href) {
             window.location.href = status.href
             return
@@ -161,7 +152,6 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
           )
         }
 
-        // Its own state, not a dimmed first step — the run hasn't started.
         if (queueState === 'queued') {
           return (
             <p mix={css({ color: '#555' })}>
@@ -191,18 +181,14 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
         )
       }
 
-      // Polling starts here rather than in the setup above, which is the whole
-      // point of this wrapper. The setup runs on the server too, to build the
-      // first paint; a loop started there fetches a relative URL that can't
-      // resolve, gives up after eight tries, and takes the server process down
-      // with it. A ref only ever fires in a browser, against a real node.
+      // Polling starts in a ref, which only fires in a browser: the setup above
+      // also runs on the server to build the first paint, and a loop started
+      // there fetches a relative URL that can't resolve.
       //
-      // It has to be a wrapper and not the panel itself: ref fires on insert
-      // and aborts on remove, and the panel swaps between a paragraph and a
-      // list as the run moves. Hung on that, every swap would abort the loop
-      // mid-run and start another. This element is the one thing on the page
-      // that survives all of it — display: contents so that being here changes
-      // nothing about how the panel lays out.
+      // It has to be this wrapper rather than the panel itself. A ref aborts on
+      // remove, and the panel swaps between a paragraph and a list as the run
+      // moves, so every swap would abort the loop and start another. This element
+      // survives all of it — display: contents, so it changes no layout.
       return (
         <div mix={[css({ display: 'contents' }), ref((_node, signal) => void poll(signal))]}>{panel()}</div>
       )

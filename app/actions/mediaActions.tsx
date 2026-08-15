@@ -28,8 +28,6 @@ import { MediaSearchPage } from '../ui/pages/media-search-page.tsx'
 
 const SUGGESTION_LIMIT = 6
 
-// The whole result set is rendered; LazyList hides the overflow client-side, so
-// the page works fully without JS.
 const SEARCH_INITIAL_VISIBLE = 10
 
 
@@ -40,17 +38,8 @@ const logSchema = f.object({
   return_to: f.field(s.defaulted(s.string(), '')),
 })
 
-// The six actions every media type's controller needs, with the type-specific
-// bits resolved from the registry and the provider.
-//
-// A factory over the *actions*, not over createController: that resolves its
-// action types from the concrete route map, and routes.movies.show and
-// routes.tv.show are different generic instantiations, so a factory generic
-// over the route map can't typecheck.
-//
-// `context` is loosely typed for the same reason — pulling the handlers out of
-// createController loses its inference. Each handler re-establishes concrete
-// types immediately, so the looseness stays in the parameter.
+// `context` is loosely typed because pulling handlers out of createController
+// loses its inference — each one re-establishes concrete types immediately.
 export function createMediaActions(mediaType: ActiveMediaType) {
   const ui = MEDIA_TYPE_UI[mediaType]
   const provider = getCatalogProvider(mediaType)
@@ -83,8 +72,6 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       )
     },
 
-    // Deliberately doesn't import/upsert, unlike `search` — most keystrokes
-    // never turn into a pick.
     async suggest(context: any) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -103,9 +90,6 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       return Response.json({ suggestions })
     },
 
-    // Imports the exact entry the suggestion already resolved, by id — a
-    // resubmitted title search could turn up something else, and re-hits the
-    // catalog regardless.
     async import(context: any) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -134,10 +118,9 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       const item = await getMediaItemDetail(db, mediaItemId)
       if (!item) return new Response('Not Found', { status: 404 })
 
-      // Scheduled, not awaited: the credit line is the only thing this fills in
-      // and the page renders without it, so making every first view wait on a
-      // remote round trip bought one line of text at the cost of the whole
-      // response. It lands on the next view instead — and once per item for
+      // Scheduled, not awaited: the credit line is all this fills in and the
+      // page renders without it, so it lands on the next view rather than making
+      // every first view wait on a remote round trip. Once per item for
       // everyone, since media_items rows are shared.
       const meta = parseMediaMetadata(item.metadata)
       if (meta.enrichedAt === null && item.external_source === provider.sourceName) {
@@ -161,8 +144,6 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       )
     },
 
-    // Manual rather than auto-detected: there's no reliable signal for a
-    // low-confidence match yet.
     async rematch(context: any) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -207,7 +188,6 @@ export function createMediaActions(mediaType: ActiveMediaType) {
         return new Response('Invalid log input', { status: 400 })
       }
 
-      // One field, two columns — see parseRatingSubmission.
       const { rating, disliked } = parseRatingSubmission(parsed.value.rating)
 
       const db: Db = context.get(Database)

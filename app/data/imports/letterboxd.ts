@@ -89,9 +89,9 @@ function parseRatingsCsv(text: string): RatingRow[] {
   for (const record of table.slice(1)) {
     if (record.length === 0 || (record.length === 1 && record[0] === '')) continue
 
-    // `Number('')` is 0, so a blank cell used to import as a zero-star review.
-    // normalizeRating is what turns it back into "unrated"; the row itself is
-    // still a film they watched, so only an unreadable date drops it.
+    // `Number('')` is 0, and normalizeRating is what turns that back into
+    // "unrated" rather than a zero-star review. The row is still a film they
+    // watched, so only an unreadable date drops it.
     const rating = normalizeRating(Number(record[ratingIndex]))
     const watchedAt = Date.parse(record[dateIndex])
     if (Number.isNaN(watchedAt)) continue

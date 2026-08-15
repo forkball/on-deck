@@ -14,22 +14,17 @@ const SOURCE = 'openlibrary'
 export interface GoodreadsImportResult {
   totalRows: number
   imported: number
-  // Rows whose book couldn't be found in the catalog at all.
   notFound: { title: string; author: string }[]
-  // Surfaced because title/author guesses are where wrong matches come from.
   matchedByIsbn: number
   matchedByTitle: number
 }
 
-// Goodreads' three shelves map exactly onto the app's three statuses, unlike
-// Letterboxd's export, which can only produce "watched".
 const SHELF_STATUS: Record<string, LogInteractionInput['status']> = {
   read: 'consumed',
   'currently-reading': 'in_progress',
   'to-read': 'want_to_consume',
 }
 
-// Only really governs the fallback: the ISBN path resolves 20 per request.
 const CONCURRENCY = 8
 
 interface ShelfRow {
@@ -42,8 +37,6 @@ interface ShelfRow {
   readAt: number | null
 }
 
-// Goodreads retired its public API in 2020, so the CSV export is the only way
-// in — but it carries ISBNs, so most rows resolve to an exact edition.
 export async function importGoodreadsLibrary(
   db: Db,
   userId: number,
@@ -55,8 +48,6 @@ export async function importGoodreadsLibrary(
   let matchedByIsbn = 0
   let matchedByTitle = 0
 
-  // 20 per request instead of one per book — seconds rather than minutes on a
-  // real library.
   const byIsbn = await getBooksByIsbns(rows.map((row) => row.isbn).filter(Boolean))
 
   const needsFallback: ShelfRow[] = []
@@ -91,7 +82,6 @@ export async function importGoodreadsLibrary(
       // can't clear a rating given here after the export was taken.
       rating: row.rating ?? undefined,
       notes: row.notes,
-      // Only "read" rows carry a date.
       consumedAt: row.readAt ?? undefined,
     })
     imported++
@@ -106,7 +96,6 @@ async function matchByTitle(title: string, author: string): Promise<CatalogSearc
   return matches[0] ?? null
 }
 
-// Goodreads export columns, of which the rest are ignored.
 function parseShelfCsv(text: string): ShelfRow[] {
   const table = parseCsv(text)
   if (table.length === 0) return []
@@ -142,7 +131,6 @@ function parseShelfCsv(text: string): ShelfRow[] {
     rows.push({
       title,
       author: cleanCell(record[authorIndex]),
-      // ISBN13 preferred; plenty of rows have neither.
       isbn: cleanCell(record[isbn13Index]) || cleanCell(record[isbnIndex]),
       status,
       rating,

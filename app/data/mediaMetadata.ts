@@ -4,21 +4,12 @@ export interface MediaMetadata {
   releaseYear: number | null
   posterUrl: string | null
   overview: string | null
-  // Films and episodes.
   runtimeMinutes: number | null
-  // Books.
   pageCount: number | null
-  // Games — hours to beat.
   playtimeHours: number | null
-  // TV — number of seasons.
   seasonCount: number | null
-  // Director, creator or author — one field, since only one is meaningful per
-  // type. MEDIA_TYPE_UI.creditLabel names it.
   creator: string | null
-  // Additional artwork, in display order. Empty rather than null, so callers
-  // can map it without a guard.
   images: string[]
-  // Games — short abbreviations.
   platforms: string[]
   // Lowercased genre labels from the source catalog. Covered by the GIN index
   // on this column, so `metadata @> '{"tags":["horror"]}'` avoids a scan.

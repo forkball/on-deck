@@ -26,11 +26,8 @@ const GENRE_MATCHERS: [genre: string, needles: string[]][] = [
   ['history', ['history']],
 ]
 
-// The vocabulary offered by the recommendation genre filter.
 export const BOOK_GENRES: string[] = GENRE_MATCHERS.map(([genre]) => genre).sort()
 
-// The series filter's vocabulary — backed by volumeInfo.seriesInfo (see
-// GoogleBooksVolume above), not a category/genre derivation.
 export const BOOK_SERIES_TYPES: string[] = ['series', 'standalone']
 
 const TAG_LIMIT = 4
@@ -117,9 +114,6 @@ function requireApiKey(): string {
   return apiKey
 }
 
-// Measured live: a plain search returned a transient 503 backendFailed on the
-// first try. Same shape as Open Library's fetchWithRetry, since the same kind
-// of wobble turned out not to be an Open-Library-specific problem.
 const FETCH_ATTEMPTS = 3
 const RETRY_BASE_MS = 400
 
@@ -163,11 +157,6 @@ async function searchGoogleBooksOnly(query: string): Promise<CatalogSearchResult
   return (data.items ?? []).map(toResult)
 }
 
-// Search only — not getBookById, which a fallback can't help anyway: a
-// Google-Books-shaped id means nothing to Open Library, so there's no id to
-// hand it. Search has no such constraint, and it's the path an outage
-// actually breaks for a user (typing into the search/autosuggest box), so
-// this is where resilience earns its keep.
 export async function searchBooks(query: string): Promise<CatalogSearchResult[]> {
   try {
     return await searchGoogleBooksOnly(query)

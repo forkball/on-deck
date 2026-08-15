@@ -8,18 +8,13 @@ import { GenerationError } from './errors.ts'
 import type { DecadeRelation, Pick } from './picks.ts'
 import { track } from './timings.ts'
 
-// A pick paired with the catalog entry it resolved to.
 export interface Candidate {
   pick: Pick
   match: CatalogSearchResult
 }
 
-// Via the registry, so an unserved type throws rather than quietly returning
-// film results for a book request.
-//
-// Timed here rather than at each call site: these two are every outbound
-// catalog request the pipeline makes, and which phase was open when one ran is
-// what says whether it was a length check or an overview fetch.
+// These two are every outbound catalog request the pipeline makes, so timing
+// them here covers all of it.
 export function searchForType(mediaType: MediaType, query: string): Promise<CatalogSearchResult[]> {
   return track('catalog.search', () => getCatalogProvider(mediaType).search(query))
 }
@@ -55,18 +50,12 @@ function levenshteinDistance(a: string, b: string): number {
   return dp[a.length][b.length]
 }
 
-// Lenient on purpose: real catalog titles differ from a natural-language ask in
-// punctuation, "the"/no "the", or translation. Catches "wrong film entirely";
-// verifyPicksAgainstOverviews catches same-title-same-year-different-film.
+// Lenient on purpose — verifyPicksAgainstOverviews is what catches a
+// same-title-same-year-different-film.
 const TITLE_SIMILARITY_THRESHOLD = 0.5
 
-// Catalog titles often carry a subtitle the pick didn't ask for — "The
-// Dispossessed: An Ambiguous Utopia" scores 0.44 and was dropped despite being
-// an exact match. Books hit this constantly, since Open Library joins the two.
-//
-// Strips at the separator rather than allowing a prefix match: "Foundation" is
-// a prefix of "Foundation and Empire", a different novel. A colon is a
-// structural marker; a space isn't.
+// Strips at the separator rather than allowing a prefix match: "Foundation" is a
+// prefix of "Foundation and Empire", a different novel.
 function withoutSubtitle(title: string): string {
   const [main] = title.split(/\s*[:–—]\s*/)
   return normalizeTitle(main ?? title)
@@ -84,27 +73,14 @@ export function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolea
   return similarity >= TITLE_SIMILARITY_THRESHOLD
 }
 
-// Each verdict carries the entry it's about. The bare boolean array this
-// replaced was paired with its candidate by position, which is an assumption
-// dressed up as data: one verdict too few and every answer after it slid onto
-// the wrong film — keeping one the model had rejected and dropping one it had
-// approved, at the single step whose job is telling near-identical entries
-// apart, with nothing anywhere reporting it.
+// Each verdict carries the index of the entry it's about, so answers pair up by
+// id rather than by position — a verdict list one short would otherwise slide
+// every answer after it onto the wrong film.
 //
-// One shape for every call, rather than built per call around the number of
-// entries. It was built per call to pin the array's length — nothing in JSON
-// Schema can say "as many as I sent you", but a count known at call time can —
-// and that turns out not to be expressible here either: a structured-output
-// schema only accepts 0 or 1 for minItems, and a larger one fails the request
-// outright rather than being ignored (`400 ... 'minItems' values other than 0
-// or 1 are not supported`).
-//
-// Nothing is lost with it gone. The prompt asks for exactly one verdict per
-// entry and applyVerdicts holds the model to that, checking the count, the
-// range and the duplicates rather than trusting any of the three — which it
-// has to do regardless, since a schema the model satisfies by shape can still
-// answer about the wrong entries. That check was always the real guarantee;
-// the schema was restating one part of it.
+// The schema can't pin the array's length: structured output only accepts 0 or
+// 1 for minItems, and a larger one fails the request outright (`400 ...
+// 'minItems' values other than 0 or 1 are not supported`). applyVerdicts is
+// what holds the model to one verdict per entry.
 const VERIFY_SCHEMA = {
   type: 'object' as const,
   additionalProperties: false,
@@ -130,14 +106,9 @@ export interface PickVerdict {
   matches: boolean
 }
 
-// Split out from the call because this is the half that can be wrong while
-// everything still looks fine — and the half that needs no model to test.
-//
-// Refuses anything it can't read unambiguously rather than filtering on a
-// best guess. A verdict set that doesn't line up means we don't know which
-// film each answer was about, and quietly keeping whatever happened to be
-// true would be the same silent mismatch in a new costume. The job retries,
-// and the picks it already paid for are in the checkpoint.
+// Refuses anything it can't read unambiguously rather than filtering on a best
+// guess: a verdict set that doesn't line up means we don't know which film each
+// answer was about.
 export function applyVerdicts(candidates: Candidate[], verdicts: PickVerdict[]): Candidate[] {
   if (!Array.isArray(verdicts)) throw mismatch(`verdicts came back as ${typeof verdicts}`)
 
@@ -158,25 +129,23 @@ export function applyVerdicts(candidates: Candidate[], verdicts: PickVerdict[]):
   return candidates.filter((_, index) => byIndex.get(index) === true)
 }
 
-// Two audiences. GenerationError is what carries the message to the waiting
-// page — see errors.ts — so it says what to do about it; the detail that would
-// only puzzle someone there goes to the log.
+// Two audiences: GenerationError carries a message to the waiting page (see
+// errors.ts), and the detail that would only puzzle them goes to the log.
 function mismatch(detail: string): GenerationError {
   console.warn(`[generation] verification mismatch: ${detail}`)
   return new GenerationError('Checking the picks came back incomplete — try generating again.')
 }
 
 // A same-title-same-year-different-film sails through titlesLikelyMatch, since
-// only the plot can tell them apart. Asks Claude, which knows what it meant, to
-// confirm against the catalog's overview — one batched call for the list.
+// only the plot can tell them apart. One batched call for the whole list.
 export async function verifyPicksAgainstOverviews(
   candidates: Candidate[],
   mediaType: MediaType = 'movie',
 ): Promise<Candidate[]> {
   if (candidates.length === 0) return []
 
-  // From the registry: a hardcoded "TMDB" told Claude the wrong source for
-  // games, inside the one prompt whose job is telling similar things apart.
+  // From the registry — this prompt's whole job is telling similar entries
+  // apart, so it has to name the catalog the entry actually came from.
   const { plural: noun, entryNoun, catalogName } = mediaTypeUiFor(mediaType)
 
   const items = candidates.map(({ pick, match }, index) => ({
@@ -187,12 +156,9 @@ export async function verifyPicksAgainstOverviews(
 
   const { verdicts } = await requestStructured<{ verdicts: PickVerdict[] }>('verify.model', {
     model: 'claude-sonnet-5',
-    // Shared with the reasoning, as everywhere else. The verdicts themselves
-    // are the smallest output in the pipeline — an index and a boolean each —
-    // but the judgement behind them is one plot read against one title per
-    // entry, and this call has had no successful run to measure since the
-    // schema stopped it reaching the model at all. Room enough that the first
-    // one reports what it wanted rather than what it was allowed.
+    // Shared with the reasoning, as everywhere else. The verdicts themselves are
+    // tiny — an index and a boolean each — but the judgement behind them is one
+    // plot read against one title per entry.
     max_tokens: 6000,
     output_config: {
       effort: 'low',
@@ -216,9 +182,7 @@ export async function verifyPicksAgainstOverviews(
   return applyVerdicts(candidates, verdicts)
 }
 
-// Same bound as the Letterboxd importer's. Shared by both by-id fan-outs
-// below, since both are the same provider being asked the same kind of
-// question — one ceiling, not two that drift apart.
+// Shared by both by-id fan-outs below — one ceiling, not two that drift apart.
 const LOOKUP_CONCURRENCY = 8
 
 // A worker pool rather than Promise.all: these run against a rate-limited
@@ -233,9 +197,8 @@ async function forEachWithConcurrency<T>(items: T[], operation: (item: T) => Pro
   await Promise.all(Array.from({ length: Math.min(LOOKUP_CONCURRENCY, items.length) }, worker))
 }
 
-// TMDB returns descriptions on search; Open Library only on the per-work
-// record. Since verifyPicksAgainstOverviews reads them, a missing one would
-// make it rubber-stamp every book.
+// TMDB returns descriptions on search; Open Library only on the per-work record.
+// Without one, verifyPicksAgainstOverviews rubber-stamps every book.
 export async function withOverviews(candidates: Candidate[], mediaType: MediaType): Promise<Candidate[]> {
   const missing = candidates.filter(({ match }) => !match.overview)
   if (missing.length === 0) return candidates
@@ -261,9 +224,7 @@ export function hasLengthDimension(mediaType: MediaType, result: CatalogSearchRe
 //
 // No provider returns length on search, only on by-id, so this is a second
 // round of requests — but only for the candidates that need it, and only when
-// the lever is set at all. It used to run inside the filter loop, which made
-// it one request at a time: up to 25 round trips end to end, in the stage the
-// waiting page labels "Checking lengths…".
+// the lever is set at all. The fan-out is bounded, not serial.
 export async function filterByLength(
   candidates: Candidate[],
   mediaType: MediaType,
@@ -271,12 +232,10 @@ export async function filterByLength(
 ): Promise<Candidate[]> {
   const provider = getCatalogProvider(mediaType)
 
-  // The stored row often already carries the dimension, making the request
-  // pure cost.
+  // The stored row often already carries the dimension.
   const needLookup = new Set(candidates.filter(({ match }) => !hasLengthDimension(mediaType, match)))
-  // Null marks a candidate whose lookup failed — no dimension, no verdict, so
-  // it can't be kept. Held beside the entry rather than mutated into it so the
-  // filter below stays a pure read.
+  // Null marks a failed lookup: no dimension, no verdict, so it can't be kept.
+  // Held beside the entry so the filter below stays a pure read.
   const resolved = new Map<Candidate, CatalogSearchResult | null>()
 
   await forEachWithConcurrency([...needLookup], async (entry) => {
@@ -292,8 +251,8 @@ export async function filterByLength(
 
     const detail = resolved.get(entry) ?? null
     if (!detail || !provider.matchesLength(detail, length)) continue
-    // Already paid for, and it carries what search omits. Keeping the search
-    // result instead wrote rows with a null runtime it had just fetched.
+    // The detail result, not the search one: it carries the dimension that was
+    // just paid for, which search omits.
     kept.push({ pick: entry.pick, match: detail })
   }
 
@@ -303,16 +262,15 @@ export async function filterByLength(
 const YEAR_TOLERANCE = 1
 
 // Resolves picks against the catalog we already hold, so a provider is only
-// asked about titles we've never seen — 21% of picks written so far were
-// already there, and that share grows as the catalog fills.
+// asked about titles we've never seen (~21% of picks are already there).
 //
 // The match is tight on purpose: normalised title equality *and* release year
-// within one. Same-titled works from different eras (Dune 1984 and 2021) are
-// exactly what a looser rule confuses, and one year never spans them.
+// within one, since a looser rule confuses same-titled works from different eras
+// (Dune 1984 and 2021).
 //
-// A row with no overview counts as a miss, since verifyPicksAgainstOverviews
-// judges on plot text and skipping the provider would skip the only check that
-// catches a wrong match. Books hit this constantly — 12% carry an overview.
+// A row with no overview counts as a miss — verifyPicksAgainstOverviews judges
+// on plot text, so skipping the provider would skip the only check that catches
+// a wrong match. Only ~12% of books carry one.
 //
 // Raw SQL because the normalisation has to happen in the database. Matches
 // normalizeTitle exactly.

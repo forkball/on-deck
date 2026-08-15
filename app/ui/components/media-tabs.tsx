@@ -15,13 +15,13 @@ function capitalize(type: string): string {
   return type === 'tv' ? 'TV' : type.replace(/^./, (c) => c.toUpperCase())
 }
 
-// Radio-driven CSS-only tabs. `:has()` on the wrapper reads each radio's
-// `:checked`, so the tab bar and panels need no sibling-order relationship.
+// Radio-driven CSS-only tabs: `:has()` on the wrapper reads each radio's
+// `:checked`, so the bar and panels need no sibling-order relationship.
 type CSSStyle = Parameters<typeof css>[0]
 
-// Base and active-state styles share one object on purpose: two css() calls
-// land in two @layers ordered by declaration, not specificity, so a
-// later-declared base would silently beat an earlier active override.
+// Base and active styles share one object: two css() calls land in two @layers
+// ordered by declaration, not specificity, so a later base beats an earlier
+// active override.
 function tabsStyle(idPrefix: string): CSSStyle {
   const style: Record<string, unknown> = {
     position: 'relative',

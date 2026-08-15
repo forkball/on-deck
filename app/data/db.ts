@@ -12,10 +12,11 @@ types.setTypeParser(types.builtins.INT8, (value) => parseInt(value, 10))
 // equality like the star input's `defaultValue === step`.
 types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value))
 
-// A search page fans out ~20 concurrent upserts, and round-trips are ~45ms, so
-// the pg default of 10 connections made queueing the dominant cost.
-// For the one query the table API can't express: title matching that needs
-// regexp_replace in SQL. See resolveFromCatalog.
+// 20 rather than pg's default 10: a search page fans out ~20 concurrent upserts
+// at ~45ms a round trip, so a smaller pool makes queueing the dominant cost.
+//
+// Exported for the one query the table API can't express — title matching that
+// needs regexp_replace in SQL. See resolveFromCatalog.
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 20 })
 
 export const db = createDatabase(createPostgresDatabaseAdapter(pool))

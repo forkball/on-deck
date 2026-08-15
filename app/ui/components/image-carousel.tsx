@@ -81,7 +81,7 @@ const dotsStyle = css({
 })
 
 // No `display` — DoodleCSS forces `.doodle label` to inline-block unlayered, so
-// it would be silently discarded. This has caught the project four times.
+// it would be silently discarded.
 const dotStyle = css({
   width: '10px',
   height: '10px',
@@ -146,7 +146,7 @@ export function ImageCarousel(handle: Handle<ImageCarouselProps>) {
             <img
               key={image}
               src={image}
-              // The first stands in for the set; enumerating the rest helps
+              // The first stands in for the set — enumerating the rest helps
               // a screen reader none.
               alt={index === 0 ? `${title} artwork` : ''}
               loading={index === 0 ? 'eager' : 'lazy'}

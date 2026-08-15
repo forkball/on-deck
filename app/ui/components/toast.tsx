@@ -3,23 +3,13 @@ import { css } from 'remix/ui'
 
 export type ToastVariant = 'success' | 'error'
 
-// A confirmation that doesn't move the page it's confirming.
+// A confirmation that doesn't move the page it's confirming: fixed rather than
+// in flow, so it shifts nothing, and visible wherever you are on a long page.
 //
-// These were a <p> at the top of whatever page the action redirected to, which
-// has two problems. It shifts everything below it down by a line, and it is
-// only seen if it happens to land above the fold — the taste settings sit at
-// the bottom of the edit page, so saving them redirected to a page whose
-// "Saved." was some 800px below where the browser put you, and the save read
-// as having done nothing at all.
-//
-// Fixed rather than in flow, so it can't move anything, and it fades itself
-// out. The fade is CSS rather than a client entry: this has to work on a page
-// with no JavaScript, and an animation does that without shipping a bundle to
-// say one word.
+// The fade is CSS, not a client entry — this has to work with no JavaScript.
 //
 // Errors don't fade. A confirmation you missed cost you nothing; a refusal you
-// missed leaves you wondering why nothing happened, which is the state this
-// component exists to prevent.
+// missed leaves you wondering why nothing happened.
 export function Toast(handle: Handle<{ message: string; variant?: ToastVariant }>) {
   return () => {
     const { message, variant = 'success' } = handle.props
