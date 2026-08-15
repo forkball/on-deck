@@ -53,9 +53,9 @@ const generateSchema = f.object({
 })
 
 async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
-  const [allRuns, allRunsFromOthers, friends, dailyRuns] = await Promise.all([
-    listRecommendationRuns(db, user.id),
-    listRecommendationRunsFromOthers(db, user.id),
+  const [runs, runsFromOthers, friends, dailyRuns] = await Promise.all([
+    listRecommendationRuns(db, user.id, mediaType),
+    listRecommendationRunsFromOthers(db, user.id, mediaType),
     listFollowedUsers(db, user.id),
     getDailyRunAllowance(db, user),
   ])
@@ -67,8 +67,8 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
 
   return {
     dailyRuns,
-    runs: allRuns.filter((run) => run.mediaType === mediaType),
-    runsFromOthers: allRunsFromOthers.filter((run) => run.mediaType === mediaType),
+    runs,
+    runsFromOthers,
     friends,
     loggedTypes: Object.fromEntries(
       friends.map((friend) => [friend.id, [...(loggedByUser.get(friend.id) ?? [])]]),
