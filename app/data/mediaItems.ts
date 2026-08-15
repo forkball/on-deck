@@ -289,10 +289,9 @@ export async function getUserInteractionForItem(db: Db, userId: number, mediaIte
   return db.findOne(userMediaInteractions, { where: { user_id: userId, media_item_id: mediaItemId } })
 }
 
-// Two queries regardless of log size — per-row item fetches are an N+1.
-//
-// The type filter stays in JS because userMediaInteractions has no `type` column;
-// it lives on the joined media_items row.
+// The whole log in two queries. For callers that partition one read across
+// several media types (mediaSummary); anything wanting a single type or a page
+// of one wants listUserMediaLog, which filters in the database.
 export async function loadUserLogEntries(db: Db, userId: number): Promise<UserLogEntry[]> {
   const interactions = await db.findMany(userMediaInteractions, {
     where: { user_id: userId },
@@ -310,9 +309,6 @@ export async function loadUserLogEntries(db: Db, userId: number): Promise<UserLo
   }))
 }
 
-// Both stay in JS: `type` has to (see loadUserLogEntries), and keeping
-// `statuses` beside it means one predicate answers for the list and the count
-// alike, so a page's rows and its pagination can't disagree.
 export interface UserLogFilter {
   type?: MediaType
   // All of them when unset.
@@ -325,27 +321,107 @@ export function matchesLogFilter(entry: UserLogEntry, filter: UserLogFilter): bo
   return true
 }
 
+// Raw SQL because `type` lives on the joined media_items row, which the table
+// API can't reach — and pushing it down is what lets `limit`/`offset` mean
+// anything. Filtering in JS made every page of a log load the whole log.
+//
+// LEFT JOIN, not INNER: an interaction whose item no longer resolves still
+// belongs in an unfiltered log. A type filter drops it, since `m.type = $x`
+// is NULL for a missing row — the same answer matchesLogFilter gives.
+const LOG_WHERE = `
+       from user_media_interactions i
+       left join media_items m on m.id = i.media_item_id
+      where i.user_id = $1
+        and ($2::text is null or m.type = $2::text)
+        and ($3::text[] is null or i.status = any($3::text[]))`
+
+function logFilterParams(userId: number, filter: UserLogFilter): [number, string | null, string[] | null] {
+  return [userId, filter.type ?? null, filter.statuses ? [...filter.statuses] : null]
+}
+
+interface LogRow {
+  id: number
+  user_id: number
+  media_item_id: number
+  status: InteractionStatus
+  rating: number | null
+  disliked: boolean | null
+  notes: string | null
+  consumed_at: number | null
+  created_at: number
+  updated_at: number
+  m_id: number | null
+  m_type: MediaType | null
+  m_external_source: string | null
+  m_external_id: string | null
+  m_title: string | null
+  m_metadata: unknown
+  m_popularity_score: number | null
+  m_created_at: number | null
+}
+
+function toLogEntry(row: LogRow): UserLogEntry {
+  return {
+    interaction: {
+      id: row.id,
+      user_id: row.user_id,
+      media_item_id: row.media_item_id,
+      status: row.status,
+      rating: row.rating,
+      disliked: row.disliked,
+      notes: row.notes,
+      consumed_at: row.consumed_at,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    } as UserMediaInteraction,
+    item:
+      row.m_id == null
+        ? null
+        : ({
+            id: row.m_id,
+            type: row.m_type,
+            external_source: row.m_external_source,
+            external_id: row.m_external_id,
+            title: row.m_title,
+            metadata: row.m_metadata,
+            popularity_score: row.m_popularity_score,
+            created_at: row.m_created_at,
+          } as MediaItem),
+  }
+}
+
 export async function listUserMediaLog(
   db: Db,
   userId: number,
   options: UserLogFilter & { limit?: number; offset?: number } = {},
 ) {
-  const entries = await loadUserLogEntries(db, userId)
-  const filtered = entries.filter((entry) => matchesLogFilter(entry, options))
+  const params: unknown[] = logFilterParams(userId, options)
+  let sql =
+    `select i.id, i.user_id, i.media_item_id, i.status, i.rating, i.disliked, i.notes,
+            i.consumed_at, i.created_at, i.updated_at,
+            m.id as m_id, m.type as m_type, m.external_source as m_external_source,
+            m.external_id as m_external_id, m.title as m_title, m.metadata as m_metadata,
+            m.popularity_score as m_popularity_score, m.created_at as m_created_at` +
+    LOG_WHERE +
+    // i.id breaks ties. updated_at alone is not unique — an import stamps a
+    // whole batch with one timestamp — and without a tiebreaker Postgres may
+    // order those rows differently per query, so paging through them can repeat
+    // one row and skip another.
+    `\n      order by i.updated_at desc, i.id desc`
 
-  const start = options.offset ?? 0
-  const end = options.limit != null ? start + options.limit : undefined
-  return filtered.slice(start, end)
+  if (options.limit != null) sql += `\n     limit $${params.push(options.limit)}`
+  if (options.offset) sql += `\n    offset $${params.push(options.offset)}`
+
+  const { rows } = await pool.query<LogRow>(sql, params)
+  return rows.map(toLogEntry)
 }
 
 export async function countUserMediaLog(db: Db, userId: number, filter: UserLogFilter = {}): Promise<number> {
-  // The only shape the database can answer without the joined item row.
-  if (!filter.type && !filter.statuses) {
-    return db.count(userMediaInteractions, { where: { user_id: userId } })
-  }
-
-  const entries = await loadUserLogEntries(db, userId)
-  return entries.filter((entry) => matchesLogFilter(entry, filter)).length
+  const { rows } = await pool.query<{ count: string }>(
+    `select count(*)::text as count` + LOG_WHERE,
+    logFilterParams(userId, filter),
+  )
+  return Number(rows[0]?.count ?? 0)
 }
 
 // Rejections don't count, the same rule findMembersMissingSourceLogs uses.
