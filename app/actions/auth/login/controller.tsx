@@ -7,9 +7,10 @@ import { redirect } from 'remix/response/redirect'
 
 import { db } from '../../../data/db.ts'
 import { users, type User } from '../../../data/schema.ts'
+import { updateUserPassword } from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI } from '../../../mediaTypes.ts'
-import { verifyPassword } from '../password.ts'
+import { hashPassword, needsRehash, verifyPassword } from '../password.ts'
 import { LoginPage } from './page.tsx'
 
 const loginSchema = f.object({
@@ -37,6 +38,20 @@ const passwordProvider = createCredentialsAuthProvider<{ identifier: string; pas
     if (!user || !(await verifyPassword(password, user.password_hash))) {
       return null
     }
+
+    // The one moment an existing account's plaintext is in hand, so the only
+    // place a stored hash can be moved to the current cost. Nobody is locked
+    // out waiting for it: the old hash keeps verifying until this runs.
+    //
+    // Awaited rather than left in flight — it costs about what the verify above
+    // just cost, once per account ever, and a write that quietly failed would
+    // leave the account trying again on every future login.
+    if (needsRehash(user.password_hash)) {
+      const rehashed = await hashPassword(password)
+      await updateUserPassword(db, user.id, rehashed)
+      return { ...user, password_hash: rehashed }
+    }
+
     return user
   },
 })
