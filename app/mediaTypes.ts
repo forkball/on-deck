@@ -195,10 +195,6 @@ export const MEDIA_TYPE_UI = {
   },
 } satisfies Record<ActiveMediaType, MediaTypeUi>
 
-export function mediaTypeUi(type: ActiveMediaType): MediaTypeUi {
-  return MEDIA_TYPE_UI[type]
-}
-
 // For code holding a MediaType off a database row. Row types widen the column
 // to `string`, so those callers can't index MEDIA_TYPE_UI directly.
 export function mediaTypeUiFor(type: MediaType): MediaTypeUi {
@@ -244,9 +240,6 @@ export function statusLabel(status: string, mediaType?: unknown): string {
   const type = parseMediaType(mediaType) ?? DEFAULT_MEDIA_TYPE
   return statusLabelsFor(type)[status] ?? status
 }
-
-export const STATUS_OPTIONS = statusOptionsFor(DEFAULT_MEDIA_TYPE)
-export const STATUS_LABELS = statusLabelsFor(DEFAULT_MEDIA_TYPE)
 
 const STATUS_BADGE_COLORS: Record<InteractionStatus, string> = {
   want_to_consume: '#1d4ed8',

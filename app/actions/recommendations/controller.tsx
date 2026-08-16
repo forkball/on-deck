@@ -32,7 +32,7 @@ import {
   type ActiveMediaType,
 } from '../../mediaTypes.ts'
 import { GeneratingPage } from './generating-page.tsx'
-import { RecommendationsPage } from './page.tsx'
+import { RecommendationsPage, type RecommendationsPageProps } from './page.tsx'
 import { RecommendationRunPage } from './run-page.tsx'
 
 const generateSchema = f.object({
@@ -84,6 +84,19 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
   }
 }
 
+// Every path through `generate` that doesn't redirect re-renders the index with
+// something to say. Building the element in one place is what keeps a prop added
+// to the page from reaching four of the five call sites.
+async function indexPage(
+  db: Db,
+  user: User,
+  mediaType: ActiveMediaType,
+  extras: Pick<RecommendationsPageProps, 'error' | 'duplicate'> = {},
+) {
+  const data = await loadIndexData(db, user, mediaType)
+  return <RecommendationsPage {...data} mediaType={mediaType} {...extras} />
+}
+
 export default createController(routes.recommendations, {
   middleware: [requireAuth<User>()],
   actions: {
@@ -96,26 +109,8 @@ export default createController(routes.recommendations, {
       context.get(Session).set('mediaType', mediaType)
 
       const db = context.get(Database)
-      const data = await loadIndexData(db, auth.identity, mediaType)
 
-      return context.render(
-        <RecommendationsPage
-          runs={data.runs}
-          runsFromOthers={data.runsFromOthers}
-          friends={data.friends}
-            loggedTypes={data.loggedTypes}
-            viewerLoggedTypes={data.viewerLoggedTypes}
-          mediaType={mediaType}
-          genres={data.genres}
-          lengthOptions={data.lengthOptions}
-          playerTypes={data.playerTypes}
-          multiplayerTypes={data.multiplayerTypes}
-          platforms={data.platforms}
-          seriesTypes={data.seriesTypes}
-          displayName={data.displayName}
-          dailyRuns={data.dailyRuns}
-        />,
-      )
+      return context.render(await indexPage(db, auth.identity, mediaType))
     },
 
     async generate(context) {
@@ -180,26 +175,12 @@ export default createController(routes.recommendations, {
               : `${label} has no ${nouns} logged`
           })
           .join(', and ')
-        const data = await loadIndexData(db, auth.identity, mediaType)
-
         return context.render(
-          <RecommendationsPage
-            runs={data.runs}
-            runsFromOthers={data.runsFromOthers}
-            friends={data.friends}
-            loggedTypes={data.loggedTypes}
-            viewerLoggedTypes={data.viewerLoggedTypes}
-            mediaType={mediaType}
-            genres={data.genres}
-            lengthOptions={data.lengthOptions}
-            playerTypes={data.playerTypes}
-            multiplayerTypes={data.multiplayerTypes}
-            platforms={data.platforms}
-            seriesTypes={data.seriesTypes}
-            displayName={data.displayName}
-            dailyRuns={data.dailyRuns}
-            error={`Can't generate this run — ${detail}. Everyone included needs something logged for each taste you're basing picks on.`}
-          />,
+          await indexPage(db, auth.identity, mediaType, {
+            error:
+              `Can't generate this run — ${detail}. Everyone included needs something ` +
+              `logged for each taste you're basing picks on.`,
+          }),
           { status: 400 },
         )
       }
@@ -207,35 +188,19 @@ export default createController(routes.recommendations, {
       const allowance = await getDailyRunAllowance(db, auth.identity)
       const runCost = runCostFor(memberIds.length)
       if (!allowance.unlimited && allowance.remaining < runCost) {
-        const data = await loadIndexData(db, auth.identity, mediaType)
         const wait =
           allowance.resetsAt == null
             ? ''
             : ` The next one frees up in about ${timeUntil(allowance.resetsAt)}.`
 
         return context.render(
-          <RecommendationsPage
-            runs={data.runs}
-            runsFromOthers={data.runsFromOthers}
-            friends={data.friends}
-            loggedTypes={data.loggedTypes}
-            viewerLoggedTypes={data.viewerLoggedTypes}
-            mediaType={mediaType}
-            genres={data.genres}
-            lengthOptions={data.lengthOptions}
-            playerTypes={data.playerTypes}
-            multiplayerTypes={data.multiplayerTypes}
-            platforms={data.platforms}
-            seriesTypes={data.seriesTypes}
-            displayName={data.displayName}
-            dailyRuns={data.dailyRuns}
-            error={
+          await indexPage(db, auth.identity, mediaType, {
+            error:
               allowance.remaining === 0
                 ? `You've used all ${allowance.limit} of your recommendation runs for today.${wait}`
                 : `A run for ${memberIds.length} people costs ${runCost} of your ${allowance.limit} daily runs, ` +
-                  `and you have ${allowance.remaining} left. Try again with fewer people, or later.${wait}`
-            }
-          />,
+                  `and you have ${allowance.remaining} left. Try again with fewer people, or later.${wait}`,
+          }),
           { status: 429 },
         )
       }
@@ -251,24 +216,9 @@ export default createController(routes.recommendations, {
         )
 
         if (duplicate) {
-          const data = await loadIndexData(db, auth.identity, mediaType)
           return context.render(
-            <RecommendationsPage
-              runs={data.runs}
-              runsFromOthers={data.runsFromOthers}
-              friends={data.friends}
-            loggedTypes={data.loggedTypes}
-            viewerLoggedTypes={data.viewerLoggedTypes}
-              mediaType={mediaType}
-              genres={data.genres}
-              lengthOptions={data.lengthOptions}
-              playerTypes={data.playerTypes}
-              multiplayerTypes={data.multiplayerTypes}
-              platforms={data.platforms}
-              seriesTypes={data.seriesTypes}
-              displayName={data.displayName}
-              dailyRuns={data.dailyRuns}
-              duplicate={{
+            await indexPage(db, auth.identity, mediaType, {
+              duplicate: {
                 runId: duplicate.runId,
                 name: duplicate.name,
                 createdAt: duplicate.createdAt,
@@ -287,8 +237,8 @@ export default createController(routes.recommendations, {
                   ...sourceTypes.map((type) => ['source', type] as [string, string]),
                   ...friendIds.map((id) => ['friend_ids', String(id)] as [string, string]),
                 ],
-              }}
-            />,
+              },
+            }),
           )
         }
       }
@@ -309,25 +259,10 @@ export default createController(routes.recommendations, {
       )
 
       if (!enqueued.ok) {
-        const data = await loadIndexData(db, auth.identity, mediaType)
         return context.render(
-          <RecommendationsPage
-            runs={data.runs}
-            runsFromOthers={data.runsFromOthers}
-            friends={data.friends}
-            loggedTypes={data.loggedTypes}
-            viewerLoggedTypes={data.viewerLoggedTypes}
-            mediaType={mediaType}
-            genres={data.genres}
-            lengthOptions={data.lengthOptions}
-            playerTypes={data.playerTypes}
-            multiplayerTypes={data.multiplayerTypes}
-            platforms={data.platforms}
-            seriesTypes={data.seriesTypes}
-            displayName={data.displayName}
-            dailyRuns={data.dailyRuns}
-            error="You already have a run in progress — give that one a moment to finish first."
-          />,
+          await indexPage(db, auth.identity, mediaType, {
+            error: 'You already have a run in progress — give that one a moment to finish first.',
+          }),
           { status: 409 },
         )
       }

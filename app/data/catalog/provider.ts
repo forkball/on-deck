@@ -166,7 +166,7 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
   },
 }
 
-export function findCatalogProvider(type: MediaType): CatalogProvider | undefined {
+function findCatalogProvider(type: MediaType): CatalogProvider | undefined {
   return CATALOG_PROVIDERS[type]
 }
 
@@ -175,10 +175,6 @@ export function getCatalogProvider(type: MediaType): CatalogProvider {
   const provider = findCatalogProvider(type)
   if (!provider) throw new Error(`No catalog provider registered for media type "${type}".`)
   return provider
-}
-
-export function supportedMediaTypes(): MediaType[] {
-  return Object.keys(CATALOG_PROVIDERS)
 }
 
 // Writes every hit into the catalog, so results are real media_items the user can
