@@ -1,4 +1,4 @@
-import { createRouter, type MiddlewareContext } from 'remix/router'
+import { createRouter } from 'remix/router'
 import { staticFiles } from 'remix/middleware/static'
 import { formData } from 'remix/middleware/form-data'
 import { methodOverride } from 'remix/middleware/method-override'
@@ -24,20 +24,11 @@ import recommendationsController from './actions/recommendations/controller.tsx'
 import tvController from './actions/tv/controller.tsx'
 import usersController from './actions/users/controller.tsx'
 import { loadDatabase } from './data/db.ts'
+import type { AppContext } from './middleware/context.ts'
 import { loadAuth } from './middleware/auth.ts'
 import { render } from './middleware/render.tsx'
 import { sessionCookie, sessionStorage } from './middleware/session.ts'
 import { routes } from './routes.ts'
-
-type AppContext = MiddlewareContext<
-  [
-    ReturnType<typeof render>,
-    ReturnType<typeof formData>,
-    ReturnType<typeof session>,
-    ReturnType<typeof loadDatabase>,
-    ReturnType<typeof loadAuth>,
-  ]
->
 
 declare module 'remix/router' {
   interface RouterTypes {

@@ -20,6 +20,7 @@ import {
   parseRatingSubmission,
 } from '../data/mediaItems.ts'
 import { INTERACTION_STATUSES, type User } from '../data/schema.ts'
+import type { MediaControllerContext, MediaItemControllerContext } from '../middleware/context.ts'
 import { displayLabel } from '../data/users.ts'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../mediaTypes.ts'
 import { parseMediaMetadata } from '../data/mediaMetadata.ts'
@@ -38,14 +39,19 @@ const logSchema = f.object({
   return_to: f.field(s.defaulted(s.string(), '')),
 })
 
-// `context` is loosely typed because pulling handlers out of createController
-// loses its inference — each one re-establishes concrete types immediately.
+// Written out rather than inferred. createController derives action types from
+// the concrete route map, and routes.movies.show and routes.tv.show are
+// different generic instantiations, so a factory generic over the route map
+// can't typecheck — which is what left these handlers on `any`.
+//
+// The context types name only what these handlers read — see
+// middleware/context.ts for why that is what makes them assignable.
 export function createMediaActions(mediaType: ActiveMediaType) {
   const ui = MEDIA_TYPE_UI[mediaType]
   const provider = getCatalogProvider(mediaType)
 
   return {
-    async search(context: any) {
+    async search(context: MediaControllerContext) {
       const db: Db = context.get(Database)
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -72,7 +78,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       )
     },
 
-    async suggest(context: any) {
+    async suggest(context: MediaControllerContext) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
@@ -90,7 +96,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       return Response.json({ suggestions })
     },
 
-    async import(context: any) {
+    async import(context: MediaControllerContext) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
@@ -108,7 +114,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       return redirect(from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref, 303)
     },
 
-    async show(context: any) {
+    async show(context: MediaItemControllerContext) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
       const identity: User = auth.identity
@@ -144,7 +150,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       )
     },
 
-    async rematch(context: any) {
+    async rematch(context: MediaItemControllerContext) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
@@ -175,7 +181,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       return redirect(`${successPath}?${query.toString()}`, 303)
     },
 
-    async log(context: any) {
+    async log(context: MediaItemControllerContext) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
       const identity: User = auth.identity
