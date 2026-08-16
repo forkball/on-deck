@@ -63,6 +63,21 @@ export async function listFollowingIds(
   return new Set(rows.map((row) => row.followed_id))
 }
 
+// The other direction, batched the same way. Both together answer "which of
+// these follow each other with me" in two queries rather than two per candidate.
+export async function listFollowerIds(
+  db: Db,
+  followedId: number,
+  candidateIds: number[],
+): Promise<Set<number>> {
+  if (candidateIds.length === 0) return new Set()
+
+  const rows = await db.findMany(userFollows, {
+    where: and(eq('followed_id', followedId), inList('follower_id', candidateIds)),
+  })
+  return new Set(rows.map((row) => row.follower_id))
+}
+
 export async function listFollowedUsers(db: Db, followerId: number): Promise<User[]> {
   const rows = await db.findMany(userFollows, { where: { follower_id: followerId } })
   if (rows.length === 0) return []

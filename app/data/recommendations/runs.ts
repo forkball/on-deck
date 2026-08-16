@@ -2,7 +2,7 @@ import { and, eq, inList } from 'remix/data-table'
 
 import type { LengthBucket } from '../catalog/provider.ts'
 import type { Db } from '../db.ts'
-import { isFollowing } from '../follows.ts'
+import { listFollowerIds, listFollowingIds } from '../follows.ts'
 import type { MediaType } from '../mediaItems.ts'
 import {
   mediaItems,
@@ -115,9 +115,17 @@ export async function findUnusedDuplicateRun(
     orderBy: ['created_at', 'desc'],
   })
 
+  // Every run's members in one query: the loop below compares a key per run, so
+  // asking per run paid a round trip even for the ones that don't match.
+  const memberRows =
+    runs.length === 0
+      ? []
+      : await db.findMany(recommendationRunMembers, { where: inList('run_id', runs.map((run) => run.id)) })
+  const memberIdsByRun = new Map<number, number[]>(runs.map((run) => [run.id, []]))
+  for (const row of memberRows) memberIdsByRun.get(row.run_id)?.push(row.user_id)
+
   for (const run of runs) {
     const params = parseParams(run)
-    const members = await db.findMany(recommendationRunMembers, { where: { run_id: run.id } })
     const key = paramsKey(
       {
         genre: params.genre,
@@ -130,7 +138,7 @@ export async function findUnusedDuplicateRun(
         series: params.series,
       },
       params.sourceTypes,
-      members.map((member) => member.user_id),
+      memberIdsByRun.get(run.id) ?? [],
     )
     if (key !== wanted) continue
 
@@ -155,17 +163,39 @@ export async function findUnusedDuplicateRun(
   return null
 }
 
-async function listOtherMemberLabels(db: Db, viewerId: number, run: RecommendationRun): Promise<string[]> {
-  const memberRows = await db.findMany(recommendationRunMembers, { where: { run_id: run.id } })
-  const otherMemberIds = memberRows.map((m) => m.user_id).filter((id) => id !== viewerId)
-  if (otherMemberIds.length === 0) return []
+// Two queries for a whole list of runs, not two per run. The member rows and
+// the user rows they name are each fetched once and grouped here; asking per
+// run made a page of runs cost a round trip apiece for the same handful of
+// people.
+async function loadOtherMemberLabels(
+  db: Db,
+  viewerId: number,
+  runs: RecommendationRun[],
+): Promise<Map<number, string[]>> {
+  const byRun = new Map<number, string[]>(runs.map((run) => [run.id, []]))
+  if (runs.length === 0) return byRun
+
+  const memberRows = await db.findMany(recommendationRunMembers, {
+    where: inList('run_id', runs.map((run) => run.id)),
+  })
+  const otherMemberIds = [...new Set(memberRows.map((row) => row.user_id))].filter((id) => id !== viewerId)
+  if (otherMemberIds.length === 0) return byRun
 
   const otherUsers = await db.findMany(users, { where: inList('id', otherMemberIds) })
-  return otherUsers.map(displayLabel)
+  const labelByUserId = new Map(otherUsers.map((user) => [user.id, displayLabel(user)]))
+
+  for (const row of memberRows) {
+    const label = labelByUserId.get(row.user_id)
+    if (label) byRun.get(row.run_id)?.push(label)
+  }
+  return byRun
 }
 
-async function buildGroupLabel(db: Db, viewerId: number, run: RecommendationRun): Promise<string> {
-  const otherMemberLabels = await listOtherMemberLabels(db, viewerId, run)
+async function listOtherMemberLabels(db: Db, viewerId: number, run: RecommendationRun): Promise<string[]> {
+  return (await loadOtherMemberLabels(db, viewerId, [run])).get(run.id) ?? []
+}
+
+function groupLabelFrom(otherMemberLabels: string[]): string {
   if (otherMemberLabels.length === 0) return 'Just you'
   return `You + ${otherMemberLabels.join(', ')}`
 }
@@ -226,59 +256,69 @@ export async function pruneOldRuns(db: Db, userId: number, mediaType: MediaType)
   return true
 }
 
-export async function listRecommendationRuns(db: Db, userId: number): Promise<RecommendationRunSummary[]> {
+// `mediaType` filters in the query rather than leaving the caller to discard
+// what it didn't want: the cap is per media type, so an unfiltered read returns
+// every type's runs and builds a group label for each one before three quarters
+// of them are thrown away.
+export async function listRecommendationRuns(
+  db: Db,
+  userId: number,
+  mediaType?: MediaType,
+): Promise<RecommendationRunSummary[]> {
   const runs = await db.findMany(recommendationRuns, {
-    where: { user_id: userId },
+    where: mediaType ? { user_id: userId, media_type: mediaType } : { user_id: userId },
     orderBy: ['created_at', 'desc'],
   })
 
-  return Promise.all(
-    runs.map(async (run) => ({
-      id: run.id,
-      createdAt: run.created_at,
-      groupLabel: await buildGroupLabel(db, userId, run),
-      mediaType: run.media_type,
-      name: run.name,
-    })),
-  )
+  const labels = await loadOtherMemberLabels(db, userId, runs)
+
+  return runs.map((run) => ({
+    id: run.id,
+    createdAt: run.created_at,
+    groupLabel: groupLabelFrom(labels.get(run.id) ?? []),
+    mediaType: run.media_type,
+    name: run.name,
+  }))
 }
 
 // Restricted to mutual follows — being added to someone's run isn't consent to
 // show up on their page. Deliberately stricter than getRecommendationRun.
-export async function listRecommendationRunsFromOthers(db: Db, userId: number): Promise<RecommendationRunSummary[]> {
+// Restricted to mutual follows — being added to someone's run isn't consent to
+// show up on their page. Deliberately stricter than getRecommendationRun.
+export async function listRecommendationRunsFromOthers(
+  db: Db,
+  userId: number,
+  mediaType?: MediaType,
+): Promise<RecommendationRunSummary[]> {
   const memberships = await db.findMany(recommendationRunMembers, { where: { user_id: userId } })
   if (memberships.length === 0) return []
 
   const runs = await db.findMany(recommendationRuns, { where: inList('id', memberships.map((m) => m.run_id)) })
-  const runsFromOthers = runs.filter((run) => run.user_id !== userId)
+  const runsFromOthers = runs.filter(
+    (run) => run.user_id !== userId && (mediaType === undefined || run.media_type === mediaType),
+  )
   if (runsFromOthers.length === 0) return []
 
+  // Both directions in two queries rather than two per requester.
   const requesterIds = [...new Set(runsFromOthers.map((run) => run.user_id))]
-  const mutualByRequesterId = new Map(
-    await Promise.all(
-      requesterIds.map(async (requesterId): Promise<[number, boolean]> => {
-        const [requesterFollowsUser, userFollowsRequester] = await Promise.all([
-          isFollowing(db, requesterId, userId),
-          isFollowing(db, userId, requesterId),
-        ])
-        return [requesterId, requesterFollowsUser && userFollowsRequester]
-      }),
-    ),
-  )
+  const [userFollows, followsUser] = await Promise.all([
+    listFollowingIds(db, userId, requesterIds),
+    listFollowerIds(db, userId, requesterIds),
+  ])
 
   const eligibleRuns = runsFromOthers
-    .filter((run) => mutualByRequesterId.get(run.user_id))
+    .filter((run) => userFollows.has(run.user_id) && followsUser.has(run.user_id))
     .sort((a, b) => b.created_at - a.created_at)
 
-  return Promise.all(
-    eligibleRuns.map(async (run) => ({
-      id: run.id,
-      createdAt: run.created_at,
-      groupLabel: await buildGroupLabel(db, userId, run),
-      mediaType: run.media_type,
-      name: run.name,
-    })),
-  )
+  const labels = await loadOtherMemberLabels(db, userId, eligibleRuns)
+
+  return eligibleRuns.map((run) => ({
+    id: run.id,
+    createdAt: run.created_at,
+    groupLabel: groupLabelFrom(labels.get(run.id) ?? []),
+    mediaType: run.media_type,
+    name: run.name,
+  }))
 }
 
 // Access is membership, and membership is permanent — unlike
@@ -298,8 +338,8 @@ export async function getRecommendationRun(
     if (!membership) return null
   }
 
-  const groupLabel = await buildGroupLabel(db, userId, run)
   const otherMemberLabels = await listOtherMemberLabels(db, userId, run)
+  const groupLabel = groupLabelFrom(otherMemberLabels)
   const params = parseParams(run)
   const rows = await db.findMany(userRecommendations, { where: { run_id: runId }, orderBy: ['rank', 'asc'] })
   if (rows.length === 0) {
