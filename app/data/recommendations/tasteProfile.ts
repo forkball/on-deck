@@ -141,13 +141,18 @@ export function buildProfilePrompt(
 
 // Returns the whole log, not the slice, so callers excluding already-seen titles
 // don't re-fetch.
+//
+// `log` is optional only so the rebuild button can call this without one.
+// ensureTasteProfile has already read it and passes it through — reading it
+// again here is a second full log load per member per media type.
 export async function regenerateTasteProfile(
   db: Db,
   userId: number,
   mediaType: MediaType,
   settings: TasteProfileSettings,
+  log?: LogEntry[],
 ): Promise<RegeneratedTasteProfile> {
-  const log = await listUserMediaLog(db, userId, { type: mediaType })
+  log ??= await listUserMediaLog(db, userId, { type: mediaType })
   const loggedItems = profilePromptRows(log, settings)
 
   if (loggedItems.length === 0) {
@@ -257,5 +262,5 @@ export async function ensureTasteProfile(
     }
   }
 
-  return { ...(await regenerateTasteProfile(db, userId, mediaType, settings)), regenerated: true }
+  return { ...(await regenerateTasteProfile(db, userId, mediaType, settings, log)), regenerated: true }
 }
