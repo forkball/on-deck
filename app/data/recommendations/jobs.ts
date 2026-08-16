@@ -79,38 +79,36 @@ export interface JobParams {
   name?: string
 }
 
+// `active_job` when the user already has one queued or running.
+export type EnqueueJobResult = { ok: true; jobId: string } | { ok: false; reason: 'active_job' }
+
+// The insert is the check. `on conflict do nothing` against the partial unique
+// index (see the 20260816120000 migration) is what makes one-per-user hold under
+// concurrent requests — reading first and inserting after leaves a window two
+// requests can both pass through.
 export async function enqueueJob(
   db: Db,
   userId: number,
   params: JobParams,
   options: { withLengthCheck: boolean },
-): Promise<string> {
+): Promise<EnqueueJobResult> {
   await sweep(db)
 
   const id = crypto.randomUUID()
   const now = Date.now()
   const phases = options.withLengthCheck ? PHASE_ORDER : PHASE_ORDER.filter((phase) => phase !== 'lengths')
 
-  await db.create(recommendationJobs, {
-    id,
-    user_id: userId,
-    status: 'queued',
-    params: JSON.stringify(params),
-    attempts: 0,
-    phases: phases.join(','),
-    phase: 'profiles',
-    pruned_oldest_run: 0,
-    created_at: now,
-    updated_at: now,
-  })
+  const { rows } = await pool.query<{ id: string }>(
+    `insert into recommendation_jobs
+       (id, user_id, status, params, attempts, phases, phase, pruned_oldest_run, created_at, updated_at)
+     values ($1, $2, 'queued', $3, 0, $4, 'profiles', 0, $5, $5)
+     on conflict (user_id) where status in ('queued', 'running') do nothing
+     returning id`,
+    [id, userId, JSON.stringify(params), phases.join(','), now],
+  )
 
-  return id
-}
-
-// One in flight per person, so nobody can fill the queue on their own.
-export async function hasActiveJob(db: Db, userId: number): Promise<boolean> {
-  const rows = await db.findMany(recommendationJobs, { where: { user_id: userId } })
-  return rows.some((row) => row.status === 'queued' || row.status === 'running')
+  if (rows.length === 0) return { ok: false, reason: 'active_job' }
+  return { ok: true, jobId: rows[0].id }
 }
 
 export async function setPhase(db: Db, jobId: string, phase: GenerationPhase): Promise<void> {
