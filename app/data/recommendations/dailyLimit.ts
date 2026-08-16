@@ -38,6 +38,11 @@ export async function getDailyRunAllowance(db: Db, user: User): Promise<DailyRun
   }
 }
 
+// Charged on save rather than on enqueue, so a run that died partway costs
+// nothing. That is only safe because a user can have at most one run in flight
+// — see the partial unique index on recommendation_jobs — so at most one
+// uncounted run exists at a time and the check before enqueueing sees it.
+//
 // `cost` is booked as that many rows rather than a quantity on one: the
 // allowance, the sweep and the resetsAt timestamp all count rows.
 export async function recordRunAgainstDailyLimit(db: Db, userId: number, cost = 1): Promise<void> {

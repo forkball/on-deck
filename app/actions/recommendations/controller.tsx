@@ -11,7 +11,7 @@ import type { Db } from '../../data/db.ts'
 import { listFollowedUsers } from '../../data/follows.ts'
 import { loadLoggedTypesByUser } from '../../data/mediaItems.ts'
 import { getDailyRunAllowance, runCostFor, timeUntil } from '../../data/recommendations/dailyLimit.ts'
-import { enqueueJob, getJob, hasActiveJob, PHASE_LABELS } from '../../data/recommendations/jobs.ts'
+import { enqueueJob, getJob, PHASE_LABELS } from '../../data/recommendations/jobs.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { getRememberedMediaType } from '../../middleware/mediaType.ts'
@@ -293,7 +293,22 @@ export default createController(routes.recommendations, {
         }
       }
 
-      if (await hasActiveJob(db, auth.identity.id)) {
+      // No pre-check: the insert refuses a second active run for this user, so
+      // two requests arriving together can't both get through.
+      const enqueued = await enqueueJob(
+        db,
+        auth.identity.id,
+        {
+          memberIds,
+          mediaType,
+          filters: filters as Record<string, unknown>,
+          sourceTypes,
+          name: parsed.value.name || undefined,
+        },
+        { withLengthCheck: filters.length != null },
+      )
+
+      if (!enqueued.ok) {
         const data = await loadIndexData(db, auth.identity, mediaType)
         return context.render(
           <RecommendationsPage
@@ -317,20 +332,7 @@ export default createController(routes.recommendations, {
         )
       }
 
-      const jobId = await enqueueJob(
-        db,
-        auth.identity.id,
-        {
-          memberIds,
-          mediaType,
-          filters: filters as Record<string, unknown>,
-          sourceTypes,
-          name: parsed.value.name || undefined,
-        },
-        { withLengthCheck: filters.length != null },
-      )
-
-      return redirect(routes.recommendations.generating.href({ jobId }), 303)
+      return redirect(routes.recommendations.generating.href({ jobId: enqueued.jobId }), 303)
     },
 
     async generating(context) {

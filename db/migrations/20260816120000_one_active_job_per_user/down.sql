@@ -1,0 +1,1 @@
+drop index if exists recommendation_jobs_one_active_per_user;
