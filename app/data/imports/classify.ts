@@ -1,0 +1,216 @@
+// How sure we are that a CSV row landed on the right catalog entry, and what to
+// tell someone about it. Deliberately free of the database and the catalog: the
+// rules are the part worth testing, and they only need the row and the result.
+
+export type MatchReason = 'exact' | 'year_drift' | 'no_year' | 'title_differs' | 'ambiguous'
+
+// pending is the state a row is written in before matching reaches it.
+// confident/uncertain/not_found are what matching leaves behind; the rest are
+// what review writes over them. `kept` is a conflict decided in favour of the
+// log — nothing is written, but nothing is lost either, which is why it is not
+// the same as `skipped`.
+export type RowState =
+  | 'pending'
+  | 'confident'
+  | 'uncertain'
+  | 'not_found'
+  | 'confirmed'
+  | 'skipped'
+  | 'kept'
+
+export interface CandidateLike {
+  externalId: string
+  title: string
+  releaseYear: number | null
+}
+
+export interface RowLike {
+  title: string
+  year: number | null
+}
+
+export interface Verdict {
+  state: Extract<RowState, 'confident' | 'uncertain' | 'not_found'>
+  reason: MatchReason | null
+  // Signed, so "matched 30 years later" and "30 years earlier" stay
+  // distinguishable; the copy only uses its magnitude.
+  yearDelta: number | null
+}
+
+// Trademark symbols, punctuation and spacing differ constantly between an
+// export and a catalog ("WALL·E" / "WALL-E"), so titles compare on letters and
+// digits only. Same normalization the Steam importer settled on.
+export function normalizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+// `results` is the whole result set the match came from, not just the winner:
+// two results sharing the chosen title and year is the only way to know a match
+// was a coin toss rather than a lookup.
+export function classifyMatch(row: RowLike, match: CandidateLike | null, results: CandidateLike[] = []): Verdict {
+  if (!match) return { state: 'not_found', reason: null, yearDelta: null }
+
+  const sameTitle = normalizeTitle(row.title) === normalizeTitle(match.title)
+
+  if (!sameTitle) {
+    return { state: 'uncertain', reason: 'title_differs', yearDelta: yearDelta(row.year, match.releaseYear) }
+  }
+
+  // A row with no year gives the matcher nothing to disambiguate on, so even a
+  // perfect title is a guess between every film that ever carried it.
+  if (row.year == null) {
+    return { state: 'uncertain', reason: 'no_year', yearDelta: null }
+  }
+
+  const delta = yearDelta(row.year, match.releaseYear)
+  if (delta == null || delta !== 0) {
+    return { state: 'uncertain', reason: 'year_drift', yearDelta: delta }
+  }
+
+  if (countSharing(results, match) > 1) {
+    return { state: 'uncertain', reason: 'ambiguous', yearDelta: 0 }
+  }
+
+  return { state: 'confident', reason: 'exact', yearDelta: 0 }
+}
+
+function yearDelta(rowYear: number | null, matchYear: number | null): number | null {
+  if (rowYear == null || matchYear == null) return null
+  return matchYear - rowYear
+}
+
+function countSharing(results: CandidateLike[], match: CandidateLike): number {
+  const title = normalizeTitle(match.title)
+  return results.filter((r) => normalizeTitle(r.title) === title && r.releaseYear === match.releaseYear).length
+}
+
+// Review lists least-certain first, so the value is front-loaded and stopping
+// early is a legitimate way to finish. Higher sorts earlier.
+export function suspicion(verdict: Verdict): number {
+  switch (verdict.reason) {
+    case 'title_differs':
+      return 1000
+    case 'no_year':
+      return 500
+    case 'year_drift':
+      // A 30-year gap is a different film; a 1-year gap is usually a festival
+      // or re-release date, so magnitude is the whole signal here.
+      return 100 + Math.min(Math.abs(verdict.yearDelta ?? 0), 99)
+    case 'ambiguous':
+      return 50
+    default:
+      return 0
+  }
+}
+
+// Fits after the row, as a chip.
+export function describeReason(verdict: Verdict): string | null {
+  const magnitude = Math.abs(verdict.yearDelta ?? 0)
+
+  switch (verdict.reason) {
+    case 'title_differs':
+      return 'Title differs'
+    case 'no_year':
+      return 'No year in your CSV'
+    case 'year_drift':
+      return magnitude === 1 ? 'Year off by 1' : `Year off by ${magnitude}`
+    case 'ambiguous':
+      return 'Several films share this title and year'
+    default:
+      return null
+  }
+}
+
+// The long tail of a large import: near-miss years, which are almost always a
+// festival or re-release date rather than a wrong film. Offered as one bulk
+// accept so 400 rows don't become 400 decisions.
+export const BULK_ACCEPT_MAX_DRIFT = 1
+
+export function isBulkAcceptable(verdict: Verdict): boolean {
+  return verdict.reason === 'year_drift' && Math.abs(verdict.yearDelta ?? 0) <= BULK_ACCEPT_MAX_DRIFT
+}
+
+export interface DuplicateRow {
+  id: number
+  // The line in the uploaded file. What the page calls the row, since "row 288"
+  // has to mean something a person can go and look at.
+  index: number
+  title: string
+  year: number | null
+  consumedAt: number | null
+  verdict: Verdict
+}
+
+// Two rows resolving to one catalog entry. `different_films` is the common
+// case — one row matched wrong and the two are separate works sharing a name —
+// so nothing is dropped and `move` names the row to repoint. `repeat` is one
+// film logged twice, where keeping one entry is right.
+export type DuplicateVerdict =
+  | { kind: 'different_films'; move: DuplicateRow; anchor: DuplicateRow }
+  | { kind: 'repeat'; keep: DuplicateRow; drop: DuplicateRow }
+
+// Told apart by the years in the CSV itself, not by the catalog: if the export
+// says 1972 and 2002, the person logged two different films, whatever the
+// matcher decided. Only rows agreeing on title and year are a real repeat.
+export function classifyDuplicate(a: DuplicateRow, b: DuplicateRow): DuplicateVerdict {
+  const differentYears = a.year != null && b.year != null && a.year !== b.year
+  const differentTitles = normalizeTitle(a.title) !== normalizeTitle(b.title)
+
+  if (differentYears || differentTitles) {
+    // The row whose own year the match agrees with is the anchor; the other is
+    // the one that drifted onto it and should move.
+    const [anchor, move] = suspicion(a.verdict) <= suspicion(b.verdict) ? [a, b] : [b, a]
+    return { kind: 'different_films', move, anchor }
+  }
+
+  // A rewatch: the later watch is what the log should end up showing, since one
+  // entry per film means the most recent viewing is the live one.
+  const [keep, drop] = (a.consumedAt ?? 0) >= (b.consumedAt ?? 0) ? [a, b] : [b, a]
+  return { kind: 'repeat', keep, drop }
+}
+
+export type ConflictField = 'rating' | 'watched' | 'notes'
+
+export interface LogValues {
+  rating: number | null
+  disliked: boolean | null
+  consumedAt: number | null
+  notes: string | null
+}
+
+// Only fields that actually disagree. A re-import of an unchanged export
+// therefore raises nothing at all, which is what keeps a large duplicate import
+// from becoming hundreds of decisions.
+export function conflictFields(existing: LogValues, incoming: LogValues): ConflictField[] {
+  const fields: ConflictField[] = []
+
+  if (incoming.rating !== existing.rating || incoming.disliked !== existing.disliked) {
+    fields.push('rating')
+  }
+  // Compared by calendar day: an export carries a date, the log carries the
+  // millisecond it was written, and a few hours apart is the same viewing.
+  if (!sameDay(incoming.consumedAt, existing.consumedAt)) {
+    fields.push('watched')
+  }
+  if (normalizeNote(incoming.notes) !== normalizeNote(existing.notes)) {
+    fields.push('notes')
+  }
+
+  return fields
+}
+
+function sameDay(a: number | null, b: number | null): boolean {
+  if (a == null || b == null) return a === b
+  return new Date(a).toISOString().slice(0, 10) === new Date(b).toISOString().slice(0, 10)
+}
+
+function normalizeNote(note: string | null): string {
+  return (note ?? '').trim()
+}
+
+// What a conflicting row does when the person hasn't said otherwise. `keep` is
+// the default because it is the only direction that destroys nothing.
+export type ConflictChoice = 'keep' | 'take'

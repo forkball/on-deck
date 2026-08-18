@@ -57,7 +57,14 @@ does nothing on its own.
     `follows`, `notifications`, `mediaSummary`
   - `app/data/catalog/` — external metadata providers behind one `CatalogProvider`
     interface (`provider.ts` is the registry; `tmdb`/`openLibrary`/`igdb` implement it)
-  - `app/data/imports/` — log importers (`csv` is shared plumbing) and `steamApi`
+  - `app/data/imports/` — log importers (`csv` is shared plumbing) and `steamApi`.
+    A CSV upload is staged rather than written straight to the log: `letterboxd`
+    parses, `batches` persists the batch and the decisions review writes onto it,
+    `matcher`/`worker` do the catalog lookups in the background, and `resolve`
+    settles the whole batch at once so a nearest-year fallback can't take an
+    entry an exact match already holds. `classify` and `review` hold the rules —
+    confidence, conflicts, duplicates, counts — and are free of the database so
+    they can be tested directly
   - `app/data/recommendations/` — the generation pipeline: `picks` asks the model,
     `matching` resolves picks to catalog entries, `runs` persists them, `generate`
     orchestrates those three, `jobs`/`worker` run it in the background,

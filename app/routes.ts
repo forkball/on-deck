@@ -63,6 +63,21 @@ export const routes = route({
       index: get('/'),
       upload: post('/'),
     }),
+    // A staged import, from matching through review to saving. Nested under
+    // its own key rather than importMovies because the review page is
+    // source-agnostic — goodreads and steam batches land here too.
+    imports: route('imports', {
+      show: get(':batchId'),
+      // Polled by the matching page; answers counts, not markup.
+      progress: get(':batchId/progress'),
+      review: get(':batchId/review'),
+      // Candidates for one row, for the picker modal.
+      candidates: get(':batchId/rows/:rowId/candidates'),
+      resolve: post(':batchId/rows/:rowId/resolve'),
+      bulk: post(':batchId/bulk'),
+      conflicts: post(':batchId/conflicts'),
+      save: post(':batchId/save'),
+    }),
     importBooks: route('import-books', {
       index: get('/'),
       upload: post('/'),

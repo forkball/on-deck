@@ -2,6 +2,7 @@ import * as http from 'node:http'
 import { createRequestListener } from 'remix/node-fetch-server'
 
 import { router } from './app/router.ts'
+import { startImportWorker } from './app/data/imports/worker.ts'
 import { startGenerationWorker } from './app/data/recommendations/worker.ts'
 
 const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 44100
@@ -28,6 +29,10 @@ server.listen(port, () => {
 // racing for the same one.
 const generationWorker = startGenerationWorker()
 
+// Matching a staged import is the same shape of work: claimed with SKIP
+// LOCKED, so running it everywhere is safe.
+const importWorker = startImportWorker()
+
 let shuttingDown = false
 
 function shutdown() {
@@ -40,6 +45,7 @@ function shutdown() {
   // sweep to requeue — a run outlasts any shutdown grace period, so waiting
   // for one would just delay the exit and lose it anyway.
   generationWorker.stop()
+  importWorker.stop()
   server.close(() => process.exit(0))
   server.closeAllConnections()
 }
