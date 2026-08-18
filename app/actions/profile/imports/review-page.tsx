@@ -2,6 +2,7 @@ import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { ImportPicker } from '../../../browser/import-picker.tsx'
+import { LazyList } from '../../../browser/lazy-list.tsx'
 import type { ConflictEntry, DuplicateEntry, ReviewModel, ReviewRow } from '../../../data/imports/review.ts'
 import type { LogValues } from '../../../data/imports/classify.ts'
 import type { ImportBatch } from '../../../data/schema.ts'
@@ -23,6 +24,14 @@ const ACCENT = '#3E5C76'
 // Stands in for a row id inside the hrefs handed to the picker, which swaps it
 // per row rather than building URLs of its own.
 const ROW_TOKEN = '__row__'
+
+// Every row is rendered; LazyList hides the tail until you scroll to it. A
+// slice would have been simpler and wrong — the rows past the cut were
+// unreachable, and for "couldn't find", which saves nothing by default, that
+// silently dropped them with no way to go and get them. Revealing costs no
+// request, and with JS off nothing is hidden at all.
+const CONFLICTS_VISIBLE = 10
+const ROWS_VISIBLE = 25
 
 function formatDate(at: number | null): string {
   if (at == null) return 'no date'
@@ -428,14 +437,15 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       Take the import
                     </button>
                   </form>
-                  {model.conflicts.slice(0, 10).map((entry) => (
-                    <ConflictCard key={entry.row.id} batchId={batchId} entry={entry} />
-                  ))}
-                  {model.conflicts.length > 10 && (
-                    <p mix={css({ fontSize: '13px', color: '#888', margin: '10px 0 0' })}>
-                      {model.conflicts.length - 10} more — only the fields that differ are highlighted.
-                    </p>
-                  )}
+                  <div id="import-conflicts">
+                    {model.conflicts.map((entry) => (
+                      <ConflictCard key={entry.row.id} batchId={batchId} entry={entry} />
+                    ))}
+                  </div>
+                  <LazyList listId="import-conflicts" initial={CONFLICTS_VISIBLE} step={CONFLICTS_VISIBLE} />
+                  <p mix={css({ fontSize: '13px', color: '#888', margin: '10px 0 0' })}>
+                    Only the fields that differ are highlighted.
+                  </p>
                 </Flag>
               )}
 
@@ -464,9 +474,12 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     Least certain first. These will be saved either way; the chip says what we're
                     unsure about.
                   </p>
-                  {model.uncertain.slice(0, 25).map((entry) => (
-                    <UncertainCard key={entry.row.id} batchId={batchId} entry={entry} />
-                  ))}
+                  <div id="import-uncertain">
+                    {model.uncertain.map((entry) => (
+                      <UncertainCard key={entry.row.id} batchId={batchId} entry={entry} />
+                    ))}
+                  </div>
+                  <LazyList listId="import-uncertain" initial={ROWS_VISIBLE} step={ROWS_VISIBLE} />
                   {model.bulkAcceptable > 0 && (
                     <form
                       method="post"
@@ -505,17 +518,20 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     No catalog result under that name. <b>These won't be saved</b> unless you track
                     them down.
                   </p>
-                  {model.notFound.slice(0, 25).map(({ row }) => (
-                    <Card key={row.id}>
-                      <div>
-                        {row.title} <span mix={css({ color: '#888' })}>{row.year ?? 'no year'}</span>
-                      </div>
-                      <Actions>
-                        <PickerButton rowId={row.id} label="Find it" primary />
-                        <ResolveForm batchId={batchId} rowId={row.id} action="skip" label="Leave out" />
-                      </Actions>
-                    </Card>
-                  ))}
+                  <div id="import-not-found">
+                    {model.notFound.map(({ row }) => (
+                      <Card key={row.id}>
+                        <div>
+                          {row.title} <span mix={css({ color: '#888' })}>{row.year ?? 'no year'}</span>
+                        </div>
+                        <Actions>
+                          <PickerButton rowId={row.id} label="Find it" primary />
+                          <ResolveForm batchId={batchId} rowId={row.id} action="skip" label="Leave out" />
+                        </Actions>
+                      </Card>
+                    ))}
+                  </div>
+                  <LazyList listId="import-not-found" initial={ROWS_VISIBLE} step={ROWS_VISIBLE} />
                 </>
               )}
 
