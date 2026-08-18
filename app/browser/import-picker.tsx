@@ -305,14 +305,19 @@ export const ImportPicker = clientEntry<ImportPickerProps>(
                         {candidate.externalId === data?.suggestedExternalId && (
                           <span
                             mix={css({
+                              // Along the bottom rather than beside the number:
+                              // at four to a row there is not width for both at
+                              // the top, and they overlapped.
                               position: 'absolute',
-                              top: '4px',
+                              bottom: '4px',
+                              left: '4px',
                               right: '4px',
                               background: '#3E5C76',
                               color: '#fff',
                               borderRadius: '4px',
                               fontSize: '10px',
                               padding: '1px 6px',
+                              textAlign: 'center',
                             })}
                           >
                             suggested

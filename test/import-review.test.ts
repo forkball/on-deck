@@ -187,6 +187,24 @@ describe('buildReview duplicates', () => {
     assert.equal(verdict.keep.id, 210)
   })
 
+  it('counts a held-back confident row once, not twice', () => {
+    // A confident row that loses a duplicate pair is shown by its duplicate
+    // card and written by nothing. Counting it as saved *and* left out made the
+    // footer claim more rows than the file had.
+    const rows = [
+      row({ id: 12, title: 'Drive', year: 2011, consumedAt: 1_700_000_000_000, mediaItemId: 9 }),
+      row({ id: 210, title: 'Drive', year: 2011, consumedAt: 1_730_000_000_000, mediaItemId: 9 }),
+    ]
+    const model = buildReview(rows, catalog(entry(9, 'Drive', 2011)), logged(), 'keep')
+    const { total, save, unchanged, leftOut } = model.counts
+
+    assert.equal(save + unchanged + leftOut, total)
+    assert.equal(save, 1)
+    assert.equal(leftOut, 1)
+    // Held back, so it is not one of the rows needing nothing done to it.
+    assert.equal(model.confidentCount, 1)
+  })
+
   it('ignores a row already skipped', () => {
     const rows = [
       row({ id: 1, mediaItemId: 3 }),

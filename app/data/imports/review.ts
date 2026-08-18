@@ -122,6 +122,11 @@ export function buildReview(
       keptCount++
       continue
     }
+    // Half of a duplicate pair. It is shown by its duplicate card and held out
+    // of the log until that is decided, so it belongs to no other bucket —
+    // counting it as confident would put it in both the save total and the
+    // left-out total at once.
+    if (held.has(row.id)) continue
 
     if (row.state === 'not_found') {
       notFound.push({ row, item: null, chip: null })
@@ -162,7 +167,7 @@ export function buildReview(
   // one conflict means that row, whatever the switch above it says.
   const taken = conflicts.filter(({ row }) => conflictChoice === 'take' || row.state === 'confirmed').length
   const unchanged = conflicts.length - taken + keptCount
-  const save = confidentCount + uncertain.filter(({ row }) => !held.has(row.id)).length + taken
+  const save = confidentCount + uncertain.length + taken
   const leftOut = notFound.length + rows.filter((row) => row.state === 'skipped').length + held.size
 
   return {

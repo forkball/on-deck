@@ -127,3 +127,24 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 .doodle button.danger:hover:not(:disabled) {
   color: #a11;
 }
+
+/* A submit that has to read as a sentence rather than a control: the "actually
+   the same film" escape under a duplicate card, where the button beside it is
+   the action and this is the disagreement. `.doodle button` sets border-image,
+   padding and colour from an unlayered rule, so a layered css() declaration is
+   dropped without a word — which is why this lives here, like the modal trigger
+   and rating chip above. */
+.doodle button.linkish {
+  border: 0;
+  border-image: none;
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  color: #6b6459;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.doodle button.linkish:hover {
+  color: #3c3c3c;
+}

@@ -250,17 +250,17 @@ function DuplicateCard(handle: Handle<{ batchId: string; entry: DuplicateEntry }
             <Actions>
               <PickerButton rowId={verdict.move.id} label={`Find the right film for row ${verdict.move.index}`} primary />
             </Actions>
-            <p mix={css({ fontSize: '13px', margin: '16px 0 0' })}>
+            <div mix={css({ margin: '16px 0 0' })}>
               <form
                 method="post"
                 action={routes.profile.imports.resolve.href({ batchId, rowId: String(verdict.move.id) })}
               >
                 <input type="hidden" name="action" value="skip" />
-                <button type="submit" mix={css({ background: 'none', border: 0, padding: 0, textDecoration: 'underline', cursor: 'pointer', color: '#6b6459', fontSize: '13px' })}>
+                <button type="submit" class="linkish">
                   Actually the same film — leave row {verdict.move.index} out
                 </button>
               </form>
-            </p>
+            </div>
           </>
         ) : (
           <>
