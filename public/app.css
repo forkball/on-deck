@@ -27,6 +27,10 @@
   border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
 }
 
+.doodle button.primary {
+  border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
+}
+
 .doodle fieldset:hover,
 .doodle textarea:hover,
 .doodle textarea:focus-visible {

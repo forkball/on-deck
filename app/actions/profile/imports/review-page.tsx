@@ -117,7 +117,7 @@ function ResolveForm(handle: Handle<{ batchId: string; rowId: number; action: st
     return (
       <form method="post" action={routes.profile.imports.resolve.href({ batchId, rowId: String(rowId) })}>
         <input type="hidden" name="action" value={action} />
-        <button type="submit" mix={css({ fontSize: '13px' })}>
+        <button type="submit" class={primary ? 'primary' : undefined} mix={css({ fontSize: '13px' })}>
           {label}
         </button>
       </form>
@@ -136,6 +136,7 @@ function PickerButton(handle: Handle<{ rowId: number; label: string; primary?: b
       <button
         type="button"
         data-import-picker={String(rowId)}
+        class={primary ? 'primary' : undefined}
         mix={css({ fontSize: '13px' })}
       >
         {label}
@@ -199,12 +200,14 @@ function ConflictCard(handle: Handle<{ batchId: string; entry: ConflictEntry }>)
         {line('On Deck', entry.existing)}
         {line('Import', entry.incoming)}
         <Actions>
-          {/* Per-row overrides sit under the bulk switch above; both write the
-              same choice, so a row decided here follows the batch default. */}
-          {/* Per-row overrides of the switch above. Keeping is not skipping:
-              the row stays out of the log because it is already in it. */}
+          {/* Per-row overrides of the switch above, and they beat it. Keeping
+              is not skipping: the row stays out of the log because it is
+              already in it. */}
+          {/* Neither is primary. The switch above states the batch default, and
+              taking the import is the only direction that overwrites something,
+              so weighting it would push toward the destructive answer. */}
           <ResolveForm batchId={batchId} rowId={entry.row.id} action="keep" label="Keep" />
-          <ResolveForm batchId={batchId} rowId={entry.row.id} action="take" label="Take" primary />
+          <ResolveForm batchId={batchId} rowId={entry.row.id} action="take" label="Take" />
         </Actions>
       </Card>
     )
@@ -422,7 +425,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       type="submit"
                       name="choice"
                       value="keep"
-                     
+                      class={batch.conflict_choice === 'keep' ? 'primary' : undefined}
                       mix={css({ fontSize: '13px' })}
                     >
                       Keep what's on On Deck
@@ -431,7 +434,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       type="submit"
                       name="choice"
                       value="take"
-                     
+                      class={batch.conflict_choice === 'take' ? 'primary' : undefined}
                       mix={css({ fontSize: '13px' })}
                     >
                       Take the import
@@ -554,7 +557,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   Decide later
                 </a>
                 <form method="post" action={routes.profile.imports.save.href({ batchId })}>
-                  <button type="submit">
+                  <button type="submit" class="primary">
                     Save {counts.save} films to my log
                   </button>
                 </form>
