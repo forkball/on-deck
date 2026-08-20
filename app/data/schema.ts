@@ -157,6 +157,54 @@ export const userRecommendations = table({
   },
 })
 
+// A CSV upload held between matching and the log — see the 20260818120000
+// migration for why matching results need somewhere to live.
+export const importBatches = table({
+  name: 'import_batches',
+  columns: {
+    id: c.text().primaryKey(),
+    user_id: c.integer().notNull().references('users', 'id'),
+    media_type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
+    source: c.text().notNull(),
+    // matching | review | saving | done | failed
+    status: c.text().notNull(),
+    total_rows: c.integer().notNull().default(0),
+    matched_rows: c.integer().notNull().default(0),
+    // keep | take — what a conflicting row does by default.
+    conflict_choice: c.text().notNull().default('keep'),
+    error: c.text(),
+    claimed_at: c.integer().nullable(),
+    created_at: c.integer().notNull(),
+    updated_at: c.integer().notNull(),
+    completed_at: c.integer().nullable(),
+  },
+})
+
+export const importRows = table({
+  name: 'import_rows',
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    batch_id: c.text().notNull().references('import_batches', 'id'),
+    row_index: c.integer().notNull(),
+    raw_title: c.text().notNull(),
+    raw_year: c.integer().nullable(),
+    // Nullable for the same reason user_media_interactions.rating is: null is
+    // "unrated", which a blank cell in an export genuinely means.
+    rating: c.decimal(3, 1).nullable(),
+    disliked: c.boolean().nullable(),
+    notes: c.text().nullable(),
+    consumed_at: c.integer().nullable(),
+    // See RowState in app/data/imports/classify.ts.
+    state: c.text().notNull().default('pending'),
+    reason: c.text(),
+    year_delta: c.integer().nullable(),
+    matched_external_id: c.text(),
+    media_item_id: c.integer().nullable(),
+    created_at: c.integer().notNull(),
+    updated_at: c.integer().notNull(),
+  },
+})
+
 export const userFollows = table({
   name: 'user_follows',
   primaryKey: ['follower_id', 'followed_id'],
@@ -193,3 +241,5 @@ export type RecommendationRunMember = TableRow<typeof recommendationRunMembers>
 export type RecommendationRunUsage = TableRow<typeof recommendationRunUsage>
 export type ProfileRebuildUsage = TableRow<typeof profileRebuildUsage>
 export type Notification = TableRow<typeof notifications>
+export type ImportBatch = TableRow<typeof importBatches>
+export type ImportRow = TableRow<typeof importRows>

@@ -1,78 +1,15 @@
-import type { Db } from '../db.ts'
-import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
-import { logInteraction, normalizeRating } from '../mediaItems.ts'
-import { headerIndex, parseCsv, runBounded } from './csv.ts'
-
-interface RatingRow {
-  title: string
-  year: number | null
-  // Null for a row with no score on it. Letterboxd's export leaves the Rating
-  // cell blank rather than writing a 0, and a blank one is a film someone
-  // watched without rating — not a film they gave nothing to.
-  rating: number | null
-  watchedAt: number
-}
-
-export interface LetterboxdImportResult {
-  totalRows: number
-  imported: number
-  notFound: { title: string; year: number | null }[]
-}
-
-// The whole import runs inside the request, so this has to bound TMDB fan-out
-// without making a few hundred ratings time out.
-const CONCURRENCY = 8
+import { headerIndex, parseCsv } from './csv.ts'
+import { normalizeRating } from '../mediaItems.ts'
+import type { ParsedRow } from './batches.ts'
 
 // ratings.csv is the only file in Letterboxd's Data Export this needs, and
 // asking for it directly avoids any zip handling.
-export async function importLetterboxdRatings(
-  db: Db,
-  userId: number,
-  csvText: string,
-): Promise<LetterboxdImportResult> {
-  const rows = parseRatingsCsv(csvText)
-  const notFound: LetterboxdImportResult['notFound'] = []
-  let imported = 0
-
-  await runBounded(rows, CONCURRENCY, async (row) => {
-    const match = await matchMovie(row.title, row.year)
-    if (!match) {
-      notFound.push({ title: row.title, year: row.year })
-      return
-    }
-
-    const item = await upsertCatalogItem(db, 'movie', match)
-    await logInteraction(db, userId, item.id, {
-      status: 'consumed',
-      // An unrated row leaves an existing rating alone rather than clearing it:
-      // a blank cell in an export is an absence of information, not an
-      // instruction to forget what was rated here.
-      rating: row.rating ?? undefined,
-      notes: null,
-      consumedAt: row.watchedAt,
-    })
-    imported++
-  })
-
-  return { totalRows: rows.length, imported, notFound }
-}
-
-async function matchMovie(title: string, year: number | null): Promise<CatalogSearchResult | null> {
-  const matches = await getCatalogProvider('movie').search(title)
-  if (matches.length === 0) return null
-  if (year == null) return matches[0]
-
-  return (
-    matches.find((m) => m.releaseYear === year) ??
-    [...matches].sort(
-      (a, b) => Math.abs((a.releaseYear ?? 0) - year) - Math.abs((b.releaseYear ?? 0) - year),
-    )[0]
-  )
-}
-
-// Matched by header name, so column order doesn't break parsing.
-function parseRatingsCsv(text: string): RatingRow[] {
-  const table = parseCsv(text)
+//
+// Parsing is all this does now. Matching moved to app/data/imports/matcher.ts,
+// behind a staged batch, so a wrong match can be seen and corrected before it
+// reaches anyone's log — see the 20260818120000 migration.
+export function parseLetterboxdRatings(csvText: string): ParsedRow[] {
+  const table = parseCsv(csvText)
   if (table.length === 0) return []
 
   const indexOf = headerIndex(table[0])
@@ -85,8 +22,9 @@ function parseRatingsCsv(text: string): RatingRow[] {
     throw new Error('ratings.csv is missing expected columns (Date, Name, Rating).')
   }
 
-  const rows: RatingRow[] = []
-  for (const record of table.slice(1)) {
+  const rows: ParsedRow[] = []
+
+  for (const [offset, record] of table.slice(1).entries()) {
     if (record.length === 0 || (record.length === 1 && record[0] === '')) continue
 
     // `Number('')` is 0, and normalizeRating is what turns that back into
@@ -98,9 +36,21 @@ function parseRatingsCsv(text: string): RatingRow[] {
 
     const year = yearIndex === -1 ? null : Number(record[yearIndex]) || null
 
-    rows.push({ title: record[nameIndex], year, rating, watchedAt })
+    rows.push({
+      // The line in the uploaded file, counting the header — this is what the
+      // review page calls the row, so it has to match what someone sees when
+      // they open the CSV themselves.
+      rowIndex: offset + 2,
+      title: record[nameIndex],
+      year,
+      rating,
+      // Letterboxd's ratings export carries neither, so there is nothing to
+      // overwrite a note or a dislike with.
+      disliked: null,
+      notes: null,
+      consumedAt: watchedAt,
+    })
   }
 
   return rows
 }
-
