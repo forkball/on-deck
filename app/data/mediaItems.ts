@@ -166,7 +166,10 @@ export interface LogInteractionInput {
   // Same three-state rule as `rating`, and not independent of it: the two are
   // one question with three answers. parseRatingSubmission keeps them consistent.
   disliked?: boolean | null
-  notes: string | null
+  // Three-state as well, for the same reason: a source with no notion of notes
+  // must be able to say nothing rather than say "empty". Goodreads carries real
+  // review text, Letterboxd's ratings export and Steam carry none.
+  notes?: string | null
   consumedAt?: number
 }
 
@@ -220,17 +223,25 @@ export async function logInteraction(
   // Omitted when not marking consumed, so a later edit leaves consumed_at alone.
   const update: Partial<UserMediaInteraction> = {
     status: input.status,
-    notes: input.notes ?? undefined,
     updated_at: activityAt,
   }
-  // Written only when the caller has an opinion. `??` won't do: it folds "no
-  // rating" back into "don't touch it", leaving a rating impossible to clear.
-  // Same for the verdict.
+  // Written only when the caller has an opinion. Two rules, and they compose:
+  //
+  // `??` won't do, because it folds "no rating" back into "don't touch it",
+  // leaving a rating impossible to clear. So undefined means leave it, null
+  // means clear it — and the key has to be added conditionally to say that,
+  // because the upsert writes a key that is present-but-undefined as NULL.
+  // Setting `notes: input.notes ?? undefined` in the literal above therefore
+  // cleared the note on every write that carried none: an import that has no
+  // notes to give would erase the ones already written by hand.
   if (input.rating !== undefined) {
     update.rating = input.rating
   }
   if (input.disliked !== undefined) {
     update.disliked = input.disliked
+  }
+  if (input.notes !== undefined) {
+    update.notes = input.notes
   }
   if (input.status === 'consumed') {
     values.consumed_at = consumedAt
@@ -256,10 +267,12 @@ export async function updateInteraction(
   const now = Date.now()
   return db.update(userMediaInteractions, interactionId, {
     status: input.status,
-    // Same three-state rule as logInteraction: undefined leaves it, null clears it.
+    // Same three-state rule as logInteraction: undefined leaves it, null clears
+    // it. Spread rather than assigned, because a key that is present but
+    // undefined is written as NULL rather than skipped.
     ...(input.rating !== undefined ? { rating: input.rating } : {}),
     ...(input.disliked !== undefined ? { disliked: input.disliked } : {}),
-    notes: input.notes ?? undefined,
+    ...(input.notes !== undefined ? { notes: input.notes } : {}),
     consumed_at: input.status === 'consumed' ? (existing.consumed_at ?? now) : (existing.consumed_at ?? undefined),
     updated_at: now,
   })

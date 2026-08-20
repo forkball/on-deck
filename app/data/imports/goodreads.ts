@@ -81,7 +81,9 @@ export async function importGoodreadsLibrary(
       // way in. Omitted rather than passed through, so re-importing a shelf
       // can't clear a rating given here after the export was taken.
       rating: row.rating ?? undefined,
-      notes: row.notes,
+      // A shelf entry with no review is Goodreads saying nothing, not saying
+      // "empty" — re-importing must not clear a note written here.
+      notes: row.notes ?? undefined,
       consumedAt: row.readAt ?? undefined,
     })
     imported++

@@ -59,7 +59,11 @@ export const userMediaInteractions = table({
     // Mutually exclusive with `rating`, so true here always means rating is
     // null. Nullable for the same reason: null is "hasn't said", not false.
     disliked: c.boolean().nullable(),
-    notes: c.text(),
+    // Nullable for the third time, and for the same reason: the column has
+    // always accepted null, but typing it `string` forced every caller to write
+    // `?? undefined` to satisfy tsc — and a key that is present but undefined is
+    // written as NULL, so the workaround silently cleared notes.
+    notes: c.text().nullable(),
     consumed_at: c.integer(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
