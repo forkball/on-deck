@@ -76,6 +76,11 @@ export interface ReviewModel {
   bulkAcceptable: number
   // The footer's arithmetic. `unchanged` only moves when conflicts are kept;
   // taking the import turns them into updates instead.
+  //
+  // `save` is how many rows get written, which is not how much the log grows:
+  // a row for a film already logged with the same rating is still written, and
+  // writing it changes nothing. An 834-row import that wrote 712 rows grew the
+  // log by 587, so the page says "saved" rather than "new" or "added".
   counts: { total: number; save: number; unchanged: number; leftOut: number }
 }
 

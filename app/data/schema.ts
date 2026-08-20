@@ -188,7 +188,7 @@ export const importRows = table({
     // "unrated", which a blank cell in an export genuinely means.
     rating: c.decimal(3, 1).nullable(),
     disliked: c.boolean().nullable(),
-    notes: c.text(),
+    notes: c.text().nullable(),
     consumed_at: c.integer().nullable(),
     // See RowState in app/data/imports/classify.ts.
     state: c.text().notNull().default('pending'),

@@ -383,7 +383,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
           {saved ? (
             <>
-              <h1>Added {counts.save} films</h1>
+              <h1>Saved {counts.save} films to your log</h1>
               <p mix={css({ color: '#15803d' })}>They're in your log now.</p>
               <ul mix={css({ color: '#555' })}>
                 <li>{model.confidentCount} matched without help</li>
@@ -550,7 +550,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 })}
               >
                 <span mix={css({ fontSize: '13px', color: '#888' })}>
-                  {counts.save} new · {counts.unchanged} unchanged · {counts.leftOut} left out
+                  {counts.save} saved · {counts.unchanged} unchanged · {counts.leftOut} left out
                 </span>
                 <span mix={css({ flex: '1 1 auto' })} />
                 <a href={routes.profile.index.href()} mix={css({ fontSize: '14px' })}>

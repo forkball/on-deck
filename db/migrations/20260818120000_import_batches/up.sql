@@ -57,7 +57,7 @@ create table import_rows (
   -- written, but not left out either, so the two are counted separately.
   state text not null default 'pending'
     check (state in ('pending', 'confident', 'uncertain', 'not_found', 'confirmed', 'skipped', 'kept')),
-  -- Why a row is uncertain: exact | year_drift | no_year | title_differs | ambiguous.
+  -- Why a row is uncertain: exact | year_drift | no_year | title_differs.
   reason text,
   year_delta integer,
   matched_external_id text,
@@ -67,8 +67,10 @@ create table import_rows (
   unique (batch_id, row_index)
 );
 
--- Rendering a batch in file order.
-create index import_rows_batch_idx on import_rows (batch_id, row_index);
+-- Rendering a batch in file order is served by the unique (batch_id, row_index)
+-- above, which is itself a btree on those columns in that order — a separate
+-- index here would be the same tree maintained twice on every row written.
+
 -- Bucketing the review page, and finding the rows a save has to write.
 create index import_rows_state_idx on import_rows (batch_id, state);
 -- Finding rows that landed on the same catalog entry, which is what makes a

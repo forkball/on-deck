@@ -328,9 +328,11 @@ export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult>
     await logInteraction(db, batch.user_id, row.media_item_id as number, {
       status: 'consumed',
       // Omitted, not null: a blank rating cell is an absence of information,
-      // not an instruction to forget what is already there.
+      // not an instruction to forget what is already there. The same holds for
+      // the note — Letterboxd's ratings export carries no review text at all,
+      // so passing null here erased notes written by hand.
       rating: row.rating ?? undefined,
-      notes: row.notes ?? null,
+      notes: row.notes ?? undefined,
       consumedAt: row.consumed_at ?? undefined,
     })
   }
