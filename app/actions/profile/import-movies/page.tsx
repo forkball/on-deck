@@ -47,12 +47,9 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
           </p>
 
           <p mix={css({ color: '#555' })}>
-            Exporting from Letterboxd's mobile app is unreliable — if the export doesn't come
-            through, try it on{' '}
-            <a href="https://letterboxd.com/settings/data/" target="_blank" rel="noreferrer">
-              desktop
-            </a>{' '}
-            or in a mobile browser instead.
+            Exporting from Letterboxd's app is unreliable — if the export doesn't come through,
+            open letterboxd.com in a mobile browser or on a desktop computer instead and export
+            from there.
           </p>
 
           <LetterboxdImportForm
