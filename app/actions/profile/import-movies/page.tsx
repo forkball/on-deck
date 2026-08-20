@@ -46,6 +46,15 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
             reviews live in separate files inside, and both come across as one import.
           </p>
 
+          <p mix={css({ color: '#555' })}>
+            Exporting from Letterboxd's mobile app is unreliable — if the export doesn't come
+            through, try it on{' '}
+            <a href="https://letterboxd.com/settings/data/" target="_blank" rel="noreferrer">
+              desktop
+            </a>{' '}
+            or in a mobile browser instead.
+          </p>
+
           <LetterboxdImportForm
             uploadHref={routes.profile.importMovies.upload.href()}
             accept=".zip"
