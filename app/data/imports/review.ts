@@ -29,6 +29,8 @@ export interface StagedRow {
   disliked: boolean | null
   notes: string | null
   consumedAt: number | null
+  logStatus: 'consumed' | 'in_progress' | 'want_to_consume'
+  author: string | null
   state: RowState
   reason: MatchReason | null
   yearDelta: number | null

@@ -6,7 +6,7 @@ import { and, eq, inList } from 'remix/data-table'
 
 import { pool, type Db } from '../db.ts'
 import { getCatalogProvider, upsertCatalogItem } from '../catalog/provider.ts'
-import { logInteraction, type MediaType } from '../mediaItems.ts'
+import { logInteraction, type LogInteractionInput, type MediaType } from '../mediaItems.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import { importBatches, importRows, mediaItems, userMediaInteractions, type ImportBatch, type ImportRow } from '../schema.ts'
 import type { ConflictChoice, RowState } from './classify.ts'
@@ -26,6 +26,9 @@ export interface ParsedRow {
   disliked?: boolean | null
   notes?: string | null
   consumedAt: number | null
+  logStatus?: LogInteractionInput['status']
+  author?: string | null
+  isbn?: string | null
 }
 
 export async function createBatch(
@@ -54,16 +57,30 @@ export async function createBatch(
   // One statement rather than a create() per row: a 400-row export is 400 round
   // trips to Supabase otherwise, which is most of the time the upload spends.
   if (rows.length > 0) {
+    const COLUMNS = 12
     const values: unknown[] = []
     const tuples = rows.map((row, i) => {
-      const base = i * 9
-      values.push(id, row.rowIndex, row.title, row.year, row.rating, row.notes ?? null, row.consumedAt, now, now)
-      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9})`
+      const base = i * COLUMNS
+      values.push(
+        id,
+        row.rowIndex,
+        row.title,
+        row.year,
+        row.rating,
+        row.notes ?? null,
+        row.consumedAt,
+        row.logStatus ?? 'consumed',
+        row.author ?? null,
+        row.isbn ?? null,
+        now,
+        now,
+      )
+      return `(${Array.from({ length: COLUMNS }, (_, n) => `$${base + n + 1}`).join(', ')})`
     })
 
     await pool.query(
       `insert into import_rows
-         (batch_id, row_index, raw_title, raw_year, rating, notes, consumed_at, created_at, updated_at)
+         (batch_id, row_index, raw_title, raw_year, rating, notes, consumed_at, log_status, author, isbn, created_at, updated_at)
        values ${tuples.join(', ')}`,
       values,
     )
@@ -158,6 +175,8 @@ function toStagedRow(row: ImportRow): StagedRow {
     disliked: row.disliked ?? null,
     notes: row.notes ?? null,
     consumedAt: row.consumed_at ?? null,
+    logStatus: (row.log_status ?? 'consumed') as StagedRow['logStatus'],
+    author: row.author ?? null,
     state: row.state as StagedRow['state'],
     reason: (row.reason ?? null) as StagedRow['reason'],
     yearDelta: row.year_delta ?? null,
@@ -326,7 +345,7 @@ export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult>
 
   for (const row of writable) {
     await logInteraction(db, batch.user_id, row.media_item_id as number, {
-      status: 'consumed',
+      status: (row.log_status ?? 'consumed') as LogInteractionInput['status'],
       // Omitted, not null: a blank rating cell is an absence of information,
       // not an instruction to forget what is already there. The same holds for
       // the note — Letterboxd's ratings export carries no review text at all,

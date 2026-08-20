@@ -21,6 +21,22 @@ const CONCURRENCY = 8
 // be a write per search; per batch would let a live import look dead.
 const PROGRESS_STRIDE = 10
 
+function searchQuery(title: string, author: string | null | undefined): string {
+  return author ? `${title} ${author}` : title
+}
+
+// A failed lookup lands the row in "couldn't find" rather than failing the import.
+async function searchQuietly(
+  provider: { search(query: string): Promise<CatalogSearchResult[]> },
+  query: string,
+): Promise<CatalogSearchResult[]> {
+  try {
+    return await provider.search(query)
+  } catch {
+    return []
+  }
+}
+
 export async function matchBatch(db: Db, batch: ImportBatch): Promise<void> {
   const mediaType = batch.media_type as MediaType
   const provider = getCatalogProvider(mediaType)
@@ -37,16 +53,22 @@ export async function matchBatch(db: Db, batch: ImportBatch): Promise<void> {
 
   await runBounded(pending, CONCURRENCY, async (row) => {
     let results: CatalogSearchResult[] = []
-    try {
-      results = await provider.search(row.raw_title)
-    } catch {
-      // A single lookup failing is not the import failing: the row lands in
-      // "couldn't find", where it can be searched for by hand.
-      results = []
+    let identified = false
+
+    if (row.isbn) {
+      results = await searchQuietly(provider, `isbn:${row.isbn}`)
+      // `isbn:` is a Google Books qualifier. The Open Library fallback has no
+      // such qualifier and reads it as text, so its hits are not identifications.
+      identified = results.length > 0 && results.every((result) => result.sourceOverride == null)
+      if (!identified) results = []
+    }
+
+    if (results.length === 0) {
+      results = await searchQuietly(provider, searchQuery(row.raw_title, row.author))
     }
 
     for (const result of results) details.set(result.externalId, result)
-    inputs.push({ rowId: row.id, title: row.raw_title, year: row.raw_year ?? null, results })
+    inputs.push({ rowId: row.id, title: row.raw_title, year: row.raw_year ?? null, results, identified })
 
     matched++
     if (matched % PROGRESS_STRIDE === 0) await setMatchedCount(db, batch.id, matched)

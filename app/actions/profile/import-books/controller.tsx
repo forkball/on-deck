@@ -1,8 +1,10 @@
 import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
+import { redirect } from 'remix/response/redirect'
 
-import { importGoodreadsLibrary } from '../../../data/imports/goodreads.ts'
+import { activeBatch, createBatch } from '../../../data/imports/batches.ts'
+import { parseGoodreadsLibrary } from '../../../data/imports/goodreads.ts'
 import type { User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { displayLabel } from '../../../data/users.ts'
@@ -10,15 +12,22 @@ import { routes } from '../../../routes.ts'
 import { GoodreadsImportPage } from './page.tsx'
 
 // Mirrors profile/import-movies (Letterboxd) — see that controller; the only
-// differences are which importer runs and which page renders.
+// differences are which parser runs and which page renders.
 export default createController(routes.profile.importBooks, {
   middleware: [requireAuth<User>()],
   actions: {
-    index(context) {
+    async index(context) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
-      return context.render(<GoodreadsImportPage displayName={displayLabel(auth.identity)} />)
+      const pending = await activeBatch(context.get(Database), auth.identity.id, 'book')
+
+      return context.render(
+        <GoodreadsImportPage
+          displayName={displayLabel(auth.identity)}
+          pendingHref={pending ? routes.profile.imports.show.href({ batchId: pending.id }) : undefined}
+        />,
+      )
     },
 
     async upload(context) {
@@ -39,11 +48,22 @@ export default createController(routes.profile.importBooks, {
       }
 
       const db = context.get(Database)
-      const csvText = await file.text()
 
       try {
-        const result = await importGoodreadsLibrary(db, auth.identity.id, csvText)
-        return context.render(<GoodreadsImportPage result={result} displayName={displayLabel(auth.identity)} />)
+        const rows = parseGoodreadsLibrary(await file.text())
+
+        if (rows.length === 0) {
+          return context.render(
+            <GoodreadsImportPage
+              error="That file has no books on a shelf we recognise."
+              displayName={displayLabel(auth.identity)}
+            />,
+            { status: 400 },
+          )
+        }
+
+        const batchId = await createBatch(db, auth.identity.id, 'book', 'goodreads', rows)
+        return redirect(routes.profile.imports.show.href({ batchId }), 303)
       } catch (error) {
         return context.render(
           <GoodreadsImportPage

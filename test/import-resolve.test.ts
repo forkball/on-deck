@@ -100,3 +100,50 @@ describe('resolveBatch', () => {
     assert.deepEqual(outcomes.map((o) => o.rowId), [3, 1, 2])
   })
 })
+
+describe('rows identified by ISBN', () => {
+  it('takes the catalog result without arguing about the title', () => {
+    const [outcome] = resolveBatch([
+      {
+        rowId: 1,
+        title: 'Dune',
+        year: 1965,
+        identified: true,
+        // What the catalog actually returns for the ISBN: a subtitled reprint
+        // whose year is the printing, not the work.
+        results: [{ externalId: 'g1', title: 'Dune: Deluxe Edition', releaseYear: 2019 }],
+      },
+    ])
+
+    assert.equal(outcome.chosen?.externalId, 'g1')
+    assert.equal(outcome.verdict.state, 'confident')
+  })
+
+  it('holds its entry against a title match that wants the same one', () => {
+    const outcomes = resolveBatch([
+      {
+        rowId: 1,
+        title: 'Dune',
+        year: 1965,
+        identified: true,
+        results: [{ externalId: 'g1', title: 'Dune: Deluxe Edition', releaseYear: 2019 }],
+      },
+      {
+        rowId: 2,
+        title: 'Dune',
+        year: 1965,
+        results: [{ externalId: 'g1', title: 'Dune: Deluxe Edition', releaseYear: 2019 }],
+      },
+    ])
+
+    assert.equal(outcomes[0].chosen?.externalId, 'g1')
+    assert.equal(outcomes[1].chosen, null, 'the second row may not take an identified row entry')
+  })
+
+  it('falls through when the identifier found nothing at all', () => {
+    const [outcome] = resolveBatch([{ rowId: 1, title: 'Dune', year: 1965, identified: true, results: [] }])
+
+    assert.equal(outcome.chosen, null)
+    assert.equal(outcome.verdict.state, 'not_found')
+  })
+})

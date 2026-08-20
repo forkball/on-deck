@@ -16,6 +16,8 @@ function row(partial: Partial<StagedRow> = {}): StagedRow {
     disliked: null,
     notes: null,
     consumedAt: Date.parse('2024-03-12T00:00:00Z'),
+    logStatus: 'consumed',
+    author: null,
     state: 'confident',
     reason: 'exact',
     yearDelta: 0,
