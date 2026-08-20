@@ -1,7 +1,6 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { GoodreadsImportResult } from '../../../data/imports/goodreads.ts'
 import { routes } from '../../../routes.ts'
 import { LetterboxdImportForm } from '../../../browser/letterboxd-import-form.tsx'
 import { Document } from '../../../ui/components/document.tsx'
@@ -10,12 +9,12 @@ import { Nav } from '../../../ui/components/nav.tsx'
 export interface GoodreadsImportPageProps {
   displayName: string
   error?: string
-  result?: GoodreadsImportResult
+  pendingHref?: string
 }
 
 export function GoodreadsImportPage(handle: Handle<GoodreadsImportPageProps>) {
   return () => {
-    const { displayName, error, result } = handle.props
+    const { displayName, error, pendingHref } = handle.props
 
     return (
       <Document title="Import from Goodreads | On Deck">
@@ -23,58 +22,29 @@ export function GoodreadsImportPage(handle: Handle<GoodreadsImportPageProps>) {
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
           <h1>Import from Goodreads</h1>
 
-          {result ? (
-            <>
-              <p mix={css({ color: '#15803d' })}>
-                Imported {result.imported} of {result.totalRows} books — your read, currently-reading,
-                and want-to-read shelves all carried over.
-              </p>
-              {result.matchedByTitle > 0 && (
-                <p mix={css({ fontSize: '13px', color: '#888' })}>
-                  {result.matchedByIsbn} matched exactly by ISBN; {result.matchedByTitle} had no ISBN in
-                  the export and were matched on title and author, so those are worth a glance.
-                </p>
-              )}
-              {result.notFound.length > 0 && (
-                <section mix={css({ marginTop: '24px' })}>
-                  <h2>Couldn't match {result.notFound.length}</h2>
-                  <p mix={css({ fontSize: '13px', color: '#888' })}>
-                    No confident Open Library match for these — usually a very obscure edition, or a
-                    book catalogued there under a different title.
-                  </p>
-                  <ul
-                    mix={css({
-                      margin: 0,
-                      padding: 0,
-                      listStyle: 'none',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                    })}
-                  >
-                    {result.notFound.map(({ title, author }) => (
-                      <li key={`${title}-${author}`} mix={css({ fontSize: '14px' })}>
-                        {title}
-                        {author ? ` — ${author}` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-            </>
-          ) : (
-            <>
-              <p mix={css({ color: '#555' })}>
-                Export your library from Goodreads (My Books → Import and export → Export Library) and
-                upload the <code>goodreads_library_export.csv</code> it emails you.
-              </p>
-              <LetterboxdImportForm
-                uploadHref={routes.profile.importBooks.upload.href()}
-                fieldName="library"
-                error={error}
-              />
-            </>
+          {pendingHref && (
+            <div mix={css({ fontSize: '14px', marginBottom: '12px' })}>
+              You have an import waiting. <a href={pendingHref}>Pick it back up</a> — uploading again
+              starts over.
+            </div>
           )}
+
+          <p mix={css({ color: '#555' })}>
+            Export your library from Goodreads (My Books → Import and export → Export Library) and
+            upload the <code>goodreads_library_export.csv</code> it emails you. Your read,
+            currently-reading and want-to-read shelves all come across, and so does anything you
+            wrote in a review.
+          </p>
+
+          <LetterboxdImportForm
+            uploadHref={routes.profile.importBooks.upload.href()}
+            fieldName="library"
+            error={error}
+          />
+
+          <p mix={css({ fontSize: '13px', color: '#3E5C76' })}>
+            Nothing is saved until you've seen what we matched.
+          </p>
         </main>
       </Document>
     )

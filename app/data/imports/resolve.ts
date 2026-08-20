@@ -18,6 +18,8 @@ export interface MatchInput {
   title: string
   year: number | null
   results: CandidateLike[]
+  // Matched by an exact identifier (ISBN), so title and year get no say.
+  identified?: boolean
 }
 
 export interface MatchOutcome {
@@ -52,10 +54,28 @@ export function resolveBatch(inputs: MatchInput[]): MatchOutcome[] {
   const claimed = new Set<string>()
   const outcomes = new Map<number, MatchOutcome>()
 
+  // Pass zero: identified rows. An ISBN names one edition, so a subtitle the
+  // publisher added is not grounds to doubt it.
+  for (const input of inputs) {
+    if (!input.identified) continue
+
+    const chosen = input.results[0]
+    if (!chosen) continue
+
+    claimed.add(chosen.externalId)
+    outcomes.set(input.rowId, {
+      rowId: input.rowId,
+      chosen,
+      verdict: { state: 'confident', reason: 'exact', yearDelta: null },
+    })
+  }
+
   // Pass one: rows the catalog agrees with outright. They claim their entry,
   // and several rows claiming the same one is left alone — that is the rewatch
   // case, and forcing them apart would invent a wrong match to avoid a question.
   for (const input of inputs) {
+    if (outcomes.has(input.rowId)) continue
+
     const exact = exactFor(input)
     if (!exact) continue
 

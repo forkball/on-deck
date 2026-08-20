@@ -194,6 +194,9 @@ export const importRows = table({
     disliked: c.boolean().nullable(),
     notes: c.text().nullable(),
     consumed_at: c.integer().nullable(),
+    log_status: c.text().notNull().default('consumed'),
+    author: c.text().nullable(),
+    isbn: c.text().nullable(),
     // See RowState in app/data/imports/classify.ts.
     state: c.text().notNull().default('pending'),
     reason: c.text(),

@@ -6,6 +6,7 @@ export type LetterboxdImportFormProps = {
   uploadHref: string;
   // Letterboxd posts `ratings`; Goodreads posts `library`.
   fieldName?: string;
+  accept?: string;
   error?: string;
 };
 
@@ -127,7 +128,11 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
     }
 
     return () => {
-      const { uploadHref, fieldName = "ratings", error } = handle.props;
+      const { uploadHref, fieldName = "ratings", accept = ".csv", error } = handle.props;
+      const formatLabel = accept
+        .split(",")
+        .map((ext) => ext.trim().replace(/^\./, "").toUpperCase())
+        .join(" or ");
 
       return (
         <form
@@ -197,7 +202,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
             <input
               type="file"
               name={fieldName}
-              accept=".csv"
+              accept={accept}
               required
               mix={[
                 css({
@@ -227,7 +232,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
               color: "#888",
             })}
           >
-            <span>Supported format: CSV</span>
+            <span>Supported format: {formatLabel}</span>
             <span>Maximum size: 25MB</span>
           </div>
 

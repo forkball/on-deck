@@ -13,8 +13,7 @@ import {
   repointRow,
   saveBatch,
   setConflictChoice,
-  skipRow,
-} from '../../../data/imports/batches.ts'
+  skipRow,} from '../../../data/imports/batches.ts'
 import { isBulkAcceptable } from '../../../data/imports/classify.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
 import type { ImportBatch, User } from '../../../data/schema.ts'
@@ -54,8 +53,10 @@ export default createController(routes.profile.imports, {
       if (!found.ok) return found.response
       const { batch, displayName } = found
 
+      const partial = context.url.searchParams.get('partial') === 'reviews' ? '?partial=reviews' : ''
+
       if (batch.status === 'review' || batch.status === 'done') {
-        return redirect(routes.profile.imports.review.href({ batchId: batch.id }), 303)
+        return redirect(`${routes.profile.imports.review.href({ batchId: batch.id })}${partial}`, 303)
       }
 
       return context.render(
@@ -66,7 +67,7 @@ export default createController(routes.profile.imports, {
           failed={batch.status === 'failed'}
           error={batch.error ?? undefined}
           progressHref={routes.profile.imports.progress.href({ batchId: batch.id })}
-          reviewHref={routes.profile.imports.review.href({ batchId: batch.id })}
+          reviewHref={`${routes.profile.imports.review.href({ batchId: batch.id })}${partial}`}
         />,
       )
     },
@@ -103,6 +104,7 @@ export default createController(routes.profile.imports, {
           batch={batch}
           model={model}
           saved={batch.status === 'done'}
+          reviewsOnly={context.url.searchParams.get('partial') === 'reviews'}
           error={context.url.searchParams.get('error') ?? undefined}
         />,
       )

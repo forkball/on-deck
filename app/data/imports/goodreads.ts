@@ -1,23 +1,7 @@
-import type { CatalogSearchResult } from '../catalog/provider.ts'
-import { cleanCell, headerIndex, parseCsv, runBounded } from './csv.ts'
-import type { Db } from '../db.ts'
-import { logInteraction, upsertMediaItem, type LogInteractionInput } from '../mediaItems.ts'
-import { getBooksByIsbns, normalizeIsbn, searchBooks } from '../catalog/openLibrary.ts'
-
-// Pinned to Open Library rather than routed through the book provider
-// registry (which is Google Books): the ISBN batch resolution below only
-// Open Library supports, so the whole import stays on one provider rather
-// than mixing sources — and tagging a row 'google-books' with an Open
-// Library-shaped id would break any later rematch against it.
-const SOURCE = 'openlibrary'
-
-export interface GoodreadsImportResult {
-  totalRows: number
-  imported: number
-  notFound: { title: string; author: string }[]
-  matchedByIsbn: number
-  matchedByTitle: number
-}
+import { cleanCell, headerIndex, parseCsv } from './csv.ts'
+import { normalizeRating } from '../mediaItems.ts'
+import type { ParsedRow } from './batches.ts'
+import type { LogInteractionInput } from '../mediaItems.ts'
 
 const SHELF_STATUS: Record<string, LogInteractionInput['status']> = {
   read: 'consumed',
@@ -25,81 +9,8 @@ const SHELF_STATUS: Record<string, LogInteractionInput['status']> = {
   'to-read': 'want_to_consume',
 }
 
-const CONCURRENCY = 8
-
-interface ShelfRow {
-  title: string
-  author: string
-  isbn: string
-  status: LogInteractionInput['status']
-  rating: number | null
-  notes: string | null
-  readAt: number | null
-}
-
-export async function importGoodreadsLibrary(
-  db: Db,
-  userId: number,
-  csvText: string,
-): Promise<GoodreadsImportResult> {
-  const rows = parseShelfCsv(csvText)
-  const notFound: GoodreadsImportResult['notFound'] = []
-  let imported = 0
-  let matchedByIsbn = 0
-  let matchedByTitle = 0
-
-  const byIsbn = await getBooksByIsbns(rows.map((row) => row.isbn).filter(Boolean))
-
-  const needsFallback: ShelfRow[] = []
-  const resolved: { row: ShelfRow; match: CatalogSearchResult }[] = []
-
-  for (const row of rows) {
-    const match = row.isbn ? byIsbn.get(normalizeIsbn(row.isbn)) : undefined
-    if (match) {
-      resolved.push({ row, match })
-      matchedByIsbn++
-    } else {
-      needsFallback.push(row)
-    }
-  }
-
-  await runBounded(needsFallback, CONCURRENCY, async (row) => {
-    const match = await matchByTitle(row.title, row.author)
-    if (!match) {
-      notFound.push({ title: row.title, author: row.author })
-      return
-    }
-    resolved.push({ row, match })
-    matchedByTitle++
-  })
-
-  await runBounded(resolved, CONCURRENCY, async ({ row, match }) => {
-    const item = await upsertMediaItem(db, 'book', match, SOURCE)
-    await logInteraction(db, userId, item.id, {
-      status: row.status,
-      // Goodreads writes 0 for an unrated book, already folded to null on the
-      // way in. Omitted rather than passed through, so re-importing a shelf
-      // can't clear a rating given here after the export was taken.
-      rating: row.rating ?? undefined,
-      // A shelf entry with no review is Goodreads saying nothing, not saying
-      // "empty" — re-importing must not clear a note written here.
-      notes: row.notes ?? undefined,
-      consumedAt: row.readAt ?? undefined,
-    })
-    imported++
-  })
-
-  return { totalRows: rows.length, imported, notFound, matchedByIsbn, matchedByTitle }
-}
-
-async function matchByTitle(title: string, author: string): Promise<CatalogSearchResult | null> {
-  const query = author ? `${title} ${author}` : title
-  const matches = await searchBooks(query)
-  return matches[0] ?? null
-}
-
-function parseShelfCsv(text: string): ShelfRow[] {
-  const table = parseCsv(text)
+export function parseGoodreadsLibrary(csvText: string): ParsedRow[] {
+  const table = parseCsv(csvText)
   if (table.length === 0) return []
 
   const indexOf = headerIndex(table[0])
@@ -115,31 +26,48 @@ function parseShelfCsv(text: string): ShelfRow[] {
   const ratingIndex = indexOf('my rating')
   const readIndex = indexOf('date read')
   const reviewIndex = indexOf('my review')
+  // The original identifies the work; the edition's year is just a printing.
+  const originalYearIndex = indexOf('original publication year')
+  const editionYearIndex = indexOf('year published')
 
-  const rows: ShelfRow[] = []
-  for (const record of table.slice(1)) {
+  const rows: ParsedRow[] = []
+
+  for (const [offset, record] of table.slice(1).entries()) {
     if (record.length === 0 || (record.length === 1 && record[0] === '')) continue
 
     const title = cleanCell(record[titleIndex])
-    const status = SHELF_STATUS[cleanCell(record[shelfIndex]).toLowerCase()]
-    if (!title || !status) continue
-
-    // 0 means unrated, not a zero-star review.
-    const rawRating = Number(cleanCell(record[ratingIndex]))
-    const rating = Number.isFinite(rawRating) && rawRating > 0 ? rawRating : null
+    const logStatus = SHELF_STATUS[cleanCell(record[shelfIndex]).toLowerCase()]
+    // An unknown shelf is dropped rather than guessed at.
+    if (!title || !logStatus) continue
 
     const readAt = Date.parse(cleanCell(record[readIndex]))
 
     rows.push({
+      // Line in the file, counting the header — the review page cites it.
+      rowIndex: offset + 2,
       title,
-      author: cleanCell(record[authorIndex]),
-      isbn: cleanCell(record[isbn13Index]) || cleanCell(record[isbnIndex]),
-      status,
-      rating,
+      year: readYear(record, originalYearIndex) ?? readYear(record, editionYearIndex),
+      // 0 means unrated, not a zero-star review.
+      rating: normalizeRating(Number(cleanCell(record[ratingIndex]))),
+      disliked: null,
       notes: cleanCell(record[reviewIndex]) || null,
-      readAt: Number.isNaN(readAt) ? null : readAt,
+      consumedAt: Number.isNaN(readAt) ? null : readAt,
+      logStatus,
+      author: cleanCell(record[authorIndex]) || null,
+      isbn: normalizeIsbn(cleanCell(record[isbn13Index]) || cleanCell(record[isbnIndex])),
     })
   }
 
   return rows
+}
+
+function readYear(record: string[], index: number): number | null {
+  if (index === -1) return null
+  return Number(cleanCell(record[index])) || null
+}
+
+// Digits plus the X that can end a 10-digit ISBN; hyphenated forms arrive too.
+function normalizeIsbn(raw: string): string | null {
+  const normalized = raw.replace(/[^0-9Xx]/g, '').toUpperCase()
+  return normalized === '' ? null : normalized
 }

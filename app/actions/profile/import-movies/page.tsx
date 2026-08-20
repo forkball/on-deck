@@ -41,11 +41,16 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
           )}
 
           <p mix={css({ color: '#555' })}>
-            Export your data from Letterboxd (Settings → Data → Export) and upload{' '}
-            <code>ratings.csv</code> from the zip.
+            Export your data from Letterboxd (Settings → Data → Export) and upload the{' '}
+            <code>.zip</code> it emails you, as it comes. Don't unzip it — your ratings and your
+            reviews live in separate files inside, and both come across as one import.
           </p>
 
-          <LetterboxdImportForm uploadHref={routes.profile.importMovies.upload.href()} error={error} />
+          <LetterboxdImportForm
+            uploadHref={routes.profile.importMovies.upload.href()}
+            accept=".zip"
+            error={error}
+          />
 
           <p mix={css({ fontSize: '13px', color: '#3E5C76' })}>
             Nothing is saved until you've seen what we matched.
