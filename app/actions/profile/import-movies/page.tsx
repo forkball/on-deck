@@ -42,8 +42,8 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
 
           <p mix={css({ color: '#555' })}>
             Export your data from Letterboxd (Settings → Data → Export) and upload the{' '}
-            <code>.zip</code> it emails you, as it comes. Don't unzip it — your ratings and your
-            reviews live in separate files inside, and both come across as one import.
+            <code>.zip</code> it emails you, unopened — ratings and reviews live in separate files
+            inside, and both come across in one import.
           </p>
 
           <p mix={css({ color: '#555' })}>
