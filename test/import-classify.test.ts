@@ -19,40 +19,42 @@ function film(title: string, releaseYear: number | null, externalId = title): Ca
 
 describe('classifyMatch', () => {
   it('is confident when title and year both agree', () => {
-    const verdict = classifyMatch({ title: 'Heat', year: 1995 }, film('Heat', 1995), [film('Heat', 1995)])
+    const verdict = classifyMatch({ title: 'Heat', year: 1995 }, film('Heat', 1995))
     assert.equal(verdict.state, 'confident')
     assert.equal(verdict.reason, 'exact')
   })
 
   it('ignores punctuation and case when comparing titles', () => {
-    const verdict = classifyMatch({ title: 'wall-e', year: 2008 }, film('WALL·E', 2008), [film('WALL·E', 2008)])
+    const verdict = classifyMatch({ title: 'wall-e', year: 2008 }, film('WALL·E', 2008))
     assert.equal(verdict.state, 'confident')
   })
 
   it('flags a year gap and keeps its size', () => {
-    const verdict = classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011), [])
+    const verdict = classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011))
     assert.equal(verdict.state, 'uncertain')
     assert.equal(verdict.reason, 'year_drift')
     assert.equal(verdict.yearDelta, 29)
   })
 
   it('flags a row with no year, however good the title', () => {
-    const verdict = classifyMatch({ title: 'Solaris', year: null }, film('Solaris', 2002), [])
+    const verdict = classifyMatch({ title: 'Solaris', year: null }, film('Solaris', 2002))
     assert.equal(verdict.state, 'uncertain')
     assert.equal(verdict.reason, 'no_year')
   })
 
   it('flags a title that only matched loosely', () => {
-    const verdict = classifyMatch({ title: 'Solyaris', year: 1972 }, film('Solaris', 1972), [])
+    const verdict = classifyMatch({ title: 'Solyaris', year: 1972 }, film('Solaris', 1972))
     assert.equal(verdict.state, 'uncertain')
     assert.equal(verdict.reason, 'title_differs')
   })
 
-  it('flags an exact match that several results tie on', () => {
+  // These used to be flagged for review. The card had no way to show which
+  // rival film it meant, so it asked a question it gave no means to answer.
+  it('trusts an exact match even when several results tie on it', () => {
     const results = [film('Drive', 2011, 'a'), film('Drive', 2011, 'b')]
-    const verdict = classifyMatch({ title: 'Drive', year: 2011 }, results[0], results)
-    assert.equal(verdict.state, 'uncertain')
-    assert.equal(verdict.reason, 'ambiguous')
+    const verdict = classifyMatch({ title: 'Drive', year: 2011 }, results[0])
+    assert.equal(verdict.state, 'confident')
+    assert.equal(verdict.reason, 'exact')
   })
 
   it('reports nothing found rather than inventing a reason', () => {
@@ -64,39 +66,39 @@ describe('classifyMatch', () => {
 
 describe('suspicion', () => {
   it('sorts a wrong-looking title above any year gap', () => {
-    const titleDiffers = classifyMatch({ title: 'Solyaris', year: 1972 }, film('Solaris', 1972), [])
-    const bigDrift = classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011), [])
+    const titleDiffers = classifyMatch({ title: 'Solyaris', year: 1972 }, film('Solaris', 1972))
+    const bigDrift = classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011))
     assert.ok(suspicion(titleDiffers) > suspicion(bigDrift))
   })
 
   it('sorts a wide year gap above a narrow one', () => {
-    const wide = classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011), [])
-    const narrow = classifyMatch({ title: 'Kwaidan', year: 1964 }, film('Kwaidan', 1965), [])
+    const wide = classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011))
+    const narrow = classifyMatch({ title: 'Kwaidan', year: 1964 }, film('Kwaidan', 1965))
     assert.ok(suspicion(wide) > suspicion(narrow))
   })
 
   it('leaves confident rows at the bottom', () => {
-    const exact = classifyMatch({ title: 'Heat', year: 1995 }, film('Heat', 1995), [film('Heat', 1995)])
+    const exact = classifyMatch({ title: 'Heat', year: 1995 }, film('Heat', 1995))
     assert.equal(suspicion(exact), 0)
   })
 })
 
 describe('isBulkAcceptable', () => {
   it('covers the off-by-one tail', () => {
-    assert.ok(isBulkAcceptable(classifyMatch({ title: 'Kwaidan', year: 1964 }, film('Kwaidan', 1965), [])))
+    assert.ok(isBulkAcceptable(classifyMatch({ title: 'Kwaidan', year: 1964 }, film('Kwaidan', 1965))))
   })
 
   it('does not sweep up a wide gap', () => {
-    assert.ok(!isBulkAcceptable(classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011), [])))
+    assert.ok(!isBulkAcceptable(classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011))))
   })
 
   it('does not sweep up a different-looking title', () => {
-    assert.ok(!isBulkAcceptable(classifyMatch({ title: 'Solyaris', year: 1972 }, film('Solaris', 1972), [])))
+    assert.ok(!isBulkAcceptable(classifyMatch({ title: 'Solyaris', year: 1972 }, film('Solaris', 1972))))
   })
 })
 
 function dupe(id: number, title: string, year: number | null, consumedAt: number | null, match: CandidateLike): DuplicateRow {
-  return { id, index: id, title, year, consumedAt, verdict: classifyMatch({ title, year }, match, []) }
+  return { id, index: id, title, year, consumedAt, verdict: classifyMatch({ title, year }, match) }
 }
 
 describe('classifyDuplicate', () => {
@@ -140,12 +142,12 @@ describe('classifyDuplicate', () => {
 
 describe('describeReason', () => {
   it('names the gap without a stray plural', () => {
-    assert.equal(describeReason(classifyMatch({ title: 'Kwaidan', year: 1964 }, film('Kwaidan', 1965), [])), 'Year off by 1')
-    assert.equal(describeReason(classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011), [])), 'Year off by 29')
+    assert.equal(describeReason(classifyMatch({ title: 'Kwaidan', year: 1964 }, film('Kwaidan', 1965))), 'Year off by 1')
+    assert.equal(describeReason(classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011))), 'Year off by 29')
   })
 
   it('says nothing about a confident match', () => {
-    assert.equal(describeReason(classifyMatch({ title: 'Heat', year: 1995 }, film('Heat', 1995), [film('Heat', 1995)])), null)
+    assert.equal(describeReason(classifyMatch({ title: 'Heat', year: 1995 }, film('Heat', 1995))), null)
   })
 })
 

@@ -63,7 +63,7 @@ export function resolveBatch(inputs: MatchInput[]): MatchOutcome[] {
     outcomes.set(input.rowId, {
       rowId: input.rowId,
       chosen: exact,
-      verdict: classifyMatch(input, exact, input.results),
+      verdict: classifyMatch(input, exact),
     })
   }
 
@@ -75,7 +75,7 @@ export function resolveBatch(inputs: MatchInput[]): MatchOutcome[] {
     outcomes.set(input.rowId, {
       rowId: input.rowId,
       chosen,
-      verdict: classifyMatch(input, chosen, input.results),
+      verdict: classifyMatch(input, chosen),
     })
   }
 

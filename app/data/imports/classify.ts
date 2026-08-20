@@ -2,7 +2,7 @@
 // tell someone about it. Deliberately free of the database and the catalog: the
 // rules are the part worth testing, and they only need the row and the result.
 
-export type MatchReason = 'exact' | 'year_drift' | 'no_year' | 'title_differs' | 'ambiguous'
+export type MatchReason = 'exact' | 'year_drift' | 'no_year' | 'title_differs'
 
 // pending is the state a row is written in before matching reaches it.
 // confident/uncertain/not_found are what matching leaves behind; the rest are
@@ -50,7 +50,7 @@ export function normalizeTitle(title: string): string {
 // `results` is the whole result set the match came from, not just the winner:
 // two results sharing the chosen title and year is the only way to know a match
 // was a coin toss rather than a lookup.
-export function classifyMatch(row: RowLike, match: CandidateLike | null, results: CandidateLike[] = []): Verdict {
+export function classifyMatch(row: RowLike, match: CandidateLike | null): Verdict {
   if (!match) return { state: 'not_found', reason: null, yearDelta: null }
 
   const sameTitle = normalizeTitle(row.title) === normalizeTitle(match.title)
@@ -70,21 +70,18 @@ export function classifyMatch(row: RowLike, match: CandidateLike | null, results
     return { state: 'uncertain', reason: 'year_drift', yearDelta: delta }
   }
 
-  if (countSharing(results, match) > 1) {
-    return { state: 'uncertain', reason: 'ambiguous', yearDelta: 0 }
-  }
-
+  // Title and year both exact is the strongest evidence there is, even when
+  // several catalog entries tie on it. Flagging those ties bought nothing: the
+  // card cannot show which rival it means without opening the picker, so it
+  // asked for a decision it gave no way to make — and on a real 834-row import
+  // every one of them had already matched the intended film. A wrong match is
+  // still fixable afterwards from the film's own page.
   return { state: 'confident', reason: 'exact', yearDelta: 0 }
 }
 
 function yearDelta(rowYear: number | null, matchYear: number | null): number | null {
   if (rowYear == null || matchYear == null) return null
   return matchYear - rowYear
-}
-
-function countSharing(results: CandidateLike[], match: CandidateLike): number {
-  const title = normalizeTitle(match.title)
-  return results.filter((r) => normalizeTitle(r.title) === title && r.releaseYear === match.releaseYear).length
 }
 
 // Review lists least-certain first, so the value is front-loaded and stopping
@@ -99,8 +96,6 @@ export function suspicion(verdict: Verdict): number {
       // A 30-year gap is a different film; a 1-year gap is usually a festival
       // or re-release date, so magnitude is the whole signal here.
       return 100 + Math.min(Math.abs(verdict.yearDelta ?? 0), 99)
-    case 'ambiguous':
-      return 50
     default:
       return 0
   }
@@ -117,8 +112,6 @@ export function describeReason(verdict: Verdict): string | null {
       return 'No year in your CSV'
     case 'year_drift':
       return magnitude === 1 ? 'Year off by 1' : `Year off by ${magnitude}`
-    case 'ambiguous':
-      return 'Several films share this title and year'
     default:
       return null
   }
