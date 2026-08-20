@@ -6,6 +6,8 @@ import { LazyList } from '../../../browser/lazy-list.tsx'
 import type { ConflictEntry, DuplicateEntry, ReviewModel, ReviewRow } from '../../../data/imports/review.ts'
 import type { LogValues } from '../../../data/imports/classify.ts'
 import type { ImportBatch } from '../../../data/schema.ts'
+import { mediaTypeUiFor } from '../../../mediaTypes.ts'
+import type { MediaType } from '../../../data/mediaItems.ts'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
@@ -16,6 +18,7 @@ export interface ImportReviewPageProps {
   batch: ImportBatch
   model: ReviewModel
   saved?: boolean
+  reviewsOnly?: boolean
   error?: string
 }
 
@@ -153,9 +156,9 @@ function Actions(handle: Handle<{ children?: RemixNode }>) {
   )
 }
 
-function ConflictCard(handle: Handle<{ batchId: string; entry: ConflictEntry }>) {
+function ConflictCard(handle: Handle<{ batchId: string; entry: ConflictEntry; pastParticiple: string }>) {
   return () => {
-    const { batchId, entry } = handle.props
+    const { batchId, entry, pastParticiple } = handle.props
     const highlight = (field: 'rating' | 'watched' | 'notes') =>
       entry.fields.includes(field)
         ? css({ background: '#f2e4cb', borderRadius: '3px', padding: '0 3px' })
@@ -178,7 +181,7 @@ function ConflictCard(handle: Handle<{ batchId: string; entry: ConflictEntry }>)
           <span mix={highlight('rating')}>
             <Rated values={values} />
           </span>
-          {' · watched '}
+          {` · ${pastParticiple} `}
           <span mix={highlight('watched')}>{formatDate(values.consumedAt)}</span>
           {values.notes ? (
             <span mix={highlight('notes')}> · has a note</span>
@@ -214,9 +217,11 @@ function ConflictCard(handle: Handle<{ batchId: string; entry: ConflictEntry }>)
   }
 }
 
-function DuplicateCard(handle: Handle<{ batchId: string; entry: DuplicateEntry }>) {
+function DuplicateCard(
+  handle: Handle<{ batchId: string; entry: DuplicateEntry; singular: string; plural: string; pastParticiple: string }>,
+) {
   return () => {
-    const { batchId, entry } = handle.props
+    const { batchId, entry, singular, plural, pastParticiple } = handle.props
     const { item, verdict } = entry
 
     const pair = (tag: string, title: string, year: number | null, extra?: string) => (
@@ -256,11 +261,11 @@ function DuplicateCard(handle: Handle<{ batchId: string; entry: DuplicateEntry }
             {pair(`Row ${verdict.anchor.index}`, verdict.anchor.title, verdict.anchor.year)}
             {pair(`Row ${verdict.move.index}`, verdict.move.title, verdict.move.year)}
             <p mix={css({ fontSize: '13.5px', color: ACCENT, margin: '10px 0 8px' })}>
-              Your two rows disagree on the year, so these are almost certainly different films. Row{' '}
+              Your two rows disagree on the year, so these are almost certainly different {plural}. Row{' '}
               {verdict.anchor.index} matches its own year, so row {verdict.move.index} is the one to move.
             </p>
             <Actions>
-              <PickerButton rowId={verdict.move.id} label={`Find the right film for row ${verdict.move.index}`} primary />
+              <PickerButton rowId={verdict.move.id} label={`Find the right ${singular} for row ${verdict.move.index}`} primary />
             </Actions>
             <div mix={css({ margin: '16px 0 0' })}>
               <form
@@ -269,7 +274,7 @@ function DuplicateCard(handle: Handle<{ batchId: string; entry: DuplicateEntry }
               >
                 <input type="hidden" name="action" value="skip" />
                 <button type="submit" class="linkish">
-                  Actually the same film — leave row {verdict.move.index} out
+                  Actually the same {singular} — leave row {verdict.move.index} out
                 </button>
               </form>
             </div>
@@ -279,7 +284,7 @@ function DuplicateCard(handle: Handle<{ batchId: string; entry: DuplicateEntry }
             {pair(`Row ${verdict.keep.index}`, verdict.keep.title, verdict.keep.year, formatDate(verdict.keep.consumedAt))}
             {pair(`Row ${verdict.drop.index}`, verdict.drop.title, verdict.drop.year, formatDate(verdict.drop.consumedAt))}
             <p mix={css({ fontSize: '13.5px', color: ACCENT, margin: '10px 0 8px' })}>
-              Same title and year in both rows, so this looks like one film logged twice — a rewatch,
+              Same title and year in both rows, so this looks like one {singular} logged twice — a rewatch,
               most likely.
             </p>
             <Actions>
@@ -294,7 +299,7 @@ function DuplicateCard(handle: Handle<{ batchId: string; entry: DuplicateEntry }
                 batchId={batchId}
                 rowId={verdict.keep.id}
                 action="skip"
-                label={`Keep the ${formatDate(verdict.drop.consumedAt)} watch`}
+                label={`Keep the ${formatDate(verdict.drop.consumedAt)} ${pastParticiple}`}
               />
             </Actions>
           </>
@@ -304,9 +309,9 @@ function DuplicateCard(handle: Handle<{ batchId: string; entry: DuplicateEntry }
   }
 }
 
-function UncertainCard(handle: Handle<{ batchId: string; entry: ReviewRow }>) {
+function UncertainCard(handle: Handle<{ batchId: string; entry: ReviewRow; pastParticiple: string }>) {
   return () => {
-    const { batchId, entry } = handle.props
+    const { batchId, entry, pastParticiple } = handle.props
     const { row, item, chip } = entry
 
     return (
@@ -320,7 +325,7 @@ function UncertainCard(handle: Handle<{ batchId: string; entry: ReviewRow }>) {
               {row.title} <span mix={css({ color: '#888' })}>{row.year ?? 'no year'}</span>
             </div>
             <div mix={css({ color: '#888', fontSize: '13px' })}>
-              <Rated values={row} /> · watched {formatDate(row.consumedAt)}
+              <Rated values={row} /> · {pastParticiple} {formatDate(row.consumedAt)}
             </div>
           </div>
           <div mix={css({ alignSelf: 'center', color: '#b3aa9c' })}>→</div>
@@ -373,8 +378,9 @@ function UncertainCard(handle: Handle<{ batchId: string; entry: ReviewRow }>) {
 
 export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
   return () => {
-    const { displayName, batch, model, saved, error } = handle.props
+    const { displayName, batch, model, saved, reviewsOnly, error } = handle.props
     const { counts } = model
+    const { singular, plural, pastParticiple } = mediaTypeUiFor(batch.media_type as MediaType)
     const batchId = batch.id
 
     return (
@@ -383,7 +389,9 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
           {saved ? (
             <>
-              <h1>Saved {counts.save} films to your log</h1>
+              <h1>
+                Saved {counts.save} {plural} to your log
+              </h1>
               <p mix={css({ color: '#15803d' })}>They're in your log now.</p>
               <ul mix={css({ color: '#555' })}>
                 <li>{model.confidentCount} matched without help</li>
@@ -404,6 +412,23 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 {counts.total} rows. <b mix={css({ fontWeight: 400 })}>{model.confidentCount} matched cleanly</b>,{' '}
                 {model.uncertain.length} worth a look, and {model.notFound.length} we couldn't find.
               </p>
+              {reviewsOnly && (
+                <p
+                  mix={css({
+                    fontSize: '13px',
+                    color: '#8a5a1e',
+                    background: '#fdf3e3',
+                    border: '1px solid #f0dcbb',
+                    borderRadius: '4px',
+                    padding: '10px 12px',
+                    margin: '0 0 16px',
+                  })}
+                >
+                  This is only the films you reviewed — <b mix={css({ fontWeight: 600 })}>reviews.csv</b>{' '}
+                  carries nothing about the rest of what you've watched. Upload the whole export zip
+                  instead if you want your full history.
+                </p>
+              )}
               <p mix={css({ fontSize: '13px', color: ACCENT, marginBottom: '20px' })}>
                 Everything saves unless you say otherwise — except the decisions below, which would
                 change or drop something you already have.
@@ -442,7 +467,12 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   </form>
                   <div id="import-conflicts">
                     {model.conflicts.map((entry) => (
-                      <ConflictCard key={entry.row.id} batchId={batchId} entry={entry} />
+                      <ConflictCard
+                        key={entry.row.id}
+                        batchId={batchId}
+                        entry={entry}
+                        pastParticiple={pastParticiple}
+                      />
                     ))}
                   </div>
                   <LazyList listId="import-conflicts" initial={CONFLICTS_VISIBLE} step={CONFLICTS_VISIBLE} />
@@ -453,13 +483,21 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
               )}
 
               {model.duplicates.length > 0 && (
-                <Flag title="Two rows, one film" count={model.duplicates.length}>
+                <Flag title={`Two rows, one ${singular}`} count={model.duplicates.length}>
                   <p mix={css({ fontSize: '14px', color: '#555', margin: '0 0 12px' })}>
-                    Two rows landed on the same film, and your log keeps one entry per film. Usually
-                    that means they're two different films sharing a name and one row matched wrong.
+                    Two rows landed on the same {singular}, and your log keeps one entry per
+                    {' '}{singular}. Usually that means they're two different {plural} sharing a name and
+                    one row matched wrong.
                   </p>
                   {model.duplicates.map((entry, i) => (
-                    <DuplicateCard key={`${entry.item.id}-${i}`} batchId={batchId} entry={entry} />
+                    <DuplicateCard
+                      key={`${entry.item.id}-${i}`}
+                      batchId={batchId}
+                      entry={entry}
+                      singular={singular}
+                      plural={plural}
+                      pastParticiple={pastParticiple}
+                    />
                   ))}
                   <p mix={css({ fontSize: '13px', color: '#888', margin: '10px 0 0' })}>
                     Until you decide, the weaker match of each pair is held back rather than
@@ -479,7 +517,12 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   </p>
                   <div id="import-uncertain">
                     {model.uncertain.map((entry) => (
-                      <UncertainCard key={entry.row.id} batchId={batchId} entry={entry} />
+                      <UncertainCard
+                        key={entry.row.id}
+                        batchId={batchId}
+                        entry={entry}
+                        pastParticiple={pastParticiple}
+                      />
                     ))}
                   </div>
                   <LazyList listId="import-uncertain" initial={ROWS_VISIBLE} step={ROWS_VISIBLE} />
@@ -558,7 +601,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 </a>
                 <form method="post" action={routes.profile.imports.save.href({ batchId })}>
                   <button type="submit" class="primary">
-                    Save {counts.save} films to my log
+                    Save {counts.save} {plural} to my log
                   </button>
                 </form>
               </div>
