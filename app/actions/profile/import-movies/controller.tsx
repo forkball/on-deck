@@ -4,7 +4,7 @@ import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import { activeBatch, createBatch } from '../../../data/imports/batches.ts'
-import { parseLetterboxdRatings } from '../../../data/imports/letterboxd.ts'
+import { parseLetterboxdUpload } from '../../../data/imports/letterboxd.ts'
 import type { User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { displayLabel } from '../../../data/users.ts'
@@ -40,7 +40,7 @@ export default createController(routes.profile.importMovies, {
       if (!(file instanceof File) || file.size === 0) {
         return context.render(
           <LetterboxdImportPage
-            error="Choose your ratings.csv file first."
+            error="Choose your Letterboxd export .zip first."
             displayName={displayLabel(auth.identity)}
           />,
           { status: 400 },
@@ -50,12 +50,12 @@ export default createController(routes.profile.importMovies, {
       const db = context.get(Database)
 
       try {
-        const rows = parseLetterboxdRatings(await file.text())
+        const { rows, reviewsOnly } = parseLetterboxdUpload(new Uint8Array(await file.arrayBuffer()))
 
         if (rows.length === 0) {
           return context.render(
             <LetterboxdImportPage
-              error="That file has no rated films in it."
+              error="That export has no rated or reviewed films in it."
               displayName={displayLabel(auth.identity)}
             />,
             { status: 400 },
@@ -65,7 +65,8 @@ export default createController(routes.profile.importMovies, {
         // The request ends here: matching a few hundred rows is tens of seconds
         // of catalog lookups, which a worker does while this redirect lands.
         const batchId = await createBatch(db, auth.identity.id, 'movie', 'letterboxd', rows)
-        return redirect(routes.profile.imports.show.href({ batchId }), 303)
+        const href = routes.profile.imports.show.href({ batchId })
+        return redirect(reviewsOnly ? `${href}?partial=reviews` : href, 303)
       } catch (error) {
         return context.render(
           <LetterboxdImportPage
