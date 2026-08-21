@@ -115,6 +115,10 @@ export const recommendationRuns = table({
     created_at: c.integer().notNull(),
     name: c.text(),
     params: c.text().notNull().default('{}'),
+    // An "I'm feeling lucky" run: one pick, no filters, once a day. Ordinary in
+    // every other respect, which is why it is a flag here rather than a table of
+    // its own — see the 20260821120000 migration.
+    is_lucky: c.boolean().notNull().default(false),
     timings: c.text(),
   },
 })

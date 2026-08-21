@@ -2,8 +2,11 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { GenerateRecommendationsForm } from '../../browser/generate-recommendations-form.tsx'
+import { LuckyButton } from '../../browser/lucky-button.tsx'
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
+import { LuckyPickCard } from '../../ui/components/lucky-pick-card.tsx'
 import { timeUntil, type DailyRunAllowance, type DailyRunsUsed } from '../../data/recommendations/dailyLimit.ts'
+import type { LuckyState } from '../../data/recommendations/lucky.ts'
 import { MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations/runs.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
@@ -32,6 +35,8 @@ export interface RecommendationsPageProps {
   // How much of the daily cap is left. Nothing is rendered for admins, who
   // aren't capped — see data/recommendations/dailyLimit.ts.
   dailyRuns: DailyRunAllowance
+  // Today's one-click pick: whether one can be drawn, and the one already drawn.
+  lucky: LuckyState
   error?: string
   // Set when the request matched an earlier run the user hasn't taken
   // anything from — see DuplicateNotice.
@@ -129,6 +134,7 @@ function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
               })}
             >
               <a href={routes.recommendations.show.href({ runId: String(run.id) })}>
+                {run.isLucky && '🎲 '}
                 {run.name ? (
                   <>
                     <strong>{run.name}</strong> — {date}
@@ -164,6 +170,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       seriesTypes,
       displayName,
       dailyRuns,
+      lucky,
       error,
       duplicate,
     } = handle.props
@@ -199,6 +206,33 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
               {error}
             </p>
           )}
+
+          {/* Above the form on purpose: it is the fast path past it. */}
+          {lucky.pick && (
+            <div mix={css({ marginBottom: '16px' })}>
+              <LuckyPickCard
+                pick={lucky.pick}
+                returnTo={recsHref}
+                heading={`Today's lucky pick`}
+              />
+            </div>
+          )}
+
+          <LuckyButton
+            luckyHref={routes.recommendations.lucky.href()}
+            mediaType={mediaType}
+            mediaTypeLabel={ui.attributive}
+            itemNoun={ui.singular}
+            friends={friends.map((friend) => ({
+              id: friend.id,
+              label: displayLabel(friend),
+              hasLogged: (loggedTypes[friend.id] ?? []).includes(mediaType),
+            }))}
+            viewerHasLogged={viewerLoggedTypes.includes(mediaType)}
+            available={lucky.available}
+            waitLabel={lucky.nextAt == null ? '' : `about ${timeUntil(lucky.nextAt)}`}
+            findPeopleHref={routes.users.search.href()}
+          />
 
           {!dailyRuns.unlimited && <DailyRunsNote dailyRuns={dailyRuns} />}
 
@@ -240,7 +274,8 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             {runs.length > 0 && (
               <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
                 Only your {MAX_RUNS_PER_USER} most recent {ui.attributive} runs are kept —
-                generating a new one removes the oldest.
+                generating a new one removes the oldest. Lucky picks (🎲) are counted
+                separately, so one can't push the other out.
               </p>
             )}
             {runs.length === 0 ? (

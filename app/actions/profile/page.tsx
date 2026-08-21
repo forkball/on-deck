@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
+import type { LuckyState } from '../../data/recommendations/lucky.ts'
 import type { TasteProfileSettings } from '../../data/recommendations/tasteProfile.ts'
 import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
@@ -9,6 +10,7 @@ import { Toast } from '../../ui/components/toast.tsx'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
+import { LuckyPickCard } from '../../ui/components/lucky-pick-card.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
@@ -35,6 +37,9 @@ export interface ProfilePageProps {
   rebuildsLeft: number | null
   rebuilt?: boolean
   rebuildError?: string
+  // Today's one-click pick, shown above the tabs so it is the same thing here as
+  // on the landing page rather than something to go looking for.
+  lucky: LuckyState
   displayName: string
 }
 
@@ -201,6 +206,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       rebuildsLeft,
       rebuilt,
       rebuildError,
+      lucky,
       displayName,
     } = handle.props
     const profileHref = routes.profile.index.href()
@@ -245,6 +251,21 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             <p mix={css({ color: '#555' })}>
               No bio yet — <a href={routes.profile.edit.index.href()}>add one</a> for other people to read.
               It has no effect on your recommendations.
+            </p>
+          )}
+
+          {lucky.pick ? (
+            <div mix={css({ margin: '24px 0' })}>
+              <LuckyPickCard
+                pick={lucky.pick}
+                returnTo={`${profileHref}?tab=${lucky.pick.mediaType}`}
+                heading={`Today's lucky pick`}
+              />
+            </div>
+          ) : (
+            <p mix={css({ margin: '24px 0', color: '#555' })}>
+              <a href={routes.recommendations.index.href()}>🎲 Draw today's lucky pick</a> — one
+              thing nobody's logged, picked for you.
             </p>
           )}
 

@@ -8,6 +8,7 @@ import {
   recordProfileRebuild,
   timeUntil,
 } from '../../data/recommendations/dailyLimit.ts'
+import { getLuckyState } from '../../data/recommendations/lucky.ts'
 import {
   parseProfileLogLimit,
   profileSettingsFor,
@@ -55,6 +56,7 @@ export default createController(routes.profile, {
       const followingCount = await countFollowing(db, auth.identity.id)
       const followersCount = await countFollowers(db, auth.identity.id)
       const rebuildAllowance = await getProfileRebuildAllowance(db, auth.identity)
+      const lucky = await getLuckyState(db, auth.identity)
 
       return context.render(
         <ProfilePage
@@ -68,6 +70,7 @@ export default createController(routes.profile, {
           rebuildsLeft={rebuildAllowance.unlimited ? null : rebuildAllowance.remaining}
           rebuilt={context.url.searchParams.get('rebuilt') === '1'}
           rebuildError={context.url.searchParams.get('rebuildError') ?? undefined}
+          lucky={lucky}
           displayName={displayLabel(auth.identity)}
         />,
       )
