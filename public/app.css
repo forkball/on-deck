@@ -95,29 +95,18 @@
   padding: 0;
 }
 
-/* The <label> that folds a dashboard section away, on the two widths it means
-   different things at. Both halves are here rather than in the component for
-   the same reason as the modal trigger above: `.doodle label { padding: .25em 0 }`
-   is unlayered, and a layered css() rule cannot outrank one at any specificity —
-   so neither the padding below nor its removal can be set from home-page.tsx.
-
-   Narrow, the label is the control that folds the section away, so it takes the
-   whole row and a thumb-sized band of padding rather than being a tap target
-   the width of the words in it. */
+/* The <label> that folds a dashboard section away is that section's heading,
+   not a form control, so it must contribute no box of its own: DoodleCSS gives
+   every label `padding: .25em 0` and `display: inline-block`, which made the
+   heading 9px taller than the plain <h2> in the column beside it and put the
+   two columns' first card borders out of line. Only this much is here, and for
+   the same reason as the modal trigger above — the DoodleCSS rule is unlayered,
+   so a layered css() rule cannot outrank it at any specificity. Everything
+   else about the toggle, the breakpoint it changes at included, is in
+   home-page.tsx, on a <span> inside the label that no vendor rule targets. */
 .doodle label.section-toggle {
   display: block;
-  padding: 0.55em 0;
-}
-
-/* Wide, the section can't be folded and the label is a heading again: no box of
-   its own, or it measures 9px taller than the plain <h2> in the column beside
-   it and puts the two columns' first card borders out of line — which is the
-   thing that alignment was for. */
-@media (min-width: 900px) {
-  .doodle label.section-toggle {
-    display: inline-block;
-    padding: 0;
-  }
+  padding: 0;
 }
 
 /* The "Not for me" chip in the rating picker. Its border, radius and colours

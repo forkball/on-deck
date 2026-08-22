@@ -2,16 +2,15 @@ import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { FollowingLogEntry } from '../data/mediaItems.ts'
-import { parseMediaMetadata } from '../data/mediaMetadata.ts'
 import type { LuckyState } from '../data/recommendations/lucky.ts'
 import type { RecommendationRunSummary } from '../data/recommendations/runs.ts'
 import { mediaTypeUiFor, statusLabel } from '../mediaTypes.ts'
 import { routes } from '../routes.ts'
 import { Document } from '../ui/components/document.tsx'
-import { LuckyPickCard } from '../ui/components/lucky-pick-card.tsx'
+import { LUCKY_PICK_LABEL, LuckyPickCard } from '../ui/components/lucky-pick-card.tsx'
 import { Nav } from '../ui/components/nav.tsx'
 import { RunList } from '../ui/components/run-list.tsx'
-import { DislikedDisplay, StarRatingDisplay } from '../ui/components/star-rating.tsx'
+import { WatchedListItem } from '../ui/components/watched-list-item.tsx'
 
 export interface HomeDashboard {
   displayName: string
@@ -31,14 +30,12 @@ export interface HomePageProps {
   dashboard: HomeDashboard | null
 }
 
-// Where the side panel appears. Below it the three sections are one column in
-// the order they are written: the pick, the runs, then the feed.
-const WIDE = '@media (min-width: 900px)'
-
-// The other side of the same line. Both are needed because the collapse below
-// is mobile-only: stating it as "not WIDE" is what keeps the wide layout from
-// ever reading a closed state.
-const NARROW = '@media (max-width: 899.98px)'
+// Where the side panel appears, and the two halves of that line. Both halves
+// are needed because the collapse below is mobile-only: stating it as "not
+// WIDE" is what keeps the wide layout from ever reading a collapsed state.
+const PANEL_BREAKPOINT = 900
+const WIDE = `@media (min-width: ${PANEL_BREAKPOINT}px)`
+const NARROW = `@media (max-width: ${PANEL_BREAKPOINT - 0.02}px)`
 
 const CARD = {
   border: '1px solid #ddd',
@@ -46,9 +43,10 @@ const CARD = {
   padding: '16px',
 } as const
 
-function formatDate(value: number): string {
-  return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-}
+// Stated once and used by both of Section's shapes: the pick column and the
+// panel beside it line up on their headings, and a heading that measured
+// differently in one of them would take the card borders out of line with it.
+const HEADING = css({ margin: '0 0 12px', fontSize: '18px' })
 
 // A checkbox rather than <details>, for one reason: every rule that acts on it
 // lives inside the NARROW media query, so the wide layout never reads the state
@@ -65,6 +63,10 @@ function formatDate(value: number): string {
 type CSSStyle = Parameters<typeof css>[0]
 
 function collapsibleStyle(id: string): CSSStyle {
+  // Through a Record first, not a cast on the literal: TypeScript won't compare
+  // an object whose values are rule bodies against the flat property type, so
+  // `{...} as CSSStyle` is an error where this is allowed. media-tabs.tsx takes
+  // the same route.
   const style: Record<string, unknown> = {
     // Off-screen rather than `display: none`, which would take it out of the
     // focus order and leave the heading unreachable by keyboard.
@@ -77,11 +79,24 @@ function collapsibleStyle(id: string): CSSStyle {
     },
     [NARROW]: {
       '& label': { cursor: 'pointer' },
-      '& label::after': { content: '" ▸"', fontSize: '13px', color: '#888' },
+      // On the <span>, not the <label>: the span is display: block below, so a
+      // marker on the label would be pushed onto a line of its own after it.
+      '& label > span::after': { content: '" ▸"', fontSize: '13px', color: '#888' },
+      // On the <span> rather than the <label>, so it can be set from here at
+      // all: DoodleCSS's unlayered `.doodle label` rule outranks anything a
+      // css() call can say about a <label>, but it has nothing to say about a
+      // bare <span>. A thumb-sized band across the row, not a tap target the
+      // width of the words.
+      '& label > span': { display: 'block', padding: '0.55em 0' },
       '& > .collapsible-body': { display: 'none' },
-      [`&:has(#${id}:checked) label::after`]: { content: '" ▾"' },
+      [`&:has(#${id}:checked) label > span::after`]: { content: '" ▾"' },
       [`&:has(#${id}:checked) > .collapsible-body`]: { display: 'block' },
     },
+    // Above the breakpoint the section can't be folded, so its heading is a
+    // heading: not a control that silently toggles a checkbox nothing reads.
+    // Stated here rather than in app.css because DoodleCSS says nothing about
+    // pointer-events, so this is a rule a css() call can win.
+    [WIDE]: { '& label': { pointerEvents: 'none' } },
   }
 
   return style as CSSStyle
@@ -99,31 +114,21 @@ function Section(
   return () => {
     const { title, collapseId, children } = handle.props
 
-    // One <h2> either way, with the same margins: the pick column and the panel
-    // beside it line up on their headings, and a heading that measured
-    // differently here would take the card borders out of line with it.
-    const heading = <h2 mix={css({ margin: '0 0 12px', fontSize: '18px' })}>{title}</h2>
-
-    if (!collapseId) {
-      return (
-        <section>
-          {heading}
-          {children}
-        </section>
-      )
-    }
-
     return (
-      <section mix={css(collapsibleStyle(collapseId))}>
-        <input type="checkbox" id={collapseId} defaultChecked={true} />
-        <h2 mix={css({ margin: '0 0 12px', fontSize: '18px' })}>
-          {/* See app.css — the class is what keeps this heading the same
-              height as a plain one. */}
-          <label for={collapseId} class="section-toggle">
-            {title}
-          </label>
+      <section mix={collapseId ? css(collapsibleStyle(collapseId)) : undefined}>
+        {collapseId && <input type="checkbox" id={collapseId} defaultChecked />}
+        <h2 mix={HEADING}>
+          {collapseId ? (
+            /* See app.css — the class is what keeps this heading the same
+               height as a plain one. */
+            <label for={collapseId} class="section-toggle">
+              <span>{title}</span>
+            </label>
+          ) : (
+            title
+          )}
         </h2>
-        <div class="collapsible-body">{children}</div>
+        {collapseId ? <div class="collapsible-body">{children}</div> : children}
       </section>
     )
   }
@@ -168,66 +173,27 @@ function ActivityList(handle: Handle<{ entries: FollowingLogEntry[] }>) {
           gap: '12px',
         })}
       >
-        {entries.map(({ interaction, item, actor }) => {
-          const { posterUrl } = item ? parseMediaMetadata(item.metadata) : { posterUrl: null }
-          // From the row's own item, so a logged book reads "Read" and not
-          // "Watched" — the same rule WatchedListItem follows.
-          const detailHref = item ? mediaTypeUiFor(item.type).hrefs.show(item.id) : undefined
-          const title = item?.title ?? 'Unknown title'
-
-          return (
-            <li key={interaction.id} mix={css({ ...CARD, display: 'flex', gap: '12px', padding: '12px 16px' })}>
-              {posterUrl ? (
-                <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
-                  <img
-                    src={posterUrl}
-                    alt={`${title} poster`}
-                    mix={css({ width: '48px', borderRadius: '4px', display: 'block' })}
-                  />
-                </a>
-              ) : (
-                <div
-                  mix={css({
-                    width: '48px',
-                    height: '72px',
-                    flex: '0 0 auto',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                  })}
-                />
-              )}
-              <div mix={css({ minWidth: 0 })}>
-                <p mix={css({ margin: 0, fontSize: '13px', color: '#555' })}>
-                  <a href={routes.users.show.href({ userId: String(actor.id) })}>{actor.label}</a>{' '}
-                  {statusLabel(interaction.status, item?.type).toLowerCase()}
-                </p>
-                {detailHref ? (
-                  <a href={detailHref}>
-                    <strong>{title}</strong>
-                  </a>
-                ) : (
-                  <strong>{title}</strong>
-                )}
-                {interaction.rating != null && (
-                  <p mix={css({ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0 0' })}>
-                    <StarRatingDisplay value={interaction.rating} /> ({interaction.rating})
-                  </p>
-                )}
-                {interaction.disliked && (
-                  <p mix={css({ margin: '4px 0 0' })}>
-                    <DislikedDisplay />
-                  </p>
-                )}
-                {interaction.notes && (
-                  <p mix={css({ margin: '4px 0 0', fontStyle: 'italic' })}>"{interaction.notes}"</p>
-                )}
-                <p mix={css({ margin: '4px 0 0', fontSize: '12px', color: '#888' })}>
-                  {formatDate(interaction.updated_at)}
-                </p>
-              </div>
-            </li>
-          )
-        })}
+        {entries.map(({ interaction, item, actor }) => (
+          <WatchedListItem
+            key={interaction.id}
+            interaction={interaction}
+            item={item}
+            detailHref={item ? mediaTypeUiFor(item.type).hrefs.show(item.id) : ''}
+            // The status is still here, but as the end of a sentence about a
+            // person: whose log this is, is the thing a feed is for. Read off
+            // the row's own item, so a logged book says "read" and not
+            // "watched".
+            byline={
+              <p mix={css({ margin: '4px 0 0', fontSize: '13px', color: '#555' })}>
+                <a href={routes.users.show.href({ userId: String(actor.id) })}>{actor.label}</a>{' '}
+                {statusLabel(interaction.status, item?.type).toLowerCase()}
+              </p>
+            }
+            // A feed is already a list of things that were logged, so the row
+            // dates itself rather than saying so again.
+            dateLabel=""
+          />
+        ))}
       </ul>
     )
   }
@@ -311,7 +277,7 @@ function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
           {/* Headed here rather than inside the card, so this column opens the
               same way the one beside it does — a heading, then a border. That
               is what puts the two columns' first card on the same line. */}
-          <Section title="Today's lucky pick">
+          <Section title={LUCKY_PICK_LABEL}>
             {lucky.pick ? (
               <LuckyPickCard pick={lucky.pick} returnTo={routes.home.href()} showLabel={false} />
             ) : (

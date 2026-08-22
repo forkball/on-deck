@@ -288,10 +288,15 @@ export async function listRecommendationRuns(
   db: Db,
   userId: number,
   mediaType?: MediaType,
+  // Applied before the labels are built, for the same reason mediaType filters
+  // in the query: a caller that wants three runs shouldn't make this fetch a
+  // name for every member of thirty.
+  limit?: number,
 ): Promise<RecommendationRunSummary[]> {
   const runs = await db.findMany(recommendationRuns, {
     where: mediaType ? { user_id: userId, media_type: mediaType } : { user_id: userId },
     orderBy: ['created_at', 'desc'],
+    ...(limit == null ? {} : { limit }),
   })
 
   const labels = await loadOtherMemberLabels(db, userId, runs)
@@ -314,6 +319,9 @@ export async function listRecommendationRunsFromOthers(
   db: Db,
   userId: number,
   mediaType?: MediaType,
+  // See listRecommendationRuns. Applied after the mutual-follow filter, since
+  // that is what decides which runs are eligible at all.
+  limit?: number,
 ): Promise<RecommendationRunSummary[]> {
   const memberships = await db.findMany(recommendationRunMembers, { where: { user_id: userId } })
   if (memberships.length === 0) return []
@@ -331,9 +339,10 @@ export async function listRecommendationRunsFromOthers(
     listFollowerIds(db, userId, requesterIds),
   ])
 
-  const eligibleRuns = runsFromOthers
+  const filtered = runsFromOthers
     .filter((run) => userFollows.has(run.user_id) && followsUser.has(run.user_id))
     .sort((a, b) => b.created_at - a.created_at)
+  const eligibleRuns = limit == null ? filtered : filtered.slice(0, limit)
 
   const labels = await loadOtherMemberLabels(db, userId, eligibleRuns)
 

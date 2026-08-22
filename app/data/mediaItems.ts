@@ -335,9 +335,9 @@ export function matchesLogFilter(entry: UserLogEntry, filter: UserLogFilter): bo
   return true
 }
 
-// The columns every log read selects, named once so a second query over the
+// The select every log read starts from, named once so a second query over the
 // same two tables can't select a subset toLogEntry then reads as null.
-const LOG_COLUMNS = `i.id, i.user_id, i.media_item_id, i.status, i.rating, i.disliked, i.notes,
+const LOG_SELECT = `select i.id, i.user_id, i.media_item_id, i.status, i.rating, i.disliked, i.notes,
             i.consumed_at, i.created_at, i.updated_at,
             m.id as m_id, m.type as m_type, m.external_source as m_external_source,
             m.external_id as m_external_id, m.title as m_title, m.metadata as m_metadata,
@@ -424,11 +424,7 @@ export async function listUserMediaLog(
   options: UserLogFilter & { limit?: number; offset?: number } = {},
 ) {
   const params: unknown[] = logFilterParams(userId, options)
-  let sql =
-    `select ` +
-    LOG_COLUMNS +
-    LOG_WHERE +
-    LOG_ORDER
+  let sql = LOG_SELECT + LOG_WHERE + LOG_ORDER
 
   if (options.limit != null) sql += `\n     limit $${params.push(options.limit)}`
   if (options.offset) sql += `\n    offset $${params.push(options.offset)}`
@@ -468,20 +464,33 @@ interface FollowingLogRow extends LogRow {
 // One query rather than a log read per followed account: the interesting rows
 // are the newest few across everyone, so fetching each person's log and merging
 // in JS reads whole logs to throw nearly all of them away.
+//
+// The lateral is what keeps that true in SQL as well. A plain join reaches the
+// same rows, but the only plan for it is to walk every interaction of everyone
+// you follow and sort the lot to take `limit` — work that grows with your
+// friends' whole libraries, which this app imports wholesale. Per followed
+// account the lateral takes `limit` rows straight off
+// user_media_interactions_user_recent, already ordered, and the outer sort sees
+// followed_count × limit rows at most.
 export async function listFollowingLogActivity(
-  db: Db,
   viewerId: number,
   limit: number,
 ): Promise<FollowingLogEntry[]> {
   const { rows } = await pool.query<FollowingLogRow>(
-    `select ` +
-      LOG_COLUMNS +
+    LOG_SELECT +
       `, u.display_name as u_display_name, u.email as u_email
-       from user_media_interactions i
-       join user_follows f on f.followed_id = i.user_id and f.follower_id = $1
+       from user_follows f
+       join lateral (
+         select *
+           from user_media_interactions i
+          where i.user_id = f.followed_id
+            and i.status = any($2::text[])
+          order by i.updated_at desc, i.id desc
+          limit $3
+       ) i on true
        join users u on u.id = i.user_id
        left join media_items m on m.id = i.media_item_id
-      where i.status = any($2::text[])` +
+      where f.follower_id = $1` +
       LOG_ORDER +
       `\n      limit $3`,
     [viewerId, [...CONSUMPTION_STATUSES], limit],

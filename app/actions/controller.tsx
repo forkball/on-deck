@@ -24,21 +24,23 @@ const ACTIVITY_SHOWN = 8
 async function loadDashboard(db: Db, user: User): Promise<HomeDashboard> {
   // Unfiltered by media type on purpose — the recommendations index is the
   // per-type view, and this one answers "what has happened lately".
-  const [lucky, runs, runsFromOthers, followingActivity, followingCount] = await Promise.all([
+  const [lucky, runs, runsFromOthers, followingActivity] = await Promise.all([
     getLuckyState(user),
-    listRecommendationRuns(db, user.id),
-    listRecommendationRunsFromOthers(db, user.id),
-    listFollowingLogActivity(db, user.id, ACTIVITY_SHOWN),
-    countFollowing(db, user.id),
+    listRecommendationRuns(db, user.id, undefined, RUNS_SHOWN),
+    listRecommendationRunsFromOthers(db, user.id, undefined, RUNS_SHOWN),
+    listFollowingLogActivity(user.id, ACTIVITY_SHOWN),
   ])
 
   return {
     displayName: displayLabel(user),
     lucky,
-    runs: runs.slice(0, RUNS_SHOWN),
-    runsFromOthers: runsFromOthers.slice(0, RUNS_SHOWN),
+    runs,
+    runsFromOthers,
     followingActivity,
-    followsAnyone: followingCount > 0,
+    // Only asked when the feed came back empty: anything in it already proves
+    // you follow someone, and this is the landing page — a round trip whose
+    // answer is usually discarded is one worth not making.
+    followsAnyone: followingActivity.length > 0 || (await countFollowing(db, user.id)) > 0,
   }
 }
 

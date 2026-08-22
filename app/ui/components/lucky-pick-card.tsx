@@ -6,6 +6,11 @@ import type { LuckyPick } from '../../data/recommendations/lucky.ts'
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
 
+// What the day's pick is called, wherever it is named. Exported because the
+// home page heads its own column with it (see showLabel) and two copies of the
+// words would drift.
+export const LUCKY_PICK_LABEL = "Today's lucky pick"
+
 // The day's pick, rendered the same on the landing page and the profile. It
 // lives in ui/components rather than beside one of them because both show it
 // and neither owns it — see AGENTS.md.
@@ -60,7 +65,7 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
         <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
           {showLabel && (
             <p mix={css({ margin: '0 0 6px', fontSize: '12px', letterSpacing: '0.04em', color: '#888' })}>
-              Today's lucky pick
+              {LUCKY_PICK_LABEL}
             </p>
           )}
           <p mix={css({ margin: 0 })}>

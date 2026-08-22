@@ -12,11 +12,18 @@ export interface WatchedListItemProps {
   item: MediaItem | null
   detailHref: string
   actions?: RemixNode
+  // Replaces the status line for a log someone else wrote, where whose it is
+  // matters as much as what it says — the home page's feed reads
+  // "mona watched". The status is still in it; it just isn't the whole line.
+  byline?: RemixNode
+  // "Logged 12 Aug" is what your own log says. A feed of other people's is
+  // already a list of things that were logged, so it just dates them.
+  dateLabel?: string
 }
 
 export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
   return () => {
-    const { interaction, item, detailHref, actions } = handle.props
+    const { interaction, item, detailHref, actions, byline, dateLabel = 'Logged' } = handle.props
     const { posterUrl, platforms } = item
       ? parseMediaMetadata(item.metadata)
       : { posterUrl: null, platforms: [] }
@@ -71,7 +78,11 @@ export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
             <a href={detailHref}>
               <strong>{item?.title ?? 'Unknown title'}</strong>
             </a>
-            <p mix={css({ margin: '4px 0 0' })}>{statusLabels[interaction.status] ?? interaction.status}</p>
+            {byline ?? (
+              <p mix={css({ margin: '4px 0 0' })}>
+                {statusLabels[interaction.status] ?? interaction.status}
+              </p>
+            )}
             {/* Games only in practice — every other type carries no platforms,
                 and the list renders nothing for an empty one. */}
             <PlatformList platforms={platforms} />
@@ -88,7 +99,9 @@ export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
             {interaction.notes && (
               <p mix={css({ margin: '4px 0 0', fontStyle: 'italic' })}>"{interaction.notes}"</p>
             )}
-            <p mix={css({ margin: '4px 0 0', fontSize: '12px', color: '#888' })}>Logged {loggedDate}</p>
+            <p mix={css({ margin: '4px 0 0', fontSize: '12px', color: '#888' })}>
+              {dateLabel ? `${dateLabel} ${loggedDate}` : loggedDate}
+            </p>
           </div>
 
           {actions}

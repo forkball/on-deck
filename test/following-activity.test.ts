@@ -74,7 +74,7 @@ describe('following log activity', { skip }, () => {
   })
 
   it('shows only what the people you follow logged', async () => {
-    const entries = await listFollowingLogActivity(db, viewer, 10)
+    const entries = await listFollowingLogActivity(viewer, 10)
     assert.deepEqual(
       entries.map((entry) => entry.item?.title),
       ['Newer', 'Older'],
@@ -83,17 +83,17 @@ describe('following log activity', { skip }, () => {
   })
 
   it('names the person who logged it', async () => {
-    const [entry] = await listFollowingLogActivity(db, viewer, 10)
+    const [entry] = await listFollowingLogActivity(viewer, 10)
     assert.match(entry!.actor.label, /^feed-friend-/)
   })
 
   it('takes the newest rows up to the limit', async () => {
-    const entries = await listFollowingLogActivity(db, viewer, 1)
+    const entries = await listFollowingLogActivity(viewer, 1)
     assert.equal(entries.length, 1)
     assert.equal(entries[0]!.item?.title, 'Newer')
   })
 
   it('is empty for someone following nobody', async () => {
-    assert.deepEqual(await listFollowingLogActivity(db, stranger, 10), [])
+    assert.deepEqual(await listFollowingLogActivity(stranger, 10), [])
   })
 })
