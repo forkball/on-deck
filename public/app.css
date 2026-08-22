@@ -85,14 +85,26 @@
   padding: 14px 22px;
 }
 
-/* The <label> around a modal trigger is a click target, nothing more: it must
-   contribute no box of its own. Without this it adds DoodleCSS's
-   `.doodle label { padding: .25em 0 }` above and below the frame — the other
-   ~8px that made an "Edit" trigger visibly taller than a "Save changes"
-   button. This is the rule modal.tsx's comment refers to; it can only be
-   beaten from an unlayered stylesheet, which is why it's here and not there. */
-.doodle label.modal-trigger {
+/* Labels that are a click target and nothing more: they must contribute no box
+   of their own. Without this they add DoodleCSS's `.doodle label { padding:
+   .25em 0 }` — the other ~8px that made an "Edit" modal trigger visibly taller
+   than a "Save changes" button, and the 9px that made a folding dashboard
+   heading taller than the plain <h2> in the column beside it, putting the two
+   columns' card borders out of line. This is the rule modal.tsx's comment
+   refers to; it can only be beaten from an unlayered stylesheet, which is why
+   it's here and not there. */
+.doodle label.modal-trigger,
+.doodle label.section-toggle {
   padding: 0;
+}
+
+/* And the fold's heading takes the whole row, since DoodleCSS's
+   `display: inline-block` would leave it as wide as its words. Everything else
+   about that control — the marker, the tap band, the breakpoint it all changes
+   at — is in home-page.tsx, on a <span> inside the label that no vendor rule
+   targets. */
+.doodle label.section-toggle {
+  display: block;
 }
 
 /* The "Not for me" chip in the rating picker. Its border, radius and colours

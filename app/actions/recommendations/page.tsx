@@ -12,6 +12,7 @@ import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
+import { RunList } from '../../ui/components/run-list.tsx'
 import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
 export interface RecommendationsPageProps {
@@ -103,51 +104,6 @@ function runsLeftLabel(dailyRuns: DailyRunAllowance): string {
   return resetsAt == null
     ? 'No runs left today'
     : `No runs left today — the next in about ${timeUntil(resetsAt)}`
-}
-
-function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
-  return () => {
-    const { runs } = handle.props
-
-    return (
-      <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' })}>
-        {runs.map((run) => {
-          const date = new Date(run.createdAt).toLocaleDateString(undefined, {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-          })
-          return (
-            <li
-              key={run.id}
-              mix={css({
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '12px',
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                padding: '12px 16px',
-              })}
-            >
-              <a href={routes.recommendations.show.href({ runId: String(run.id) })}>
-                {run.isLucky && '🎲 '}
-                {run.name ? (
-                  <>
-                    <strong>{run.name}</strong> — {date}
-                  </>
-                ) : (
-                  <>
-                    <strong>{date}</strong> — {run.groupLabel}
-                  </>
-                )}
-              </a>
-            </li>
-          )
-        })}
-      </ul>
-    )
-  }
 }
 
 export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {

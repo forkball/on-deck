@@ -6,6 +6,20 @@ import type { LuckyPick } from '../../data/recommendations/lucky.ts'
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
 
+// What the day's pick is called, wherever it is named. Exported because the
+// home page heads its own column with it (see showLabel) and two copies of the
+// words would drift.
+export const LUCKY_PICK_LABEL = "Today's lucky pick"
+
+// The box the pick sits in, exported because the home page renders a call to
+// action in the same slot when nothing has been drawn — the two have to be the
+// same box, or the empty state visibly steps out of the filled one.
+export const LUCKY_CARD_BOX = {
+  border: '1px solid #ddd',
+  borderRadius: '8px',
+  padding: '16px',
+} as const
+
 // The day's pick, rendered the same on the landing page and the profile. It
 // lives in ui/components rather than beside one of them because both show it
 // and neither owns it — see AGENTS.md.
@@ -14,26 +28,22 @@ export interface LuckyPickCardProps {
   // Where the "back" link on the media page should return to. Each place this
   // appears is a different answer.
   returnTo: string
+  // The card names itself by default. The home page turns that off because it
+  // heads the column the card sits in — the label is still on screen, once,
+  // above the card rather than inside it.
+  showLabel?: boolean
 }
 
 export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
   return () => {
-    const { pick, returnTo } = handle.props
+    const { pick, returnTo, showLabel = true } = handle.props
     const { releaseYear, posterUrl } = parseMediaMetadata(pick.metadata)
     const ui = mediaTypeUiFor(pick.mediaType)
     const runHref = routes.recommendations.show.href({ runId: String(pick.runId) })
     const detailHref = `${ui.hrefs.show(pick.mediaItemId)}?from=${encodeURIComponent(returnTo)}`
 
     return (
-      <div
-        mix={css({
-          border: '1px solid #ddd',
-          borderRadius: '8px',
-          padding: '16px',
-          display: 'flex',
-          gap: '14px',
-        })}
-      >
+      <div mix={css({ ...LUCKY_CARD_BOX, display: 'flex', gap: '14px' })}>
         {posterUrl ? (
           <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
             <img
@@ -54,9 +64,11 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
           />
         )}
         <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
-          <p mix={css({ margin: '0 0 6px', fontSize: '12px', letterSpacing: '0.04em', color: '#888' })}>
-            Today's lucky pick
-          </p>
+          {showLabel && (
+            <p mix={css({ margin: '0 0 6px', fontSize: '12px', letterSpacing: '0.04em', color: '#888' })}>
+              {LUCKY_PICK_LABEL}
+            </p>
+          )}
           <p mix={css({ margin: 0 })}>
             <a href={detailHref} mix={css({ fontWeight: 700 })}>
               {pick.title}
@@ -68,7 +80,7 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
           <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
             {pick.otherMemberLabels.length > 0
               ? `Drawn for you + ${pick.otherMemberLabels.join(', ')} — none of you had logged it.`
-              : `Nothing you'd logged.`}{' '}
+              : `Drawn for you — you hadn't logged it.`}{' '}
             <a href={runHref}>See the pick →</a>
           </p>
         </div>
