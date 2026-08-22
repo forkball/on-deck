@@ -197,14 +197,39 @@ async function forEachWithConcurrency<T>(items: T[], operation: (item: T) => Pro
   await Promise.all(Array.from({ length: Math.min(LOOKUP_CONCURRENCY, items.length) }, worker))
 }
 
+// A by-id lookup that answers null rather than throwing. A provider is a
+// third party having a bad day — Google Books answers 429 once the quota for
+// the day is gone, and a book row imported through the Open Library fallback
+// carries an id Google Books was never going to resolve — and one such answer
+// is a verdict about one candidate, not grounds to fail a run that has already
+// paid for its picks. Callers below decide what a missing answer means.
+export type CatalogLookup = (mediaType: MediaType, externalId: string) => Promise<CatalogSearchResult | null>
+
+async function lookupQuietly(
+  lookup: CatalogLookup,
+  mediaType: MediaType,
+  externalId: string,
+): Promise<CatalogSearchResult | null> {
+  try {
+    return await lookup(mediaType, externalId)
+  } catch (error) {
+    console.warn(`[generation] ${mediaType} lookup failed for ${externalId}:`, error)
+    return null
+  }
+}
+
 // TMDB returns descriptions on search; Open Library only on the per-work record.
 // Without one, verifyPicksAgainstOverviews rubber-stamps every book.
-export async function withOverviews(candidates: Candidate[], mediaType: MediaType): Promise<Candidate[]> {
+export async function withOverviews(
+  candidates: Candidate[],
+  mediaType: MediaType,
+  lookup: CatalogLookup = lookupForType,
+): Promise<Candidate[]> {
   const missing = candidates.filter(({ match }) => !match.overview)
   if (missing.length === 0) return candidates
 
   await forEachWithConcurrency(missing, async (entry) => {
-    const detail = await lookupForType(mediaType, entry.match.externalId)
+    const detail = await lookupQuietly(lookup, mediaType, entry.match.externalId)
     if (detail?.overview) entry.match = { ...entry.match, overview: detail.overview }
   })
 
@@ -229,17 +254,18 @@ export async function filterByLength(
   candidates: Candidate[],
   mediaType: MediaType,
   length: LengthBucket,
+  lookup: CatalogLookup = lookupForType,
 ): Promise<Candidate[]> {
   const provider = getCatalogProvider(mediaType)
 
   // The stored row often already carries the dimension.
   const needLookup = new Set(candidates.filter(({ match }) => !hasLengthDimension(mediaType, match)))
-  // Null marks a failed lookup: no dimension, no verdict, so it can't be kept.
-  // Held beside the entry so the filter below stays a pure read.
+  // Null marks a lookup that answered nothing: no dimension, no verdict, so it
+  // can't be kept. Held beside the entry so the filter below stays a pure read.
   const resolved = new Map<Candidate, CatalogSearchResult | null>()
 
   await forEachWithConcurrency([...needLookup], async (entry) => {
-    resolved.set(entry, await lookupForType(mediaType, entry.match.externalId))
+    resolved.set(entry, await lookupQuietly(lookup, mediaType, entry.match.externalId))
   })
 
   const kept: Candidate[] = []
@@ -254,6 +280,18 @@ export async function filterByLength(
     // The detail result, not the search one: it carries the dimension that was
     // just paid for, which search omits.
     kept.push({ pick: entry.pick, match: detail })
+  }
+
+  // Dropping one candidate the provider wouldn't answer for is the rule working.
+  // Dropping every one of them, with nothing left that carried the dimension
+  // already, is the provider being down — and a run saved from that is an empty
+  // page reading as "nothing matched your length", which is a different and
+  // untrue thing. Say so instead.
+  if (kept.length === 0 && needLookup.size > 0 && [...resolved.values()].every((detail) => detail == null)) {
+    throw new GenerationError(
+      `Couldn't check the length of any of the ${mediaTypeUiFor(mediaType).plural} — the catalog isn't ` +
+        `answering right now. Try generating again in a few minutes.`,
+    )
   }
 
   return kept
