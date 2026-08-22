@@ -41,15 +41,6 @@ const CARD = {
   padding: '16px',
 } as const
 
-// The label above the day's pick, matched from LuckyPickCard so the call to
-// action standing in for it is the same card with different words in it.
-const CARD_LABEL = {
-  margin: '0 0 6px',
-  fontSize: '12px',
-  letterSpacing: '0.04em',
-  color: '#888',
-} as const
-
 function formatDate(value: number): string {
   return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
@@ -78,7 +69,6 @@ function Empty(handle: Handle<{ children?: RemixNode }>) {
 function LuckyPickCta() {
   return () => (
     <div mix={css({ ...CARD, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' })}>
-      <p mix={css(CARD_LABEL)}>Today's lucky pick</p>
       <p mix={css({ margin: 0 })}>
         <strong>Nothing drawn yet today.</strong>
       </p>
@@ -195,8 +185,7 @@ function RunPanel(
           [WIDE]: { borderLeft: '1px solid #ddd', paddingLeft: '24px' },
         })}
       >
-        <div>
-          <h2 mix={css({ margin: '0 0 12px', fontSize: '18px' })}>Your runs</h2>
+        <Section title="Your runs">
           {runs.length > 0 ? (
             <RunList runs={runs} variant="panel" />
           ) : (
@@ -205,10 +194,9 @@ function RunPanel(
               logged.
             </Empty>
           )}
-        </div>
+        </Section>
 
-        <div>
-          <h2 mix={css({ margin: '0 0 12px', fontSize: '18px' })}>Run for you</h2>
+        <Section title="Run for you">
           {runsFromOthers.length > 0 ? (
             <RunList runs={runsFromOthers} variant="panel" />
           ) : (
@@ -216,7 +204,7 @@ function RunPanel(
               Nothing yet — group runs someone else generated show up here once you both follow each other.
             </Empty>
           )}
-        </div>
+        </Section>
       </aside>
     )
   }
@@ -249,9 +237,16 @@ function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
         })}
       >
         <div mix={css({ gridArea: 'pick' })}>
-          {/* No heading of its own: the card carries the label, and the call to
-              action standing in for it carries the same one. */}
-          {lucky.pick ? <LuckyPickCard pick={lucky.pick} returnTo={routes.home.href()} /> : <LuckyPickCta />}
+          {/* Headed here rather than inside the card, so this column opens the
+              same way the one beside it does — a heading, then a border. That
+              is what puts the two columns' first card on the same line. */}
+          <Section title="Today's lucky pick">
+            {lucky.pick ? (
+              <LuckyPickCard pick={lucky.pick} returnTo={routes.home.href()} showLabel={false} />
+            ) : (
+              <LuckyPickCta />
+            )}
+          </Section>
         </div>
 
         <RunPanel runs={runs} runsFromOthers={runsFromOthers} />

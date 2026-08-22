@@ -14,11 +14,15 @@ export interface LuckyPickCardProps {
   // Where the "back" link on the media page should return to. Each place this
   // appears is a different answer.
   returnTo: string
+  // The card names itself by default. The home page turns that off because it
+  // heads the column the card sits in — the label is still on screen, once,
+  // above the card rather than inside it.
+  showLabel?: boolean
 }
 
 export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
   return () => {
-    const { pick, returnTo } = handle.props
+    const { pick, returnTo, showLabel = true } = handle.props
     const { releaseYear, posterUrl } = parseMediaMetadata(pick.metadata)
     const ui = mediaTypeUiFor(pick.mediaType)
     const runHref = routes.recommendations.show.href({ runId: String(pick.runId) })
@@ -54,9 +58,11 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
           />
         )}
         <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
-          <p mix={css({ margin: '0 0 6px', fontSize: '12px', letterSpacing: '0.04em', color: '#888' })}>
-            Today's lucky pick
-          </p>
+          {showLabel && (
+            <p mix={css({ margin: '0 0 6px', fontSize: '12px', letterSpacing: '0.04em', color: '#888' })}>
+              Today's lucky pick
+            </p>
+          )}
           <p mix={css({ margin: 0 })}>
             <a href={detailHref} mix={css({ fontWeight: 700 })}>
               {pick.title}
@@ -68,7 +74,7 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
           <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
             {pick.otherMemberLabels.length > 0
               ? `Drawn for you + ${pick.otherMemberLabels.join(', ')} — none of you had logged it.`
-              : `Nothing you'd logged.`}{' '}
+              : `Drawn for you — you hadn't logged it.`}{' '}
             <a href={runHref}>See the pick →</a>
           </p>
         </div>
