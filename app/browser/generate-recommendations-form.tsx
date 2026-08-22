@@ -22,6 +22,11 @@ export type GenerateRecommendationsFormProps = {
   multiplayerTypes: string[]
   platforms: string[]
   seriesTypes: string[]
+  // How many picks a full run comes back with, so the two buttons can say what
+  // they each produce. Passed in from the pipeline's own constant.
+  shortlistCount: number
+  // "3 of 5 runs left today", already phrased. Empty for an account with no cap.
+  runsLeftLabel: string
   generateHref: string
   // The lucky draw posts this same form to its own action, so the group picked
   // above carries over and there is no second copy of it to keep in step.
@@ -88,6 +93,8 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         multiplayerTypes,
         platforms,
         seriesTypes,
+        shortlistCount,
+        runsLeftLabel,
         generateHref,
         luckyHref,
         luckyAvailable,
@@ -124,6 +131,13 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       if (page > totalPages) page = totalPages
       const start = (page - 1) * FRIENDS_PAGE_SIZE
       const visibleIds = new Set(filtered.slice(start, start + FRIENDS_PAGE_SIZE).map((friend) => friend.id))
+
+      const caption = css({ fontSize: '12px', color: '#888', lineHeight: 1.4 })
+
+      // Stated so the two buttons are the same height. Left to the default, the
+      // emoji on one of them makes a taller line box than plain text does, and
+      // the captions beneath end up on different baselines.
+      const submitButton = css({ lineHeight: 1.5 })
 
       const sectionLabel = css({
         margin: '0 0 10px',
@@ -460,42 +474,65 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             </p>
           )}
 
-          <div mix={css({ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' })}>
-            <button
-              type="submit"
-              disabled={submitting || !hasSource || blockedBy.length > 0}
-              mix={on('click', () => {
-                pressed = 'generate'
-              })}
-            >
-              {submitting && pressed === 'generate' ? 'Starting…' : 'Get recommendations'}
-            </button>
+          {/* A caption under each, rather than one paragraph under both. With
+              nothing set above, the two buttons otherwise make the same promise
+              — and what actually separates them (how many come back, and what
+              it costs) is exactly what someone is choosing between. */}
+          <div mix={css({ display: 'flex', gap: '24px', flexWrap: 'wrap' })}>
+            <div mix={css({ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px', maxWidth: '260px' })}>
+              <button
+                type="submit"
+                disabled={submitting || !hasSource || blockedBy.length > 0}
+                mix={[
+                  submitButton,
+                  on('click', () => {
+                    pressed = 'generate'
+                  }),
+                ]}
+              >
+                {submitting && pressed === 'generate' ? 'Starting…' : 'Get recommendations'}
+              </button>
+              <span mix={caption}>
+                Up to {shortlistCount} picks to choose from.
+                {runsLeftLabel && ` ${runsLeftLabel}.`}
+              </span>
+            </div>
 
             {/* Same form, different action: formaction sends everything above
                 to the lucky endpoint, which reads only who is in the run and
                 ignores the rest. That is what keeps one group picker on the
                 page instead of two that can disagree. */}
-            <button
-              type="submit"
-              formaction={luckyHref}
-              disabled={luckyDisabled}
-              mix={on('click', () => {
-                pressed = 'lucky'
-              })}
-            >
-              {submitting && pressed === 'lucky' ? 'Drawing…' : `🎲 I'm feeling lucky`}
-            </button>
+            <div mix={css({ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px', maxWidth: '280px' })}>
+              <button
+                type="submit"
+                formaction={luckyHref}
+                disabled={luckyDisabled}
+                mix={[
+                  submitButton,
+                  on('click', () => {
+                    pressed = 'lucky'
+                  }),
+                ]}
+              >
+                {submitting && pressed === 'lucky' ? 'Drawing…' : `🎲 I'm feeling lucky`}
+              </button>
+              <span mix={caption}>
+                {!luckyAvailable
+                  ? `Drawn for today — another in ${luckyWaitLabel}. It's in the list below.`
+                  : luckyBlockedBy.length > 0
+                    ? `Needs everyone in the run to have ${mediaTypeLabel} logged — ` +
+                      `${luckyBlockedBy.map((member) => member.label).join(', ')} ` +
+                      `${luckyBlockedBy.length === 1 && luckyBlockedBy[0].label === 'You' ? 'have' : 'has'} none.`
+                    : `One ${itemNoun}, already decided. Costs no run — one a day.`}
+              </span>
+            </div>
           </div>
 
+          {/* The one difference neither caption can carry, and the one that is
+              invisible with nothing set above. */}
           <p mix={css({ margin: 0, fontSize: '12px', color: '#888' })}>
-            {!luckyAvailable
-              ? `Today's lucky pick is drawn — another one in ${luckyWaitLabel}. It's below, under Past recommendations.`
-              : luckyBlockedBy.length > 0
-                ? `Feeling lucky needs everyone in the run to have ${mediaTypeLabel} logged — ` +
-                  `${luckyBlockedBy.map((member) => member.label).join(', ')} ` +
-                  `${luckyBlockedBy.length === 1 && luckyBlockedBy[0].label === 'You' ? 'have' : 'has'} none.`
-                : `Feeling lucky draws one ${itemNoun} nobody in the run has logged. It ignores everything ` +
-                  `above — no settings, no filters — and you get one a day.`}
+            Lucky is the stricter of the two: it won't draw anything anyone in the run has logged,
+            down to a want-to. A shortlist only rules out what most of you have already finished.
           </p>
         </form>
       )

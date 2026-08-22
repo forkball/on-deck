@@ -41,7 +41,9 @@ import { emptyDrops, logPickTally } from './tally.ts'
 import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
 
-const TARGET_COUNT = 8
+// Exported so the page can say how many a run comes back with rather than
+// restating the number in copy that would then drift from it.
+export const TARGET_COUNT = 8
 
 // What "I'm feeling lucky" means at this end of the pipeline: one pick, the
 // top-ranked one. Everything before this stage is unchanged — the same number of

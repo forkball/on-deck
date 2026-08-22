@@ -3,7 +3,8 @@ import { css } from 'remix/ui'
 
 import { GenerateRecommendationsForm } from '../../browser/generate-recommendations-form.tsx'
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
-import { timeUntil, type DailyRunAllowance, type DailyRunsUsed } from '../../data/recommendations/dailyLimit.ts'
+import { timeUntil, type DailyRunAllowance } from '../../data/recommendations/dailyLimit.ts'
+import { TARGET_COUNT } from '../../data/recommendations/generate.ts'
 import type { LuckyState } from '../../data/recommendations/lucky.ts'
 import { MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations/runs.ts'
 import type { User } from '../../data/schema.ts'
@@ -90,22 +91,18 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
 }
 
 // Counted per person rather than per media type: a run costs the same whatever
-// it is a run of. Rendered even when there is plenty left, so running out is
-// never the first time someone hears there's a cap.
-function DailyRunsNote(handle: Handle<{ dailyRuns: DailyRunsUsed }>) {
-  return () => {
-    const { remaining, limit, resetsAt } = handle.props.dailyRuns
+// it is a run of. Said even when there is plenty left, so running out is never
+// the first time someone hears there's a cap — and said under the button that
+// spends one, which is the other half of what separates it from a lucky draw.
+// Empty for an account with no cap.
+function runsLeftLabel(dailyRuns: DailyRunAllowance): string {
+  if (dailyRuns.unlimited) return ''
 
-    return (
-      <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
-        {remaining > 0
-          ? `${remaining} of ${limit} recommendation runs left today.`
-          : resetsAt == null
-            ? `No recommendation runs left today.`
-            : `No recommendation runs left today — the next one frees up in about ${timeUntil(resetsAt)}.`}
-      </p>
-    )
-  }
+  const { remaining, limit, resetsAt } = dailyRuns
+  if (remaining > 0) return `${remaining} of ${limit} runs left today`
+  return resetsAt == null
+    ? 'No runs left today'
+    : `No runs left today — the next in about ${timeUntil(resetsAt)}`
 }
 
 function RunList(handle: Handle<{ runs: RecommendationRunSummary[] }>) {
@@ -207,8 +204,6 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             </p>
           )}
 
-          {!dailyRuns.unlimited && <DailyRunsNote dailyRuns={dailyRuns} />}
-
           <GenerateRecommendationsForm
             friends={friends.map((friend) => ({
               id: friend.id,
@@ -219,6 +214,8 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             mediaType={mediaType}
             mediaTypeLabel={ui.attributive}
             itemNoun={ui.singular}
+            shortlistCount={TARGET_COUNT}
+            runsLeftLabel={runsLeftLabel(dailyRuns)}
             sources={enabledMediaTypes().map((type) => ({
               value: type,
               label: `${MEDIA_TYPE_UI[type].attributive} taste`,
