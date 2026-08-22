@@ -11,6 +11,7 @@ import {
   type UserMediaInteraction,
 } from './schema.ts'
 import type { TmdbSearchResult } from './catalog/tmdb.ts'
+import { displayLabel } from './users.ts'
 
 export type MediaType = MediaItem['type']
 
@@ -334,6 +335,20 @@ export function matchesLogFilter(entry: UserLogEntry, filter: UserLogFilter): bo
   return true
 }
 
+// The columns every log read selects, named once so a second query over the
+// same two tables can't select a subset toLogEntry then reads as null.
+const LOG_COLUMNS = `i.id, i.user_id, i.media_item_id, i.status, i.rating, i.disliked, i.notes,
+            i.consumed_at, i.created_at, i.updated_at,
+            m.id as m_id, m.type as m_type, m.external_source as m_external_source,
+            m.external_id as m_external_id, m.title as m_title, m.metadata as m_metadata,
+            m.popularity_score as m_popularity_score, m.created_at as m_created_at`
+
+// i.id breaks ties. updated_at alone is not unique — an import stamps a whole
+// batch with one timestamp — and without a tiebreaker Postgres may order those
+// rows differently per query, so paging through them can repeat one row and
+// skip another.
+const LOG_ORDER = `\n      order by i.updated_at desc, i.id desc`
+
 // Raw SQL because `type` lives on the joined media_items row, which the table
 // API can't reach — and pushing it down is what lets `limit`/`offset` mean
 // anything. Filtering in JS made every page of a log load the whole log.
@@ -410,17 +425,10 @@ export async function listUserMediaLog(
 ) {
   const params: unknown[] = logFilterParams(userId, options)
   let sql =
-    `select i.id, i.user_id, i.media_item_id, i.status, i.rating, i.disliked, i.notes,
-            i.consumed_at, i.created_at, i.updated_at,
-            m.id as m_id, m.type as m_type, m.external_source as m_external_source,
-            m.external_id as m_external_id, m.title as m_title, m.metadata as m_metadata,
-            m.popularity_score as m_popularity_score, m.created_at as m_created_at` +
+    `select ` +
+    LOG_COLUMNS +
     LOG_WHERE +
-    // i.id breaks ties. updated_at alone is not unique — an import stamps a
-    // whole batch with one timestamp — and without a tiebreaker Postgres may
-    // order those rows differently per query, so paging through them can repeat
-    // one row and skip another.
-    `\n      order by i.updated_at desc, i.id desc`
+    LOG_ORDER
 
   if (options.limit != null) sql += `\n     limit $${params.push(options.limit)}`
   if (options.offset) sql += `\n    offset $${params.push(options.offset)}`
@@ -435,6 +443,57 @@ export async function countUserMediaLog(db: Db, userId: number, filter: UserLogF
     logFilterParams(userId, filter),
   )
   return Number(rows[0]?.count ?? 0)
+}
+
+// One row of the following feed: a log entry plus who wrote it. The label is
+// resolved here rather than in the page, because the fallback to email lives in
+// displayLabel and the page has no user row to run it on.
+export interface FollowingLogEntry extends UserLogEntry {
+  actor: { id: number; label: string }
+}
+
+interface FollowingLogRow extends LogRow {
+  u_display_name: string
+  u_email: string
+}
+
+// The feed on the home page: what the people this viewer follows have logged,
+// newest first.
+//
+// No privacy check beyond the join. `is_private` gates a profile behind a
+// follow (see canViewProfile), and every row here is by definition someone the
+// viewer already follows — so the join *is* the check. Rejections are excluded,
+// the same way they are everywhere else a log is shown.
+//
+// One query rather than a log read per followed account: the interesting rows
+// are the newest few across everyone, so fetching each person's log and merging
+// in JS reads whole logs to throw nearly all of them away.
+export async function listFollowingLogActivity(
+  db: Db,
+  viewerId: number,
+  limit: number,
+): Promise<FollowingLogEntry[]> {
+  const { rows } = await pool.query<FollowingLogRow>(
+    `select ` +
+      LOG_COLUMNS +
+      `, u.display_name as u_display_name, u.email as u_email
+       from user_media_interactions i
+       join user_follows f on f.followed_id = i.user_id and f.follower_id = $1
+       join users u on u.id = i.user_id
+       left join media_items m on m.id = i.media_item_id
+      where i.status = any($2::text[])` +
+      LOG_ORDER +
+      `\n      limit $3`,
+    [viewerId, [...CONSUMPTION_STATUSES], limit],
+  )
+
+  return rows.map((row) => ({
+    ...toLogEntry(row),
+    actor: {
+      id: row.user_id,
+      label: displayLabel({ display_name: row.u_display_name, email: row.u_email }),
+    },
+  }))
 }
 
 // Rejections don't count, the same rule findMembersMissingSourceLogs uses.
