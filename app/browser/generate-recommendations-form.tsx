@@ -124,11 +124,12 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       // A lucky draw reads one taste — the type being generated — and ignores
       // every lever under Settings, so it needs its own answer to "could this
       // go anywhere". Unchecking every source blocks a shortlist, not this.
+      // `isLucky` already implies the draw is available — the radio for it is
+      // disabled when it isn't — so only the per-kind rule is left to check.
       const isLucky = runKind === 'lucky'
       const luckyBlockedBy = membersInRun.filter((member) => !member.loggedTypes.includes(mediaType))
       const disabled =
-        submitting ||
-        (isLucky ? !luckyAvailable || luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
+        submitting || (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
 
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
@@ -212,16 +213,17 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 is what this replaced: on a narrow screen they stacked into a
                 wall of grey and stopped reading as a comparison at all. */}
             <p mix={caption}>
-              {!luckyAvailable && isLucky
-                ? `Drawn for today — another in ${luckyWaitLabel}. It's in the list below.`
-                : isLucky
-                  ? `One ${itemNoun}, and never one anyone in the run has logged — down to a want-to. ` +
-                    `Costs no run, and you get one a day.`
-                  : `Up to ${shortlistCount} picks to choose from, minus what most of you have already ` +
-                    `finished.${runsLeftLabel ? ` ${runsLeftLabel}.` : ''}`}
+              {isLucky
+                ? `One ${itemNoun}, and never one anyone in the run has logged — down to a want-to. ` +
+                  `Costs no run, and you get one a day.`
+                : `Up to ${shortlistCount} picks to choose from, minus what most of you have already ` +
+                  `finished.${runsLeftLabel ? ` ${runsLeftLabel}.` : ''}`}
             </p>
 
-            {!luckyAvailable && !isLucky && (
+            {/* Only ever alongside the shortlist caption: the option above is
+                disabled once the draw is spent, so it cannot be the selected
+                one and have this to say. */}
+            {!luckyAvailable && (
               <p mix={caption}>
                 Today's lucky pick is already drawn — another in {luckyWaitLabel}.
               </p>

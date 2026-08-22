@@ -26,7 +26,7 @@ export default createController(routes, {
           displayName={auth.ok ? displayLabel(auth.identity) : undefined}
           // One query, and only for someone signed in — see lucky.ts. This page
           // is otherwise free, and it stays that way for a visitor.
-          lucky={auth.ok ? await getLuckyState(context.get(Database), auth.identity) : undefined}
+          lucky={auth.ok ? await getLuckyState(auth.identity) : undefined}
         />,
       )
     },

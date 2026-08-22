@@ -16,7 +16,11 @@ import { getLuckyState, LUCKY_RUN_NAME } from '../../data/recommendations/lucky.
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { getRememberedMediaType } from '../../middleware/mediaType.ts'
-import { findMembersMissingSourceLogs, generateRecommendations } from '../../data/recommendations/generate.ts'
+import {
+  findMembersMissingSourceLogs,
+  generateRecommendations,
+  type MissingSourceLogs,
+} from '../../data/recommendations/generate.ts'
 import type { RecommendationFilters } from '../../data/recommendations/picks.ts'
 import {
   findUnusedDuplicateRun,
@@ -59,7 +63,7 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     listRecommendationRunsFromOthers(db, user.id, mediaType),
     listFollowedUsers(db, user.id),
     getDailyRunAllowance(db, user),
-    getLuckyState(db, user),
+    getLuckyState(user),
   ])
 
   // After the fetch above rather than alongside it, since it needs the ids it
@@ -85,6 +89,17 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     seriesTypes: getCatalogProvider(mediaType).seriesTypes ?? [],
     displayName: displayLabel(user),
   }
+}
+
+// Both actions refuse for the same reason in the same words — an empty log
+// gives the profile nothing to work from, whichever kind of run asked for it.
+function describeMissingLogs(missing: MissingSourceLogs[], viewerId: number): string {
+  return missing
+    .map(({ userId, label, missing: types }) => {
+      const nouns = types.map((type) => mediaTypeUiFor(type).plural).join(' or ')
+      return userId === viewerId ? `you have no ${nouns} logged` : `${label} has no ${nouns} logged`
+    })
+    .join(', and ')
 }
 
 // Every path through `generate` that doesn't redirect re-renders the index with
@@ -170,14 +185,7 @@ export default createController(routes.recommendations, {
 
       const missing = await findMembersMissingSourceLogs(db, memberIds, profileTypes)
       if (missing.length > 0) {
-        const detail = missing
-          .map(({ userId, label, missing: types }) => {
-            const nouns = types.map((type) => mediaTypeUiFor(type).plural).join(' or ')
-            return userId === auth.identity.id
-              ? `you have no ${nouns} logged`
-              : `${label} has no ${nouns} logged`
-          })
-          .join(', and ')
+        const detail = describeMissingLogs(missing, auth.identity.id)
         return context.render(
           await indexPage(db, auth.identity, mediaType, {
             error:
@@ -317,7 +325,7 @@ export default createController(routes.recommendations, {
 
       const memberIds = [auth.identity.id, ...friendIds]
 
-      const lucky = await getLuckyState(db, auth.identity)
+      const lucky = await getLuckyState(auth.identity)
       if (!lucky.available) {
         return context.render(
           await indexPage(db, auth.identity, mediaType, {
@@ -335,12 +343,7 @@ export default createController(routes.recommendations, {
       // from the run.
       const missing = await findMembersMissingSourceLogs(db, memberIds, [mediaType])
       if (missing.length > 0) {
-        const nouns = mediaTypeUiFor(mediaType).plural
-        const detail = missing
-          .map(({ userId, label }) =>
-            userId === auth.identity.id ? `you have no ${nouns} logged` : `${label} has no ${nouns} logged`,
-          )
-          .join(', and ')
+        const detail = describeMissingLogs(missing, auth.identity.id)
         return context.render(
           await indexPage(db, auth.identity, mediaType, {
             error: `Can't draw a lucky pick — ${detail}. Everyone in the draw needs something logged.`,

@@ -6,22 +6,19 @@ import type { LuckyPick } from '../../data/recommendations/lucky.ts'
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
 
-// The day's pick, rendered the same on the landing page, the profile and the
-// recommendations page. It lives in ui/components rather than beside one of
-// them because all three show it and none of them owns it — see AGENTS.md.
+// The day's pick, rendered the same on the landing page and the profile. It
+// lives in ui/components rather than beside one of them because both show it
+// and neither owns it — see AGENTS.md.
 export interface LuckyPickCardProps {
   pick: LuckyPick
-  // Where the "back" link on the media page should return to. The three places
-  // this appears are three different answers.
+  // Where the "back" link on the media page should return to. Each place this
+  // appears is a different answer.
   returnTo: string
-  // The landing page and the profile lead with it; the recommendations page has
-  // already said what it is in the panel around it.
-  heading?: string
 }
 
 export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
   return () => {
-    const { pick, returnTo, heading } = handle.props
+    const { pick, returnTo } = handle.props
     const { releaseYear, posterUrl } = parseMediaMetadata(pick.metadata)
     const ui = mediaTypeUiFor(pick.mediaType)
     const runHref = routes.recommendations.show.href({ runId: String(pick.runId) })
@@ -57,11 +54,9 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
           />
         )}
         <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
-          {heading && (
-            <p mix={css({ margin: '0 0 6px', fontSize: '12px', letterSpacing: '0.04em', color: '#888' })}>
-              {heading}
-            </p>
-          )}
+          <p mix={css({ margin: '0 0 6px', fontSize: '12px', letterSpacing: '0.04em', color: '#888' })}>
+            Today's lucky pick
+          </p>
           <p mix={css({ margin: 0 })}>
             <a href={detailHref} mix={css({ fontWeight: 700 })}>
               {pick.title}

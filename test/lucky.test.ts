@@ -130,7 +130,7 @@ describe("I'm feeling lucky", { skip }, () => {
   })
 
   it('offers a draw when none has been made', async () => {
-    const state = await getLuckyState(db, user)
+    const state = await getLuckyState(user)
 
     assert.equal(state.pick, null)
     assert.equal(state.available, true)
@@ -141,7 +141,7 @@ describe("I'm feeling lucky", { skip }, () => {
     const drawnAt = Date.now() - 60_000
     const runId = await saveLuckyRun(user, drawnAt)
 
-    const state = await getLuckyState(db, user)
+    const state = await getLuckyState(user)
 
     assert.equal(state.available, false)
     assert.equal(state.nextAt, drawnAt + LUCKY_WINDOW_MS)
@@ -155,7 +155,7 @@ describe("I'm feeling lucky", { skip }, () => {
     const stale = await newUser('stale')
     await saveLuckyRun(stale, Date.now() - LUCKY_WINDOW_MS - 60_000)
 
-    const state = await getLuckyState(db, stale)
+    const state = await getLuckyState(stale)
 
     assert.equal(state.pick, null, 'yesterday is not today')
     assert.equal(state.available, true)
@@ -166,7 +166,7 @@ describe("I'm feeling lucky", { skip }, () => {
     await pool.query(`update users set is_admin = true where id = $1`, [admin.id])
     await saveLuckyRun({ ...admin, is_admin: true }, Date.now())
 
-    const state = await getLuckyState(db, { ...admin, is_admin: true })
+    const state = await getLuckyState({ ...admin, is_admin: true })
 
     assert.equal(state.available, true)
     assert.ok(state.pick, 'still shows what they last drew')
@@ -183,7 +183,7 @@ describe("I'm feeling lucky", { skip }, () => {
       results: [{ item: { id: itemId } as never, reason: 'r', interaction: null }],
     })
 
-    const state = await getLuckyState(db, other)
+    const state = await getLuckyState(other)
 
     assert.equal(state.available, true)
     assert.equal(state.pick, null)
@@ -201,7 +201,7 @@ describe("I'm feeling lucky", { skip }, () => {
       lucky: true,
     })
 
-    const state = await getLuckyState(db, empty)
+    const state = await getLuckyState(empty)
 
     assert.equal(state.available, true, 'there is nothing to show for it, so it cannot be today’s pick')
     assert.equal(state.pick, null)
@@ -230,7 +230,7 @@ describe("I'm feeling lucky", { skip }, () => {
       "the day's pick survived a full cap of ordinary runs",
     )
 
-    const state = await getLuckyState(db, busy)
+    const state = await getLuckyState(busy)
     assert.equal(state.pick?.runId, luckyRunId)
   })
 

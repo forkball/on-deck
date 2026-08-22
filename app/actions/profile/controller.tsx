@@ -55,8 +55,10 @@ export default createController(routes.profile, {
 
       const followingCount = await countFollowing(db, auth.identity.id)
       const followersCount = await countFollowers(db, auth.identity.id)
-      const rebuildAllowance = await getProfileRebuildAllowance(db, auth.identity)
-      const lucky = await getLuckyState(db, auth.identity)
+      const [rebuildAllowance, lucky] = await Promise.all([
+        getProfileRebuildAllowance(db, auth.identity),
+        getLuckyState(auth.identity),
+      ])
 
       return context.render(
         <ProfilePage

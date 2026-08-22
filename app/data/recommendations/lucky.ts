@@ -1,4 +1,4 @@
-import { pool, type Db } from '../db.ts'
+import { pool } from '../db.ts'
 import type { MediaType } from '../mediaItems.ts'
 import type { User } from '../schema.ts'
 import { LIMIT_WINDOW_MS } from './dailyLimit.ts'
@@ -94,7 +94,7 @@ async function findLuckyPick(userId: number, since: number): Promise<LuckyPick |
 
 // Admins are exempt from the cap, the same way they are exempt from the run and
 // rebuild caps — see dailyLimit.ts. They still see their latest pick.
-export async function getLuckyState(db: Db, user: User, now: number = Date.now()): Promise<LuckyState> {
+export async function getLuckyState(user: User, now: number = Date.now()): Promise<LuckyState> {
   const pick = await findLuckyPick(user.id, now - LUCKY_WINDOW_MS)
   const available = pick == null || user.is_admin
 

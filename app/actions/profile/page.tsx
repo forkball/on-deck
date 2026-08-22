@@ -256,11 +256,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
 
           {lucky.pick ? (
             <div mix={css({ margin: '24px 0' })}>
-              <LuckyPickCard
-                pick={lucky.pick}
-                returnTo={`${profileHref}?tab=${lucky.pick.mediaType}`}
-                heading={`Today's lucky pick`}
-              />
+              <LuckyPickCard pick={lucky.pick} returnTo={`${profileHref}?tab=${lucky.pick.mediaType}`} />
             </div>
           ) : (
             <p mix={css({ margin: '24px 0', color: '#555' })}>

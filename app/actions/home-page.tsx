@@ -41,11 +41,7 @@ export function HomePage(
                   changes daily and takes no reading. */}
               {lucky?.pick ? (
                 <div mix={css({ margin: "24px 0" })}>
-                  <LuckyPickCard
-                    pick={lucky.pick}
-                    returnTo={homeHref}
-                    heading={"Today's lucky pick"}
-                  />
+                  <LuckyPickCard pick={lucky.pick} returnTo={homeHref} />
                 </div>
               ) : (
                 <p>
