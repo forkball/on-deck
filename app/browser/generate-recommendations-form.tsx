@@ -13,6 +13,8 @@ export type GenerateRecommendationsFormProps = {
   viewerLoggedTypes: string[]
   mediaType: string
   mediaTypeLabel: string
+  // Singular noun for one of them — "movie", "TV show", "book", "game".
+  itemNoun: string
   sources: { value: string; label: string }[]
   genres: string[]
   lengthOptions: { value: string; label: string }[]
@@ -21,6 +23,15 @@ export type GenerateRecommendationsFormProps = {
   platforms: string[]
   seriesTypes: string[]
   generateHref: string
+  // The lucky draw posts this same form to its own action, so the group picked
+  // above carries over and there is no second copy of it to keep in step.
+  luckyHref: string
+  // False once today's draw is spent. The button stays, greyed, so the cap is
+  // visible before it is hit rather than after.
+  luckyAvailable: boolean
+  // How long until the next draw, already phrased ("about 7 hours"). Empty
+  // while one is available.
+  luckyWaitLabel: string
   findPeopleHref: string
 }
 
@@ -49,6 +60,9 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
   import.meta.url,
   function GenerateRecommendationsForm(handle) {
     let submitting = false
+    // Which button was pressed, so only that one says what it is doing. Set on
+    // click and read on submit, which is the order the two fire in.
+    let pressed: 'generate' | 'lucky' = 'generate'
     let mode: 'self' | 'group' = 'self'
     let search = ''
     let page = 1
@@ -56,7 +70,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let decade = ''
     // Tracked rather than left to native <details>: any re-render in this form
     // would otherwise re-close the panel, its open-ness being nowhere in the JSX.
-    let filtersOpen = false
+    let settingsOpen = false
     const selectedSources = new Set<string>([handle.props.mediaType])
     const selectedFriends = new Set<number>()
 
@@ -66,6 +80,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         viewerLoggedTypes,
         mediaType,
         mediaTypeLabel,
+        itemNoun,
         sources,
         genres,
         lengthOptions,
@@ -74,9 +89,13 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         platforms,
         seriesTypes,
         generateHref,
+        luckyHref,
+        luckyAvailable,
+        luckyWaitLabel,
         findPeopleHref,
       } = handle.props
       const hasSource = selectedSources.size > 0
+      const sourcesAreDefault = selectedSources.size === 1 && selectedSources.has(mediaType)
 
       const membersInRun = [
         { label: 'You', loggedTypes: viewerLoggedTypes },
@@ -92,6 +111,12 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
           missing: [...selectedSources].filter((source) => !member.loggedTypes.includes(source)),
         }))
         .filter((entry) => entry.missing.length > 0)
+
+      // A lucky draw reads one taste — the type being generated — and ignores
+      // every lever under Settings, so it needs its own answer to "could this
+      // go anywhere". Unchecking every source blocks the long form, not this.
+      const luckyBlockedBy = membersInRun.filter((member) => !member.loggedTypes.includes(mediaType))
+      const luckyDisabled = submitting || !luckyAvailable || luckyBlockedBy.length > 0
 
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
@@ -248,52 +273,61 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
           <input type="hidden" name="mediaType" value={mediaType} />
 
           <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
-            <p mix={sectionLabel}>Base picks on</p>
-            <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
-              {sources.map((source) => (
-                <label key={source.value}>
-                  <input
-                    type="checkbox"
-                    name="source"
-                    value={source.value}
-                    checked={selectedSources.has(source.value)}
-                    mix={on('change', (event) => {
-                      if ((event.target as HTMLInputElement).checked) selectedSources.add(source.value)
-                      else selectedSources.delete(source.value)
-                      handle.update()
-                    })}
-                  />{' '}
-                  {source.label}
-                </label>
-              ))}
-              {PLACEHOLDER_SOURCES.map((label) => (
-                <label key={label} mix={css({ color: '#aaa' })}>
-                  <input type="checkbox" disabled /> {label}{' '}
-                  <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
-                </label>
-              ))}
-            </div>
-            {hasSource ? (
-              <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
-                You'll still get {mediaTypeLabel} picks — this only changes which taste they're
-                drawn from.
-              </p>
-            ) : (
-              <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#b91c1c' })}>
-                Pick at least one taste to base picks on.
-              </p>
-            )}
-          </div>
-
-          <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
             <details
-              open={filtersOpen}
+              open={settingsOpen}
               mix={on('toggle', (event) => {
-                filtersOpen = (event.target as HTMLDetailsElement).open
+                settingsOpen = (event.target as HTMLDetailsElement).open
                 handle.update()
               })}
             >
-            <summary mix={[sectionLabel, css({ cursor: 'pointer' })]}>Filters (optional)</summary>
+            {/* Named on the summary when it is closed and not what the page
+                implies. Which taste a run reads changes the picks as much as
+                any filter does, and folded away with no sign of it, a run drawn
+                from something else would look like a bug. */}
+            <summary mix={[sectionLabel, css({ cursor: 'pointer' })]}>
+              Settings (optional)
+              {!settingsOpen && hasSource && !sourcesAreDefault && (
+                <span mix={css({ textTransform: 'none', letterSpacing: 0, fontWeight: 400 })}>
+                  {' '}
+                  — based on {[...selectedSources].map(sourceLabel).join(', ')}
+                </span>
+              )}
+            </summary>
+
+            <div mix={css({ marginTop: '12px', marginBottom: '16px' })}>
+              <p mix={sectionLabel}>Base picks on</p>
+              <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
+                {sources.map((source) => (
+                  <label key={source.value}>
+                    <input
+                      type="checkbox"
+                      name="source"
+                      value={source.value}
+                      checked={selectedSources.has(source.value)}
+                      mix={on('change', (event) => {
+                        if ((event.target as HTMLInputElement).checked) selectedSources.add(source.value)
+                        else selectedSources.delete(source.value)
+                        handle.update()
+                      })}
+                    />{' '}
+                    {source.label}
+                  </label>
+                ))}
+                {PLACEHOLDER_SOURCES.map((label) => (
+                  <label key={label} mix={css({ color: '#aaa' })}>
+                    <input type="checkbox" disabled /> {label}{' '}
+                    <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
+                  </label>
+                ))}
+              </div>
+              {hasSource && (
+                <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
+                  You'll still get {mediaTypeLabel} picks — this only changes which taste they're
+                  drawn from.
+                </p>
+              )}
+            </div>
+
             <div
               mix={css({
                 display: 'grid',
@@ -404,8 +438,17 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             </details>
           </div>
 
+          {/* Both of these used to sit inside the sources block. They report on
+              a setting that is now folded away, so they have to be where the
+              button they are blocking is. */}
+          {!hasSource && (
+            <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
+              Pick at least one taste to base picks on, under Settings.
+            </p>
+          )}
+
           {blockedBy.length > 0 && (
-            <p mix={css({ margin: '0 0 12px', fontSize: '13px', color: '#b91c1c' })}>
+            <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
               {blockedBy
                 .map(
                   (entry) =>
@@ -417,9 +460,43 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             </p>
           )}
 
-          <button type="submit" disabled={submitting || !hasSource || blockedBy.length > 0}>
-            {submitting ? 'Starting…' : 'Get recommendations'}
-          </button>
+          <div mix={css({ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' })}>
+            <button
+              type="submit"
+              disabled={submitting || !hasSource || blockedBy.length > 0}
+              mix={on('click', () => {
+                pressed = 'generate'
+              })}
+            >
+              {submitting && pressed === 'generate' ? 'Starting…' : 'Get recommendations'}
+            </button>
+
+            {/* Same form, different action: formaction sends everything above
+                to the lucky endpoint, which reads only who is in the run and
+                ignores the rest. That is what keeps one group picker on the
+                page instead of two that can disagree. */}
+            <button
+              type="submit"
+              formaction={luckyHref}
+              disabled={luckyDisabled}
+              mix={on('click', () => {
+                pressed = 'lucky'
+              })}
+            >
+              {submitting && pressed === 'lucky' ? 'Drawing…' : `🎲 I'm feeling lucky`}
+            </button>
+          </div>
+
+          <p mix={css({ margin: 0, fontSize: '12px', color: '#888' })}>
+            {!luckyAvailable
+              ? `Today's lucky pick is drawn — another one in ${luckyWaitLabel}. It's below, under Past recommendations.`
+              : luckyBlockedBy.length > 0
+                ? `Feeling lucky needs everyone in the run to have ${mediaTypeLabel} logged — ` +
+                  `${luckyBlockedBy.map((member) => member.label).join(', ')} ` +
+                  `${luckyBlockedBy.length === 1 && luckyBlockedBy[0].label === 'You' ? 'have' : 'has'} none.`
+                : `Feeling lucky draws one ${itemNoun} nobody in the run has logged. It ignores everything ` +
+                  `above — no settings, no filters — and you get one a day.`}
+          </p>
         </form>
       )
     }

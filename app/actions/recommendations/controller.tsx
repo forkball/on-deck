@@ -274,9 +274,12 @@ export default createController(routes.recommendations, {
     },
 
     // One pick, no levers, once a day. Deliberately short next to `generate`:
-    // there is nothing to parse but the medium and who's in the draw, and that
-    // is the feature — everything the long form asks about is answered by not
+    // there is nothing to read but the medium and who's in the draw, and that is
+    // the feature — everything the long form asks about is answered by not
     // asking.
+    //
+    // It is posted from the same form, via formaction, so the whole of it
+    // arrives here. Everything but those two fields is ignored on purpose.
     async lucky(context) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
@@ -288,14 +291,22 @@ export default createController(routes.recommendations, {
         parseEnabledMediaType(formData.get('mediaType')) ?? getRememberedMediaType(context)
       context.get(Session).set('mediaType', mediaType)
 
-      // Narrowed to people this account actually follows. The picker only offers
-      // those, so this costs nothing in the normal case — it stops a hand-posted
-      // id pulling a stranger's taste into a run and notifying them about it.
+      // `mode` decides whether the checkboxes count at all, the same way it does
+      // in `generate`: the shared form keeps every friend checkbox mounted and
+      // only hides them, so a selection made and then switched away from is
+      // still in the request.
+      //
+      // What survives that is narrowed to people this account actually follows.
+      // The picker only offers those, so it costs nothing in the normal case —
+      // it stops a hand-posted id pulling a stranger's taste into a run and
+      // notifying them about it.
       const requested = new Set(
-        formData
-          .getAll('friend_ids')
-          .map((value) => Number(value))
-          .filter((id) => Number.isInteger(id)),
+        formData.get('mode') === 'group'
+          ? formData
+              .getAll('friend_ids')
+              .map((value) => Number(value))
+              .filter((id) => Number.isInteger(id))
+          : [],
       )
       const friendIds =
         requested.size === 0

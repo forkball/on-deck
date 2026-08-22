@@ -2,9 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { GenerateRecommendationsForm } from '../../browser/generate-recommendations-form.tsx'
-import { LuckyButton } from '../../browser/lucky-button.tsx'
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
-import { LuckyPickCard } from '../../ui/components/lucky-pick-card.tsx'
 import { timeUntil, type DailyRunAllowance, type DailyRunsUsed } from '../../data/recommendations/dailyLimit.ts'
 import type { LuckyState } from '../../data/recommendations/lucky.ts'
 import { MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations/runs.ts'
@@ -35,7 +33,9 @@ export interface RecommendationsPageProps {
   // How much of the daily cap is left. Nothing is rendered for admins, who
   // aren't capped — see data/recommendations/dailyLimit.ts.
   dailyRuns: DailyRunAllowance
-  // Today's one-click pick: whether one can be drawn, and the one already drawn.
+  // Whether today's one-click draw is still available. The pick it produced is
+  // not shown again up here — it is in the run list at the bottom, marked, and
+  // the landing page and profile lead with it.
   lucky: LuckyState
   error?: string
   // Set when the request matched an earlier run the user hasn't taken
@@ -207,33 +207,6 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             </p>
           )}
 
-          {/* Above the form on purpose: it is the fast path past it. */}
-          {lucky.pick && (
-            <div mix={css({ marginBottom: '16px' })}>
-              <LuckyPickCard
-                pick={lucky.pick}
-                returnTo={recsHref}
-                heading={`Today's lucky pick`}
-              />
-            </div>
-          )}
-
-          <LuckyButton
-            luckyHref={routes.recommendations.lucky.href()}
-            mediaType={mediaType}
-            mediaTypeLabel={ui.attributive}
-            itemNoun={ui.singular}
-            friends={friends.map((friend) => ({
-              id: friend.id,
-              label: displayLabel(friend),
-              hasLogged: (loggedTypes[friend.id] ?? []).includes(mediaType),
-            }))}
-            viewerHasLogged={viewerLoggedTypes.includes(mediaType)}
-            available={lucky.available}
-            waitLabel={lucky.nextAt == null ? '' : `about ${timeUntil(lucky.nextAt)}`}
-            findPeopleHref={routes.users.search.href()}
-          />
-
           {!dailyRuns.unlimited && <DailyRunsNote dailyRuns={dailyRuns} />}
 
           <GenerateRecommendationsForm
@@ -245,6 +218,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             viewerLoggedTypes={viewerLoggedTypes}
             mediaType={mediaType}
             mediaTypeLabel={ui.attributive}
+            itemNoun={ui.singular}
             sources={enabledMediaTypes().map((type) => ({
               value: type,
               label: `${MEDIA_TYPE_UI[type].attributive} taste`,
@@ -256,6 +230,9 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             platforms={platforms}
             seriesTypes={seriesTypes}
             generateHref={routes.recommendations.generate.href()}
+            luckyHref={routes.recommendations.lucky.href()}
+            luckyAvailable={lucky.available}
+            luckyWaitLabel={lucky.nextAt == null ? '' : `about ${timeUntil(lucky.nextAt)}`}
             findPeopleHref={routes.users.search.href()}
           />
 
