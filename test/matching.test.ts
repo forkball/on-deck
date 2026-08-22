@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { applyVerdicts, matchesDecade, titlesLikelyMatch, type Candidate } from '../app/data/recommendations/matching.ts'
+import {
+  applyVerdicts,
+  filterByLength,
+  matchesDecade,
+  titlesLikelyMatch,
+  withOverviews,
+  type Candidate,
+  type CatalogLookup,
+} from '../app/data/recommendations/matching.ts'
 
 describe('titlesLikelyMatch', () => {
   it('accepts the same title', () => {
@@ -108,5 +116,108 @@ describe('applyVerdicts', () => {
 
   it('returns nothing for no candidates', () => {
     assert.deepEqual(applyVerdicts([], []), [])
+  })
+})
+
+// A book candidate as the pipeline holds one: a search hit that may or may not
+// have carried its page count, plus the id a by-id lookup would be asked about.
+const book = (title: string, externalId: string, pageCount: number | null): Candidate =>
+  ({ pick: { title, year: 2000, reason: '' }, match: { title, externalId, pageCount } }) as unknown as Candidate
+
+const detail = (externalId: string, pageCount: number) =>
+  ({ title: externalId, externalId, pageCount }) as unknown as Awaited<ReturnType<CatalogLookup>>
+
+describe('filterByLength', () => {
+  it('reads the dimension off the search hit without paying for a lookup', async () => {
+    const asked: string[] = []
+    const kept = await filterByLength(
+      [book('short one', 'A', 100), book('long one', 'B', 900)],
+      'book',
+      'short',
+      async (_type, externalId) => {
+        asked.push(externalId)
+        return null
+      },
+    )
+
+    assert.deepEqual(kept.map((c) => c.pick.title), ['short one'])
+    assert.deepEqual(asked, [])
+  })
+
+  it('looks up only the candidates whose hit lacked the dimension', async () => {
+    const asked: string[] = []
+    const kept = await filterByLength(
+      [book('known', 'A', 100), book('unknown', 'B', null)],
+      'book',
+      'short',
+      async (_type, externalId) => {
+        asked.push(externalId)
+        return detail(externalId, 120)
+      },
+    )
+
+    assert.deepEqual(asked, ['B'])
+    assert.deepEqual(kept.map((c) => c.pick.title), ['known', 'unknown'])
+  })
+
+  // The bug this exists for: Google Books answers 429 once the day's quota is
+  // gone, and a book row imported through the Open Library fallback carries an
+  // id it will never resolve. Either threw straight out of the run. Every
+  // lookup failing is only the catalog's fault when nothing else survived it.
+  it('drops a candidate the provider throws on instead of failing the run', async () => {
+    const kept = await filterByLength(
+      [book('known', 'A', 100), book('unlookupable', 'B', null)],
+      'book',
+      'short',
+      async (_type, externalId) => {
+        if (externalId === 'B') throw new Error('Google Books lookup failed: 429')
+        return null
+      },
+    )
+
+    assert.deepEqual(kept.map((c) => c.pick.title), ['known'])
+  })
+
+  it('says the catalog is down rather than saving an empty run', async () => {
+    await assert.rejects(
+      filterByLength([book('unlookupable', 'B', null)], 'book', 'short', async () => {
+        throw new Error('Google Books lookup failed: 429')
+      }),
+      /catalog isn't answering/,
+    )
+  })
+
+  it('keeps a candidate whose lookup answered, even when a sibling lookup threw', async () => {
+    const kept = await filterByLength(
+      [book('answered', 'A', null), book('threw', 'B', null)],
+      'book',
+      'short',
+      async (_type, externalId) => {
+        if (externalId === 'B') throw new Error('Google Books lookup failed: 429')
+        return detail(externalId, 100)
+      },
+    )
+
+    assert.deepEqual(kept.map((c) => c.pick.title), ['answered'])
+  })
+})
+
+describe('withOverviews', () => {
+  it('leaves a candidate as it found it when the lookup throws', async () => {
+    const candidates = [book('no overview', 'A', 100)]
+    const returned = await withOverviews(candidates, 'book', async () => {
+      throw new Error('Google Books lookup failed: 429')
+    })
+
+    assert.equal(returned.length, 1)
+    assert.equal(returned[0].match.overview, undefined)
+  })
+
+  it('fills in the overview the lookup did return', async () => {
+    const candidates = [book('no overview', 'A', 100)]
+    const returned = await withOverviews(candidates, 'book', async () =>
+      ({ overview: 'a plot' }) as unknown as Awaited<ReturnType<CatalogLookup>>)
+
+    assert.equal(returned[0].match.overview, 'a plot')
   })
 })

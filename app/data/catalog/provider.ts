@@ -220,8 +220,13 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
   return imported
 }
 
+// sourceOverride wins when set, exactly as in searchAndImport: a fallback hit
+// carries an id from a different provider, and filing it under the registered
+// one makes a row its own provider can never resolve — the later by-id lookup
+// (an overview, a page count) asks Google Books about an Open Library work key
+// and gets nothing back for the life of the row.
 export async function upsertCatalogItem(db: Db, type: MediaType, result: CatalogSearchResult): Promise<MediaItem> {
-  return upsertMediaItem(db, type, result, getCatalogProvider(type).sourceName, true)
+  return upsertMediaItem(db, type, result, result.sourceOverride ?? getCatalogProvider(type).sourceName, true)
 }
 
 // Off the response path — the page renders fine without the credit line, which
