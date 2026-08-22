@@ -7,15 +7,18 @@ import { routes } from '../../routes.ts'
 
 export interface RunListProps {
   runs: RecommendationRunSummary[]
-  // Off by default, because the recommendations index is already filtered to
-  // one type and a badge on every row there would say the same word twice. The
-  // home page mixes all four, where the type is the thing telling them apart.
-  showMediaType?: boolean
+  // 'list' is a full-width row: everything on one line, the way the
+  // recommendations index has always shown a run. 'panel' is the same rows in a
+  // column narrow enough that they have to stack, which is also where the media
+  // type earns a place — the index is filtered to one type and would say the
+  // same word on every row.
+  variant?: 'list' | 'panel'
 }
 
 export function RunList(handle: Handle<RunListProps>) {
   return () => {
-    const { runs, showMediaType = false } = handle.props
+    const { runs, variant = 'list' } = handle.props
+    const panel = variant === 'panel'
 
     return (
       <ul
@@ -25,7 +28,7 @@ export function RunList(handle: Handle<RunListProps>) {
           padding: 0,
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
+          gap: panel ? '8px' : '12px',
         })}
       >
         {runs.map((run) => {
@@ -34,6 +37,37 @@ export function RunList(handle: Handle<RunListProps>) {
             month: 'short',
             day: 'numeric',
           })
+
+          if (panel) {
+            return (
+              <li
+                key={run.id}
+                mix={css({
+                  // Flex for the same reason the row below is: DoodleCSS puts a
+                  // "* " marker on `.doodle ul li`, whose specificity beats
+                  // anything stated here — but a list item that isn't
+                  // display: list-item has no marker box to put it in.
+                  display: 'flex',
+                  flexDirection: 'column',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                })}
+              >
+                <a href={routes.recommendations.show.href({ runId: String(run.id) })}>
+                  {run.isLucky && '🎲 '}
+                  <strong>{run.name || date}</strong>
+                </a>
+                {/* The line the row was too narrow to keep: whatever the link
+                    above didn't already say. */}
+                <p mix={css({ margin: '2px 0 0', fontSize: '12px', color: '#888' })}>
+                  {run.name ? `${date} — ` : ''}
+                  {run.groupLabel} · {mediaTypeUiFor(run.mediaType).tabLabel}
+                </p>
+              </li>
+            )
+          }
+
           return (
             <li
               key={run.id}
@@ -48,6 +82,7 @@ export function RunList(handle: Handle<RunListProps>) {
               })}
             >
               <a href={routes.recommendations.show.href({ runId: String(run.id) })}>
+                {run.isLucky && '🎲 '}
                 {run.name ? (
                   <>
                     <strong>{run.name}</strong> — {date}
@@ -58,11 +93,6 @@ export function RunList(handle: Handle<RunListProps>) {
                   </>
                 )}
               </a>
-              {showMediaType && (
-                <span mix={css({ flex: '0 0 auto', fontSize: '12px', color: '#888' })}>
-                  {mediaTypeUiFor(run.mediaType).tabLabel}
-                </span>
-              )}
             </li>
           )
         })}

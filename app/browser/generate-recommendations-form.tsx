@@ -13,6 +13,8 @@ export type GenerateRecommendationsFormProps = {
   viewerLoggedTypes: string[]
   mediaType: string
   mediaTypeLabel: string
+  // Singular noun for one of them — "movie", "TV show", "book", "game".
+  itemNoun: string
   sources: { value: string; label: string }[]
   genres: string[]
   lengthOptions: { value: string; label: string }[]
@@ -20,7 +22,21 @@ export type GenerateRecommendationsFormProps = {
   multiplayerTypes: string[]
   platforms: string[]
   seriesTypes: string[]
+  // How many picks a full run comes back with, so the two buttons can say what
+  // they each produce. Passed in from the pipeline's own constant.
+  shortlistCount: number
+  // "3 of 5 runs left today", already phrased. Empty for an account with no cap.
+  runsLeftLabel: string
   generateHref: string
+  // The lucky draw posts this same form to its own action, so the group picked
+  // above carries over and there is no second copy of it to keep in step.
+  luckyHref: string
+  // False once today's draw is spent. The button stays, greyed, so the cap is
+  // visible before it is hit rather than after.
+  luckyAvailable: boolean
+  // How long until the next draw, already phrased ("about 7 hours"). Empty
+  // while one is available.
+  luckyWaitLabel: string
   findPeopleHref: string
 }
 
@@ -49,6 +65,11 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
   import.meta.url,
   function GenerateRecommendationsForm(handle) {
     let submitting = false
+    // Which of the two runs this form is currently set up to make. It picks the
+    // action the form posts to and decides which of the fields below apply —
+    // `mode` below is a different question (who the run is for), and keeps its
+    // name because that one is a field the server reads.
+    let runKind: 'shortlist' | 'lucky' = 'shortlist'
     let mode: 'self' | 'group' = 'self'
     let search = ''
     let page = 1
@@ -56,7 +77,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let decade = ''
     // Tracked rather than left to native <details>: any re-render in this form
     // would otherwise re-close the panel, its open-ness being nowhere in the JSX.
-    let filtersOpen = false
+    let settingsOpen = false
     const selectedSources = new Set<string>([handle.props.mediaType])
     const selectedFriends = new Set<number>()
 
@@ -66,6 +87,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         viewerLoggedTypes,
         mediaType,
         mediaTypeLabel,
+        itemNoun,
         sources,
         genres,
         lengthOptions,
@@ -73,10 +95,16 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         multiplayerTypes,
         platforms,
         seriesTypes,
+        shortlistCount,
+        runsLeftLabel,
         generateHref,
+        luckyHref,
+        luckyAvailable,
+        luckyWaitLabel,
         findPeopleHref,
       } = handle.props
       const hasSource = selectedSources.size > 0
+      const sourcesAreDefault = selectedSources.size === 1 && selectedSources.has(mediaType)
 
       const membersInRun = [
         { label: 'You', loggedTypes: viewerLoggedTypes },
@@ -93,12 +121,30 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         }))
         .filter((entry) => entry.missing.length > 0)
 
+      // A lucky draw reads one taste — the type being generated — and ignores
+      // every lever under Settings, so it needs its own answer to "could this
+      // go anywhere". Unchecking every source blocks a shortlist, not this.
+      // `isLucky` already implies the draw is available — the radio for it is
+      // disabled when it isn't — so only the per-kind rule is left to check.
+      const isLucky = runKind === 'lucky'
+      const luckyBlockedBy = membersInRun.filter((member) => !member.loggedTypes.includes(mediaType))
+      const disabled =
+        submitting || (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
+
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
       const totalPages = Math.max(1, Math.ceil(filtered.length / FRIENDS_PAGE_SIZE))
       if (page > totalPages) page = totalPages
       const start = (page - 1) * FRIENDS_PAGE_SIZE
       const visibleIds = new Set(filtered.slice(start, start + FRIENDS_PAGE_SIZE).map((friend) => friend.id))
+
+      const caption = css({ margin: '10px 0 0', fontSize: '12px', color: '#888', lineHeight: 1.4 })
+
+      // Only ever one field's worth of it on screen, so a field that does not
+      // apply to the run being made is hidden rather than dropped: unmounting
+      // would lose a typed name, a chosen genre and the panel's open state
+      // every time someone looked at the other kind of run.
+      const onlyForShortlist = css({ display: isLucky ? 'none' : 'block' })
 
       const sectionLabel = css({
         margin: '0 0 10px',
@@ -112,7 +158,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       return (
         <form
           method="post"
-          action={generateHref}
+          action={isLucky ? luckyHref : generateHref}
           mix={[
             css({
               display: 'flex',
@@ -129,9 +175,66 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             }),
           ]}
         >
-          <Field label="Name this run (optional)">
-            <input type="text" name="name" placeholder="e.g. Cozy weekend picks" />
-          </Field>
+          {/* The first question, because it decides which of the rest apply.
+              `run_kind` is not read by either action — the form posts to a
+              different one for each — it is here so the two radios group. */}
+          <div>
+            <p mix={sectionLabel}>What are you after?</p>
+            <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
+              <label>
+                <input
+                  type="radio"
+                  name="run_kind"
+                  value="shortlist"
+                  defaultChecked
+                  mix={on('change', () => {
+                    runKind = 'shortlist'
+                    handle.update()
+                  })}
+                />{' '}
+                A shortlist
+              </label>
+              <label mix={css({ color: luckyAvailable ? 'inherit' : '#888' })}>
+                <input
+                  type="radio"
+                  name="run_kind"
+                  value="lucky"
+                  disabled={!luckyAvailable}
+                  mix={on('change', () => {
+                    runKind = 'lucky'
+                    handle.update()
+                  })}
+                />{' '}
+                Today's lucky pick
+              </label>
+            </div>
+
+            {/* One line, for the one that is selected. Two captions side by side
+                is what this replaced: on a narrow screen they stacked into a
+                wall of grey and stopped reading as a comparison at all. */}
+            <p mix={caption}>
+              {isLucky
+                ? `One ${itemNoun}, and never one anyone in the run has logged — down to a want-to. ` +
+                  `Costs no run, and you get one a day.`
+                : `Up to ${shortlistCount} picks to choose from, minus what most of you have already ` +
+                  `finished.${runsLeftLabel ? ` ${runsLeftLabel}.` : ''}`}
+            </p>
+
+            {/* Only ever alongside the shortlist caption: the option above is
+                disabled once the draw is spent, so it cannot be the selected
+                one and have this to say. */}
+            {!luckyAvailable && (
+              <p mix={caption}>
+                Today's lucky pick is already drawn — another in {luckyWaitLabel}.
+              </p>
+            )}
+          </div>
+
+          <div mix={onlyForShortlist}>
+            <Field label="Name this run (optional)">
+              <input type="text" name="name" placeholder="e.g. Cozy weekend picks" />
+            </Field>
+          </div>
 
           <div>
             <p mix={sectionLabel}>Who's this for?</p>
@@ -247,53 +350,64 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
           <input type="hidden" name="mediaType" value={mediaType} />
 
-          <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
-            <p mix={sectionLabel}>Base picks on</p>
-            <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
-              {sources.map((source) => (
-                <label key={source.value}>
-                  <input
-                    type="checkbox"
-                    name="source"
-                    value={source.value}
-                    checked={selectedSources.has(source.value)}
-                    mix={on('change', (event) => {
-                      if ((event.target as HTMLInputElement).checked) selectedSources.add(source.value)
-                      else selectedSources.delete(source.value)
-                      handle.update()
-                    })}
-                  />{' '}
-                  {source.label}
-                </label>
-              ))}
-              {PLACEHOLDER_SOURCES.map((label) => (
-                <label key={label} mix={css({ color: '#aaa' })}>
-                  <input type="checkbox" disabled /> {label}{' '}
-                  <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
-                </label>
-              ))}
-            </div>
-            {hasSource ? (
-              <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
-                You'll still get {mediaTypeLabel} picks — this only changes which taste they're
-                drawn from.
-              </p>
-            ) : (
-              <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#b91c1c' })}>
-                Pick at least one taste to base picks on.
-              </p>
-            )}
-          </div>
-
-          <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
+          <div
+            mix={[css({ borderTop: '1px solid #eee', paddingTop: '16px' }), onlyForShortlist]}
+          >
             <details
-              open={filtersOpen}
+              open={settingsOpen}
               mix={on('toggle', (event) => {
-                filtersOpen = (event.target as HTMLDetailsElement).open
+                settingsOpen = (event.target as HTMLDetailsElement).open
                 handle.update()
               })}
             >
-            <summary mix={[sectionLabel, css({ cursor: 'pointer' })]}>Filters (optional)</summary>
+            {/* Named on the summary when it is closed and not what the page
+                implies. Which taste a run reads changes the picks as much as
+                any filter does, and folded away with no sign of it, a run drawn
+                from something else would look like a bug. */}
+            <summary mix={[sectionLabel, css({ cursor: 'pointer' })]}>
+              Settings (optional)
+              {!settingsOpen && hasSource && !sourcesAreDefault && (
+                <span mix={css({ textTransform: 'none', letterSpacing: 0, fontWeight: 400 })}>
+                  {' '}
+                  — based on {[...selectedSources].map(sourceLabel).join(', ')}
+                </span>
+              )}
+            </summary>
+
+            <div mix={css({ marginTop: '12px', marginBottom: '16px' })}>
+              <p mix={sectionLabel}>Base picks on</p>
+              <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
+                {sources.map((source) => (
+                  <label key={source.value}>
+                    <input
+                      type="checkbox"
+                      name="source"
+                      value={source.value}
+                      checked={selectedSources.has(source.value)}
+                      mix={on('change', (event) => {
+                        if ((event.target as HTMLInputElement).checked) selectedSources.add(source.value)
+                        else selectedSources.delete(source.value)
+                        handle.update()
+                      })}
+                    />{' '}
+                    {source.label}
+                  </label>
+                ))}
+                {PLACEHOLDER_SOURCES.map((label) => (
+                  <label key={label} mix={css({ color: '#aaa' })}>
+                    <input type="checkbox" disabled /> {label}{' '}
+                    <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
+                  </label>
+                ))}
+              </div>
+              {hasSource && (
+                <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
+                  You'll still get {mediaTypeLabel} picks — this only changes which taste they're
+                  drawn from.
+                </p>
+              )}
+            </div>
+
             <div
               mix={css({
                 display: 'grid',
@@ -404,21 +518,48 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             </details>
           </div>
 
-          {blockedBy.length > 0 && (
-            <p mix={css({ margin: '0 0 12px', fontSize: '13px', color: '#b91c1c' })}>
-              {blockedBy
-                .map(
-                  (entry) =>
-                    `${entry.label} ${entry.label === 'You' ? 'have' : 'has'} nothing logged under ` +
-                    `${entry.missing.map(sourceLabel).join(' or ')}`,
-                )
-                .join(', and ')}
-              . Everyone in the run needs something logged for each taste it reads.
-            </p>
-          )}
+          {/* Whichever rule the run being made actually has to clear. Both used
+              to live inside the sources block, which is folded away — and one of
+              them is about a setting a lucky draw never reads. */}
+          {isLucky
+            ? luckyBlockedBy.length > 0 && (
+                <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
+                  {luckyBlockedBy.map((member) => member.label).join(', ')}{' '}
+                  {luckyBlockedBy.length === 1 && luckyBlockedBy[0].label === 'You' ? 'have' : 'has'}{' '}
+                  nothing {mediaTypeLabel} logged to draw from.
+                </p>
+              )
+            : (!hasSource || blockedBy.length > 0) && (
+                <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
+                  {!hasSource
+                    ? 'Pick at least one taste to base picks on, under Settings.'
+                    : blockedBy
+                        .map(
+                          (entry) =>
+                            `${entry.label} ${entry.label === 'You' ? 'have' : 'has'} nothing logged under ` +
+                            `${entry.missing.map(sourceLabel).join(' or ')}`,
+                        )
+                        .join(', and ') +
+                      '. Everyone in the run needs something logged for each taste it reads.'}
+                </p>
+              )}
 
-          <button type="submit" disabled={submitting || !hasSource || blockedBy.length > 0}>
-            {submitting ? 'Starting…' : 'Get recommendations'}
+          {/* One button, because there is one thing to press: the choice it
+              makes was made at the top of the form. minHeight rather than
+              padding — app.css sets the padding unlayered, where a rule from
+              here cannot reach it — which also gives it a thumb-sized target. */}
+          <button
+            type="submit"
+            disabled={disabled}
+            mix={css({ minHeight: '44px', width: '100%' })}
+          >
+            {submitting
+              ? isLucky
+                ? 'Drawing…'
+                : 'Starting…'
+              : isLucky
+                ? `🎲 Draw today's pick`
+                : 'Get recommendations'}
           </button>
         </form>
       )

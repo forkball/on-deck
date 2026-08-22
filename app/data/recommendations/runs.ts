@@ -21,6 +21,11 @@ import type { RunTimings } from './timings.ts'
 
 export const MAX_RUNS_PER_USER = 3
 
+// Lucky runs are capped the same way, but counted separately — see pruneOldRuns.
+// Three days of them is enough to keep a link someone was sent still resolving,
+// which is all the history a once-a-day pick needs.
+export const MAX_LUCKY_RUNS_PER_USER = 3
+
 export interface RecommendationResult {
   item: MediaItem
   reason: string
@@ -35,6 +40,9 @@ export interface RecommendationRunSummary {
   groupLabel: string
   mediaType: MediaType
   name: string | null
+  // An "I'm feeling lucky" run — one pick, no filters, once a day. Kept and
+  // pruned on its own track, so an ordinary run can never evict today's pick.
+  isLucky: boolean
 }
 
 // sourceTypes always has at least one entry — see parseParams.
@@ -110,8 +118,11 @@ export async function findUnusedDuplicateRun(
 ): Promise<UnusedDuplicateRun | null> {
   const wanted = paramsKey(filters, sourceTypes.length > 0 ? sourceTypes : [mediaType], memberIds)
 
+  // Lucky runs are excluded: they carry no filters, so every one of them keys
+  // the same as an unfiltered solo run and would have the notice offering
+  // yesterday's single pick as "a recommendation like this".
   const runs = await db.findMany(recommendationRuns, {
-    where: { user_id: userId, media_type: mediaType },
+    where: { user_id: userId, media_type: mediaType, is_lucky: false },
     orderBy: ['created_at', 'desc'],
   })
 
@@ -207,6 +218,7 @@ export interface SaveRunInput {
   name?: string
   params: GenerationParams
   results: RecommendationResult[]
+  lucky?: boolean
 }
 
 export async function saveRun(db: Db, input: SaveRunInput): Promise<number> {
@@ -218,6 +230,7 @@ export async function saveRun(db: Db, input: SaveRunInput): Promise<number> {
       created_at: Date.now(),
       name: input.name?.trim() || undefined,
       params: JSON.stringify(input.params),
+      is_lucky: input.lucky === true,
     },
     { returnRow: true },
   )
@@ -243,15 +256,26 @@ export async function saveRunTimings(db: Db, runId: number, timings: RunTimings)
   await db.updateMany(recommendationRuns, { timings: JSON.stringify(timings) }, { where: { id: runId } })
 }
 
-// Scoped to one media type, so a TV run never prunes an older movie run.
-export async function pruneOldRuns(db: Db, userId: number, mediaType: MediaType): Promise<boolean> {
+// Scoped to one media type, so a TV run never prunes an older movie run — and
+// to one track, so an ordinary run never prunes a lucky one. The second scope is
+// what lets the landing page rely on today's lucky pick still being there:
+// without it, three ordinary movie runs would evict it before the day was out.
+export async function pruneOldRuns(
+  db: Db,
+  userId: number,
+  mediaType: MediaType,
+  options: { lucky?: boolean } = {},
+): Promise<boolean> {
+  const lucky = options.lucky === true
+  const keep = lucky ? MAX_LUCKY_RUNS_PER_USER : MAX_RUNS_PER_USER
+
   const runs = await db.findMany(recommendationRuns, {
-    where: { user_id: userId, media_type: mediaType },
+    where: { user_id: userId, media_type: mediaType, is_lucky: lucky },
     orderBy: ['created_at', 'asc'],
   })
-  if (runs.length <= MAX_RUNS_PER_USER) return false
+  if (runs.length <= keep) return false
 
-  const excess = runs.slice(0, runs.length - MAX_RUNS_PER_USER)
+  const excess = runs.slice(0, runs.length - keep)
   await db.deleteMany(recommendationRuns, { where: inList('id', excess.map((run) => run.id)) })
   return true
 }
@@ -278,6 +302,7 @@ export async function listRecommendationRuns(
     groupLabel: groupLabelFrom(labels.get(run.id) ?? []),
     mediaType: run.media_type,
     name: run.name,
+    isLucky: run.is_lucky,
   }))
 }
 
@@ -318,6 +343,7 @@ export async function listRecommendationRunsFromOthers(
     groupLabel: groupLabelFrom(labels.get(run.id) ?? []),
     mediaType: run.media_type,
     name: run.name,
+    isLucky: run.is_lucky,
   }))
 }
 
@@ -349,6 +375,7 @@ export async function getRecommendationRun(
       groupLabel,
       mediaType: run.media_type,
       name: run.name,
+      isLucky: run.is_lucky,
       otherMemberLabels,
       results: [],
       params,
@@ -384,6 +411,7 @@ export async function getRecommendationRun(
     groupLabel,
     mediaType: run.media_type,
     name: run.name,
+    isLucky: run.is_lucky,
     otherMemberLabels,
     results,
     params,

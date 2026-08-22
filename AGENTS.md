@@ -66,10 +66,15 @@ does nothing on its own.
     confidence, conflicts, duplicates, counts — and are free of the database so
     they can be tested directly
   - `app/data/recommendations/` — the generation pipeline: `picks` asks the model,
-    `matching` resolves picks to catalog entries, `runs` persists them, `generate`
-    orchestrates those three, `jobs`/`worker` run it in the background,
-    `dailyLimit` caps how many runs one account can generate in 24 hours
-    (`users.is_admin` is exempt — granted only by `scripts/set-admin.ts`)
+    `matching` resolves picks to catalog entries, `exclusions` decides what a run
+    may not suggest (database-free, so the rule can be tested directly), `runs`
+    persists them, `generate` orchestrates those, `jobs`/`worker` run it in the
+    background, `dailyLimit` caps how many runs one account can generate in 24
+    hours (`users.is_admin` is exempt — granted only by `scripts/set-admin.ts`),
+    and `lucky` holds the once-a-day one-pick draw. A lucky run is an ordinary
+    run with `recommendation_runs.is_lucky` set: same queue, same stages, one
+    result, a stricter exclusion rule, and its own cap — the run row itself is
+    the record that the day's pick has been drawn
 - `db/` holds migrations, `public/` static files served from the app root
 
 ## Route Ownership

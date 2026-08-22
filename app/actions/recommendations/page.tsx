@@ -3,7 +3,9 @@ import { css } from 'remix/ui'
 
 import { GenerateRecommendationsForm } from '../../browser/generate-recommendations-form.tsx'
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
-import { timeUntil, type DailyRunAllowance, type DailyRunsUsed } from '../../data/recommendations/dailyLimit.ts'
+import { timeUntil, type DailyRunAllowance } from '../../data/recommendations/dailyLimit.ts'
+import { TARGET_COUNT } from '../../data/recommendations/generate.ts'
+import type { LuckyState } from '../../data/recommendations/lucky.ts'
 import { MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations/runs.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
@@ -33,6 +35,10 @@ export interface RecommendationsPageProps {
   // How much of the daily cap is left. Nothing is rendered for admins, who
   // aren't capped — see data/recommendations/dailyLimit.ts.
   dailyRuns: DailyRunAllowance
+  // Whether today's one-click draw is still available. The pick it produced is
+  // not shown again up here — it is in the run list at the bottom, marked, and
+  // the landing page and profile lead with it.
+  lucky: LuckyState
   error?: string
   // Set when the request matched an earlier run the user hasn't taken
   // anything from — see DuplicateNotice.
@@ -86,22 +92,18 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
 }
 
 // Counted per person rather than per media type: a run costs the same whatever
-// it is a run of. Rendered even when there is plenty left, so running out is
-// never the first time someone hears there's a cap.
-function DailyRunsNote(handle: Handle<{ dailyRuns: DailyRunsUsed }>) {
-  return () => {
-    const { remaining, limit, resetsAt } = handle.props.dailyRuns
+// it is a run of. Said even when there is plenty left, so running out is never
+// the first time someone hears there's a cap — and said under the button that
+// spends one, which is the other half of what separates it from a lucky draw.
+// Empty for an account with no cap.
+function runsLeftLabel(dailyRuns: DailyRunAllowance): string {
+  if (dailyRuns.unlimited) return ''
 
-    return (
-      <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
-        {remaining > 0
-          ? `${remaining} of ${limit} recommendation runs left today.`
-          : resetsAt == null
-            ? `No recommendation runs left today.`
-            : `No recommendation runs left today — the next one frees up in about ${timeUntil(resetsAt)}.`}
-      </p>
-    )
-  }
+  const { remaining, limit, resetsAt } = dailyRuns
+  if (remaining > 0) return `${remaining} of ${limit} runs left today`
+  return resetsAt == null
+    ? 'No runs left today'
+    : `No runs left today — the next in about ${timeUntil(resetsAt)}`
 }
 
 export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
@@ -121,6 +123,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       seriesTypes,
       displayName,
       dailyRuns,
+      lucky,
       error,
       duplicate,
     } = handle.props
@@ -157,8 +160,6 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             </p>
           )}
 
-          {!dailyRuns.unlimited && <DailyRunsNote dailyRuns={dailyRuns} />}
-
           <GenerateRecommendationsForm
             friends={friends.map((friend) => ({
               id: friend.id,
@@ -168,6 +169,9 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             viewerLoggedTypes={viewerLoggedTypes}
             mediaType={mediaType}
             mediaTypeLabel={ui.attributive}
+            itemNoun={ui.singular}
+            shortlistCount={TARGET_COUNT}
+            runsLeftLabel={runsLeftLabel(dailyRuns)}
             sources={enabledMediaTypes().map((type) => ({
               value: type,
               label: `${MEDIA_TYPE_UI[type].attributive} taste`,
@@ -179,6 +183,9 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             platforms={platforms}
             seriesTypes={seriesTypes}
             generateHref={routes.recommendations.generate.href()}
+            luckyHref={routes.recommendations.lucky.href()}
+            luckyAvailable={lucky.available}
+            luckyWaitLabel={lucky.nextAt == null ? '' : `about ${timeUntil(lucky.nextAt)}`}
             findPeopleHref={routes.users.search.href()}
           />
 
@@ -197,7 +204,8 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             {runs.length > 0 && (
               <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
                 Only your {MAX_RUNS_PER_USER} most recent {ui.attributive} runs are kept —
-                generating a new one removes the oldest.
+                generating a new one removes the oldest. Lucky picks (🎲) are counted
+                separately, so one can't push the other out.
               </p>
             )}
             {runs.length === 0 ? (

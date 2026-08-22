@@ -7,6 +7,7 @@ import { assetServer } from '../assets.ts'
 import type { Db } from '../data/db.ts'
 import { countFollowing } from '../data/follows.ts'
 import { listFollowingLogActivity } from '../data/mediaItems.ts'
+import { getLuckyState } from '../data/recommendations/lucky.ts'
 import { listRecommendationRuns, listRecommendationRunsFromOthers } from '../data/recommendations/runs.ts'
 import type { User } from '../data/schema.ts'
 import { displayLabel } from '../data/users.ts'
@@ -23,7 +24,8 @@ const ACTIVITY_SHOWN = 8
 async function loadDashboard(db: Db, user: User): Promise<HomeDashboard> {
   // Unfiltered by media type on purpose — the recommendations index is the
   // per-type view, and this one answers "what has happened lately".
-  const [runs, runsFromOthers, followingActivity, followingCount] = await Promise.all([
+  const [lucky, runs, runsFromOthers, followingActivity, followingCount] = await Promise.all([
+    getLuckyState(user),
     listRecommendationRuns(db, user.id),
     listRecommendationRunsFromOthers(db, user.id),
     listFollowingLogActivity(db, user.id, ACTIVITY_SHOWN),
@@ -32,12 +34,7 @@ async function loadDashboard(db: Db, user: User): Promise<HomeDashboard> {
 
   return {
     displayName: displayLabel(user),
-    // Nothing picks one yet — the section renders its call to action until
-    // something does. See LuckyPickView for the shape to fill in here.
-    luckyPick: null,
-    // Placeholder target, for the same reason: there is no action to roll a
-    // pick yet, and recommendations is the nearest page that gives you one.
-    luckyPickHref: routes.recommendations.index.href(),
+    lucky,
     runs: runs.slice(0, RUNS_SHOWN),
     runsFromOthers: runsFromOthers.slice(0, RUNS_SHOWN),
     followingActivity,
@@ -54,6 +51,8 @@ export default createController(routes, {
     },
     async home(context) {
       const auth = context.get(Auth)
+      // Nothing is loaded for a visitor: the dashboard is the only thing on
+      // this page that touches the database, and they have none of it.
       if (!auth.ok) return context.render(<HomePage dashboard={null} />)
 
       const db = context.get(Database)

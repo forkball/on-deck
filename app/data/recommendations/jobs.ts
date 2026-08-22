@@ -77,6 +77,10 @@ export interface JobParams {
   filters: Record<string, unknown>
   sourceTypes: string[]
   name?: string
+  // An "I'm feeling lucky" run. It queues, claims, beats and resumes exactly
+  // like any other — only what comes out the far end differs, so this rides
+  // along in the params rather than splitting the queue.
+  lucky?: boolean
 }
 
 // `active_job` when the user already has one queued or running.
