@@ -35,6 +35,11 @@ export interface HomePageProps {
 // the order they are written: the pick, the runs, then the feed.
 const WIDE = '@media (min-width: 900px)'
 
+// The other side of the same line. Both are needed because the collapse below
+// is mobile-only: stating it as "not WIDE" is what keeps the wide layout from
+// ever reading a closed state.
+const NARROW = '@media (max-width: 899.98px)'
+
 const CARD = {
   border: '1px solid #ddd',
   borderRadius: '8px',
@@ -45,14 +50,80 @@ function formatDate(value: number): string {
   return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-function Section(handle: Handle<{ title: string; children?: RemixNode }>) {
+// A checkbox rather than <details>, for one reason: every rule that acts on it
+// lives inside the NARROW media query, so the wide layout never reads the state
+// at all. A <details> carries its openness in the element — collapse one on a
+// phone, turn the phone sideways, and the panel would be gone from a layout
+// with nothing to reopen it.
+//
+// Base rule then `:has(:checked)` override, both in one object: two css() calls
+// land in two @layers ordered by declaration, so a later base would beat an
+// earlier override. Same reason media-tabs.tsx builds its style this way.
+// Same cast media-tabs.tsx makes, for the same reason: an object literal whose
+// keys hold nested rule bodies infers an index signature the flat CSS property
+// type won't accept, even though nesting is exactly what CSSProps allows.
+type CSSStyle = Parameters<typeof css>[0]
+
+function collapsibleStyle(id: string): CSSStyle {
+  const style: Record<string, unknown> = {
+    // Off-screen rather than `display: none`, which would take it out of the
+    // focus order and leave the heading unreachable by keyboard.
+    '& > input[type="checkbox"]': {
+      position: 'absolute',
+      width: 0,
+      height: 0,
+      opacity: 0,
+      pointerEvents: 'none',
+    },
+    [NARROW]: {
+      '& label': { cursor: 'pointer' },
+      '& label::after': { content: '" ▸"', fontSize: '13px', color: '#888' },
+      '& > .collapsible-body': { display: 'none' },
+      [`&:has(#${id}:checked) label::after`]: { content: '" ▾"' },
+      [`&:has(#${id}:checked) > .collapsible-body`]: { display: 'block' },
+    },
+  }
+
+  return style as CSSStyle
+}
+
+function Section(
+  handle: Handle<{
+    title: string
+    // Set to make the section fold away under the panel breakpoint. The id is
+    // the handle the CSS above reads, so it has to be unique on the page.
+    collapseId?: string
+    children?: RemixNode
+  }>,
+) {
   return () => {
-    const { title, children } = handle.props
+    const { title, collapseId, children } = handle.props
+
+    // One <h2> either way, with the same margins: the pick column and the panel
+    // beside it line up on their headings, and a heading that measured
+    // differently here would take the card borders out of line with it.
+    const heading = <h2 mix={css({ margin: '0 0 12px', fontSize: '18px' })}>{title}</h2>
+
+    if (!collapseId) {
+      return (
+        <section>
+          {heading}
+          {children}
+        </section>
+      )
+    }
 
     return (
-      <section>
-        <h2 mix={css({ margin: '0 0 12px', fontSize: '18px' })}>{title}</h2>
-        {children}
+      <section mix={css(collapsibleStyle(collapseId))}>
+        <input type="checkbox" id={collapseId} defaultChecked={true} />
+        <h2 mix={css({ margin: '0 0 12px', fontSize: '18px' })}>
+          {/* See app.css — the class is what keeps this heading the same
+              height as a plain one. */}
+          <label for={collapseId} class="section-toggle">
+            {title}
+          </label>
+        </h2>
+        <div class="collapsible-body">{children}</div>
       </section>
     )
   }
@@ -185,7 +256,7 @@ function RunPanel(
           [WIDE]: { borderLeft: '1px solid #ddd', paddingLeft: '24px' },
         })}
       >
-        <Section title="Your runs">
+        <Section title="Your runs" collapseId="home-your-runs">
           {runs.length > 0 ? (
             <RunList runs={runs} variant="panel" />
           ) : (
@@ -196,7 +267,7 @@ function RunPanel(
           )}
         </Section>
 
-        <Section title="Run for you">
+        <Section title="Run for you" collapseId="home-runs-for-you">
           {runsFromOthers.length > 0 ? (
             <RunList runs={runsFromOthers} variant="panel" />
           ) : (
