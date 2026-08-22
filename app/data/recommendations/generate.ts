@@ -10,6 +10,7 @@ import { createNotification } from '../notifications.ts'
 import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
 import { recordRunAgainstDailyLimit, runCostFor } from './dailyLimit.ts'
+import { buildExclusions } from './exclusions.ts'
 import type { GenerationPhase } from './jobs.ts'
 import {
   filterByLength,
@@ -24,7 +25,6 @@ import {
 import {
   requestPicks,
   toTasteSummary,
-  type ExcludedTitles,
   type MemberProfile,
   type MultiSourceMemberProfile,
   type Pick,
@@ -41,13 +41,28 @@ import { emptyDrops, logPickTally } from './tally.ts'
 import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
 
-const TARGET_COUNT = 8
+// Exported so the page can say how many a run comes back with rather than
+// restating the number in copy that would then drift from it.
+export const TARGET_COUNT = 8
+
+// What "I'm feeling lucky" means at this end of the pipeline: one pick, the
+// top-ranked one. Everything before this stage is unchanged — the same number of
+// picks is asked for and put through the same gates, because the drops are what
+// make one survivor likely rather than a coin toss.
+const LUCKY_TARGET_COUNT = 1
 
 // Ids, not objects: the rows they name are written before the checkpoint
 // records them, and a job row has to stay small.
 export interface GenerationCheckpoint {
   picks?: Pick[]
   verified?: { mediaItemId: number; reason: string }[]
+}
+
+export interface GenerateOptions {
+  // An "I'm feeling lucky" run: one pick instead of eight, nothing anyone in the
+  // group has logged, and charged to its own once-a-day cap rather than the
+  // general allowance. Same queue, same stages, same tables.
+  lucky?: boolean
 }
 
 export interface GenerateRecommendationsOutcome {
@@ -103,7 +118,13 @@ export async function generateRecommendations(
   // interrupted run doesn't buy the same model call twice.
   checkpoint: GenerationCheckpoint = {},
   onCheckpoint: (checkpoint: GenerationCheckpoint) => void = () => {},
+  // An object rather than an eleventh positional: `lucky` is not a parameter of
+  // the same kind as the ones above it, and the list is long enough already.
+  // Anything else that changes the shape of a run rather than its content
+  // belongs here too.
+  options: GenerateOptions = {},
 ): Promise<GenerateRecommendationsOutcome> {
+  const lucky = options.lucky === true
   const profileTypes: MediaType[] = sourceTypes && sourceTypes.length > 0 ? sourceTypes : [mediaType]
 
   // Both announcements go through here, or a new stage gets measured as part of
@@ -153,59 +174,7 @@ export async function generateRecommendations(
     ),
   )
 
-  // The id set is what enforces both; the title lists are a prompt hint the
-  // model is free to ignore.
-  //
-  // Seen excludes only once most of the group has; a rejection excludes on its
-  // own, from anyone.
-  const memberCount = exclusionLogs.length
-  const seenThreshold = Math.floor(memberCount / 2) + 1
-
-  const excluded: ExcludedTitles = { seen: [], rejected: [] }
-  const excludedExternalIds = new Set<string>()
-
-  // Keyed by catalog id: two people's rows for the same film are different rows.
-  // Title is the fallback, and the only key for anything unmatched.
-  const seenBy = new Map<string, { count: number; title?: string; externalId?: string }>()
-
-  // Same key as the tally, or a title several people turned down is named once
-  // per person in the prompt.
-  const rejectedKeys = new Set<string>()
-
-  for (const log of exclusionLogs) {
-    // Per member, so one person's duplicate rows can't cross the threshold alone.
-    const countedThisMember = new Set<string>()
-
-    for (const { interaction, item } of log) {
-      const key = item?.external_id ?? item?.title
-      if (!key) continue
-
-      if (interaction.status === 'not_interested') {
-        if (item?.external_id) excludedExternalIds.add(item.external_id)
-        if (item?.title && !rejectedKeys.has(key)) {
-          rejectedKeys.add(key)
-          excluded.rejected.push(item.title)
-        }
-        continue
-      }
-      if (interaction.status !== 'consumed') continue
-
-      if (countedThisMember.has(key)) continue
-      countedThisMember.add(key)
-
-      const tally = seenBy.get(key) ?? { count: 0 }
-      tally.count += 1
-      tally.title ??= item?.title ?? undefined
-      tally.externalId ??= item?.external_id ?? undefined
-      seenBy.set(key, tally)
-    }
-  }
-
-  for (const { count, title, externalId } of seenBy.values()) {
-    if (count < seenThreshold) continue
-    if (title) excluded.seen.push(title)
-    if (externalId) excludedExternalIds.add(externalId)
-  }
+  const { titles: excluded, externalIds: excludedExternalIds } = buildExclusions(exclusionLogs, { lucky })
 
   let picks: Pick[]
   if (checkpoint.picks?.length) {
@@ -305,7 +274,7 @@ export async function generateRecommendations(
     enterPhase('saving')
     // Promise.all keeps pick order, which is the order they're ranked in.
     results = await Promise.all(
-      verified.slice(0, TARGET_COUNT).map(async ({ pick, match }) => ({
+      verified.slice(0, lucky ? LUCKY_TARGET_COUNT : TARGET_COUNT).map(async ({ pick, match }) => ({
         item: await track('catalog.upsert', () => upsertCatalogItem(db, mediaType, match)),
         reason: pick.reason,
         interaction: null,
@@ -334,6 +303,7 @@ export async function generateRecommendations(
       memberUserIds,
       mediaType,
       name,
+      lucky,
       params: {
         genre: filters.genre,
         decade: filters.decade,
@@ -351,10 +321,18 @@ export async function generateRecommendations(
 
   // Usage is counted here, against the run that exists, not against the request:
   // a run that never made it this far cost nothing.
+  //
+  // A lucky run is not charged to the general allowance, and does not need a
+  // ledger row of its own: the run it just saved is the record that the day's
+  // pick has been drawn — see lucky.ts. Charging it to both would make one click
+  // cost two things, and let a spent general allowance block the button whose
+  // whole point is that it takes no thought.
   const [, , prunedOldestRun] = await Promise.all([
-    track('run.usage', () => recordRunAgainstDailyLimit(db, requestingUserId, runCostFor(memberUserIds.length))),
+    lucky
+      ? Promise.resolve()
+      : track('run.usage', () => recordRunAgainstDailyLimit(db, requestingUserId, runCostFor(memberUserIds.length))),
     track('run.notify', () => notifyMutualFollowers(db, requestingUserId, memberUserIds, runId)),
-    track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType)),
+    track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType, { lucky })),
   ])
 
   return { runId, prunedOldestRun }

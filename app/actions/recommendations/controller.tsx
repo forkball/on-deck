@@ -12,10 +12,15 @@ import { listFollowedUsers } from '../../data/follows.ts'
 import { loadLoggedTypesByUser } from '../../data/mediaItems.ts'
 import { getDailyRunAllowance, runCostFor, timeUntil } from '../../data/recommendations/dailyLimit.ts'
 import { enqueueJob, getJob, PHASE_LABELS } from '../../data/recommendations/jobs.ts'
+import { getLuckyState, LUCKY_RUN_NAME } from '../../data/recommendations/lucky.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { getRememberedMediaType } from '../../middleware/mediaType.ts'
-import { findMembersMissingSourceLogs, generateRecommendations } from '../../data/recommendations/generate.ts'
+import {
+  findMembersMissingSourceLogs,
+  generateRecommendations,
+  type MissingSourceLogs,
+} from '../../data/recommendations/generate.ts'
 import type { RecommendationFilters } from '../../data/recommendations/picks.ts'
 import {
   findUnusedDuplicateRun,
@@ -53,11 +58,12 @@ const generateSchema = f.object({
 })
 
 async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
-  const [runs, runsFromOthers, friends, dailyRuns] = await Promise.all([
+  const [runs, runsFromOthers, friends, dailyRuns, lucky] = await Promise.all([
     listRecommendationRuns(db, user.id, mediaType),
     listRecommendationRunsFromOthers(db, user.id, mediaType),
     listFollowedUsers(db, user.id),
     getDailyRunAllowance(db, user),
+    getLuckyState(user),
   ])
 
   // After the fetch above rather than alongside it, since it needs the ids it
@@ -67,6 +73,7 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
 
   return {
     dailyRuns,
+    lucky,
     runs,
     runsFromOthers,
     friends,
@@ -82,6 +89,17 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     seriesTypes: getCatalogProvider(mediaType).seriesTypes ?? [],
     displayName: displayLabel(user),
   }
+}
+
+// Both actions refuse for the same reason in the same words — an empty log
+// gives the profile nothing to work from, whichever kind of run asked for it.
+function describeMissingLogs(missing: MissingSourceLogs[], viewerId: number): string {
+  return missing
+    .map(({ userId, label, missing: types }) => {
+      const nouns = types.map((type) => mediaTypeUiFor(type).plural).join(' or ')
+      return userId === viewerId ? `you have no ${nouns} logged` : `${label} has no ${nouns} logged`
+    })
+    .join(', and ')
 }
 
 // Every path through `generate` that doesn't redirect re-renders the index with
@@ -167,14 +185,7 @@ export default createController(routes.recommendations, {
 
       const missing = await findMembersMissingSourceLogs(db, memberIds, profileTypes)
       if (missing.length > 0) {
-        const detail = missing
-          .map(({ userId, label, missing: types }) => {
-            const nouns = types.map((type) => mediaTypeUiFor(type).plural).join(' or ')
-            return userId === auth.identity.id
-              ? `you have no ${nouns} logged`
-              : `${label} has no ${nouns} logged`
-          })
-          .join(', and ')
+        const detail = describeMissingLogs(missing, auth.identity.id)
         return context.render(
           await indexPage(db, auth.identity, mediaType, {
             error:
@@ -256,6 +267,105 @@ export default createController(routes.recommendations, {
           name: parsed.value.name || undefined,
         },
         { withLengthCheck: filters.length != null },
+      )
+
+      if (!enqueued.ok) {
+        return context.render(
+          await indexPage(db, auth.identity, mediaType, {
+            error: 'You already have a run in progress — give that one a moment to finish first.',
+          }),
+          { status: 409 },
+        )
+      }
+
+      return redirect(routes.recommendations.generating.href({ jobId: enqueued.jobId }), 303)
+    },
+
+    // One pick, no levers, once a day. Deliberately short next to `generate`:
+    // there is nothing to read but the medium and who's in the draw, and that is
+    // the feature — everything the long form asks about is answered by not
+    // asking.
+    //
+    // It is posted from the same form, via formaction, so the whole of it
+    // arrives here. Everything but those two fields is ignored on purpose.
+    async lucky(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const db = context.get(Database)
+      const formData = context.get(FormData)
+
+      const mediaType =
+        parseEnabledMediaType(formData.get('mediaType')) ?? getRememberedMediaType(context)
+      context.get(Session).set('mediaType', mediaType)
+
+      // `mode` decides whether the checkboxes count at all, the same way it does
+      // in `generate`: the shared form keeps every friend checkbox mounted and
+      // only hides them, so a selection made and then switched away from is
+      // still in the request.
+      //
+      // What survives that is narrowed to people this account actually follows.
+      // The picker only offers those, so it costs nothing in the normal case —
+      // it stops a hand-posted id pulling a stranger's taste into a run and
+      // notifying them about it.
+      const requested = new Set(
+        formData.get('mode') === 'group'
+          ? formData
+              .getAll('friend_ids')
+              .map((value) => Number(value))
+              .filter((id) => Number.isInteger(id))
+          : [],
+      )
+      const friendIds =
+        requested.size === 0
+          ? []
+          : (await listFollowedUsers(db, auth.identity.id))
+              .map((friend) => friend.id)
+              .filter((id) => requested.has(id))
+
+      const memberIds = [auth.identity.id, ...friendIds]
+
+      const lucky = await getLuckyState(auth.identity)
+      if (!lucky.available) {
+        return context.render(
+          await indexPage(db, auth.identity, mediaType, {
+            error:
+              lucky.nextAt == null
+                ? `You've already drawn today's lucky pick.`
+                : `You've already drawn today's lucky pick — the next one frees up in about ${timeUntil(lucky.nextAt)}.`,
+          }),
+          { status: 429 },
+        )
+      }
+
+      // A lucky run reads one taste: the medium it is drawing from. Same check
+      // `generate` makes, because the same emptiness would silently drop someone
+      // from the run.
+      const missing = await findMembersMissingSourceLogs(db, memberIds, [mediaType])
+      if (missing.length > 0) {
+        const detail = describeMissingLogs(missing, auth.identity.id)
+        return context.render(
+          await indexPage(db, auth.identity, mediaType, {
+            error: `Can't draw a lucky pick — ${detail}. Everyone in the draw needs something logged.`,
+          }),
+          { status: 400 },
+        )
+      }
+
+      // No duplicate check: a lucky run carries no levers to match on, and its
+      // once-a-day cap already rules out drawing the same thing twice in a day.
+      const enqueued = await enqueueJob(
+        db,
+        auth.identity.id,
+        {
+          memberIds,
+          mediaType,
+          filters: {},
+          sourceTypes: [mediaType],
+          name: LUCKY_RUN_NAME,
+          lucky: true,
+        },
+        { withLengthCheck: false },
       )
 
       if (!enqueued.ok) {

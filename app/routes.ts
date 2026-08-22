@@ -98,6 +98,11 @@ export const routes = route({
   recommendations: route('recommendations', {
     index: get('/'),
     generate: post('/'),
+    // One pick, no levers, once a day. A POST of its own rather than a preset on
+    // `generate`: it has its own cap and its own rules about what may be picked,
+    // and folding those into the general form's action would put both behind the
+    // same parse.
+    lucky: post('lucky'),
     generating: get('generating/:jobId'),
     status: get('status/:jobId'),
     show: get(':runId'),

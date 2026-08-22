@@ -63,7 +63,7 @@ export function startGenerationWorker(): GenerationWorker {
     }, HEARTBEAT_MS)
 
     try {
-      const { memberIds, mediaType, filters, sourceTypes, name } = job.params
+      const { memberIds, mediaType, filters, sourceTypes, name, lucky } = job.params
 
       // Guessing at defaults would silently generate something nobody asked for.
       if (!Array.isArray(memberIds) || memberIds.length === 0 || !mediaType) {
@@ -83,6 +83,7 @@ export function startGenerationWorker(): GenerationWorker {
           (phase) => void setPhase(db, job.id, phase).catch(() => {}),
           job.checkpoint as GenerationCheckpoint,
           (checkpoint) => void saveCheckpoint(db, job.id, checkpoint).catch(() => {}),
+          { lucky: lucky === true },
         ),
       )
 
