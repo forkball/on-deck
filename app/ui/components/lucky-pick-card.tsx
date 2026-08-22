@@ -11,6 +11,15 @@ import { routes } from '../../routes.ts'
 // words would drift.
 export const LUCKY_PICK_LABEL = "Today's lucky pick"
 
+// The box the pick sits in, exported because the home page renders a call to
+// action in the same slot when nothing has been drawn — the two have to be the
+// same box, or the empty state visibly steps out of the filled one.
+export const LUCKY_CARD_BOX = {
+  border: '1px solid #ddd',
+  borderRadius: '8px',
+  padding: '16px',
+} as const
+
 // The day's pick, rendered the same on the landing page and the profile. It
 // lives in ui/components rather than beside one of them because both show it
 // and neither owns it — see AGENTS.md.
@@ -34,15 +43,7 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
     const detailHref = `${ui.hrefs.show(pick.mediaItemId)}?from=${encodeURIComponent(returnTo)}`
 
     return (
-      <div
-        mix={css({
-          border: '1px solid #ddd',
-          borderRadius: '8px',
-          padding: '16px',
-          display: 'flex',
-          gap: '14px',
-        })}
-      >
+      <div mix={css({ ...LUCKY_CARD_BOX, display: 'flex', gap: '14px' })}>
         {posterUrl ? (
           <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
             <img

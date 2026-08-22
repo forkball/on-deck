@@ -4,29 +4,17 @@ import { after, before, describe, it } from 'node:test'
 import { db, pool } from '../app/data/db.ts'
 import { followUser } from '../app/data/follows.ts'
 import { listFollowingLogActivity } from '../app/data/mediaItems.ts'
+import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 
 // The home page's feed. What it must not show is the point: a stranger's log,
 // or a rejection from someone you do follow. Both are decided in SQL, so both
 // are asserted against a real database.
 //
-// Needs a migrated database: `npm run db:up && npm run db:migrate`.
-const skip = process.env.DATABASE_URL ? false : 'set DATABASE_URL to run (npm run db:up && npm run db:migrate)'
-
-describe('following log activity', { skip }, () => {
+describe('following log activity', { skip: skipWithoutDatabase }, () => {
   let viewer: number
   let friend: number
   let stranger: number
   const itemIds: number[] = []
-
-  const newUser = async (tag: string) => {
-    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const { rows: [u] } = await pool.query<{ id: number }>(
-      `insert into users (email, password_hash, display_name, created_at)
-       values ($1,'x',$2,$3) returning id`,
-      [`feed-${tag}-${stamp}@example.test`, `feed-${tag}-${stamp}`, Date.now()],
-    )
-    return u.id
-  }
 
   const newItem = async (title: string) => {
     const { rows: [item] } = await pool.query<{ id: number }>(
@@ -46,9 +34,9 @@ describe('following log activity', { skip }, () => {
     )
 
   before(async () => {
-    viewer = await newUser('viewer')
-    friend = await newUser('friend')
-    stranger = await newUser('stranger')
+    viewer = await insertUser('feed-viewer')
+    friend = await insertUser('feed-friend')
+    stranger = await insertUser('feed-stranger')
     await followUser(db, viewer, friend)
 
     const stamp = Date.now()
@@ -63,12 +51,7 @@ describe('following log activity', { skip }, () => {
   })
 
   after(async () => {
-    for (const id of [viewer, friend, stranger]) {
-      if (!id) continue
-      await pool.query('delete from user_media_interactions where user_id = $1', [id])
-      await pool.query('delete from user_follows where follower_id = $1 or followed_id = $1', [id])
-      await pool.query('delete from users where id = $1', [id])
-    }
+    await deleteUsers([viewer, friend, stranger])
     if (itemIds.length) await pool.query('delete from media_items where id = any($1)', [itemIds])
     await pool.end()
   })

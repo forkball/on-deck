@@ -471,7 +471,8 @@ interface FollowingLogRow extends LogRow {
 // friends' whole libraries, which this app imports wholesale. Per followed
 // account the lateral takes `limit` rows straight off
 // user_media_interactions_user_recent, already ordered, and the outer sort sees
-// followed_count × limit rows at most.
+// followed_count × limit rows at most. $3 is deliberately both bounds: taking
+// more than `limit` from any one person can't change the newest `limit` overall.
 export async function listFollowingLogActivity(
   viewerId: number,
   limit: number,
@@ -484,8 +485,9 @@ export async function listFollowingLogActivity(
          select *
            from user_media_interactions i
           where i.user_id = f.followed_id
-            and i.status = any($2::text[])
-          order by i.updated_at desc, i.id desc
+            and i.status = any($2::text[])` +
+      LOG_ORDER +
+      `
           limit $3
        ) i on true
        join users u on u.id = i.user_id

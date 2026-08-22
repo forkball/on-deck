@@ -4,10 +4,10 @@ import { css } from 'remix/ui'
 import type { FollowingLogEntry } from '../data/mediaItems.ts'
 import type { LuckyState } from '../data/recommendations/lucky.ts'
 import type { RecommendationRunSummary } from '../data/recommendations/runs.ts'
-import { mediaTypeUiFor, statusLabel } from '../mediaTypes.ts'
+import { mediaTypeUiFor } from '../mediaTypes.ts'
 import { routes } from '../routes.ts'
 import { Document } from '../ui/components/document.tsx'
-import { LUCKY_PICK_LABEL, LuckyPickCard } from '../ui/components/lucky-pick-card.tsx'
+import { LUCKY_CARD_BOX, LUCKY_PICK_LABEL, LuckyPickCard } from '../ui/components/lucky-pick-card.tsx'
 import { Nav } from '../ui/components/nav.tsx'
 import { RunList } from '../ui/components/run-list.tsx'
 import { WatchedListItem } from '../ui/components/watched-list-item.tsx'
@@ -37,84 +37,74 @@ const PANEL_BREAKPOINT = 900
 const WIDE = `@media (min-width: ${PANEL_BREAKPOINT}px)`
 const NARROW = `@media (max-width: ${PANEL_BREAKPOINT - 0.02}px)`
 
-const CARD = {
-  border: '1px solid #ddd',
-  borderRadius: '8px',
-  padding: '16px',
-} as const
-
-// Stated once and used by both of Section's shapes: the pick column and the
-// panel beside it line up on their headings, and a heading that measured
-// differently in one of them would take the card borders out of line with it.
+// The folding heading and the plain one are the same <h2> with the same style,
+// which is what lines the pick column up with the panel beside it: a heading
+// that measured differently in one of them would take the card borders out of
+// line with it.
 const HEADING = css({ margin: '0 0 12px', fontSize: '18px' })
 
-// A checkbox rather than <details>, for one reason: every rule that acts on it
-// lives inside the NARROW media query, so the wide layout never reads the state
-// at all. A <details> carries its openness in the element — collapse one on a
-// phone, turn the phone sideways, and the panel would be gone from a layout
-// with nothing to reopen it.
+// A checkbox rather than <details>, because the fold only exists below the
+// breakpoint: every rule that reads the box sits inside NARROW, so the wide
+// layout renders the body whatever state the box is in. <details> keeps its
+// openness in the element, so a section folded on a phone and carried into the
+// wide layout would stay folded there, with no control left to reopen it.
 //
-// Base rule then `:has(:checked)` override, both in one object: two css() calls
+// That is a support window rather than a limit — `::details-content` can
+// force a closed <details> open at wide width — but it is Baseline newly
+// available, where the sibling selectors below are not. Worth revisiting.
+//
+// One constant rather than a function of the section's id: `input:checked ~`
+// reaches the same elements `:has(#id:checked)` did, without an id to
+// interpolate. The id still binds the <label> to the box, just not the CSS.
+//
+// Base rule then the checked override, both in one object: two css() calls
 // land in two @layers ordered by declaration, so a later base would beat an
 // earlier override. Same reason media-tabs.tsx builds its style this way.
-// Same cast media-tabs.tsx makes, for the same reason: an object literal whose
-// keys hold nested rule bodies infers an index signature the flat CSS property
-// type won't accept, even though nesting is exactly what CSSProps allows.
-type CSSStyle = Parameters<typeof css>[0]
-
-function collapsibleStyle(id: string): CSSStyle {
-  // Through a Record first, not a cast on the literal: TypeScript won't compare
-  // an object whose values are rule bodies against the flat property type, so
-  // `{...} as CSSStyle` is an error where this is allowed. media-tabs.tsx takes
-  // the same route.
-  const style: Record<string, unknown> = {
-    // Off-screen rather than `display: none`, which would take it out of the
-    // focus order and leave the heading unreachable by keyboard.
-    '& > input[type="checkbox"]': {
-      position: 'absolute',
-      width: 0,
-      height: 0,
-      opacity: 0,
-      pointerEvents: 'none',
+const COLLAPSIBLE = css({
+  // Off-screen rather than `display: none`, which would take it out of the
+  // focus order and leave the heading unreachable by keyboard.
+  '& > input[type="checkbox"]': {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    opacity: 0,
+    pointerEvents: 'none',
+  },
+  [NARROW]: {
+    '& label': { cursor: 'pointer' },
+    // `disclosure-closed` / `disclosure-open` are the list-style values a
+    // <summary> uses for its own marker, so this fold reads as the same control
+    // as the profile's taste-profile disclosure rather than as a second thing
+    // that also opens.
+    //
+    // All of it on the <span> rather than the <label>: DoodleCSS's unlayered
+    // `.doodle label` rule outranks anything a css() call can say about a
+    // <label>, but it has nothing to say about a bare <span>. The padding makes
+    // a thumb-sized band across the row rather than a tap target the width of
+    // the words, and `list-item` on the same element keeps the marker on the
+    // text's line instead of a line of its own.
+    '& label > span': {
+      display: 'list-item',
+      listStyleType: 'disclosure-closed',
+      listStylePosition: 'inside',
+      padding: '0.55em 0',
     },
-    [NARROW]: {
-      '& label': { cursor: 'pointer' },
-      // `disclosure-closed` / `disclosure-open` are the list-style values a
-      // <summary> uses for its own marker, so this fold reads as the same
-      // control as the profile's taste-profile disclosure rather than as a
-      // second thing that also opens.
-      //
-      // All of it on the <span> rather than the <label>: DoodleCSS's unlayered
-      // `.doodle label` rule outranks anything a css() call can say about a
-      // <label>, but it has nothing to say about a bare <span>. The padding
-      // makes a thumb-sized band across the row rather than a tap target the
-      // width of the words, and `list-item` on the same element keeps the
-      // marker on the text's line instead of a line of its own.
-      '& label > span': {
-        display: 'list-item',
-        listStyleType: 'disclosure-closed',
-        listStylePosition: 'inside',
-        padding: '0.55em 0',
-      },
-      '& > .collapsible-body': { display: 'none' },
-      [`&:has(#${id}:checked) label > span`]: { listStyleType: 'disclosure-open' },
-      [`&:has(#${id}:checked) > .collapsible-body`]: { display: 'block' },
-    },
-    // Above the breakpoint the section can't be folded, so its heading is a
-    // heading: not a control that silently toggles a checkbox nothing reads.
-    // Stated here rather than in app.css because DoodleCSS says nothing about
-    // pointer-events, so this is a rule a css() call can win.
-    [WIDE]: { '& label': { pointerEvents: 'none' } },
-  }
-
-  return style as CSSStyle
-}
+    '& > .collapsible-body': { display: 'none' },
+    '& > input:checked ~ h2 label > span': { listStyleType: 'disclosure-open' },
+    '& > input:checked ~ .collapsible-body': { display: 'block' },
+  },
+  // Above the breakpoint the section can't be folded, so its heading is a
+  // heading: not a control that silently toggles a checkbox nothing reads.
+  // Stated here rather than in app.css because DoodleCSS says nothing about
+  // pointer-events, so this is a rule a css() call can win.
+  [WIDE]: { '& label': { pointerEvents: 'none' } },
+})
 
 function Section(
   handle: Handle<{
     title: string
-    // Set to make the section fold away under the panel breakpoint. The id is
-    // the handle the CSS above reads, so it has to be unique on the page.
+    // Set to make the section fold away under the panel breakpoint. Binds the
+    // heading to its checkbox, so it has to be unique on the page.
     collapseId?: string
     children?: RemixNode
   }>,
@@ -123,7 +113,7 @@ function Section(
     const { title, collapseId, children } = handle.props
 
     return (
-      <section mix={collapseId ? css(collapsibleStyle(collapseId)) : undefined}>
+      <section mix={collapseId ? COLLAPSIBLE : undefined}>
         {collapseId && <input type="checkbox" id={collapseId} defaultChecked />}
         <h2 mix={HEADING}>
           {collapseId ? (
@@ -152,7 +142,7 @@ function Empty(handle: Handle<{ children?: RemixNode }>) {
 // the pick is that there is nothing to fill in first.
 function LuckyPickCta() {
   return () => (
-    <div mix={css({ ...CARD, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' })}>
+    <div mix={css({ ...LUCKY_CARD_BOX, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' })}>
       <p mix={css({ margin: 0 })}>
         <strong>Nothing drawn yet today.</strong>
       </p>
@@ -186,20 +176,8 @@ function ActivityList(handle: Handle<{ entries: FollowingLogEntry[] }>) {
             key={interaction.id}
             interaction={interaction}
             item={item}
-            detailHref={item ? mediaTypeUiFor(item.type).hrefs.show(item.id) : ''}
-            // The status is still here, but as the end of a sentence about a
-            // person: whose log this is, is the thing a feed is for. Read off
-            // the row's own item, so a logged book says "read" and not
-            // "watched".
-            byline={
-              <p mix={css({ margin: '4px 0 0', fontSize: '13px', color: '#555' })}>
-                <a href={routes.users.show.href({ userId: String(actor.id) })}>{actor.label}</a>{' '}
-                {statusLabel(interaction.status, item?.type).toLowerCase()}
-              </p>
-            }
-            // A feed is already a list of things that were logged, so the row
-            // dates itself rather than saying so again.
-            dateLabel=""
+            detailHref={item ? mediaTypeUiFor(item.type).hrefs.show(item.id) : '#'}
+            actor={actor}
           />
         ))}
       </ul>
@@ -355,9 +333,9 @@ export function HomePage(handle: Handle<HomePageProps>) {
         <Nav authed={dashboard != null} displayName={dashboard?.displayName} />
         <main
           mix={css({
-            // The same 720 the nav and every other page use — the side panel
-            // is carved out of that width rather than added to it, so the page
-            // still lines up with the nav above it.
+            // The same 720 the nav uses — the side panel is carved out of
+            // that width rather than added to it, so the page still lines up
+            // with the nav above it.
             maxWidth: dashboard ? '720px' : '640px',
             margin: '0 auto',
             padding: dashboard ? '32px 24px' : '48px 24px',

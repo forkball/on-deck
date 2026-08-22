@@ -3,7 +3,8 @@ import { css } from 'remix/ui'
 
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
-import { DEFAULT_MEDIA_TYPE, parseMediaType, statusLabelsFor } from '../../mediaTypes.ts'
+import { statusLabel } from '../../mediaTypes.ts'
+import { routes } from '../../routes.ts'
 import { PlatformList } from './platform-list.tsx'
 import { DislikedDisplay, StarRatingDisplay } from './star-rating.tsx'
 
@@ -12,24 +13,23 @@ export interface WatchedListItemProps {
   item: MediaItem | null
   detailHref: string
   actions?: RemixNode
-  // Replaces the status line for a log someone else wrote, where whose it is
-  // matters as much as what it says — the home page's feed reads
-  // "mona watched". The status is still in it; it just isn't the whole line.
-  byline?: RemixNode
-  // "Logged 12 Aug" is what your own log says. A feed of other people's is
-  // already a list of things that were logged, so it just dates them.
-  dateLabel?: string
+  // Set when the row is someone else's log rather than the viewer's own — the
+  // home page's feed of what people you follow have logged. One fact, because
+  // it decides two things together: the status line becomes a sentence about a
+  // person ("mona watched"), and the date drops its "Logged" prefix, a feed
+  // being already a list of things that were logged.
+  actor?: { id: number; label: string }
 }
 
 export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
   return () => {
-    const { interaction, item, detailHref, actions, byline, dateLabel = 'Logged' } = handle.props
+    const { interaction, item, detailHref, actions, actor } = handle.props
     const { posterUrl, platforms } = item
       ? parseMediaMetadata(item.metadata)
       : { posterUrl: null, platforms: [] }
     // Derived from the row's own item rather than threaded in: a logged
     // book must read "Read", not "Watched".
-    const statusLabels = statusLabelsFor(parseMediaType(item?.type) ?? DEFAULT_MEDIA_TYPE)
+    const status = statusLabel(interaction.status, item?.type)
     const loggedDate = new Date(interaction.updated_at).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
@@ -78,11 +78,16 @@ export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
             <a href={detailHref}>
               <strong>{item?.title ?? 'Unknown title'}</strong>
             </a>
-            {byline ?? (
-              <p mix={css({ margin: '4px 0 0' })}>
-                {statusLabels[interaction.status] ?? interaction.status}
-              </p>
-            )}
+            <p mix={css({ margin: '4px 0 0' })}>
+              {actor ? (
+                <>
+                  <a href={routes.users.show.href({ userId: String(actor.id) })}>{actor.label}</a>{' '}
+                  {status.toLowerCase()}
+                </>
+              ) : (
+                status
+              )}
+            </p>
             {/* Games only in practice — every other type carries no platforms,
                 and the list renders nothing for an empty one. */}
             <PlatformList platforms={platforms} />
@@ -100,7 +105,7 @@ export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
               <p mix={css({ margin: '4px 0 0', fontStyle: 'italic' })}>"{interaction.notes}"</p>
             )}
             <p mix={css({ margin: '4px 0 0', fontSize: '12px', color: '#888' })}>
-              {dateLabel ? `${dateLabel} ${loggedDate}` : loggedDate}
+              {actor ? loggedDate : `Logged ${loggedDate}`}
             </p>
           </div>
 
