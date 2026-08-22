@@ -65,9 +65,11 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
   import.meta.url,
   function GenerateRecommendationsForm(handle) {
     let submitting = false
-    // Which button was pressed, so only that one says what it is doing. Set on
-    // click and read on submit, which is the order the two fire in.
-    let pressed: 'generate' | 'lucky' = 'generate'
+    // Which of the two runs this form is currently set up to make. It picks the
+    // action the form posts to and decides which of the fields below apply —
+    // `mode` below is a different question (who the run is for), and keeps its
+    // name because that one is a field the server reads.
+    let runKind: 'shortlist' | 'lucky' = 'shortlist'
     let mode: 'self' | 'group' = 'self'
     let search = ''
     let page = 1
@@ -121,9 +123,12 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
       // A lucky draw reads one taste — the type being generated — and ignores
       // every lever under Settings, so it needs its own answer to "could this
-      // go anywhere". Unchecking every source blocks the long form, not this.
+      // go anywhere". Unchecking every source blocks a shortlist, not this.
+      const isLucky = runKind === 'lucky'
       const luckyBlockedBy = membersInRun.filter((member) => !member.loggedTypes.includes(mediaType))
-      const luckyDisabled = submitting || !luckyAvailable || luckyBlockedBy.length > 0
+      const disabled =
+        submitting ||
+        (isLucky ? !luckyAvailable || luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
 
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
@@ -132,12 +137,13 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       const start = (page - 1) * FRIENDS_PAGE_SIZE
       const visibleIds = new Set(filtered.slice(start, start + FRIENDS_PAGE_SIZE).map((friend) => friend.id))
 
-      const caption = css({ fontSize: '12px', color: '#888', lineHeight: 1.4 })
+      const caption = css({ margin: '10px 0 0', fontSize: '12px', color: '#888', lineHeight: 1.4 })
 
-      // Stated so the two buttons are the same height. Left to the default, the
-      // emoji on one of them makes a taller line box than plain text does, and
-      // the captions beneath end up on different baselines.
-      const submitButton = css({ lineHeight: 1.5 })
+      // Only ever one field's worth of it on screen, so a field that does not
+      // apply to the run being made is hidden rather than dropped: unmounting
+      // would lose a typed name, a chosen genre and the panel's open state
+      // every time someone looked at the other kind of run.
+      const onlyForShortlist = css({ display: isLucky ? 'none' : 'block' })
 
       const sectionLabel = css({
         margin: '0 0 10px',
@@ -151,7 +157,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       return (
         <form
           method="post"
-          action={generateHref}
+          action={isLucky ? luckyHref : generateHref}
           mix={[
             css({
               display: 'flex',
@@ -168,9 +174,65 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             }),
           ]}
         >
-          <Field label="Name this run (optional)">
-            <input type="text" name="name" placeholder="e.g. Cozy weekend picks" />
-          </Field>
+          {/* The first question, because it decides which of the rest apply.
+              `run_kind` is not read by either action — the form posts to a
+              different one for each — it is here so the two radios group. */}
+          <div>
+            <p mix={sectionLabel}>What are you after?</p>
+            <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
+              <label>
+                <input
+                  type="radio"
+                  name="run_kind"
+                  value="shortlist"
+                  defaultChecked
+                  mix={on('change', () => {
+                    runKind = 'shortlist'
+                    handle.update()
+                  })}
+                />{' '}
+                A shortlist
+              </label>
+              <label mix={css({ color: luckyAvailable ? 'inherit' : '#888' })}>
+                <input
+                  type="radio"
+                  name="run_kind"
+                  value="lucky"
+                  disabled={!luckyAvailable}
+                  mix={on('change', () => {
+                    runKind = 'lucky'
+                    handle.update()
+                  })}
+                />{' '}
+                Today's lucky pick
+              </label>
+            </div>
+
+            {/* One line, for the one that is selected. Two captions side by side
+                is what this replaced: on a narrow screen they stacked into a
+                wall of grey and stopped reading as a comparison at all. */}
+            <p mix={caption}>
+              {!luckyAvailable && isLucky
+                ? `Drawn for today — another in ${luckyWaitLabel}. It's in the list below.`
+                : isLucky
+                  ? `One ${itemNoun}, and never one anyone in the run has logged — down to a want-to. ` +
+                    `Costs no run, and you get one a day.`
+                  : `Up to ${shortlistCount} picks to choose from, minus what most of you have already ` +
+                    `finished.${runsLeftLabel ? ` ${runsLeftLabel}.` : ''}`}
+            </p>
+
+            {!luckyAvailable && !isLucky && (
+              <p mix={caption}>
+                Today's lucky pick is already drawn — another in {luckyWaitLabel}.
+              </p>
+            )}
+          </div>
+
+          <div mix={onlyForShortlist}>
+            <Field label="Name this run (optional)">
+              <input type="text" name="name" placeholder="e.g. Cozy weekend picks" />
+            </Field>
+          </div>
 
           <div>
             <p mix={sectionLabel}>Who's this for?</p>
@@ -286,7 +348,9 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
           <input type="hidden" name="mediaType" value={mediaType} />
 
-          <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
+          <div
+            mix={[css({ borderTop: '1px solid #eee', paddingTop: '16px' }), onlyForShortlist]}
+          >
             <details
               open={settingsOpen}
               mix={on('toggle', (event) => {
@@ -452,88 +516,49 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             </details>
           </div>
 
-          {/* Both of these used to sit inside the sources block. They report on
-              a setting that is now folded away, so they have to be where the
-              button they are blocking is. */}
-          {!hasSource && (
-            <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
-              Pick at least one taste to base picks on, under Settings.
-            </p>
-          )}
+          {/* Whichever rule the run being made actually has to clear. Both used
+              to live inside the sources block, which is folded away — and one of
+              them is about a setting a lucky draw never reads. */}
+          {isLucky
+            ? luckyBlockedBy.length > 0 && (
+                <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
+                  {luckyBlockedBy.map((member) => member.label).join(', ')}{' '}
+                  {luckyBlockedBy.length === 1 && luckyBlockedBy[0].label === 'You' ? 'have' : 'has'}{' '}
+                  nothing {mediaTypeLabel} logged to draw from.
+                </p>
+              )
+            : (!hasSource || blockedBy.length > 0) && (
+                <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
+                  {!hasSource
+                    ? 'Pick at least one taste to base picks on, under Settings.'
+                    : blockedBy
+                        .map(
+                          (entry) =>
+                            `${entry.label} ${entry.label === 'You' ? 'have' : 'has'} nothing logged under ` +
+                            `${entry.missing.map(sourceLabel).join(' or ')}`,
+                        )
+                        .join(', and ') +
+                      '. Everyone in the run needs something logged for each taste it reads.'}
+                </p>
+              )}
 
-          {blockedBy.length > 0 && (
-            <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
-              {blockedBy
-                .map(
-                  (entry) =>
-                    `${entry.label} ${entry.label === 'You' ? 'have' : 'has'} nothing logged under ` +
-                    `${entry.missing.map(sourceLabel).join(' or ')}`,
-                )
-                .join(', and ')}
-              . Everyone in the run needs something logged for each taste it reads.
-            </p>
-          )}
-
-          {/* A caption under each, rather than one paragraph under both. With
-              nothing set above, the two buttons otherwise make the same promise
-              — and what actually separates them (how many come back, and what
-              it costs) is exactly what someone is choosing between. */}
-          <div mix={css({ display: 'flex', gap: '24px', flexWrap: 'wrap' })}>
-            <div mix={css({ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px', maxWidth: '260px' })}>
-              <button
-                type="submit"
-                disabled={submitting || !hasSource || blockedBy.length > 0}
-                mix={[
-                  submitButton,
-                  on('click', () => {
-                    pressed = 'generate'
-                  }),
-                ]}
-              >
-                {submitting && pressed === 'generate' ? 'Starting…' : 'Get recommendations'}
-              </button>
-              <span mix={caption}>
-                Up to {shortlistCount} picks to choose from.
-                {runsLeftLabel && ` ${runsLeftLabel}.`}
-              </span>
-            </div>
-
-            {/* Same form, different action: formaction sends everything above
-                to the lucky endpoint, which reads only who is in the run and
-                ignores the rest. That is what keeps one group picker on the
-                page instead of two that can disagree. */}
-            <div mix={css({ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px', maxWidth: '280px' })}>
-              <button
-                type="submit"
-                formaction={luckyHref}
-                disabled={luckyDisabled}
-                mix={[
-                  submitButton,
-                  on('click', () => {
-                    pressed = 'lucky'
-                  }),
-                ]}
-              >
-                {submitting && pressed === 'lucky' ? 'Drawing…' : `🎲 I'm feeling lucky`}
-              </button>
-              <span mix={caption}>
-                {!luckyAvailable
-                  ? `Drawn for today — another in ${luckyWaitLabel}. It's in the list below.`
-                  : luckyBlockedBy.length > 0
-                    ? `Needs everyone in the run to have ${mediaTypeLabel} logged — ` +
-                      `${luckyBlockedBy.map((member) => member.label).join(', ')} ` +
-                      `${luckyBlockedBy.length === 1 && luckyBlockedBy[0].label === 'You' ? 'have' : 'has'} none.`
-                    : `One ${itemNoun}, already decided. Costs no run — one a day.`}
-              </span>
-            </div>
-          </div>
-
-          {/* The one difference neither caption can carry, and the one that is
-              invisible with nothing set above. */}
-          <p mix={css({ margin: 0, fontSize: '12px', color: '#888' })}>
-            Lucky is the stricter of the two: it won't draw anything anyone in the run has logged,
-            down to a want-to. A shortlist only rules out what most of you have already finished.
-          </p>
+          {/* One button, because there is one thing to press: the choice it
+              makes was made at the top of the form. minHeight rather than
+              padding — app.css sets the padding unlayered, where a rule from
+              here cannot reach it — which also gives it a thumb-sized target. */}
+          <button
+            type="submit"
+            disabled={disabled}
+            mix={css({ minHeight: '44px', width: '100%' })}
+          >
+            {submitting
+              ? isLucky
+                ? 'Drawing…'
+                : 'Starting…'
+              : isLucky
+                ? `🎲 Draw today's pick`
+                : 'Get recommendations'}
+          </button>
         </form>
       )
     }
