@@ -79,17 +79,25 @@ function collapsibleStyle(id: string): CSSStyle {
     },
     [NARROW]: {
       '& label': { cursor: 'pointer' },
-      // On the <span>, not the <label>: the span is display: block below, so a
-      // marker on the label would be pushed onto a line of its own after it.
-      '& label > span::after': { content: '" ▸"', fontSize: '13px', color: '#888' },
-      // On the <span> rather than the <label>, so it can be set from here at
-      // all: DoodleCSS's unlayered `.doodle label` rule outranks anything a
-      // css() call can say about a <label>, but it has nothing to say about a
-      // bare <span>. A thumb-sized band across the row, not a tap target the
-      // width of the words.
-      '& label > span': { display: 'block', padding: '0.55em 0' },
+      // `disclosure-closed` / `disclosure-open` are the list-style values a
+      // <summary> uses for its own marker, so this fold reads as the same
+      // control as the profile's taste-profile disclosure rather than as a
+      // second thing that also opens.
+      //
+      // All of it on the <span> rather than the <label>: DoodleCSS's unlayered
+      // `.doodle label` rule outranks anything a css() call can say about a
+      // <label>, but it has nothing to say about a bare <span>. The padding
+      // makes a thumb-sized band across the row rather than a tap target the
+      // width of the words, and `list-item` on the same element keeps the
+      // marker on the text's line instead of a line of its own.
+      '& label > span': {
+        display: 'list-item',
+        listStyleType: 'disclosure-closed',
+        listStylePosition: 'inside',
+        padding: '0.55em 0',
+      },
       '& > .collapsible-body': { display: 'none' },
-      [`&:has(#${id}:checked) label > span::after`]: { content: '" ▾"' },
+      [`&:has(#${id}:checked) label > span`]: { listStyleType: 'disclosure-open' },
       [`&:has(#${id}:checked) > .collapsible-body`]: { display: 'block' },
     },
     // Above the breakpoint the section can't be folded, so its heading is a
