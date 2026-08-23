@@ -29,7 +29,7 @@ import {
   listRecommendationRunsFromOthers,
 } from '../../data/recommendations/runs.ts'
 import { displayLabel } from '../../data/users.ts'
-import { routes } from '../../routes.ts'
+import { LUCKY_KIND, routes, RUN_KIND_PARAM } from '../../routes.ts'
 import {
   DEFAULT_MEDIA_TYPE,
   mediaTypeUiFor,
@@ -110,9 +110,25 @@ async function indexPage(
   user: User,
   mediaType: ActiveMediaType,
   extras: Pick<RecommendationsPageProps, 'error' | 'duplicate'> = {},
+  // Only the index route passes this. Every other caller is re-rendering after a
+  // submit that failed, where the reader already chose a kind and having the
+  // form jump under them would be the wrong answer.
+  //
+  // `available` is checked here rather than trusted from the link: the draw may
+  // have been spent since the call to action was rendered, or the URL typed by
+  // hand, and opening on a radio that is disabled would strand the form on a
+  // kind it can't submit.
+  luckyRequested = false,
 ) {
   const data = await loadIndexData(db, user, mediaType)
-  return <RecommendationsPage {...data} mediaType={mediaType} {...extras} />
+  return (
+    <RecommendationsPage
+      {...data}
+      mediaType={mediaType}
+      startLucky={luckyRequested && data.lucky.available}
+      {...extras}
+    />
+  )
 }
 
 export default createController(routes.recommendations, {
@@ -128,7 +144,15 @@ export default createController(routes.recommendations, {
 
       const db = context.get(Database)
 
-      return context.render(await indexPage(db, auth.identity, mediaType))
+      return context.render(
+        await indexPage(
+          db,
+          auth.identity,
+          mediaType,
+          {},
+          context.url.searchParams.get(RUN_KIND_PARAM) === LUCKY_KIND,
+        ),
+      )
     },
 
     async generate(context) {

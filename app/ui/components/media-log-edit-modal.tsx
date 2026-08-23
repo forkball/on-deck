@@ -6,6 +6,7 @@ import type { ActiveMediaType } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
 import { Modal } from './modal.tsx'
+import { NotesField } from './notes-field.tsx'
 import { StarRatingInput } from './star-rating.tsx'
 import { StatusSelect } from './status-select.tsx'
 import { Field } from '../shared/field.tsx'
@@ -48,9 +49,7 @@ export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
                 disliked={interaction.disliked ?? null}
               />
             </div>
-            <Field label="Notes">
-              <textarea name="notes" rows={3} defaultValue={interaction.notes ?? ''} placeholder="What did you think?" />
-            </Field>
+            <NotesField defaultValue={interaction.notes} />
           </div>
           <FrameForm />
         </form>

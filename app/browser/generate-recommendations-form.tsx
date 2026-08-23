@@ -37,6 +37,12 @@ export type GenerateRecommendationsFormProps = {
   // How long until the next draw, already phrased ("about 7 hours"). Empty
   // while one is available.
   luckyWaitLabel: string
+  // Opens the form already set to the draw, for the "today's pick" calls to
+  // action elsewhere that land here instead of drawing on the spot. The server
+  // only sets it when the draw is actually available, which is what keeps the
+  // `isLucky` reasoning below true — the radio it selects is never a disabled
+  // one.
+  startLucky: boolean
   findPeopleHref: string
 }
 
@@ -69,7 +75,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     // action the form posts to and decides which of the fields below apply —
     // `mode` below is a different question (who the run is for), and keeps its
     // name because that one is a field the server reads.
-    let runKind: 'shortlist' | 'lucky' = 'shortlist'
+    let runKind: 'shortlist' | 'lucky' = handle.props.startLucky ? 'lucky' : 'shortlist'
     let mode: 'self' | 'group' = 'self'
     let search = ''
     let page = 1
@@ -101,6 +107,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         luckyHref,
         luckyAvailable,
         luckyWaitLabel,
+        startLucky,
         findPeopleHref,
       } = handle.props
       const hasSource = selectedSources.size > 0
@@ -186,7 +193,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   type="radio"
                   name="run_kind"
                   value="shortlist"
-                  defaultChecked
+                  defaultChecked={!startLucky}
                   mix={on('change', () => {
                     runKind = 'shortlist'
                     handle.update()
@@ -200,6 +207,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   name="run_kind"
                   value="lucky"
                   disabled={!luckyAvailable}
+                  defaultChecked={startLucky}
                   mix={on('change', () => {
                     runKind = 'lucky'
                     handle.update()

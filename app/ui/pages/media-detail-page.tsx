@@ -10,6 +10,7 @@ import { ExpandableText } from '../components/expandable-text.tsx'
 import { ImageCarousel } from '../components/image-carousel.tsx'
 import { Modal } from '../components/modal.tsx'
 import { Nav } from '../components/nav.tsx'
+import { NotesField } from '../components/notes-field.tsx'
 import { PlatformList } from '../components/platform-list.tsx'
 import { StatusSelect } from '../components/status-select.tsx'
 import { Collapsible } from '../shared/collapsible.tsx'
@@ -209,15 +210,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                           disliked={interaction?.disliked ?? null}
                         />
                       </div>
-                      <Field label="Notes">
-                        <textarea
-                          name="notes"
-                          rows={3}
-                          defaultValue={interaction?.notes ?? ''}
-                          placeholder="What did you think?"
-                          mix={css({ width: '100%' })}
-                        />
-                      </Field>
+                      <NotesField defaultValue={interaction?.notes} />
                     </div>
                     <FrameForm />
                   </form>

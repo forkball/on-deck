@@ -6,6 +6,7 @@ import type { MediaType } from '../../data/mediaItems.ts'
 import { Toast } from '../../ui/components/toast.tsx'
 import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
+import { NotesField } from '../../ui/components/notes-field.tsx'
 import { Field } from '../../ui/shared/field.tsx'
 import { Document } from '../../ui/components/document.tsx'
 import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
@@ -215,14 +216,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                               disliked={interaction?.disliked ?? null}
                             />
                           </div>
-                          <Field label="Add thoughts">
-                            <input
-                              type="text"
-                              name="notes"
-                              defaultValue={interaction?.notes ?? ''}
-                              placeholder="What did you think?"
-                            />
-                          </Field>
+                          <NotesField defaultValue={interaction?.notes} />
                         </div>
                         <button type="submit">Save</button>
                         <FrameForm />
