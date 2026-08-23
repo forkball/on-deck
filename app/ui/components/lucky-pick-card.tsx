@@ -4,7 +4,6 @@ import { css } from 'remix/ui'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import type { LuckyPick } from '../../data/recommendations/lucky.ts'
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
-import { routes } from '../../routes.ts'
 
 // What the day's pick is called, wherever it is named. Exported because the
 // home page heads its own column with it (see showLabel) and two copies of the
@@ -39,7 +38,6 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
     const { pick, returnTo, showLabel = true } = handle.props
     const { releaseYear, posterUrl } = parseMediaMetadata(pick.metadata)
     const ui = mediaTypeUiFor(pick.mediaType)
-    const runHref = routes.recommendations.show.href({ runId: String(pick.runId) })
     const detailHref = `${ui.hrefs.show(pick.mediaItemId)}?from=${encodeURIComponent(returnTo)}`
 
     return (
@@ -77,12 +75,6 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
             <span mix={css({ color: '#888', fontSize: '13px' })}>· {ui.singular}</span>
           </p>
           <p mix={css({ margin: '6px 0 0', color: '#555' })}>{pick.reason}</p>
-          <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
-            {pick.otherMemberLabels.length > 0
-              ? `Drawn for you + ${pick.otherMemberLabels.join(', ')} — none of you had logged it.`
-              : `Drawn for you — you hadn't logged it.`}{' '}
-            <a href={runHref}>See the pick →</a>
-          </p>
         </div>
       </div>
     )
