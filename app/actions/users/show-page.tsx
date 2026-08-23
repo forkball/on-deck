@@ -92,6 +92,7 @@ function FollowButton(handle: Handle<{ userId: number; following: boolean; retur
     return (
       <form
         method="post"
+        mix={css({ margin: '0 0 16px' })}
         action={
           following
             ? routes.users.unfollow.href({ userId: String(userId) })
@@ -99,7 +100,9 @@ function FollowButton(handle: Handle<{ userId: number; following: boolean; retur
         }
       >
         <input type="hidden" name="return_to" value={returnTo} />
-        <button type="submit">{following ? 'Unfollow' : 'Follow'}</button>
+        <button type="submit" mix={css({ width: '100%', padding: '8px 12px' })}>
+          {following ? 'Unfollow' : 'Follow'}
+        </button>
       </form>
     )
   }
@@ -116,11 +119,8 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
       <Document title={`${label} | On Deck`}>
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <div mix={css({ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px' })}>
-            <h1>{label}</h1>
-            <FollowButton userId={user.id} following={viewerFollows} returnTo={returnTo} />
-          </div>
-          <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
+          <h1 mix={css({ margin: '0 0 4px', overflowWrap: 'break-word' })}>{label}</h1>
+          <p mix={css({ margin: '0 0 12px', color: '#555' })}>
             {locked ? (
               <>
                 {followingCount} following · {followersCount} follower{followersCount === 1 ? '' : 's'}
@@ -134,6 +134,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
               </>
             )}
           </p>
+          <FollowButton userId={user.id} following={viewerFollows} returnTo={returnTo} />
 
           {locked ? (
             <p>This profile is private. Follow {label} to see their bio and log.</p>

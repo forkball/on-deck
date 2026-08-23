@@ -53,16 +53,19 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
                     padding: '12px 16px',
                   })}
                 >
-                  {canView ? (
-                    <a href={routes.users.show.href({ userId: String(user.id) })}>
+                  <div mix={css({ minWidth: 0, overflowWrap: 'break-word' })}>
+                    {canView ? (
+                      <a href={routes.users.show.href({ userId: String(user.id) })}>
+                        <strong>{displayLabel(user)}</strong>
+                      </a>
+                    ) : (
                       <strong>{displayLabel(user)}</strong>
-                    </a>
-                  ) : (
-                    <strong>{displayLabel(user)}</strong>
-                  )}
+                    )}
+                  </div>
 
                   <form
                     method="post"
+                    mix={css({ flexShrink: 0 })}
                     action={
                       following
                         ? routes.users.unfollow.href({ userId: String(user.id) })
