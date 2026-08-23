@@ -134,15 +134,15 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       <Document title="Recommendations | On Deck">
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          <MediaTabLinks
-            current={mediaType}
-            hrefFor={(type) => `${recsHref}?mediaType=${type}`}
-          />
           <h1>Recommendations</h1>
           <p mix={css({ color: '#555' })}>
             Rewrites your {ui.attributive} taste profile from what you've logged, then finds
             picks to try next.
           </p>
+          <MediaTabLinks
+            current={mediaType}
+            hrefFor={(type) => `${recsHref}?mediaType=${type}`}
+          />
 
           {duplicate && <DuplicateNotice duplicate={duplicate} />}
 
