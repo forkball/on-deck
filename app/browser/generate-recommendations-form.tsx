@@ -188,54 +188,51 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
           <div>
             <p mix={sectionLabel}>What are you after?</p>
             <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
-              <label>
-                <input
-                  type="radio"
-                  name="run_kind"
-                  value="shortlist"
-                  defaultChecked={!startLucky}
-                  mix={on('change', () => {
-                    runKind = 'shortlist'
-                    handle.update()
-                  })}
-                />{' '}
-                A shortlist
-              </label>
-              <label mix={css({ color: luckyAvailable ? 'inherit' : '#888' })}>
-                <input
-                  type="radio"
-                  name="run_kind"
-                  value="lucky"
-                  disabled={!luckyAvailable}
-                  defaultChecked={startLucky}
-                  mix={on('change', () => {
-                    runKind = 'lucky'
-                    handle.update()
-                  })}
-                />{' '}
-                Today's lucky pick
-              </label>
+              <div mix={css({ flex: '1 1 200px' })}>
+                <label>
+                  <input
+                    type="radio"
+                    name="run_kind"
+                    value="shortlist"
+                    defaultChecked={!startLucky}
+                    mix={on('change', () => {
+                      runKind = 'shortlist'
+                      handle.update()
+                    })}
+                  />{' '}
+                  A shortlist
+                </label>
+                <p mix={caption}>
+                  {`Up to ${shortlistCount} picks to choose from, minus what most of you have already ` +
+                    `finished.${runsLeftLabel ? ` ${runsLeftLabel}.` : ''}`}
+                </p>
+              </div>
+              <div mix={css({ flex: '1 1 200px', color: luckyAvailable ? 'inherit' : '#888' })}>
+                <label>
+                  <input
+                    type="radio"
+                    name="run_kind"
+                    value="lucky"
+                    disabled={!luckyAvailable}
+                    defaultChecked={startLucky}
+                    mix={on('change', () => {
+                      runKind = 'lucky'
+                      handle.update()
+                    })}
+                  />{' '}
+                  Today's lucky pick
+                </label>
+                <p mix={caption}>
+                  {`One ${itemNoun}, and never one anyone in the run has logged — down to a want-to. ` +
+                    `Costs no run, and you get one a day.`}
+                </p>
+                {!luckyAvailable && (
+                  <p mix={caption}>
+                    Today's lucky pick is already drawn — another in {luckyWaitLabel}.
+                  </p>
+                )}
+              </div>
             </div>
-
-            {/* One line, for the one that is selected. Two captions side by side
-                is what this replaced: on a narrow screen they stacked into a
-                wall of grey and stopped reading as a comparison at all. */}
-            <p mix={caption}>
-              {isLucky
-                ? `One ${itemNoun}, and never one anyone in the run has logged — down to a want-to. ` +
-                  `Costs no run, and you get one a day.`
-                : `Up to ${shortlistCount} picks to choose from, minus what most of you have already ` +
-                  `finished.${runsLeftLabel ? ` ${runsLeftLabel}.` : ''}`}
-            </p>
-
-            {/* Only ever alongside the shortlist caption: the option above is
-                disabled once the draw is spent, so it cannot be the selected
-                one and have this to say. */}
-            {!luckyAvailable && (
-              <p mix={caption}>
-                Today's lucky pick is already drawn — another in {luckyWaitLabel}.
-              </p>
-            )}
           </div>
 
           <div mix={onlyForShortlist}>
