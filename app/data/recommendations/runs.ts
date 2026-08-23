@@ -1,4 +1,4 @@
-import { and, eq, inList } from 'remix/data-table'
+import { and, eq, inList, lt, or } from 'remix/data-table'
 
 import type { LengthBucket } from '../catalog/provider.ts'
 import type { Db } from '../db.ts'
@@ -43,6 +43,25 @@ export interface RecommendationRunSummary {
   // An "I'm feeling lucky" run — one pick, no filters, once a day. Kept and
   // pruned on its own track, so an ordinary run can never evict today's pick.
   isLucky: boolean
+  // Who generated it, or null when that is the viewer. Null rather than the
+  // viewer's own label because the two say different things on screen — "you
+  // generated" is a sentence the reader is in, and the home feed interleaves
+  // these rows with other people's, where the distinction is the whole point.
+  owner: { id: number; label: string } | null
+}
+
+// Where to continue a listing from: the run after which to resume, as the same
+// (createdAt, id) pair the ordering uses. The id is part of it because two runs
+// can share a millisecond, and a plain `createdAt <` would drop one of them.
+export interface RunCursor {
+  at: number
+  id: number
+}
+
+// The `where` fragment for a cursor, as the table API spells a row comparison:
+// older, or the same instant and a lower id.
+function olderThan(cursor: RunCursor) {
+  return or(lt('created_at', cursor.at), and(eq('created_at', cursor.at), lt('id', cursor.id)))
 }
 
 // sourceTypes always has at least one entry — see parseParams.
@@ -292,10 +311,22 @@ export async function listRecommendationRuns(
   // in the query: a caller that wants three runs shouldn't make this fetch a
   // name for every member of thirty.
   limit?: number,
+  // Where to resume — see RunCursor. Left out, the listing starts at the newest.
+  before?: RunCursor,
 ): Promise<RecommendationRunSummary[]> {
+  const scope = [
+    eq('user_id', userId),
+    ...(mediaType ? [eq('media_type', mediaType)] : []),
+    ...(before ? [olderThan(before)] : []),
+  ]
+
   const runs = await db.findMany(recommendationRuns, {
-    where: mediaType ? { user_id: userId, media_type: mediaType } : { user_id: userId },
-    orderBy: ['created_at', 'desc'],
+    where: and(...scope),
+    // id breaks ties, so the ordering matches what a RunCursor resumes from.
+    orderBy: [
+      ['created_at', 'desc'],
+      ['id', 'desc'],
+    ],
     limit,
   })
 
@@ -308,11 +339,12 @@ export async function listRecommendationRuns(
     mediaType: run.media_type,
     name: run.name,
     isLucky: run.is_lucky,
+    // These are the viewer's own runs by construction — the query filters on
+    // their user_id — so there is no one else to name.
+    owner: null,
   }))
 }
 
-// Restricted to mutual follows — being added to someone's run isn't consent to
-// show up on their page. Deliberately stricter than getRecommendationRun.
 // Restricted to mutual follows — being added to someone's run isn't consent to
 // show up on their page. Deliberately stricter than getRecommendationRun.
 export async function listRecommendationRunsFromOthers(
@@ -322,6 +354,9 @@ export async function listRecommendationRunsFromOthers(
   // See listRecommendationRuns. Applied after the mutual-follow filter, since
   // that is what decides which runs are eligible at all.
   limit?: number,
+  // Also applied in JS rather than in the query, for the same reason: which
+  // runs are eligible isn't known until the follow check has run.
+  before?: RunCursor,
 ): Promise<RecommendationRunSummary[]> {
   const memberships = await db.findMany(recommendationRunMembers, { where: { user_id: userId } })
   if (memberships.length === 0) return []
@@ -341,10 +376,27 @@ export async function listRecommendationRunsFromOthers(
 
   const eligibleRuns = runsFromOthers
     .filter((run) => userFollows.has(run.user_id) && followsUser.has(run.user_id))
-    .sort((a, b) => b.created_at - a.created_at)
+    .filter(
+      (run) =>
+        before === undefined ||
+        run.created_at < before.at ||
+        (run.created_at === before.at && run.id < before.id),
+    )
+    // Same ordering a RunCursor resumes from, id included.
+    .sort((a, b) => b.created_at - a.created_at || b.id - a.id)
     .slice(0, limit)
 
-  const labels = await loadOtherMemberLabels(db, userId, eligibleRuns)
+  if (eligibleRuns.length === 0) return []
+
+  // Who generated each one. The member labels below cover everyone *else* in
+  // the run, which on someone else's run is usually the requester too — but not
+  // always, so the owners are read rather than picked out of that map.
+  const ownerIds = [...new Set(eligibleRuns.map((run) => run.user_id))]
+  const [labels, owners] = await Promise.all([
+    loadOtherMemberLabels(db, userId, eligibleRuns),
+    db.findMany(users, { where: inList('id', ownerIds) }),
+  ])
+  const ownerById = new Map(owners.map((owner) => [owner.id, displayLabel(owner)]))
 
   return eligibleRuns.map((run) => ({
     id: run.id,
@@ -353,6 +405,7 @@ export async function listRecommendationRunsFromOthers(
     mediaType: run.media_type,
     name: run.name,
     isLucky: run.is_lucky,
+    owner: { id: run.user_id, label: ownerById.get(run.user_id) ?? 'Someone' },
   }))
 }
 
@@ -376,6 +429,10 @@ export async function getRecommendationRun(
   const otherMemberLabels = await listOtherMemberLabels(db, userId, run)
   const groupLabel = groupLabelFrom(otherMemberLabels)
   const params = parseParams(run)
+  // Only looked up when the run is someone else's; on your own there is nobody
+  // to name, which is what `null` means here.
+  const ownerRow = run.user_id === userId ? null : await db.find(users, run.user_id)
+  const owner = ownerRow ? { id: ownerRow.id, label: displayLabel(ownerRow) } : null
   const rows = await db.findMany(userRecommendations, { where: { run_id: runId }, orderBy: ['rank', 'asc'] })
   if (rows.length === 0) {
     return {
@@ -385,6 +442,7 @@ export async function getRecommendationRun(
       mediaType: run.media_type,
       name: run.name,
       isLucky: run.is_lucky,
+      owner,
       otherMemberLabels,
       results: [],
       params,
@@ -421,6 +479,7 @@ export async function getRecommendationRun(
     mediaType: run.media_type,
     name: run.name,
     isLucky: run.is_lucky,
+    owner,
     otherMemberLabels,
     results,
     params,

@@ -473,10 +473,30 @@ interface FollowingLogRow extends LogRow {
 // user_media_interactions_user_recent, already ordered, and the outer sort sees
 // followed_count × limit rows at most. $3 is deliberately both bounds: taking
 // more than `limit` from any one person can't change the newest `limit` overall.
+//
+// `before` pages the feed: the row after which to continue, as the same
+// (updated_at, id) pair the ordering uses. A plain `updated_at <` would drop
+// rows — an import stamps a whole batch with one timestamp, so the boundary
+// timestamp is routinely shared — which is why the tiebreaker is part of the
+// cursor and the comparison is a row comparison rather than two predicates.
+// It goes inside the lateral as well as outside: the inner slice is per
+// account, so without it each person's `limit` rows are their newest ones over
+// again and paging never advances past them.
+export interface LogCursor {
+  at: number
+  id: number
+}
+
 export async function listFollowingLogActivity(
   viewerId: number,
   limit: number,
+  before?: LogCursor,
 ): Promise<FollowingLogEntry[]> {
+  // Row comparison against a NULL row is NULL, not true, so the no-cursor case
+  // is spelled as its own `is null` branch rather than left to the comparison.
+  const notAfterCursor = `
+            and ($4::bigint is null or (i.updated_at, i.id) < ($4::bigint, $5::bigint))`
+
   const { rows } = await pool.query<FollowingLogRow>(
     LOG_SELECT +
       `, u.display_name as u_display_name, u.email as u_email
@@ -486,6 +506,7 @@ export async function listFollowingLogActivity(
            from user_media_interactions i
           where i.user_id = f.followed_id
             and i.status = any($2::text[])` +
+      notAfterCursor +
       LOG_ORDER +
       `
           limit $3
@@ -493,9 +514,10 @@ export async function listFollowingLogActivity(
        join users u on u.id = i.user_id
        left join media_items m on m.id = i.media_item_id
       where f.follower_id = $1` +
+      notAfterCursor +
       LOG_ORDER +
       `\n      limit $3`,
-    [viewerId, [...CONSUMPTION_STATUSES], limit],
+    [viewerId, [...CONSUMPTION_STATUSES], limit, before?.at ?? null, before?.id ?? null],
   )
 
   return rows.map((row) => ({
