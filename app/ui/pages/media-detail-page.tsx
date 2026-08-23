@@ -2,7 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
-import { MEDIA_TYPE_UI, statusLabelsFor, type ActiveMediaType } from '../../mediaTypes.ts'
+import { MEDIA_TYPE_UI, NOTES_HINT, statusLabelsFor, type ActiveMediaType } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
 import { Document } from '../components/document.tsx'
@@ -209,7 +209,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                           disliked={interaction?.disliked ?? null}
                         />
                       </div>
-                      <Field label="Notes">
+                      <Field label="Notes" hint={NOTES_HINT}>
                         <textarea
                           name="notes"
                           rows={3}

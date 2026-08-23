@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import type { getUserInteractionForItem } from '../../data/mediaItems.ts'
 import type { MediaItem } from '../../data/schema.ts'
 import { MediaTabLinks } from '../components/media-tab-links.tsx'
-import { MEDIA_TYPE_UI, statusLabelsFor, type ActiveMediaType } from '../../mediaTypes.ts'
+import { MEDIA_TYPE_UI, NOTES_HINT, statusLabelsFor, type ActiveMediaType } from '../../mediaTypes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
 import { LazyList } from '../../browser/lazy-list.tsx'
 import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
@@ -178,12 +178,13 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                                     disliked={interaction?.disliked ?? null}
                                   />
                                 </div>
-                                <Field label="Add thoughts">
-                                  <input
-                                    type="text"
+                                <Field label="Notes" hint={NOTES_HINT}>
+                                  <textarea
                                     name="notes"
+                                    rows={3}
                                     defaultValue={interaction?.notes ?? ''}
                                     placeholder="What did you think?"
+                                    mix={css({ width: '100%' })}
                                   />
                                 </Field>
                               </div>

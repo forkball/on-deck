@@ -2,7 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { UserMediaInteraction } from '../../data/schema.ts'
-import type { ActiveMediaType } from '../../mediaTypes.ts'
+import { NOTES_HINT, type ActiveMediaType } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
 import { Modal } from './modal.tsx'
@@ -48,7 +48,7 @@ export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
                 disliked={interaction.disliked ?? null}
               />
             </div>
-            <Field label="Notes">
+            <Field label="Notes" hint={NOTES_HINT}>
               <textarea name="notes" rows={3} defaultValue={interaction.notes ?? ''} placeholder="What did you think?" />
             </Field>
           </div>
