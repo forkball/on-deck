@@ -12,7 +12,7 @@ import { Toast } from '../components/toast.tsx'
 import { Document } from '../components/document.tsx'
 import { FloatingDropdown } from '../components/floating-dropdown.tsx'
 import { Nav } from '../components/nav.tsx'
-import { NotesHint } from '../components/notes-hint.tsx'
+import { NotesField } from '../components/notes-field.tsx'
 import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { StatusSelect } from '../components/status-select.tsx'
 import { Field } from '../shared/field.tsx'
@@ -179,16 +179,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                                     disliked={interaction?.disliked ?? null}
                                   />
                                 </div>
-                                <Field label="Notes">
-                                  <textarea
-                                    name="notes"
-                                    rows={3}
-                                    defaultValue={interaction?.notes ?? ''}
-                                    placeholder="What did you think?"
-                                    mix={css({ width: '100%' })}
-                                  />
-                                </Field>
-                                <NotesHint />
+                                <NotesField defaultValue={interaction?.notes} />
                               </div>
                               <button type="submit">Save</button>
                               <FrameForm />
