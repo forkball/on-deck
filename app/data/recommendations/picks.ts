@@ -89,22 +89,29 @@ const SEEN_TITLES_IN_PROMPT = 200
 // A backstop against an unbounded prompt rather than a limit anyone reaches.
 const REJECTED_TITLES_IN_PROMPT = 100
 
-export function describeSeen(seen: string[], noun: string): string {
+// `subject` is the person's name for a solo run, or null for a group — where
+// there's no single "they" to name, so the prompt stays pronoun-generic.
+export function describeSeen(seen: string[], noun: string, subject: string | null): string {
   if (seen.length === 0) return ''
 
   const shown = seen.slice(0, SEEN_TITLES_IN_PROMPT)
   if (shown.length === seen.length) {
-    return `\n\nThey've already seen (do not suggest any of these): ${JSON.stringify(seen)}`
+    return subject
+      ? `\n\n${subject} has already seen (do not suggest any of these): ${JSON.stringify(seen)}`
+      : `\n\nThey've already seen (do not suggest any of these): ${JSON.stringify(seen)}`
   }
 
   // The count matters: handed a bare 200 out of 900, the model reads that as the
   // whole of what they've watched and pitches at someone barely started.
-  return (
-    `\n\nThey've logged ${seen.length} ${noun} as seen — here are the ${shown.length} most recent, none of ` +
-    `which you should suggest: ${JSON.stringify(shown)}. Take it as read that there are many more you ` +
-    `haven't been shown: this is someone well past the obvious picks, so favour things they're unlikely to ` +
-    `have already worked through.`
-  )
+  return subject
+    ? `\n\n${subject} has logged ${seen.length} ${noun} as seen — here are the ${shown.length} most recent, none ` +
+      `of which you should suggest: ${JSON.stringify(shown)}. Take it as read that there are many more you ` +
+      `haven't been shown: ${subject} is well past the obvious picks, so favour things ${subject} is unlikely to ` +
+      `have already worked through.`
+    : `\n\nThey've logged ${seen.length} ${noun} as seen — here are the ${shown.length} most recent, none of ` +
+      `which you should suggest: ${JSON.stringify(shown)}. Take it as read that there are many more you ` +
+      `haven't been shown: this is someone well past the obvious picks, so favour things they're unlikely to ` +
+      `have already worked through.`
 }
 
 function buildFilterInstructions(filters: RecommendationFilters, noun: string, mediaType: MediaType): string {
@@ -145,6 +152,7 @@ export async function requestPicks(
   sourceTypes: MediaType[] = ['movie'],
 ): Promise<Pick[]> {
   const isGroup = profiles.length > 1
+  const subject = isGroup ? null : profiles[0].label
   const noun = mediaTypeUiFor(mediaType).plural
   const sourceNouns = sourceTypes.map((type) => mediaTypeUiFor(type).plural)
   const crossesMedia = sourceTypes.some((type) => type !== mediaType)
@@ -175,10 +183,10 @@ export async function requestPicks(
       `tags — reason per-person about how each candidate would land for them specifically. For each pick, give ` +
       `your best-guess release year (used only to disambiguate remakes/same-titled entries) and a reason ` +
       `noting which member(s) it serves and why.`
-    : `A person's ${noun} taste profile:\n${JSON.stringify(profiles[0], null, 2)}\n\n` +
+    : `${subject}'s ${noun} taste profile:\n${JSON.stringify(profiles[0], null, 2)}\n\n` +
       `Suggest ${requestedCount} real ${noun} (not from any fixed list — use your own knowledge) that match ` +
       `this taste profile.${filterInstructions} For each, give your best-guess release year (used only to ` +
-      `disambiguate remakes/same-titled entries) and a one-sentence reason tied to their profile.`
+      `disambiguate remakes/same-titled entries) and a one-sentence reason tied to ${subject}'s profile.`
 
 // Scales per person because the reasoning does — a run that exhausts its budget
   // thinking comes back with no picks at all.
@@ -199,11 +207,15 @@ export async function requestPicks(
         role: 'user',
         content:
           prompt +
-          describeSeen(excluded.seen, noun) +
+          describeSeen(excluded.seen, noun, subject) +
           (excluded.rejected.length > 0
-            ? `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
-              `as a signal about what to steer away from more broadly: ` +
-              `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
+            ? subject
+              ? `\n\n${subject} has explicitly ruled these out as not interesting — never suggest them, and treat ` +
+                `them as a signal about what to steer away from more broadly: ` +
+                `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
+              : `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
+                `as a signal about what to steer away from more broadly: ` +
+                `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
             : ''),
       },
     ],

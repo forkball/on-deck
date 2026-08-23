@@ -21,7 +21,7 @@ export async function searchUsers(db: Db, query: string, excludeUserId: number):
 }
 
 export const USERNAME_MIN_LENGTH = 3
-export const USERNAME_MAX_LENGTH = 30
+export const USERNAME_MAX_LENGTH = 16
 export const BIO_MAX_LENGTH = 500
 
 // Usernames double as a login handle alongside email, putting both in one

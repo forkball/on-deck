@@ -43,6 +43,7 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
           display: 'flex',
           gap: '20px',
           borderBottom: '1px solid #ddd',
+          marginTop: '20px',
           marginBottom: '20px',
         })}
       >

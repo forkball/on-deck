@@ -59,19 +59,22 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
                       padding: '12px 16px',
                     })}
                   >
-                    {canView ? (
-                      <a href={routes.users.show.href({ userId: String(user.id) })}>
+                    <div mix={css({ minWidth: 0, overflowWrap: 'break-word' })}>
+                      {canView ? (
+                        <a href={routes.users.show.href({ userId: String(user.id) })}>
+                          <strong>{displayLabel(user)}</strong>
+                        </a>
+                      ) : (
                         <strong>{displayLabel(user)}</strong>
-                      </a>
-                    ) : (
-                      <strong>{displayLabel(user)}</strong>
-                    )}
+                      )}
+                    </div>
 
                     {isViewer ? (
-                      <span mix={css({ fontSize: '13px', color: '#555' })}>You</span>
+                      <span mix={css({ fontSize: '13px', color: '#555', flexShrink: 0 })}>You</span>
                     ) : (
                       <form
                         method="post"
+                        mix={css({ flexShrink: 0 })}
                         action={
                           following
                             ? routes.users.unfollow.href({ userId: String(user.id) })
