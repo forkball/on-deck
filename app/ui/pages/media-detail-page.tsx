@@ -25,6 +25,10 @@ export interface MediaDetailPageProps {
   interaction: UserMediaInteraction | null
   from?: string
   displayName: string
+  // Repointing a media_items row changes it for everyone who logged that work,
+  // so the form is only offered to admins — see the rematch action in
+  // actions/mediaActions.tsx, which enforces it.
+  canRematch?: boolean
   rematchError?: string
   rematched?: boolean
   merged?: boolean
@@ -34,7 +38,7 @@ export interface MediaDetailPageProps {
 // from MEDIA_TYPE_UI.
 export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
   return () => {
-    const { mediaType, item, interaction, from, displayName, rematchError, rematched, merged } =
+    const { mediaType, item, interaction, from, displayName, canRematch, rematchError, rematched, merged } =
       handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
     const { releaseYear, posterUrl, overview, creator, images, platforms, tags } = parseMediaMetadata(
@@ -113,33 +117,39 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
               {/* Top margin matters now that the description above may end
                   in a Read more toggle, which carries no bottom margin of
                   its own — without this the two sit flush together. */}
-              <div mix={css({ marginTop: '20px', marginBottom: '16px', color: '#555' })}>
-                {/* Held open when the last attempt failed: collapsing would hide
-                    both the error and the field it refers to, leaving the page
-                    looking like nothing happened. */}
-                <Collapsible summary={`Wrong ${ui.itemNoun}?`} open={Boolean(rematchError)}>
-                <form
-                  method="post"
-                  action={ui.hrefs.rematch(item.id)}
-                  mix={css({ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap', alignItems: 'center' })}
-                >
-                  <input type="hidden" name="return_to" value={returnTo} />
-                  <input
-                    type="text"
-                    name="tmdb_link"
-                    placeholder={ui.rematchPlaceholder}
-                    mix={css({ flex: '1 1 240px' })}
-                  />
-                  <button type="submit">Fix match</button>
-                </form>
-                <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
-                  <a href={ui.catalogSearchUrl(item.title, releaseYear)} target="_blank" rel="noopener noreferrer">
-                    Look up "{item.title}" on {ui.catalogName}
-                  </a>
-                </p>
-                {rematchError && <p mix={css({ color: '#c33', margin: '8px 0 0' })}>{rematchError}</p>}
-                </Collapsible>
-              </div>
+              {canRematch && (
+                <div mix={css({ marginTop: '20px', marginBottom: '16px', color: '#555' })}>
+                  {/* Held open when the last attempt failed: collapsing would hide
+                      both the error and the field it refers to, leaving the page
+                      looking like nothing happened. */}
+                  <Collapsible summary={`Wrong ${ui.itemNoun}?`} open={Boolean(rematchError)}>
+                  <form
+                    method="post"
+                    action={ui.hrefs.rematch(item.id)}
+                    mix={css({ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap', alignItems: 'center' })}
+                  >
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <input
+                      type="text"
+                      name="tmdb_link"
+                      placeholder={ui.rematchPlaceholder}
+                      mix={css({ flex: '1 1 240px' })}
+                    />
+                    <button type="submit">Fix match</button>
+                  </form>
+                  <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
+                    <a href={ui.catalogSearchUrl(item.title, releaseYear)} target="_blank" rel="noopener noreferrer">
+                      Look up "{item.title}" on {ui.catalogName}
+                    </a>
+                  </p>
+                  <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
+                    This entry is shared: fixing the match repoints it for everyone who logged this{' '}
+                    {ui.itemNoun}.
+                  </p>
+                  {rematchError && <p mix={css({ color: '#c33', margin: '8px 0 0' })}>{rematchError}</p>}
+                  </Collapsible>
+                </div>
+              )}
 
               <div
                 mix={css({

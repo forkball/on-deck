@@ -107,7 +107,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       if (!result) return redirect(ui.hrefs.search(), 303)
 
       const db: Db = context.get(Database)
-      const item = await upsertCatalogItem(db, mediaType, result)
+      const item = await upsertCatalogItem(db, mediaType, result, true)
 
       const from = context.url.searchParams.get('from') || undefined
       const showHref = ui.hrefs.show(item.id)
@@ -143,6 +143,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
           interaction={interaction}
           from={from}
           displayName={displayLabel(identity)}
+          canRematch={identity.is_admin}
           rematchError={context.url.searchParams.get('rematchError') || undefined}
           rematched={context.url.searchParams.get('rematched') === '1'}
           merged={context.url.searchParams.get('merged') === '1'}
@@ -150,9 +151,16 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       )
     },
 
+    // Admin-only, and the check is here rather than only on the form: a
+    // media_items row is shared by everyone who logged that work, so repointing
+    // it rewrites — or, on a merge, deletes — an entry other people's logs hang
+    // off. Correcting a bad match for yourself alone is what the import review
+    // does (repointRow in data/imports/batches.ts), which stages the change
+    // against your own rows and leaves the catalog alone.
     async rematch(context: MediaItemControllerContext) {
       const auth = context.get(Auth)
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+      if (!auth.identity.is_admin) return new Response('Forbidden', { status: 403 })
 
       const mediaItemId = Number(context.params.mediaItemId)
       const formData = context.get(FormData)

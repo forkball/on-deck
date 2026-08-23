@@ -277,7 +277,7 @@ export async function repointRow(
   const detail = await provider.getById(parsed)
   if (!detail) return { ok: false, error: provider.lookupFailedError }
 
-  const item = await upsertCatalogItem(db, mediaType, detail)
+  const item = await upsertCatalogItem(db, mediaType, detail, true)
 
   await db.update(importRows, row.id, {
     // Confirmed rather than re-classified: a person picking a film off the
