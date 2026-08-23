@@ -5,42 +5,65 @@ import { redirect } from 'remix/response/redirect'
 
 import { assetServer } from '../assets.ts'
 import type { Db } from '../data/db.ts'
+import { loadFeedPage, type FeedCursor } from '../data/feed.ts'
 import { countFollowing } from '../data/follows.ts'
-import { listFollowingLogActivity } from '../data/mediaItems.ts'
 import { getLuckyState } from '../data/recommendations/lucky.ts'
-import { listRecommendationRuns, listRecommendationRunsFromOthers } from '../data/recommendations/runs.ts'
 import type { User } from '../data/schema.ts'
 import { displayLabel } from '../data/users.ts'
 import { getRememberedMediaType } from '../middleware/mediaType.ts'
 import { routes } from '../routes.ts'
+import { FeedRows } from './activity-feed.tsx'
 import { HomePage, type HomeDashboard } from './home-page.tsx'
 import { MEDIA_TYPE_UI } from '../mediaTypes.ts'
 
-// A landing page, not a log: enough of each list to show what's there, with the
-// page that owns it a click away.
-const RUNS_SHOWN = 3
-const ACTIVITY_SHOWN = 8
+// One screenful and a bit. Small enough that the landing page isn't paying for
+// rows nobody scrolls to, big enough that the first auto-load isn't immediate.
+const FEED_PAGE = 10
 
 async function loadDashboard(db: Db, user: User): Promise<HomeDashboard> {
   // Unfiltered by media type on purpose — the recommendations index is the
   // per-type view, and this one answers "what has happened lately".
-  const [lucky, runs, runsFromOthers, followingActivity] = await Promise.all([
-    getLuckyState(user),
-    listRecommendationRuns(db, user.id, undefined, RUNS_SHOWN),
-    listRecommendationRunsFromOthers(db, user.id, undefined, RUNS_SHOWN),
-    listFollowingLogActivity(user.id, ACTIVITY_SHOWN),
-  ])
+  const [lucky, page] = await Promise.all([getLuckyState(user), loadFeedPage(db, user.id, FEED_PAGE)])
 
   return {
     displayName: displayLabel(user),
     lucky,
-    runs,
-    runsFromOthers,
-    followingActivity,
+    feed: page.items,
+    feedCursor: page.cursor,
     // Only asked when the feed came back empty: anything in it already proves
-    // you follow someone, and this is the landing page — a round trip whose
-    // answer is usually discarded is one worth not making.
-    followsAnyone: followingActivity.length > 0 || (await countFollowing(db, user.id)) > 0,
+    // there is something to show, and this is the landing page — a round trip
+    // whose answer is usually discarded is one worth not making.
+    followsAnyone: page.items.length > 0 || (await countFollowing(db, user.id)) > 0,
+  }
+}
+
+// The cursor arrives as whatever the last response put in the query string.
+// Anything that isn't the shape we sent back is treated as no cursor at all —
+// a feed that restarts from the top is a much better answer to a mangled URL
+// than a 500, and there is nothing here worth defending beyond that.
+function parseFeedCursor(raw: string | null): FeedCursor | undefined {
+  if (!raw) return undefined
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return undefined
+
+    const cursor: FeedCursor = {}
+    for (const key of ['log', 'runs', 'runsFromOthers'] as const) {
+      const value = (parsed as Record<string, unknown>)[key]
+      if (value === null) {
+        cursor[key] = null
+      } else if (
+        typeof value === 'object' &&
+        value !== null &&
+        typeof (value as { at?: unknown }).at === 'number' &&
+        typeof (value as { id?: unknown }).id === 'number'
+      ) {
+        cursor[key] = { at: (value as { at: number }).at, id: (value as { id: number }).id }
+      }
+    }
+    return cursor
+  } catch {
+    return undefined
   }
 }
 
@@ -59,6 +82,28 @@ export default createController(routes, {
 
       const db = context.get(Database)
       return context.render(<HomePage dashboard={await loadDashboard(db, auth.identity)} />)
+    },
+    // The rest of the home feed, for the auto-loader. Answers the rows as
+    // markup rather than as data: they are built from components under app/ui
+    // that a client bundle can't import, so rendering them here is what keeps an
+    // appended row identical to a server-rendered one.
+    async feed(context) {
+      const auth = context.get(Auth)
+      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
+
+      const db = context.get(Database)
+      const page = await loadFeedPage(
+        db,
+        auth.identity.id,
+        FEED_PAGE,
+        parseFeedCursor(context.url.searchParams.get('cursor')),
+      )
+
+      // Rendered to a string rather than streamed: it is going into a JSON
+      // field beside the cursor, and the caller needs both together.
+      const html = await context.render(<FeedRows items={page.items} />).text()
+
+      return Response.json({ html, cursor: page.cursor && JSON.stringify(page.cursor) })
     },
     media(context) {
       return redirect(MEDIA_TYPE_UI[getRememberedMediaType(context)].hrefs.search(), 303)

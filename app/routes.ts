@@ -3,6 +3,10 @@ import { del, form, get, put, post, route } from 'remix/routes'
 export const routes = route({
   assets: get('/assets/*path'),
   home: '/',
+  // The home page's activity feed, a page at a time. Answers rows, not a page:
+  // the landing page renders the first one itself and this serves the rest as
+  // the reader reaches them.
+  feed: get('feed'),
   media: get('media'),
   auth: route('auth', {
     signup: form('signup'),

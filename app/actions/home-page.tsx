@@ -1,27 +1,28 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { FollowingLogEntry } from '../data/mediaItems.ts'
+import { FeedAutoLoad } from '../browser/feed-auto-load.tsx'
+import type { FeedCursor, FeedItem } from '../data/feed.ts'
 import type { LuckyState } from '../data/recommendations/lucky.ts'
-import type { RecommendationRunSummary } from '../data/recommendations/runs.ts'
-import { mediaTypeUiFor } from '../mediaTypes.ts'
 import { routes } from '../routes.ts'
 import { Document } from '../ui/components/document.tsx'
 import { LUCKY_CARD_BOX, LUCKY_PICK_LABEL, LuckyPickCard } from '../ui/components/lucky-pick-card.tsx'
 import { Nav } from '../ui/components/nav.tsx'
-import { RunList } from '../ui/components/run-list.tsx'
-import { WatchedListItem } from '../ui/components/watched-list-item.tsx'
+import { FEED_LIST_ID, FeedList } from './activity-feed.tsx'
 
 export interface HomeDashboard {
   displayName: string
   // Today's draw, or the absence of one — see lucky.ts. `pick` being null is
   // what puts the call to action on screen.
   lucky: LuckyState
-  runs: RecommendationRunSummary[]
-  runsFromOthers: RecommendationRunSummary[]
-  followingActivity: FollowingLogEntry[]
-  // Separates "nobody you follow has logged anything" from "you follow nobody",
-  // which want different things said to them.
+  // Recommendation runs and what people you follow have logged, already merged
+  // into one list newest-first — see data/feed.ts. The page renders the first
+  // page and FeedAutoLoad fetches the rest.
+  feed: FeedItem[]
+  feedCursor: FeedCursor | null
+  // Only consulted when the feed is empty, to separate "nothing has happened
+  // yet" from "there is nobody and nothing for anything to happen from", which
+  // want different things said to them.
   followsAnyone: boolean
 }
 
@@ -69,42 +70,19 @@ function LuckyPickCta() {
   )
 }
 
-function ActivityList(handle: Handle<{ entries: FollowingLogEntry[] }>) {
-  return () => {
-    const { entries } = handle.props
-
-    return (
-      <ul
-        mix={css({
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-        })}
-      >
-        {entries.map(({ interaction, item, actor }) => (
-          <WatchedListItem
-            key={interaction.id}
-            interaction={interaction}
-            item={item}
-            detailHref={item ? mediaTypeUiFor(item.type).hrefs.show(item.id) : '#'}
-            actor={actor}
-          />
-        ))}
-      </ul>
-    )
-  }
-}
-
-// A sub-heading inside the merged "Activity" section — one for each of the
-// three things it now shows.
-const SUBHEADING = css({ margin: '20px 0 8px', fontSize: '14px' })
+// Sits under the feed: the auto-loader's "Loading…" line, and the line that
+// says there is nothing older.
+//
+// The end text is written here when the first page is already the last one —
+// which is also what a reader with JS off sees, the feed reading as finished
+// rather than as cut short — and handed to the auto-loader for when it is the
+// one that reaches the end. One string either way.
+const FEED_STATUS_ID = 'home-activity-status'
+const FEED_END_TEXT = 'Nothing older.'
 
 function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
   return () => {
-    const { lucky, runs, runsFromOthers, followingActivity, followsAnyone } = handle.props.dashboard
+    const { lucky, feed, feedCursor, followsAnyone } = handle.props.dashboard
 
     return (
       <div mix={css({ display: 'flex', flexDirection: 'column', gap: '32px', marginTop: '32px' })}>
@@ -117,34 +95,31 @@ function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
         </Section>
 
         <Section title="Activity">
-          <h3 mix={SUBHEADING}>Your runs</h3>
-          {runs.length > 0 ? (
-            <RunList runs={runs} />
-          ) : (
-            <Empty>
-              None yet — <a href={routes.recommendations.index.href()}>generate one</a> from what you've
-              logged.
-            </Empty>
-          )}
-
-          <h3 mix={SUBHEADING}>Run for you</h3>
-          {runsFromOthers.length > 0 ? (
-            <RunList runs={runsFromOthers} />
-          ) : (
-            <Empty>
-              Nothing yet — group runs someone else generated show up here once you both follow each other.
-            </Empty>
-          )}
-
-          <h3 mix={SUBHEADING}>From people you follow</h3>
-          {followingActivity.length > 0 ? (
-            <ActivityList entries={followingActivity} />
+          {feed.length > 0 ? (
+            <>
+              <FeedList items={feed} />
+              <p
+                id={FEED_STATUS_ID}
+                mix={css({ margin: '12px 0 0', fontSize: '12px', color: '#888', textAlign: 'center' })}
+              >
+                {feedCursor ? '' : FEED_END_TEXT}
+              </p>
+              {feedCursor && (
+                <FeedAutoLoad
+                  feedHref={routes.feed.href()}
+                  listId={FEED_LIST_ID}
+                  cursor={JSON.stringify(feedCursor)}
+                  statusId={FEED_STATUS_ID}
+                  endText={FEED_END_TEXT}
+                />
+              )}
+            </>
           ) : followsAnyone ? (
-            <Empty>Quiet so far — nobody you follow has logged anything yet.</Empty>
+            <Empty>Quiet so far — nothing logged or generated yet.</Empty>
           ) : (
             <Empty>
-              You're not following anyone yet — <a href={routes.users.search.href()}>find people</a> to see
-              what they're logging.
+              Nothing here yet — <a href={routes.recommendations.index.href()}>generate a recommendation</a>{' '}
+              or <a href={routes.users.search.href()}>find people</a> to follow.
             </Empty>
           )}
         </Section>
