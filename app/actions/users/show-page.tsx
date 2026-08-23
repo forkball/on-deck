@@ -92,7 +92,7 @@ function FollowButton(handle: Handle<{ userId: number; following: boolean; retur
     return (
       <form
         method="post"
-        mix={css({ flexShrink: 0 })}
+        mix={css({ margin: '0 0 16px' })}
         action={
           following
             ? routes.users.unfollow.href({ userId: String(userId) })
@@ -100,7 +100,7 @@ function FollowButton(handle: Handle<{ userId: number; following: boolean; retur
         }
       >
         <input type="hidden" name="return_to" value={returnTo} />
-        <button type="submit" mix={css({ padding: '4px 12px', fontSize: '13px' })}>
+        <button type="submit" mix={css({ width: '100%', padding: '8px 12px' })}>
           {following ? 'Unfollow' : 'Follow'}
         </button>
       </form>
@@ -120,23 +120,21 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
           <h1 mix={css({ margin: '0 0 4px', overflowWrap: 'break-word' })}>{label}</h1>
-          <div mix={css({ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', margin: '0 0 16px' })}>
-            <p mix={css({ margin: 0, color: '#555' })}>
-              {locked ? (
-                <>
-                  {followingCount} following · {followersCount} follower{followersCount === 1 ? '' : 's'}
-                </>
-              ) : (
-                <>
-                  <a href={routes.users.following.href({ userId: String(user.id) })}>{followingCount} following</a> ·{' '}
-                  <a href={routes.users.followers.href({ userId: String(user.id) })}>
-                    {followersCount} follower{followersCount === 1 ? '' : 's'}
-                  </a>
-                </>
-              )}
-            </p>
-            <FollowButton userId={user.id} following={viewerFollows} returnTo={returnTo} />
-          </div>
+          <p mix={css({ margin: '0 0 12px', color: '#555' })}>
+            {locked ? (
+              <>
+                {followingCount} following · {followersCount} follower{followersCount === 1 ? '' : 's'}
+              </>
+            ) : (
+              <>
+                <a href={routes.users.following.href({ userId: String(user.id) })}>{followingCount} following</a> ·{' '}
+                <a href={routes.users.followers.href({ userId: String(user.id) })}>
+                  {followersCount} follower{followersCount === 1 ? '' : 's'}
+                </a>
+              </>
+            )}
+          </p>
+          <FollowButton userId={user.id} following={viewerFollows} returnTo={returnTo} />
 
           {locked ? (
             <p>This profile is private. Follow {label} to see their bio and log.</p>
