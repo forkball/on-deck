@@ -15,11 +15,11 @@ export interface Candidate {
 
 // These two are every outbound catalog request the pipeline makes, so timing
 // them here covers all of it.
-export function searchForType(mediaType: MediaType, query: string): Promise<CatalogSearchResult[]> {
+function searchForType(mediaType: MediaType, query: string): Promise<CatalogSearchResult[]> {
   return track('catalog.search', () => getCatalogProvider(mediaType).search(query))
 }
 
-export function lookupForType(mediaType: MediaType, externalId: string): Promise<CatalogSearchResult | null> {
+function lookupForType(mediaType: MediaType, externalId: string): Promise<CatalogSearchResult | null> {
   return track('catalog.lookup', () => getCatalogProvider(mediaType).getById(externalId))
 }
 
@@ -182,27 +182,79 @@ export async function verifyPicksAgainstOverviews(
   return applyVerdicts(candidates, verdicts)
 }
 
-// Shared by both by-id fan-outs below — one ceiling, not two that drift apart.
 const LOOKUP_CONCURRENCY = 8
+
+// Held apart from LOOKUP_CONCURRENCY even though both are 8: the searches are a
+// different burst against a different provider, and one should be tunable
+// without silently moving the other. 8 is the width a run was observed
+// completing at; 18 at once is the width one was observed failing at.
+const SEARCH_CONCURRENCY = 8
 
 // A worker pool rather than Promise.all: these run against a rate-limited
 // provider, and a run can carry 25 picks.
-async function forEachWithConcurrency<T>(items: T[], operation: (item: T) => Promise<void>): Promise<void> {
+async function forEachWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  operation: (item: T) => Promise<void>,
+): Promise<void> {
   let next = 0
   async function worker(): Promise<void> {
     while (next < items.length) {
       await operation(items[next++])
     }
   }
-  await Promise.all(Array.from({ length: Math.min(LOOKUP_CONCURRENCY, items.length) }, worker))
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
 }
 
-// A by-id lookup that answers null rather than throwing. A provider is a
-// third party having a bad day — Google Books answers 429 once the quota for
-// the day is gone, and a book row imported through the Open Library fallback
-// carries an id Google Books was never going to resolve — and one such answer
-// is a verdict about one candidate, not grounds to fail a run that has already
-// paid for its picks. Callers below decide what a missing answer means.
+// One wording for one condition, however many stages reach it.
+function catalogDown(what: string): GenerationError {
+  return new GenerationError(`${what} — the catalog isn't answering right now. Try generating again in a few minutes.`)
+}
+
+export type CatalogSearch = (mediaType: MediaType, query: string) => Promise<CatalogSearchResult[]>
+
+// One search per pick the local catalog didn't already answer for, bounded —
+// `Promise.all` put all 18 of a filtered run's on the wire at once, and one of
+// them throwing took the whole run with it after the picks were paid for.
+//
+// A failed search leaves that pick with no matches, which the caller counts as
+// unfound and drops. All of them failing with nothing rescued locally is the
+// catalog being unreachable, not that many unfindable titles.
+export async function searchForPicks(
+  mediaType: MediaType,
+  picks: Pick[],
+  fromCatalog: Map<number, CatalogSearchResult>,
+  search: CatalogSearch = searchForType,
+): Promise<CatalogSearchResult[][]> {
+  const matches: CatalogSearchResult[][] = []
+  const toSearch: number[] = []
+  let failed = 0
+
+  picks.forEach((_, index) => {
+    const local = fromCatalog.get(index)
+    matches.push(local ? [local] : [])
+    if (!local) toSearch.push(index)
+  })
+
+  await forEachWithConcurrency(toSearch, SEARCH_CONCURRENCY, async (index) => {
+    try {
+      matches[index] = await search(mediaType, picks[index].title)
+    } catch (error) {
+      failed++
+      console.warn(`[generation] ${mediaType} search failed for ${JSON.stringify(picks[index].title)}:`, error)
+    }
+  })
+
+  if (toSearch.length > 0 && failed === toSearch.length && fromCatalog.size === 0) {
+    throw catalogDown("Couldn't look up any of the picks")
+  }
+
+  return matches
+}
+
+// A by-id lookup that answers null rather than throwing: a provider refusing
+// one id is a verdict about that candidate, not grounds to fail a run that has
+// already paid for its picks. Callers below decide what a null means.
 export type CatalogLookup = (mediaType: MediaType, externalId: string) => Promise<CatalogSearchResult | null>
 
 async function lookupQuietly(
@@ -228,7 +280,7 @@ export async function withOverviews(
   const missing = candidates.filter(({ match }) => !match.overview)
   if (missing.length === 0) return candidates
 
-  await forEachWithConcurrency(missing, async (entry) => {
+  await forEachWithConcurrency(missing, LOOKUP_CONCURRENCY, async (entry) => {
     const detail = await lookupQuietly(lookup, mediaType, entry.match.externalId)
     if (detail?.overview) entry.match = { ...entry.match, overview: detail.overview }
   })
@@ -264,7 +316,7 @@ export async function filterByLength(
   // can't be kept. Held beside the entry so the filter below stays a pure read.
   const resolved = new Map<Candidate, CatalogSearchResult | null>()
 
-  await forEachWithConcurrency([...needLookup], async (entry) => {
+  await forEachWithConcurrency([...needLookup], LOOKUP_CONCURRENCY, async (entry) => {
     resolved.set(entry, await lookupQuietly(lookup, mediaType, entry.match.externalId))
   })
 
@@ -288,10 +340,7 @@ export async function filterByLength(
   // page reading as "nothing matched your length", which is a different and
   // untrue thing. Say so instead.
   if (kept.length === 0 && needLookup.size > 0 && [...resolved.values()].every((detail) => detail == null)) {
-    throw new GenerationError(
-      `Couldn't check the length of any of the ${mediaTypeUiFor(mediaType).plural} — the catalog isn't ` +
-        `answering right now. Try generating again in a few minutes.`,
-    )
+    throw catalogDown(`Couldn't check the length of any of the ${mediaTypeUiFor(mediaType).plural}`)
   }
 
   return kept

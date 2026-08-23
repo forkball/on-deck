@@ -16,7 +16,7 @@ import {
   filterByLength,
   matchesDecade,
   resolveFromCatalog,
-  searchForType,
+  searchForPicks,
   titlesLikelyMatch,
   verifyPicksAgainstOverviews,
   withOverviews,
@@ -189,12 +189,7 @@ export async function generateRecommendations(
   enterPhase('matching')
   const fromCatalog = await resolveFromCatalog(mediaType, picks)
 
-  const matchesByPick = await Promise.all(
-    picks.map(async (pick, index) => {
-      const local = fromCatalog.get(index)
-      return local ? [local] : await searchForType(mediaType, pick.title)
-    }),
-  )
+  const matchesByPick = await searchForPicks(mediaType, picks, fromCatalog)
 
   // Not capped at TARGET_COUNT: verification below drops some too, so the
   // over-request slack has to reach it.

@@ -1,3 +1,5 @@
+import { createProviderCircuit } from './circuit.ts'
+import { fetchWithRetry } from './retry.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
 import { searchBooks as searchOpenLibraryBooks } from './openLibrary.ts'
 
@@ -114,29 +116,11 @@ function requireApiKey(): string {
   return apiKey
 }
 
-const FETCH_ATTEMPTS = 3
-const RETRY_BASE_MS = 400
-
-async function fetchWithRetry(url: URL): Promise<Response> {
-  let lastError: unknown
-
-  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
-    try {
-      const response = await fetch(url)
-      // 5xx is worth another go; a 4xx means the request itself is wrong.
-      if (response.ok || response.status < 500) return response
-      lastError = new Error(`Google Books responded ${response.status}`)
-    } catch (error) {
-      lastError = error
-    }
-
-    if (attempt < FETCH_ATTEMPTS) {
-      await new Promise((resolve) => setTimeout(resolve, RETRY_BASE_MS * attempt))
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error('Google Books request failed')
-}
+// Three failures in a row is a provider that is down, not three bad queries.
+// Deliberately per-provider rather than on the registry: this one is cheap
+// because searchBooks has a free fallback, and IGDB's revoked-token throw is
+// meant to be recovered by the very next call.
+const circuit = createProviderCircuit(3, 60_000)
 
 const SEARCH_MAX_RESULTS = 20
 
@@ -148,7 +132,7 @@ async function searchGoogleBooksOnly(query: string): Promise<CatalogSearchResult
   url.searchParams.set('maxResults', String(SEARCH_MAX_RESULTS))
   url.searchParams.set('key', apiKey)
 
-  const response = await fetchWithRetry(url)
+  const response = await fetchWithRetry(url, 'Google Books')
   if (!response.ok) {
     throw new Error(`Google Books search failed: ${response.status} ${await response.text()}`)
   }
@@ -158,13 +142,18 @@ async function searchGoogleBooksOnly(query: string): Promise<CatalogSearchResult
 }
 
 export async function searchBooks(query: string): Promise<CatalogSearchResult[]> {
-  try {
-    return await searchGoogleBooksOnly(query)
-  } catch (error) {
-    console.error('Google Books search failed, falling back to Open Library:', error)
-    const fallback = await searchOpenLibraryBooks(query)
-    return fallback.map((result) => ({ ...result, sourceOverride: 'openlibrary' }))
+  // Skipped rather than tried once per pick: the rest of a run's fan-out would
+  // each pay three attempts and a second of sleeping for the same answer.
+  if (!circuit.isOpen()) {
+    try {
+      return await circuit.run(() => searchGoogleBooksOnly(query))
+    } catch (error) {
+      console.error('Google Books search failed, falling back to Open Library:', error)
+    }
   }
+
+  const fallback = await searchOpenLibraryBooks(query)
+  return fallback.map((result) => ({ ...result, sourceOverride: 'openlibrary' }))
 }
 
 export async function getBookById(externalId: string): Promise<CatalogSearchResult | null> {
@@ -172,17 +161,24 @@ export async function getBookById(externalId: string): Promise<CatalogSearchResu
   const trimmed = externalId.trim()
   if (!trimmed) return null
 
-  const url = new URL(`${GOOGLE_BOOKS_BASE}/volumes/${encodeURIComponent(trimmed)}`)
-  url.searchParams.set('key', apiKey)
+  // No fallback here, unlike search, so an open circuit gives up rather than
+  // spending three more attempts on a service already known to be down.
+  if (circuit.isOpen()) throw new Error('Google Books is not answering — lookup skipped')
 
-  const response = await fetchWithRetry(url)
-  if (response.status === 404) return null
-  if (!response.ok) {
-    throw new Error(`Google Books lookup failed: ${response.status} ${await response.text()}`)
-  }
+  // A 404 returns rather than throws, so answering "no" never counts as down.
+  return circuit.run(async () => {
+    const url = new URL(`${GOOGLE_BOOKS_BASE}/volumes/${encodeURIComponent(trimmed)}`)
+    url.searchParams.set('key', apiKey)
 
-  const volume = (await response.json()) as GoogleBooksVolume
-  return toResult(volume)
+    const response = await fetchWithRetry(url, 'Google Books')
+    if (response.status === 404) return null
+    if (!response.ok) {
+      throw new Error(`Google Books lookup failed: ${response.status} ${await response.text()}`)
+    }
+
+    const volume = (await response.json()) as GoogleBooksVolume
+    return toResult(volume)
+  })
 }
 
 // Volume ids are opaque ~12-character tokens (e.g. "-Ff2DwAAQBAJ"), shown in
