@@ -15,11 +15,11 @@ export interface Candidate {
 
 // These two are every outbound catalog request the pipeline makes, so timing
 // them here covers all of it.
-export function searchForType(mediaType: MediaType, query: string): Promise<CatalogSearchResult[]> {
+function searchForType(mediaType: MediaType, query: string): Promise<CatalogSearchResult[]> {
   return track('catalog.search', () => getCatalogProvider(mediaType).search(query))
 }
 
-export function lookupForType(mediaType: MediaType, externalId: string): Promise<CatalogSearchResult | null> {
+function lookupForType(mediaType: MediaType, externalId: string): Promise<CatalogSearchResult | null> {
   return track('catalog.lookup', () => getCatalogProvider(mediaType).getById(externalId))
 }
 
@@ -182,7 +182,8 @@ export async function verifyPicksAgainstOverviews(
   return applyVerdicts(candidates, verdicts)
 }
 
-// Shared by both by-id fan-outs below — one ceiling, not two that drift apart.
+// Shared by every provider fan-out below — one ceiling, not several that drift
+// apart.
 const LOOKUP_CONCURRENCY = 8
 
 // A worker pool rather than Promise.all: these run against a rate-limited
@@ -195,6 +196,52 @@ async function forEachWithConcurrency<T>(items: T[], operation: (item: T) => Pro
     }
   }
   await Promise.all(Array.from({ length: Math.min(LOOKUP_CONCURRENCY, items.length) }, worker))
+}
+
+export type CatalogSearch = (mediaType: MediaType, query: string) => Promise<CatalogSearchResult[]>
+
+// One search per pick the local catalog didn't already answer for, through the
+// same pool as the by-id fan-outs. `Promise.all` over the picks put all of them
+// on the wire at once — 18 on a filtered run, which asks for six extra — and
+// that is the burst that gets Google Books answering 503 and Open Library, which
+// resets connections at the best of times, resetting most of them. One of those
+// throwing took the whole run with it, after the picks had already been paid for.
+//
+// A search that fails is a pick nothing was found for, which the caller already
+// counts and drops. Every search failing is not 18 unfindable titles, it's the
+// catalog being unreachable, so say that rather than save a run with nothing in
+// it — unless the local catalog answered for some, in which case there is still
+// a run to make.
+export async function searchForPicks(
+  mediaType: MediaType,
+  picks: Pick[],
+  fromCatalog: Map<number, CatalogSearchResult>,
+  search: CatalogSearch = searchForType,
+): Promise<CatalogSearchResult[][]> {
+  const matches: CatalogSearchResult[][] = picks.map((_, index) => {
+    const local = fromCatalog.get(index)
+    return local ? [local] : []
+  })
+  const toSearch = picks.map((_, index) => index).filter((index) => !fromCatalog.has(index))
+  let failed = 0
+
+  await forEachWithConcurrency(toSearch, async (index) => {
+    try {
+      matches[index] = await search(mediaType, picks[index].title)
+    } catch (error) {
+      failed++
+      console.warn(`[generation] ${mediaType} search failed for ${JSON.stringify(picks[index].title)}:`, error)
+    }
+  })
+
+  if (failed > 0 && failed === toSearch.length && fromCatalog.size === 0) {
+    throw new GenerationError(
+      `Couldn't look up any of the picks — the catalog isn't answering right now. ` +
+        `Try generating again in a few minutes.`,
+    )
+  }
+
+  return matches
 }
 
 // A by-id lookup that answers null rather than throwing. A provider is a

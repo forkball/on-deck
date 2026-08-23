@@ -5,11 +5,14 @@ import {
   applyVerdicts,
   filterByLength,
   matchesDecade,
+  searchForPicks,
   titlesLikelyMatch,
   withOverviews,
   type Candidate,
   type CatalogLookup,
+  type CatalogSearch,
 } from '../app/data/recommendations/matching.ts'
+import type { Pick } from '../app/data/recommendations/picks.ts'
 
 describe('titlesLikelyMatch', () => {
   it('accepts the same title', () => {
@@ -219,5 +222,75 @@ describe('withOverviews', () => {
       ({ overview: 'a plot' }) as unknown as Awaited<ReturnType<CatalogLookup>>)
 
     assert.equal(returned[0].match.overview, 'a plot')
+  })
+})
+
+const pickOf = (title: string): Pick => ({ title, year: 2000, reason: '' })
+
+const hit = (title: string) => ({ title, externalId: title }) as unknown as Awaited<ReturnType<CatalogSearch>>[number]
+
+describe('searchForPicks', () => {
+  const three = [pickOf('a'), pickOf('b'), pickOf('c')]
+
+  it('searches only the picks the local catalog did not answer for', async () => {
+    const asked: string[] = []
+    const local = new Map([[1, hit('b from catalog')]])
+
+    const matches = await searchForPicks('book', three, local as never, async (_type, query) => {
+      asked.push(query)
+      return [hit(query)]
+    })
+
+    assert.deepEqual(asked, ['a', 'c'])
+    assert.deepEqual(matches.map((m) => m.map((r) => r.title)), [['a'], ['b from catalog'], ['c']])
+  })
+
+  // The production failure: Google Books 503s, `searchBooks` falls back to Open
+  // Library, Open Library resets the connection, and the raw fetch error came
+  // out of the Promise.all and failed the whole run after the picks were paid
+  // for. One unreachable title is one pick nothing was found for.
+  it('leaves a pick unfound when its search throws, rather than failing the run', async () => {
+    const matches = await searchForPicks('book', three, new Map(), async (_type, query) => {
+      if (query === 'b') throw Object.assign(new TypeError('fetch failed'), { cause: new Error('read ECONNRESET') })
+      return [hit(query)]
+    })
+
+    assert.deepEqual(matches.map((m) => m.length), [1, 0, 1])
+  })
+
+  it('says the catalog is unreachable when every search failed', async () => {
+    await assert.rejects(
+      searchForPicks('book', three, new Map(), async () => {
+        throw new TypeError('fetch failed')
+      }),
+      /catalog isn't answering/,
+    )
+  })
+
+  // Not "the catalog is down" when the local rows already carry a run's worth.
+  it('still returns what the local catalog answered when every search failed', async () => {
+    const local = new Map([[0, hit('a from catalog')]])
+
+    const matches = await searchForPicks('book', three, local as never, async () => {
+      throw new TypeError('fetch failed')
+    })
+
+    assert.deepEqual(matches.map((m) => m.length), [1, 0, 0])
+  })
+
+  it('holds the fan-out to the pool rather than putting every pick on the wire', async () => {
+    const picks = Array.from({ length: 18 }, (_, i) => pickOf(`t${i}`))
+    let inFlight = 0
+    let peak = 0
+
+    await searchForPicks('book', picks, new Map(), async (_type, query) => {
+      inFlight++
+      peak = Math.max(peak, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 1))
+      inFlight--
+      return [hit(query)]
+    })
+
+    assert.equal(peak, 8)
   })
 })
