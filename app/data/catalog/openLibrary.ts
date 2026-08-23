@@ -1,4 +1,4 @@
-import { fetchWithRetry } from './requests.ts'
+import { fetchWithRetry } from './retry.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
 
 // Open Library needs no API key, but three quirks shape this file:

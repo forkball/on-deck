@@ -182,50 +182,61 @@ export async function verifyPicksAgainstOverviews(
   return applyVerdicts(candidates, verdicts)
 }
 
-// Shared by every provider fan-out below — one ceiling, not several that drift
-// apart.
 const LOOKUP_CONCURRENCY = 8
+
+// Held apart from LOOKUP_CONCURRENCY even though both are 8: the searches are a
+// different burst against a different provider, and one should be tunable
+// without silently moving the other. 8 is the width a run was observed
+// completing at; 18 at once is the width one was observed failing at.
+const SEARCH_CONCURRENCY = 8
 
 // A worker pool rather than Promise.all: these run against a rate-limited
 // provider, and a run can carry 25 picks.
-async function forEachWithConcurrency<T>(items: T[], operation: (item: T) => Promise<void>): Promise<void> {
+async function forEachWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  operation: (item: T) => Promise<void>,
+): Promise<void> {
   let next = 0
   async function worker(): Promise<void> {
     while (next < items.length) {
       await operation(items[next++])
     }
   }
-  await Promise.all(Array.from({ length: Math.min(LOOKUP_CONCURRENCY, items.length) }, worker))
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+}
+
+// One wording for one condition, however many stages reach it.
+function catalogDown(what: string): GenerationError {
+  return new GenerationError(`${what} — the catalog isn't answering right now. Try generating again in a few minutes.`)
 }
 
 export type CatalogSearch = (mediaType: MediaType, query: string) => Promise<CatalogSearchResult[]>
 
-// One search per pick the local catalog didn't already answer for, through the
-// same pool as the by-id fan-outs. `Promise.all` over the picks put all of them
-// on the wire at once — 18 on a filtered run, which asks for six extra — and
-// that is the burst that gets Google Books answering 503 and Open Library, which
-// resets connections at the best of times, resetting most of them. One of those
-// throwing took the whole run with it, after the picks had already been paid for.
+// One search per pick the local catalog didn't already answer for, bounded —
+// `Promise.all` put all 18 of a filtered run's on the wire at once, and one of
+// them throwing took the whole run with it after the picks were paid for.
 //
-// A search that fails is a pick nothing was found for, which the caller already
-// counts and drops. Every search failing is not 18 unfindable titles, it's the
-// catalog being unreachable, so say that rather than save a run with nothing in
-// it — unless the local catalog answered for some, in which case there is still
-// a run to make.
+// A failed search leaves that pick with no matches, which the caller counts as
+// unfound and drops. All of them failing with nothing rescued locally is the
+// catalog being unreachable, not that many unfindable titles.
 export async function searchForPicks(
   mediaType: MediaType,
   picks: Pick[],
   fromCatalog: Map<number, CatalogSearchResult>,
   search: CatalogSearch = searchForType,
 ): Promise<CatalogSearchResult[][]> {
-  const matches: CatalogSearchResult[][] = picks.map((_, index) => {
-    const local = fromCatalog.get(index)
-    return local ? [local] : []
-  })
-  const toSearch = picks.map((_, index) => index).filter((index) => !fromCatalog.has(index))
+  const matches: CatalogSearchResult[][] = []
+  const toSearch: number[] = []
   let failed = 0
 
-  await forEachWithConcurrency(toSearch, async (index) => {
+  picks.forEach((_, index) => {
+    const local = fromCatalog.get(index)
+    matches.push(local ? [local] : [])
+    if (!local) toSearch.push(index)
+  })
+
+  await forEachWithConcurrency(toSearch, SEARCH_CONCURRENCY, async (index) => {
     try {
       matches[index] = await search(mediaType, picks[index].title)
     } catch (error) {
@@ -234,22 +245,16 @@ export async function searchForPicks(
     }
   })
 
-  if (failed > 0 && failed === toSearch.length && fromCatalog.size === 0) {
-    throw new GenerationError(
-      `Couldn't look up any of the picks — the catalog isn't answering right now. ` +
-        `Try generating again in a few minutes.`,
-    )
+  if (toSearch.length > 0 && failed === toSearch.length && fromCatalog.size === 0) {
+    throw catalogDown("Couldn't look up any of the picks")
   }
 
   return matches
 }
 
-// A by-id lookup that answers null rather than throwing. A provider is a
-// third party having a bad day — Google Books answers 429 once the quota for
-// the day is gone, and a book row imported through the Open Library fallback
-// carries an id Google Books was never going to resolve — and one such answer
-// is a verdict about one candidate, not grounds to fail a run that has already
-// paid for its picks. Callers below decide what a missing answer means.
+// A by-id lookup that answers null rather than throwing: a provider refusing
+// one id is a verdict about that candidate, not grounds to fail a run that has
+// already paid for its picks. Callers below decide what a null means.
 export type CatalogLookup = (mediaType: MediaType, externalId: string) => Promise<CatalogSearchResult | null>
 
 async function lookupQuietly(
@@ -275,7 +280,7 @@ export async function withOverviews(
   const missing = candidates.filter(({ match }) => !match.overview)
   if (missing.length === 0) return candidates
 
-  await forEachWithConcurrency(missing, async (entry) => {
+  await forEachWithConcurrency(missing, LOOKUP_CONCURRENCY, async (entry) => {
     const detail = await lookupQuietly(lookup, mediaType, entry.match.externalId)
     if (detail?.overview) entry.match = { ...entry.match, overview: detail.overview }
   })
@@ -311,7 +316,7 @@ export async function filterByLength(
   // can't be kept. Held beside the entry so the filter below stays a pure read.
   const resolved = new Map<Candidate, CatalogSearchResult | null>()
 
-  await forEachWithConcurrency([...needLookup], async (entry) => {
+  await forEachWithConcurrency([...needLookup], LOOKUP_CONCURRENCY, async (entry) => {
     resolved.set(entry, await lookupQuietly(lookup, mediaType, entry.match.externalId))
   })
 
@@ -335,10 +340,7 @@ export async function filterByLength(
   // page reading as "nothing matched your length", which is a different and
   // untrue thing. Say so instead.
   if (kept.length === 0 && needLookup.size > 0 && [...resolved.values()].every((detail) => detail == null)) {
-    throw new GenerationError(
-      `Couldn't check the length of any of the ${mediaTypeUiFor(mediaType).plural} — the catalog isn't ` +
-        `answering right now. Try generating again in a few minutes.`,
-    )
+    throw catalogDown(`Couldn't check the length of any of the ${mediaTypeUiFor(mediaType).plural}`)
   }
 
   return kept

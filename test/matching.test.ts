@@ -66,8 +66,11 @@ describe('matchesDecade', () => {
 // Verdicts pair with candidates by index, not by position. This is the step
 // whose job is telling near-identical entries apart, so a set it cannot read
 // unambiguously has to be refused rather than filtered on a best guess.
-const candidate = (title: string): Candidate =>
-  ({ pick: { title, year: 2000, reason: '' }, match: { title } }) as unknown as Candidate
+const pickOf = (title: string): Pick => ({ title, year: 2000, reason: '' })
+
+const hit = (title: string) => ({ title, externalId: title }) as unknown as Awaited<ReturnType<CatalogSearch>>[number]
+
+const candidate = (title: string): Candidate => ({ pick: pickOf(title), match: { title } }) as unknown as Candidate
 
 describe('applyVerdicts', () => {
   const three = [candidate('a'), candidate('b'), candidate('c')]
@@ -125,7 +128,7 @@ describe('applyVerdicts', () => {
 // A book candidate as the pipeline holds one: a search hit that may or may not
 // have carried its page count, plus the id a by-id lookup would be asked about.
 const book = (title: string, externalId: string, pageCount: number | null): Candidate =>
-  ({ pick: { title, year: 2000, reason: '' }, match: { title, externalId, pageCount } }) as unknown as Candidate
+  ({ pick: pickOf(title), match: { title, externalId, pageCount } }) as unknown as Candidate
 
 const detail = (externalId: string, pageCount: number) =>
   ({ title: externalId, externalId, pageCount }) as unknown as Awaited<ReturnType<CatalogLookup>>
@@ -225,9 +228,6 @@ describe('withOverviews', () => {
   })
 })
 
-const pickOf = (title: string): Pick => ({ title, year: 2000, reason: '' })
-
-const hit = (title: string) => ({ title, externalId: title }) as unknown as Awaited<ReturnType<CatalogSearch>>[number]
 
 describe('searchForPicks', () => {
   const three = [pickOf('a'), pickOf('b'), pickOf('c')]
@@ -245,10 +245,6 @@ describe('searchForPicks', () => {
     assert.deepEqual(matches.map((m) => m.map((r) => r.title)), [['a'], ['b from catalog'], ['c']])
   })
 
-  // The production failure: Google Books 503s, `searchBooks` falls back to Open
-  // Library, Open Library resets the connection, and the raw fetch error came
-  // out of the Promise.all and failed the whole run after the picks were paid
-  // for. One unreachable title is one pick nothing was found for.
   it('leaves a pick unfound when its search throws, rather than failing the run', async () => {
     const matches = await searchForPicks('book', three, new Map(), async (_type, query) => {
       if (query === 'b') throw Object.assign(new TypeError('fetch failed'), { cause: new Error('read ECONNRESET') })
@@ -291,6 +287,6 @@ describe('searchForPicks', () => {
       return [hit(query)]
     })
 
-    assert.equal(peak, 8)
+    assert.equal(peak, 8, 'the search fan-out should hold to SEARCH_CONCURRENCY')
   })
 })

@@ -56,7 +56,10 @@ does nothing on its own.
   - `app/data/` root: `db`, `schema`, `mediaItems`, `mediaMetadata`, `users`,
     `follows`, `notifications`, `mediaSummary`
   - `app/data/catalog/` — external metadata providers behind one `CatalogProvider`
-    interface (`provider.ts` is the registry; `tmdb`/`openLibrary`/`igdb` implement it)
+    interface (`provider.ts` is the registry; `tmdb`/`openLibrary`/`igdb` implement it).
+    `retry.ts` holds the shared GET-with-backoff the two book providers use;
+    `circuit.ts` holds the per-provider "stop asking, it's down" rule, which is
+    policy each provider opts into rather than something the registry applies
   - `app/data/imports/` — log importers (`csv` is shared plumbing) and `steamApi`.
     A CSV upload is staged rather than written straight to the log: `letterboxd`
     parses, `batches` persists the batch and the decisions review writes onto it,
