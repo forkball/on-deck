@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import { FeedAutoLoad } from '../browser/feed-auto-load.tsx'
 import type { FeedCursor, FeedItem } from '../data/feed.ts'
 import type { LuckyState } from '../data/recommendations/lucky.ts'
-import { routes } from '../routes.ts'
+import { luckyRecommendationsHref, routes } from '../routes.ts'
 import { Document } from '../ui/components/document.tsx'
 import { LUCKY_CARD_BOX, LUCKY_PICK_LABEL, LuckyPickCard } from '../ui/components/lucky-pick-card.tsx'
 import { Nav } from '../ui/components/nav.tsx'
@@ -51,9 +51,13 @@ function Empty(handle: Handle<{ children?: RemixNode }>) {
   return () => <p mix={css({ margin: 0, color: '#555' })}>{handle.props.children}</p>
 }
 
-// Posts the draw itself rather than linking to the form that holds the button:
-// a solo draw is what the action does with an empty body, and the whole point of
-// the pick is that there is nothing to fill in first.
+// Opens the recommendations page with the draw already selected rather than
+// posting it from here. Drawing on the spot spent the day's one pick on a click
+// that couldn't say who it was for — the form on the other end carries the group
+// picker, and the draw is still the only thing selected when it opens.
+//
+// Styled as a button the way the sign-in link is, so the call to action still
+// reads as one thing to press.
 function LuckyPickCta() {
   return () => (
     <div mix={css({ ...LUCKY_CARD_BOX, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' })}>
@@ -63,9 +67,13 @@ function LuckyPickCta() {
       <p mix={css({ margin: '6px 0 0', color: '#555' })}>
         One thing to watch, read or play — no filters, nothing to decide.
       </p>
-      <form method="post" action={routes.recommendations.lucky.href()} mix={css({ marginTop: '12px' })}>
-        <button type="submit">🎲 Draw today's pick</button>
-      </form>
+      <a
+        href={luckyRecommendationsHref()}
+        class="doodle-border"
+        mix={css({ display: 'inline-block', marginTop: '12px', textDecoration: 'none' })}
+      >
+        🎲 Draw today's pick
+      </a>
     </div>
   )
 }

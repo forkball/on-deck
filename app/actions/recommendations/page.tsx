@@ -39,6 +39,10 @@ export interface RecommendationsPageProps {
   // not shown again up here — it is in the run list at the bottom, marked, and
   // the landing page and profile lead with it.
   lucky: LuckyState
+  // Arrived from a "today's pick" call to action, so the form opens on the draw
+  // rather than the shortlist. Already checked against `lucky.available` by the
+  // controller — see indexPage.
+  startLucky?: boolean
   error?: string
   // Set when the request matched an earlier run the user hasn't taken
   // anything from — see DuplicateNotice.
@@ -124,6 +128,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       displayName,
       dailyRuns,
       lucky,
+      startLucky,
       error,
       duplicate,
     } = handle.props
@@ -186,6 +191,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             luckyHref={routes.recommendations.lucky.href()}
             luckyAvailable={lucky.available}
             luckyWaitLabel={lucky.nextAt == null ? '' : `about ${timeUntil(lucky.nextAt)}`}
+            startLucky={startLucky === true}
             findPeopleHref={routes.users.search.href()}
           />
 

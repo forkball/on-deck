@@ -7,7 +7,7 @@ import type { TasteProfileSettings } from '../../data/recommendations/tasteProfi
 import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { Toast } from '../../ui/components/toast.tsx'
-import { routes } from '../../routes.ts'
+import { luckyRecommendationsHref, routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { LuckyPickCard } from '../../ui/components/lucky-pick-card.tsx'
@@ -260,7 +260,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             </div>
           ) : (
             <p mix={css({ margin: '24px 0', color: '#555' })}>
-              <a href={routes.recommendations.index.href()}>🎲 Draw today's lucky pick</a> — one
+              <a href={luckyRecommendationsHref()}>🎲 Draw today's lucky pick</a> — one
               thing nobody's logged, picked for you.
             </p>
           )}
