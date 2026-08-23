@@ -1,3 +1,4 @@
+import { fetchWithRetry } from './requests.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
 
 // Open Library needs no API key, but three quirks shape this file:
@@ -127,40 +128,16 @@ function toResult(doc: OpenLibraryDoc): CatalogSearchResult {
   }
 }
 
-// Open Library resets connections often — measured two ECONNRESETs in three
-// consecutive identical requests — so a wobble would otherwise fail a search
-// page or kill an import mid-way.
-const FETCH_ATTEMPTS = 3
-const RETRY_BASE_MS = 400
-
-async function fetchWithRetry(url: URL): Promise<Response> {
-  let lastError: unknown
-
-  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
-    try {
-      const response = await fetch(url)
-      // 5xx is worth another go; a 4xx means the request itself is wrong.
-      if (response.ok || response.status < 500) return response
-      lastError = new Error(`Open Library responded ${response.status}`)
-    } catch (error) {
-      lastError = error
-    }
-
-    if (attempt < FETCH_ATTEMPTS) {
-      await new Promise((resolve) => setTimeout(resolve, RETRY_BASE_MS * attempt))
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error('Open Library request failed')
-}
-
 async function searchOpenLibrary(query: string, limit: number): Promise<OpenLibraryDoc[]> {
   const url = new URL(`${OPEN_LIBRARY_BASE}/search.json`)
   url.searchParams.set('q', query)
   url.searchParams.set('fields', SEARCH_FIELDS)
   url.searchParams.set('limit', String(limit))
 
-  const response = await fetchWithRetry(url)
+  // Open Library resets connections often — measured two ECONNRESETs in three
+  // consecutive identical requests — so without the retry a wobble fails a
+  // search page or kills an import mid-way.
+  const response = await fetchWithRetry(url, 'Open Library')
   if (!response.ok) {
     throw new Error(`Open Library search failed: ${response.status} ${await response.text()}`)
   }

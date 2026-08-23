@@ -1,3 +1,4 @@
+import { createProviderCircuit, fetchWithRetry } from './requests.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
 import { searchBooks as searchOpenLibraryBooks } from './openLibrary.ts'
 
@@ -114,28 +115,26 @@ function requireApiKey(): string {
   return apiKey
 }
 
-const FETCH_ATTEMPTS = 3
-const RETRY_BASE_MS = 400
+// Three failures in a row is a provider that is down, not three bad queries.
+// The cooldown outlasts one run's search fan-out, so a run that starts inside
+// an outage stops asking for the rest of it, and the next run finds out for
+// itself rather than inheriting a verdict minutes old.
+const CIRCUIT_FAILURE_THRESHOLD = 3
+const CIRCUIT_COOLDOWN_MS = 60_000
 
-async function fetchWithRetry(url: URL): Promise<Response> {
-  let lastError: unknown
+const circuit = createProviderCircuit(CIRCUIT_FAILURE_THRESHOLD, CIRCUIT_COOLDOWN_MS)
 
-  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
-    try {
-      const response = await fetch(url)
-      // 5xx is worth another go; a 4xx means the request itself is wrong.
-      if (response.ok || response.status < 500) return response
-      lastError = new Error(`Google Books responded ${response.status}`)
-    } catch (error) {
-      lastError = error
-    }
-
-    if (attempt < FETCH_ATTEMPTS) {
-      await new Promise((resolve) => setTimeout(resolve, RETRY_BASE_MS * attempt))
-    }
+// Only a throw counts against the circuit. A 404 is Google answering, and
+// answering "no" is not being down.
+async function recordingOutcome<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    const result = await operation()
+    circuit.recordSuccess()
+    return result
+  } catch (error) {
+    circuit.recordFailure()
+    throw error
   }
-
-  throw lastError instanceof Error ? lastError : new Error('Google Books request failed')
 }
 
 const SEARCH_MAX_RESULTS = 20
@@ -148,7 +147,7 @@ async function searchGoogleBooksOnly(query: string): Promise<CatalogSearchResult
   url.searchParams.set('maxResults', String(SEARCH_MAX_RESULTS))
   url.searchParams.set('key', apiKey)
 
-  const response = await fetchWithRetry(url)
+  const response = await fetchWithRetry(url, 'Google Books')
   if (!response.ok) {
     throw new Error(`Google Books search failed: ${response.status} ${await response.text()}`)
   }
@@ -158,13 +157,20 @@ async function searchGoogleBooksOnly(query: string): Promise<CatalogSearchResult
 }
 
 export async function searchBooks(query: string): Promise<CatalogSearchResult[]> {
-  try {
-    return await searchGoogleBooksOnly(query)
-  } catch (error) {
-    console.error('Google Books search failed, falling back to Open Library:', error)
-    const fallback = await searchOpenLibraryBooks(query)
-    return fallback.map((result) => ({ ...result, sourceOverride: 'openlibrary' }))
+  // Skipped outright while the circuit is open, rather than tried and logged
+  // per pick: the whole of a run's fan-out would otherwise each pay three
+  // attempts and a second of sleeping to be told the same thing, and the
+  // fallback that answers it is right here.
+  if (!circuit.isOpen()) {
+    try {
+      return await recordingOutcome(() => searchGoogleBooksOnly(query))
+    } catch (error) {
+      console.error('Google Books search failed, falling back to Open Library:', error)
+    }
   }
+
+  const fallback = await searchOpenLibraryBooks(query)
+  return fallback.map((result) => ({ ...result, sourceOverride: 'openlibrary' }))
 }
 
 export async function getBookById(externalId: string): Promise<CatalogSearchResult | null> {
@@ -172,17 +178,25 @@ export async function getBookById(externalId: string): Promise<CatalogSearchResu
   const trimmed = externalId.trim()
   if (!trimmed) return null
 
-  const url = new URL(`${GOOGLE_BOOKS_BASE}/volumes/${encodeURIComponent(trimmed)}`)
-  url.searchParams.set('key', apiKey)
+  // Unlike search there is nowhere to fall back to, so an open circuit fails
+  // fast instead of spending three more attempts on a service already known to
+  // be down. Callers in the generation pipeline treat a failed lookup as one
+  // candidate they could not check, not as a run they have to abandon.
+  if (circuit.isOpen()) throw new Error('Google Books is not answering — lookup skipped')
 
-  const response = await fetchWithRetry(url)
-  if (response.status === 404) return null
-  if (!response.ok) {
-    throw new Error(`Google Books lookup failed: ${response.status} ${await response.text()}`)
-  }
+  return recordingOutcome(async () => {
+    const url = new URL(`${GOOGLE_BOOKS_BASE}/volumes/${encodeURIComponent(trimmed)}`)
+    url.searchParams.set('key', apiKey)
 
-  const volume = (await response.json()) as GoogleBooksVolume
-  return toResult(volume)
+    const response = await fetchWithRetry(url, 'Google Books')
+    if (response.status === 404) return null
+    if (!response.ok) {
+      throw new Error(`Google Books lookup failed: ${response.status} ${await response.text()}`)
+    }
+
+    const volume = (await response.json()) as GoogleBooksVolume
+    return toResult(volume)
+  })
 }
 
 // Volume ids are opaque ~12-character tokens (e.g. "-Ff2DwAAQBAJ"), shown in
