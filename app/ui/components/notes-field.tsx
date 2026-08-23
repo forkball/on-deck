@@ -33,7 +33,7 @@ export function NotesField(handle: Handle<{ defaultValue?: string | null }>) {
         />
       </Field>
       <p mix={hintStyle}>
-        Feeds your taste profile unless you've turned notes off in{' '}
+        Notes feed your taste profile unless you've turned them off in{' '}
         <a href={routes.profile.edit.index.href()}>settings</a>.
       </p>
     </div>
