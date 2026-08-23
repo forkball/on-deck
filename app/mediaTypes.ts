@@ -82,13 +82,6 @@ interface MediaTypeUi {
   }
 }
 
-// Shown under every note field. Deliberately not conditional on the reader's
-// own `profile_use_notes`: making it so would thread that flag through every
-// surface that logs a note, and the hedge is true either way. The bio field
-// carries the opposite hint — see profile/edit — and until now the field that
-// does reach a model was the one saying nothing.
-export const NOTES_HINT = "Feeds your taste profile unless you've turned notes off in settings."
-
 const WATCH_VERBS: StatusVerbs = { want: 'Want to watch', inProgress: 'Watching', done: 'Watched' }
 const READ_VERBS: StatusVerbs = { want: 'Want to read', inProgress: 'Reading', done: 'Read' }
 const PLAY_VERBS: StatusVerbs = { want: 'Want to play', inProgress: 'Playing', done: 'Played' }

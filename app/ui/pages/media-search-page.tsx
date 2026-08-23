@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import type { getUserInteractionForItem } from '../../data/mediaItems.ts'
 import type { MediaItem } from '../../data/schema.ts'
 import { MediaTabLinks } from '../components/media-tab-links.tsx'
-import { MEDIA_TYPE_UI, NOTES_HINT, statusLabelsFor, type ActiveMediaType } from '../../mediaTypes.ts'
+import { MEDIA_TYPE_UI, statusLabelsFor, type ActiveMediaType } from '../../mediaTypes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
 import { LazyList } from '../../browser/lazy-list.tsx'
 import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
@@ -12,6 +12,7 @@ import { Toast } from '../components/toast.tsx'
 import { Document } from '../components/document.tsx'
 import { FloatingDropdown } from '../components/floating-dropdown.tsx'
 import { Nav } from '../components/nav.tsx'
+import { NotesHint } from '../components/notes-hint.tsx'
 import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { StatusSelect } from '../components/status-select.tsx'
 import { Field } from '../shared/field.tsx'
@@ -178,7 +179,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                                     disliked={interaction?.disliked ?? null}
                                   />
                                 </div>
-                                <Field label="Notes" hint={NOTES_HINT}>
+                                <Field label="Notes">
                                   <textarea
                                     name="notes"
                                     rows={3}
@@ -187,6 +188,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                                     mix={css({ width: '100%' })}
                                   />
                                 </Field>
+                                <NotesHint />
                               </div>
                               <button type="submit">Save</button>
                               <FrameForm />

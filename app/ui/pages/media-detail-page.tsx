@@ -2,7 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
-import { MEDIA_TYPE_UI, NOTES_HINT, statusLabelsFor, type ActiveMediaType } from '../../mediaTypes.ts'
+import { MEDIA_TYPE_UI, statusLabelsFor, type ActiveMediaType } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
 import { Document } from '../components/document.tsx'
@@ -10,6 +10,7 @@ import { ExpandableText } from '../components/expandable-text.tsx'
 import { ImageCarousel } from '../components/image-carousel.tsx'
 import { Modal } from '../components/modal.tsx'
 import { Nav } from '../components/nav.tsx'
+import { NotesHint } from '../components/notes-hint.tsx'
 import { PlatformList } from '../components/platform-list.tsx'
 import { StatusSelect } from '../components/status-select.tsx'
 import { Collapsible } from '../shared/collapsible.tsx'
@@ -209,7 +210,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                           disliked={interaction?.disliked ?? null}
                         />
                       </div>
-                      <Field label="Notes" hint={NOTES_HINT}>
+                      <Field label="Notes">
                         <textarea
                           name="notes"
                           rows={3}
@@ -218,6 +219,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                           mix={css({ width: '100%' })}
                         />
                       </Field>
+                      <NotesHint />
                     </div>
                     <FrameForm />
                   </form>
