@@ -107,7 +107,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       if (!result) return redirect(ui.hrefs.search(), 303)
 
       const db: Db = context.get(Database)
-      const item = await upsertCatalogItem(db, mediaType, result)
+      const item = await upsertCatalogItem(db, mediaType, result, true)
 
       const from = context.url.searchParams.get('from') || undefined
       const showHref = ui.hrefs.show(item.id)

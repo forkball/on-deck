@@ -225,8 +225,27 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
 // one makes a row its own provider can never resolve — the later by-id lookup
 // (an overview, a page count) asks Google Books about an Open Library work key
 // and gets nothing back for the life of the row.
-export async function upsertCatalogItem(db: Db, type: MediaType, result: CatalogSearchResult): Promise<MediaItem> {
-  return upsertMediaItem(db, type, result, result.sourceOverride ?? getCatalogProvider(type).sourceName, true)
+//
+// `fromDetailLookup` says which kind of payload this is, and only the caller
+// knows: a by-id result carries credits and a runtime, a search result carries
+// neither. It was hardcoded true back when both callers did their own by-id
+// lookup, and the four added since do not — an import, a Steam sync or a
+// recommendation run stamped its search results as fully enriched, which is the
+// one thing that stops the detail page ever fetching the real record. Defaulting
+// to false keeps a caller that says nothing from making that claim.
+export async function upsertCatalogItem(
+  db: Db,
+  type: MediaType,
+  result: CatalogSearchResult,
+  fromDetailLookup = false,
+): Promise<MediaItem> {
+  return upsertMediaItem(
+    db,
+    type,
+    result,
+    result.sourceOverride ?? getCatalogProvider(type).sourceName,
+    fromDetailLookup,
+  )
 }
 
 // Off the response path — the page renders fine without the credit line, which
@@ -246,7 +265,7 @@ export function backfillCatalogDetail(db: Db, type: MediaType, item: MediaItem):
       // null is a definitive 404, so stamp it and stop asking. A transient
       // failure throws instead and is left unstamped, so the next view retries.
       if (detail) {
-        await upsertCatalogItem(db, type, detail)
+        await upsertCatalogItem(db, type, detail, true)
       } else {
         await markMediaItemEnriched(db, item)
       }
