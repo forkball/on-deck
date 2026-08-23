@@ -54,30 +54,28 @@ export function RunListItem(handle: Handle<RunListItemProps>) {
           {!feed && (run.name ? <> — {date}</> : <> — {run.groupLabel}</>)}
         </a>
 
-        {/* Who made it, as a sentence, the way a log row says "mona watched" —
-            in the feed that is the only thing saying so. `attributive` rather
-            than the tab label, which is plural: "a movie recommendation", not
-            "a movies recommendation". */}
-        {feed && (
-          <p mix={css({ margin: '2px 0 0' })}>
-            {run.owner ? (
-              <>
-                <a href={routes.users.show.href({ userId: String(run.owner.id) })}>{run.owner.label}</a>{' '}
-                generated a {mediaTypeUiFor(run.mediaType).attributive} recommendation
-              </>
-            ) : (
-              <>You generated a {mediaTypeUiFor(run.mediaType).attributive} recommendation</>
-            )}
-          </p>
-        )}
+        {/* Who made it, then when and with whom — the two lines the stacked row
+            breaks out, since the link above is only the run's name.
 
-        {/* The line the stacked row had to break out: whatever the link above
-            didn't already say. */}
+            The sentence reads the way a log row does ("mona watched"); in the
+            feed it is the only thing saying whose run this is. `attributive`
+            rather than the tab label, which is plural: "a movie
+            recommendation", not "a movies recommendation". */}
         {feed && (
-          <p mix={css({ margin: '2px 0 0', fontSize: '12px', color: '#888' })}>
-            {run.name ? `${date} — ` : ''}
-            {run.groupLabel}
-          </p>
+          <>
+            <p mix={css({ margin: '2px 0 0' })}>
+              {run.owner ? (
+                <a href={routes.users.show.href({ userId: String(run.owner.id) })}>{run.owner.label}</a>
+              ) : (
+                'You'
+              )}{' '}
+              generated a {mediaTypeUiFor(run.mediaType).attributive} recommendation
+            </p>
+            <p mix={css({ margin: '2px 0 0', fontSize: '12px', color: '#888' })}>
+              {run.name ? `${date} — ` : ''}
+              {run.groupLabel}
+            </p>
+          </>
         )}
       </li>
     )

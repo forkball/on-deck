@@ -1,10 +1,9 @@
 import type { Db } from './db.ts'
-import { listFollowingLogActivity, type FollowingLogEntry, type LogCursor } from './mediaItems.ts'
+import { listFollowingLogActivity, type FollowingLogEntry } from './mediaItems.ts'
 import {
   listRecommendationRuns,
   listRecommendationRunsFromOthers,
   type RecommendationRunSummary,
-  type RunCursor,
 } from './recommendations/runs.ts'
 
 // One row of the home page's activity feed. Recommendation runs and log entries
@@ -25,6 +24,14 @@ export type FeedItem =
 const SOURCES = ['log', 'runs', 'runsFromOthers'] as const
 type SourceName = (typeof SOURCES)[number]
 
+// Where one source resumes from. Structurally what both LogCursor and RunCursor
+// are — the row's ordering timestamp and its id — and assignable to either,
+// which is what lets the slots below be one type rather than a mapped one.
+export interface FeedRowCursor {
+  at: number
+  id: number
+}
+
 // Where to resume, one slot per source, in the three states a source can be in:
 //
 //   absent — not read from yet, so start at the newest
@@ -35,9 +42,7 @@ type SourceName = (typeof SOURCES)[number]
 // independently: a page can take five log rows and one run, and the next page
 // has to continue each of them from where it actually stopped. A shared cursor
 // would either re-read what a source hadn't reached or skip what it had.
-export type FeedCursor = {
-  [K in SourceName]?: (K extends 'log' ? LogCursor : RunCursor) | null
-}
+export type FeedCursor = { [K in SourceName]?: FeedRowCursor | null }
 
 export interface FeedPage {
   items: FeedItem[]
@@ -103,7 +108,7 @@ export async function loadFeedPage(
     const source = sourceOf(item)
     taken[source] += 1
     // Sorted newest first, so the last one seen is the oldest this page used.
-    cursor[source] = { at: item.at, id: item.id } as never
+    cursor[source] = { at: item.at, id: item.id }
   }
 
   // A source is finished only when its query had nothing more to give *and*

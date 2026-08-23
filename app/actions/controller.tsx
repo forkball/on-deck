@@ -5,7 +5,7 @@ import { redirect } from 'remix/response/redirect'
 
 import { assetServer } from '../assets.ts'
 import type { Db } from '../data/db.ts'
-import { loadFeedPage, type FeedCursor } from '../data/feed.ts'
+import { loadFeedPage, type FeedCursor, type FeedRowCursor } from '../data/feed.ts'
 import { countFollowing } from '../data/follows.ts'
 import { getLuckyState } from '../data/recommendations/lucky.ts'
 import type { User } from '../data/schema.ts'
@@ -41,30 +41,32 @@ async function loadDashboard(db: Db, user: User): Promise<HomeDashboard> {
 // Anything that isn't the shape we sent back is treated as no cursor at all —
 // a feed that restarts from the top is a much better answer to a mangled URL
 // than a 500, and there is nothing here worth defending beyond that.
+function parseRowCursor(value: unknown): FeedRowCursor | null | undefined {
+  if (value === null) return null
+  if (typeof value !== 'object') return undefined
+  const { at, id } = value as Record<string, unknown>
+  return typeof at === 'number' && typeof id === 'number' ? { at, id } : undefined
+}
+
 function parseFeedCursor(raw: string | null): FeedCursor | undefined {
   if (!raw) return undefined
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed !== 'object' || parsed === null) return undefined
 
-    const cursor: FeedCursor = {}
-    for (const key of ['log', 'runs', 'runsFromOthers'] as const) {
-      const value = (parsed as Record<string, unknown>)[key]
-      if (value === null) {
-        cursor[key] = null
-      } else if (
-        typeof value === 'object' &&
-        value !== null &&
-        typeof (value as { at?: unknown }).at === 'number' &&
-        typeof (value as { id?: unknown }).id === 'number'
-      ) {
-        cursor[key] = { at: (value as { at: number }).at, id: (value as { id: number }).id }
-      }
-    }
-    return cursor
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
   } catch {
     return undefined
   }
+  if (typeof parsed !== 'object' || parsed === null) return undefined
+
+  const cursor: FeedCursor = {}
+  for (const key of ['log', 'runs', 'runsFromOthers'] as const) {
+    // Left absent when the slot is missing or malformed, which reads as "start
+    // this source from the newest" — see FeedCursor.
+    const slot = parseRowCursor((parsed as Record<string, unknown>)[key])
+    if (slot !== undefined) cursor[key] = slot
+  }
+  return cursor
 }
 
 export default createController(routes, {

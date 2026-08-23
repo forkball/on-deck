@@ -314,19 +314,14 @@ export async function listRecommendationRuns(
   // Where to resume — see RunCursor. Left out, the listing starts at the newest.
   before?: RunCursor,
 ): Promise<RecommendationRunSummary[]> {
-  const mine = eq('user_id', userId)
-  const ofType = mediaType ? eq('media_type', mediaType) : undefined
-  const older = before ? olderThan(before) : undefined
+  const scope = [
+    eq('user_id', userId),
+    ...(mediaType ? [eq('media_type', mediaType)] : []),
+    ...(before ? [olderThan(before)] : []),
+  ]
 
   const runs = await db.findMany(recommendationRuns, {
-    where:
-      ofType && older
-        ? and(mine, ofType, older)
-        : ofType
-          ? and(mine, ofType)
-          : older
-            ? and(mine, older)
-            : mine,
+    where: and(...scope),
     // id breaks ties, so the ordering matches what a RunCursor resumes from.
     orderBy: [
       ['created_at', 'desc'],
