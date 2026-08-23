@@ -1,4 +1,5 @@
 import type { Handle } from 'remix/ui'
+import { css } from 'remix/ui'
 
 import { routes } from '../../routes.ts'
 import { Field, hintStyle } from '../shared/field.tsx'
@@ -32,7 +33,11 @@ export function NotesField(handle: Handle<{ defaultValue?: string | null }>) {
           placeholder="What did you think?"
         />
       </Field>
-      <p mix={hintStyle}>
+      {/* hintStyle's 4px reads as a normal field's label-to-control gap once this
+          sits under a textarea, whose own line-height already pushes the last
+          line of text away from the border below it — closer here reads as
+          "attached to this field" rather than "starting a new one". */}
+      <p mix={[hintStyle, css({ marginTop: '1px' })]}>
         Notes feed your taste profile unless you've turned them off in{' '}
         <a href={routes.profile.edit.index.href()}>settings</a>.
       </p>
