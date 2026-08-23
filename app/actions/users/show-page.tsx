@@ -117,8 +117,10 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
           <div mix={css({ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px' })}>
-            <h1>{label}</h1>
-            <FollowButton userId={user.id} following={viewerFollows} returnTo={returnTo} />
+            <h1 mix={css({ minWidth: 0, overflowWrap: 'break-word' })}>{label}</h1>
+            <div mix={css({ flexShrink: 0 })}>
+              <FollowButton userId={user.id} following={viewerFollows} returnTo={returnTo} />
+            </div>
           </div>
           <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
             {locked ? (
