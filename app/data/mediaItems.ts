@@ -103,6 +103,13 @@ async function mergeInteractionsInto(db: Db, fromMediaItemId: number, toMediaIte
 
 // In place, so interactions stay attached to the same id. Tags are fully
 // replaced — the old ones described the wrong work.
+//
+// A media_items row is shared by everyone who logged that work, so this rewrites
+// the catalog entry under other people's logs — and on a collision it merges
+// their interactions onto the winner and deletes the loser. That is why the
+// route calling it is admin-only. A member correcting a match for themselves
+// goes through the import review instead (repointRow in imports/batches.ts),
+// which only changes which existing row a staged row points at.
 export async function rematchMediaItem(
   db: Db,
   type: MediaType,

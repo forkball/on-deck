@@ -101,4 +101,10 @@ does nothing on its own.
   copies of the plural-noun table had accumulated before they were folded back in.
   Code holding a `MediaType` off a database row wants `mediaTypeUiFor`, since the
   row types widen the column to `string`.
+- `media_items` rows are shared by everyone who logged that work, so anything that
+  rewrites one changes other people's logs — `rematchMediaItem` repoints the row
+  and can merge two of them, which is why the route calling it is admin-only.
+  A member correcting a bad match for themselves does it through the import
+  review (`repointRow`), which changes which existing row a staged row points at
+  and leaves the catalog alone.
 - There is no `test/` directory yet, despite `npm test` being wired up.
