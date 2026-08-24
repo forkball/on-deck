@@ -162,10 +162,13 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
       const runsPill = css({
         display: 'inline-block',
-        // Nudged down from dead centre: DoodleCSS's radio glyph sits low in its
-        // 1.5em box (the hand-drawn circle doesn't fill the border-image square),
-        // so aligning box-centres put the pill visibly above the ring it's beside.
-        marginTop: '3px',
+        // Pushed down onto the label text's optical centre. The row centres
+        // boxes, but Short Stack's `line-height: normal` gives the label's text
+        // a ~35px line box at 16px and seats the ink low inside it — so box
+        // centring alone leaves this sitting 5px above the words beside it.
+        // Measured against that 16px label; revisit if its font size changes.
+        position: 'relative',
+        top: '5px',
         padding: '2px 8px',
         borderRadius: '999px',
         border: '1px solid #ccc',
