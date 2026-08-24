@@ -158,17 +158,43 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       // The label's default inline layout aligns the radio glyph and its text
       // on a text baseline, which sits noticeably above the glyph's own visual
       // centre — flexing the label re-centres the text on the glyph's box instead.
+      //
+      // That's as far as this goes without guessing: a further pixel nudge to
+      // seat Short Stack's own ink exactly on the glyph's centre would need
+      // measuring against the real font, and this app's dev tooling can't load
+      // it (its web-font request gets reset before render), so any offset
+      // tuned here would be tuned against the wrong glyph shapes entirely.
+      // Check by eye against a real build before adding one.
       const radioLabel = css({ display: 'inline-flex', alignItems: 'center', gap: '8px' })
+
+      // The one radio look used everywhere in this form — shortlist/lucky and
+      // self/group all render through here, so the fix above only ever needs
+      // to be right in one place.
+      function radioOption(props: {
+        name: string
+        value: string
+        checked?: boolean
+        disabled?: boolean
+        onChange: () => void
+        children: string
+      }) {
+        return (
+          <label mix={radioLabel}>
+            <input
+              type="radio"
+              name={props.name}
+              value={props.value}
+              disabled={props.disabled}
+              defaultChecked={props.checked}
+              mix={on('change', props.onChange)}
+            />
+            {props.children}
+          </label>
+        )
+      }
 
       const runsPill = css({
         display: 'inline-block',
-        // Pushed down onto the label text's optical centre. The row centres
-        // boxes, but Short Stack's `line-height: normal` gives the label's text
-        // a ~35px line box at 16px and seats the ink low inside it — so box
-        // centring alone leaves this sitting 5px above the words beside it.
-        // Measured against that 16px label; revisit if its font size changes.
-        position: 'relative',
-        top: '5px',
         padding: '2px 8px',
         borderRadius: '999px',
         border: '1px solid #ccc',
@@ -222,19 +248,16 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             <div mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}>
               <div>
                 <div mix={css({ display: 'flex', alignItems: 'center', gap: '10px' })}>
-                  <label mix={radioLabel}>
-                    <input
-                      type="radio"
-                      name="run_kind"
-                      value="shortlist"
-                      defaultChecked={!startLucky}
-                      mix={on('change', () => {
-                        runKind = 'shortlist'
-                        handle.update()
-                      })}
-                    />
-                    A shortlist
-                  </label>
+                  {radioOption({
+                    name: 'run_kind',
+                    value: 'shortlist',
+                    checked: !startLucky,
+                    onChange: () => {
+                      runKind = 'shortlist'
+                      handle.update()
+                    },
+                    children: 'A shortlist',
+                  })}
                   {/* Only ever shows once runs actually remain — the exhausted-cap
                       and no-cap cases have no count worth badging, and fall back
                       to the plain-text caption below instead. */}
@@ -250,20 +273,17 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 </p>
               </div>
               <div mix={css({ color: luckyAvailable ? 'inherit' : '#888' })}>
-                <label mix={radioLabel}>
-                  <input
-                    type="radio"
-                    name="run_kind"
-                    value="lucky"
-                    disabled={!luckyAvailable}
-                    defaultChecked={startLucky}
-                    mix={on('change', () => {
-                      runKind = 'lucky'
-                      handle.update()
-                    })}
-                  />
-                  Today's lucky pick
-                </label>
+                {radioOption({
+                  name: 'run_kind',
+                  value: 'lucky',
+                  checked: startLucky,
+                  disabled: !luckyAvailable,
+                  onChange: () => {
+                    runKind = 'lucky'
+                    handle.update()
+                  },
+                  children: "Today's lucky pick",
+                })}
                 <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
                   {`One ${itemNoun} nobody in the run has logged.`}
                 </p>
@@ -285,32 +305,26 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
           <div>
             <p mix={sectionLabel}>Who's this for?</p>
             <div mix={css({ display: 'flex', gap: '20px' })}>
-              <label>
-                <input
-                  type="radio"
-                  name="mode"
-                  value="self"
-                  defaultChecked
-                  mix={on('change', () => {
-                    mode = 'self'
-                    handle.update()
-                  })}
-                />{' '}
-                Just me
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="mode"
-                  value="group"
-                  disabled={friends.length === 0}
-                  mix={on('change', () => {
-                    mode = 'group'
-                    handle.update()
-                  })}
-                />{' '}
-                With friends
-              </label>
+              {radioOption({
+                name: 'mode',
+                value: 'self',
+                checked: true,
+                onChange: () => {
+                  mode = 'self'
+                  handle.update()
+                },
+                children: 'Just me',
+              })}
+              {radioOption({
+                name: 'mode',
+                value: 'group',
+                disabled: friends.length === 0,
+                onChange: () => {
+                  mode = 'group'
+                  handle.update()
+                },
+                children: 'With friends',
+              })}
             </div>
 
             {friends.length === 0 ? (
