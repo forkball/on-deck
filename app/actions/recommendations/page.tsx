@@ -177,6 +177,8 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             itemNoun={ui.singular}
             shortlistCount={TARGET_COUNT}
             runsLeftLabel={runsLeftLabel(dailyRuns)}
+            runsRemaining={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.remaining : undefined}
+            runsLimit={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.limit : undefined}
             sources={enabledMediaTypes().map((type) => ({
               value: type,
               label: `${MEDIA_TYPE_UI[type].attributive} taste`,

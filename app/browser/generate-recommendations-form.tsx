@@ -25,8 +25,14 @@ export type GenerateRecommendationsFormProps = {
   // How many picks a full run comes back with, so the two buttons can say what
   // they each produce. Passed in from the pipeline's own constant.
   shortlistCount: number
-  // "3 of 5 runs left today", already phrased. Empty for an account with no cap.
+  // "3 of 5 runs left today", already phrased — the fallback once the cap is
+  // spent (or for an account with no cap, where it's empty). While runs remain,
+  // runsRemaining/runsLimit take over so the count can render as a pill instead.
   runsLeftLabel: string
+  // Set together, and only while there's a cap and runs remain — the same
+  // condition under which the plain-text runsLeftLabel above steps back.
+  runsRemaining?: number
+  runsLimit?: number
   generateHref: string
   // The lucky draw posts this same form to its own action, so the group picked
   // above carries over and there is no second copy of it to keep in step.
@@ -103,6 +109,8 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         seriesTypes,
         shortlistCount,
         runsLeftLabel,
+        runsRemaining,
+        runsLimit,
         generateHref,
         luckyHref,
         luckyAvailable,
@@ -147,6 +155,27 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
       const caption = css({ margin: '10px 0 0', fontSize: '12px', color: '#888', lineHeight: 1.4 })
 
+      // The label's default inline layout aligns the radio glyph and its text
+      // on a text baseline, which sits noticeably above the glyph's own visual
+      // centre — flexing the label re-centres the text on the glyph's box instead.
+      const radioLabel = css({ display: 'inline-flex', alignItems: 'center', gap: '8px' })
+
+      const runsPill = css({
+        display: 'inline-block',
+        // Pushed down onto the label text's optical centre. The row centres
+        // boxes, but Short Stack's `line-height: normal` gives the label's text
+        // a ~35px line box at 16px and seats the ink low inside it — so box
+        // centring alone leaves this sitting 5px above the words beside it.
+        // Measured against that 16px label; revisit if its font size changes.
+        position: 'relative',
+        top: '5px',
+        padding: '2px 8px',
+        borderRadius: '999px',
+        border: '1px solid #ccc',
+        fontSize: '11px',
+        color: '#555',
+      })
+
       // Only ever one field's worth of it on screen, so a field that does not
       // apply to the run being made is hidden rather than dropped: unmounting
       // would lose a typed name, a chosen genre and the panel's open state
@@ -187,28 +216,41 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               different one for each — it is here so the two radios group. */}
           <div>
             <p mix={sectionLabel}>What are you after?</p>
-            <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
-              <div mix={css({ flex: '1 1 200px' })}>
-                <label>
-                  <input
-                    type="radio"
-                    name="run_kind"
-                    value="shortlist"
-                    defaultChecked={!startLucky}
-                    mix={on('change', () => {
-                      runKind = 'shortlist'
-                      handle.update()
-                    })}
-                  />{' '}
-                  A shortlist
-                </label>
-                <p mix={caption}>
-                  {`Up to ${shortlistCount} picks to choose from, minus what most of you have already ` +
-                    `finished.${runsLeftLabel ? ` ${runsLeftLabel}.` : ''}`}
+            {/* Stacked like a description list — each radio is the term, the
+                caption under it the description — rather than side by side,
+                which read as a comparison table with two competing columns. */}
+            <div mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}>
+              <div>
+                <div mix={css({ display: 'flex', alignItems: 'center', gap: '10px' })}>
+                  <label mix={radioLabel}>
+                    <input
+                      type="radio"
+                      name="run_kind"
+                      value="shortlist"
+                      defaultChecked={!startLucky}
+                      mix={on('change', () => {
+                        runKind = 'shortlist'
+                        handle.update()
+                      })}
+                    />
+                    A shortlist
+                  </label>
+                  {/* Only ever shows once runs actually remain — the exhausted-cap
+                      and no-cap cases have no count worth badging, and fall back
+                      to the plain-text caption below instead. */}
+                  {runsRemaining != null && runsLimit != null && (
+                    <span mix={runsPill}>
+                      {runsRemaining}/{runsLimit} runs left today
+                    </span>
+                  )}
+                </div>
+                <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
+                  {`Up to ${shortlistCount} picks, minus what most of you have already finished.`}
+                  {runsRemaining == null && runsLeftLabel && ` ${runsLeftLabel}.`}
                 </p>
               </div>
-              <div mix={css({ flex: '1 1 200px', color: luckyAvailable ? 'inherit' : '#888' })}>
-                <label>
+              <div mix={css({ color: luckyAvailable ? 'inherit' : '#888' })}>
+                <label mix={radioLabel}>
                   <input
                     type="radio"
                     name="run_kind"
@@ -219,16 +261,15 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                       runKind = 'lucky'
                       handle.update()
                     })}
-                  />{' '}
+                  />
                   Today's lucky pick
                 </label>
-                <p mix={caption}>
-                  {`One ${itemNoun}, and never one anyone in the run has logged — down to a want-to. ` +
-                    `Costs no run, and you get one a day.`}
+                <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
+                  {`One ${itemNoun} nobody in the run has logged.`}
                 </p>
                 {!luckyAvailable && (
-                  <p mix={caption}>
-                    Today's lucky pick is already drawn — another in {luckyWaitLabel}.
+                  <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
+                    Already drawn — another in {luckyWaitLabel}.
                   </p>
                 )}
               </div>
