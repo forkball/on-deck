@@ -192,17 +192,46 @@ function cacheKey(type: MediaType, query: string): string {
   return `${type}:${query.trim().toLowerCase()}`
 }
 
+// Milliseconds below a second rather than "0.0s" — a cache hit is supposed to
+// read as instant, and rounding it away hides the thing the line is for.
+function duration(ms: number): string {
+  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`
+}
+
+// The query is quoted because it is raw user input: trailing spaces, empty-ish
+// strings and embedded punctuation all have to survive into the log legibly.
+function logSearch(type: MediaType, query: string, cache: 'hit' | 'miss', count: number, startedAt: number): void {
+  console.info(`[search] ${type} ${JSON.stringify(query)} ${cache} ${count} result(s) ${duration(Date.now() - startedAt)}`)
+}
+
+// Every line this logs is one person submitting one query. The generation
+// worker reaches the catalog through provider.search directly
+// (recommendations/matching.ts) and the typeahead does the same, so neither
+// shows up here.
 export async function searchAndImport(db: Db, type: MediaType, query: string): Promise<MediaItem[]> {
   const key = cacheKey(type, query)
+  const startedAt = Date.now()
   const cached = searchCache.get(key)
   if (cached && Date.now() - cached.storedAt < SEARCH_CACHE_TTL_MS) {
     searchCache.delete(key)
     searchCache.set(key, cached)
+    logSearch(type, query, 'hit', cached.results.length, startedAt)
     return cached.results
   }
 
   const provider = getCatalogProvider(type)
-  const results = await provider.search(query)
+  let results: CatalogSearchResult[]
+  try {
+    results = await provider.search(query)
+  } catch (error) {
+    // Only books catch their own provider failure (googleBooks.ts falls back to
+    // Open Library). Everywhere else the throw lands in the server's request
+    // handler as a bare stack with no query and no media type on it. Rethrown
+    // immediately — the 500 is still the right answer, this only makes it
+    // possible to tell which search caused it.
+    console.error(`[search] ${type} ${JSON.stringify(query)} failed after ${duration(Date.now() - startedAt)}:`, error)
+    throw error
+  }
 
   // Promise.all preserves input order, so results keep their relevance ranking.
   const imported = await Promise.all(
@@ -217,6 +246,8 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
     if (oldest !== undefined) searchCache.delete(oldest)
   }
 
+  // After the upserts, so the duration is what the person actually waited.
+  logSearch(type, query, 'miss', imported.length, startedAt)
   return imported
 }
 
