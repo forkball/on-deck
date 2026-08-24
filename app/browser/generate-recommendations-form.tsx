@@ -203,7 +203,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   A shortlist
                 </label>
                 <p mix={caption}>
-                  {`Up to ${shortlistCount} picks, minus what you've already finished.` +
+                  {`Up to ${shortlistCount} picks, minus what most of you have already finished.` +
                     (runsLeftLabel ? ` ${runsLeftLabel}.` : '')}
                 </p>
               </div>
@@ -223,7 +223,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   Today's lucky pick
                 </label>
                 <p mix={caption}>
-                  {`One ${itemNoun} nobody's logged, not even a want-to. Free, one a day.`}
+                  {`One ${itemNoun} nobody in the run has logged. Free, one a day.`}
                 </p>
                 {!luckyAvailable && (
                   <p mix={caption}>Already drawn — another in {luckyWaitLabel}.</p>
