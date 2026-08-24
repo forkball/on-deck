@@ -157,7 +157,6 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
       const runsPill = css({
         display: 'inline-block',
-        marginTop: '6px',
         padding: '2px 8px',
         borderRadius: '999px',
         border: '1px solid #ccc',
@@ -210,34 +209,33 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 which read as a comparison table with two competing columns. */}
             <div mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}>
               <div>
-                <label>
-                  <input
-                    type="radio"
-                    name="run_kind"
-                    value="shortlist"
-                    defaultChecked={!startLucky}
-                    mix={on('change', () => {
-                      runKind = 'shortlist'
-                      handle.update()
-                    })}
-                  />{' '}
-                  A shortlist
-                </label>
+                <div mix={css({ display: 'flex', alignItems: 'center', gap: '10px' })}>
+                  <label>
+                    <input
+                      type="radio"
+                      name="run_kind"
+                      value="shortlist"
+                      defaultChecked={!startLucky}
+                      mix={on('change', () => {
+                        runKind = 'shortlist'
+                        handle.update()
+                      })}
+                    />{' '}
+                    A shortlist
+                  </label>
+                  {/* Only ever shows once runs actually remain — the exhausted-cap
+                      and no-cap cases have no count worth badging, and fall back
+                      to the plain-text caption below instead. */}
+                  {runsRemaining != null && runsLimit != null && (
+                    <span mix={runsPill}>
+                      {runsRemaining}/{runsLimit} runs left today
+                    </span>
+                  )}
+                </div>
                 <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
                   {`Up to ${shortlistCount} picks, minus what most of you have already finished.`}
+                  {runsRemaining == null && runsLeftLabel && ` ${runsLeftLabel}.`}
                 </p>
-                {/* The plain-text fallback only ever shows once the cap is spent
-                    (or for an uncapped account, where it's empty) — the pill
-                    above takes over the instant runs actually remain. */}
-                {runsRemaining != null && runsLimit != null ? (
-                  <span mix={[runsPill, css({ marginLeft: '1.6em' })]}>
-                    {runsRemaining}/{runsLimit} runs left today
-                  </span>
-                ) : (
-                  runsLeftLabel && (
-                    <p mix={[caption, css({ paddingLeft: '1.6em' })]}>{runsLeftLabel}.</p>
-                  )
-                )}
               </div>
               <div mix={css({ color: luckyAvailable ? 'inherit' : '#888' })}>
                 <label>
