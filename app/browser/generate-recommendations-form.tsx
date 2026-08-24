@@ -158,17 +158,18 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       // The label's default inline layout aligns the radio glyph and its text
       // on a text baseline, which sits noticeably above the glyph's own visual
       // centre — flexing the label re-centres the text on the glyph's box instead.
+      //
+      // That's as far as this goes without guessing: a further pixel nudge to
+      // seat Short Stack's own ink exactly on the glyph's centre would need
+      // measuring against the real font, and this app's dev tooling can't load
+      // it (its web-font request gets reset before render), so any offset
+      // tuned here would be tuned against the wrong glyph shapes entirely.
+      // Check by eye against a real build before adding one.
       const radioLabel = css({ display: 'inline-flex', alignItems: 'center', gap: '8px' })
 
-      // Even centred by box, the text still hangs 3.5px below the glyph's own
-      // centre — Short Stack's line box doesn't seat the ink at its middle, and
-      // that's true at whatever height the text ends up centred to, so no box
-      // trick fixes it. Measured directly against the input's own box centre.
-      const radioLabelText = css({ position: 'relative', top: '-3.5px' })
-
       // The one radio look used everywhere in this form — shortlist/lucky and
-      // self/group all render through here, so the two fixes above only ever
-      // need to be right in one place.
+      // self/group all render through here, so the fix above only ever needs
+      // to be right in one place.
       function radioOption(props: {
         name: string
         value: string
@@ -187,19 +188,13 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               defaultChecked={props.checked}
               mix={on('change', props.onChange)}
             />
-            <span mix={radioLabelText}>{props.children}</span>
+            {props.children}
           </label>
         )
       }
 
       const runsPill = css({
         display: 'inline-block',
-        // Pushed down onto the label text's optical centre — which
-        // radioLabelText above now pulls onto the radio glyph's own centre, so
-        // this is measured against that, not the raw text. Re-measure both
-        // together if either one's font size changes.
-        position: 'relative',
-        top: '1.5px',
         padding: '2px 8px',
         borderRadius: '999px',
         border: '1px solid #ccc',
