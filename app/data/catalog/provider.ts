@@ -198,10 +198,25 @@ function duration(ms: number): string {
   return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`
 }
 
+// Which provider actually answered. Books are the reason this is here: a search
+// that fell back to Open Library returns results this layer cannot tell from
+// Google Books ones, and finding out meant correlating the line against a stack
+// trace that happened to be logged a second earlier.
+//
+// Joined rather than reduced to one name because a fallback hit carries its own
+// source per result, so a mixed answer is representable and worth seeing.
+function sourcesOf(results: MediaItem[]): string {
+  const sources = [...new Set(results.map((result) => result.external_source))]
+  return sources.length > 0 ? sources.join('+') : 'nothing'
+}
+
 // The query is quoted because it is raw user input: trailing spaces, empty-ish
 // strings and embedded punctuation all have to survive into the log legibly.
-function logSearch(type: MediaType, query: string, cache: 'hit' | 'miss', count: number, startedAt: number): void {
-  console.info(`[search] ${type} ${JSON.stringify(query)} ${cache} ${count} result(s) ${duration(Date.now() - startedAt)}`)
+function logSearch(type: MediaType, query: string, cache: 'hit' | 'miss', results: MediaItem[], startedAt: number): void {
+  console.info(
+    `[search] ${type} ${JSON.stringify(query)} ${cache} ${results.length} result(s) ` +
+      `via ${sourcesOf(results)} ${duration(Date.now() - startedAt)}`,
+  )
 }
 
 // Every line this logs is one person submitting one query. The generation
@@ -215,7 +230,7 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
   if (cached && Date.now() - cached.storedAt < SEARCH_CACHE_TTL_MS) {
     searchCache.delete(key)
     searchCache.set(key, cached)
-    logSearch(type, query, 'hit', cached.results.length, startedAt)
+    logSearch(type, query, 'hit', cached.results, startedAt)
     return cached.results
   }
 
@@ -247,7 +262,7 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
   }
 
   // After the upserts, so the duration is what the person actually waited.
-  logSearch(type, query, 'miss', imported.length, startedAt)
+  logSearch(type, query, 'miss', imported, startedAt)
   return imported
 }
 

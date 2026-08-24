@@ -34,32 +34,32 @@ async function fail(circuit: ReturnType<typeof createProviderCircuit>, times = T
 
 describe('createProviderCircuit', () => {
   it('stays closed below the threshold', async () => {
-    const circuit = createProviderCircuit(THRESHOLD, COOLDOWN_MS)
+    const circuit = createProviderCircuit('Test Provider', THRESHOLD, COOLDOWN_MS)
     await fail(circuit, THRESHOLD - 1)
     assert.equal(circuit.isOpen(), false)
   })
 
   it('opens on the threshold failure', async () => {
-    const circuit = createProviderCircuit(THRESHOLD, COOLDOWN_MS)
+    const circuit = createProviderCircuit('Test Provider', THRESHOLD, COOLDOWN_MS)
     await fail(circuit)
     assert.equal(circuit.isOpen(), true)
   })
 
   it('hands the operation its result, and its error, untouched', async () => {
-    const circuit = createProviderCircuit(THRESHOLD, COOLDOWN_MS)
+    const circuit = createProviderCircuit('Test Provider', THRESHOLD, COOLDOWN_MS)
     assert.equal(await circuit.run(async () => 'answered'), 'answered')
     await assert.rejects(circuit.run(failing), /provider is down/)
   })
 
   // A 404 comes back as a returned null, not a throw, so it must not count.
   it('counts only a throw, not a falsy answer', async () => {
-    const circuit = createProviderCircuit(THRESHOLD, COOLDOWN_MS)
+    const circuit = createProviderCircuit('Test Provider', THRESHOLD, COOLDOWN_MS)
     for (let i = 0; i < THRESHOLD; i++) await circuit.run(async () => null)
     assert.equal(circuit.isOpen(), false)
   })
 
   it('a success closes it and clears the count', async () => {
-    const circuit = createProviderCircuit(THRESHOLD, COOLDOWN_MS)
+    const circuit = createProviderCircuit('Test Provider', THRESHOLD, COOLDOWN_MS)
     await fail(circuit)
     await circuit.run(async () => 'answered')
     assert.equal(circuit.isOpen(), false)
@@ -70,7 +70,7 @@ describe('createProviderCircuit', () => {
 
   it('half-opens once the cooldown is up', async (t) => {
     t.mock.timers.enable({ apis: ['Date'], now: 1_000_000 })
-    const circuit = createProviderCircuit(THRESHOLD, COOLDOWN_MS)
+    const circuit = createProviderCircuit('Test Provider', THRESHOLD, COOLDOWN_MS)
     await fail(circuit)
 
     t.mock.timers.tick(COOLDOWN_MS - 1_000)
@@ -82,7 +82,7 @@ describe('createProviderCircuit', () => {
 
   it('restarts the cooldown when the caller let through also fails', async (t) => {
     t.mock.timers.enable({ apis: ['Date'], now: 1_000_000 })
-    const circuit = createProviderCircuit(THRESHOLD, COOLDOWN_MS)
+    const circuit = createProviderCircuit('Test Provider', THRESHOLD, COOLDOWN_MS)
     await fail(circuit)
 
     t.mock.timers.tick(COOLDOWN_MS + 1_000)
