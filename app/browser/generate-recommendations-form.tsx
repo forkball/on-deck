@@ -195,6 +195,14 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
       const runsPill = css({
         display: 'inline-block',
+        // Row-centring by box height isn't enough — measured directly against
+        // a real screenshot (the sandbox here can't load Short Stack to check
+        // it live, see radioLabel above), comparing pixel rows of ink in the
+        // label text against ink in the pill: the pill sat ~9 physical px
+        // above the label text, which a known-size UI element (the 20px nav
+        // bell icon) puts at this device's pixel ratio around 4.5 CSS px.
+        position: 'relative',
+        top: '4.5px',
         padding: '2px 8px',
         borderRadius: '999px',
         border: '1px solid #ccc',
