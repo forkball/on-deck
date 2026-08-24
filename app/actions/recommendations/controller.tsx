@@ -58,13 +58,19 @@ const generateSchema = f.object({
 })
 
 async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
-  const [runs, runsFromOthers, friends, dailyRuns, lucky] = await Promise.all([
+  const [allRuns, runsFromOthers, friends, dailyRuns, lucky] = await Promise.all([
     listRecommendationRuns(db, user.id, mediaType),
     listRecommendationRunsFromOthers(db, user.id, mediaType),
     listFollowedUsers(db, user.id),
     getDailyRunAllowance(db, user),
     getLuckyState(user),
   ])
+
+  // Split once here rather than in the page: the two are kept on separate
+  // tracks all the way down to pruning (see pruneOldRuns), and the page shows
+  // them as separate sections rather than one list distinguished by an emoji.
+  const runs = allRuns.filter((run) => !run.isLucky)
+  const luckyRuns = allRuns.filter((run) => run.isLucky)
 
   // After the fetch above rather than alongside it, since it needs the ids it
   // returns. One query for everyone the picker can offer, so the form can grey
@@ -75,6 +81,7 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     dailyRuns,
     lucky,
     runs,
+    luckyRuns,
     runsFromOthers,
     friends,
     loggedTypes: Object.fromEntries(

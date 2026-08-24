@@ -6,7 +6,7 @@ import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { timeUntil, type DailyRunAllowance } from '../../data/recommendations/dailyLimit.ts'
 import { TARGET_COUNT } from '../../data/recommendations/generate.ts'
 import type { LuckyState } from '../../data/recommendations/lucky.ts'
-import { MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations/runs.ts'
+import { MAX_LUCKY_RUNS_PER_USER, MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations/runs.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
@@ -17,6 +17,9 @@ import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../me
 
 export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
+  // Past lucky draws, kept and pruned on their own track (see runs.ts) and
+  // shown in their own section below rather than mixed into `runs`.
+  luckyRuns: RecommendationRunSummary[]
   runsFromOthers: RecommendationRunSummary[]
   friends: User[]
   // Which media types each friend has logged in, keyed by user id, and the
@@ -114,6 +117,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
     const {
       runs,
+      luckyRuns,
       runsFromOthers,
       friends,
       loggedTypes,
@@ -207,13 +211,23 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             </section>
           )}
 
+          {luckyRuns.length > 0 && (
+            <section mix={css({ marginTop: '40px' })}>
+              <h2>Lucky picks</h2>
+              <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
+                Your last {MAX_LUCKY_RUNS_PER_USER} draws. Kept on their own track, so
+                generating a run above never pushes one out.
+              </p>
+              <RunList runs={luckyRuns} />
+            </section>
+          )}
+
           <section mix={css({ marginTop: '40px' })}>
             <h2>Past recommendations</h2>
             {runs.length > 0 && (
               <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
                 Only your {MAX_RUNS_PER_USER} most recent {ui.attributive} runs are kept —
-                generating a new one removes the oldest. Lucky picks (🎲) are counted
-                separately, so one can't push the other out.
+                generating a new one removes the oldest.
               </p>
             )}
             {runs.length === 0 ? (
