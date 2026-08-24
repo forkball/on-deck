@@ -155,6 +155,11 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
       const caption = css({ margin: '10px 0 0', fontSize: '12px', color: '#888', lineHeight: 1.4 })
 
+      // The label's default inline layout aligns the radio glyph and its text
+      // on a text baseline, which sits noticeably above the glyph's own visual
+      // centre — flexing the label re-centres the text on the glyph's box instead.
+      const radioLabel = css({ display: 'inline-flex', alignItems: 'center', gap: '8px' })
+
       const runsPill = css({
         display: 'inline-block',
         // Nudged down from dead centre: DoodleCSS's radio glyph sits low in its
@@ -214,7 +219,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             <div mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}>
               <div>
                 <div mix={css({ display: 'flex', alignItems: 'center', gap: '10px' })}>
-                  <label>
+                  <label mix={radioLabel}>
                     <input
                       type="radio"
                       name="run_kind"
@@ -224,7 +229,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                         runKind = 'shortlist'
                         handle.update()
                       })}
-                    />{' '}
+                    />
                     A shortlist
                   </label>
                   {/* Only ever shows once runs actually remain — the exhausted-cap
@@ -242,7 +247,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 </p>
               </div>
               <div mix={css({ color: luckyAvailable ? 'inherit' : '#888' })}>
-                <label>
+                <label mix={radioLabel}>
                   <input
                     type="radio"
                     name="run_kind"
@@ -253,7 +258,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                       runKind = 'lucky'
                       handle.update()
                     })}
-                  />{' '}
+                  />
                   Today's lucky pick
                 </label>
                 <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
