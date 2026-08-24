@@ -157,6 +157,10 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
       const runsPill = css({
         display: 'inline-block',
+        // Nudged down from dead centre: DoodleCSS's radio glyph sits low in its
+        // 1.5em box (the hand-drawn circle doesn't fill the border-image square),
+        // so aligning box-centres put the pill visibly above the ring it's beside.
+        marginTop: '3px',
         padding: '2px 8px',
         borderRadius: '999px',
         border: '1px solid #ccc',
@@ -253,7 +257,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   Today's lucky pick
                 </label>
                 <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
-                  {`One ${itemNoun} nobody in the run has logged. Free, one a day.`}
+                  {`One ${itemNoun} nobody in the run has logged.`}
                 </p>
                 {!luckyAvailable && (
                   <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
