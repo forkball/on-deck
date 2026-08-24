@@ -47,6 +47,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
         <Nav authed={true} displayName={displayName} />
         {message && <Toast message={message} />}
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
+          <h1 mix={css({ margin: '0 0 16px' })}>{ui.searchHeading}</h1>
           <MediaTabLinks
             current={mediaType}
             // Switching type starts a fresh search rather than carrying the
@@ -54,7 +55,6 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
             // catalogs, so carrying it just fills the new tab with noise.
             hrefFor={(type) => MEDIA_TYPE_UI[type].hrefs.search()}
           />
-          <h1 mix={css({ margin: '0 0 16px' })}>{ui.searchHeading}</h1>
           <MovieSearchForm
             query={query}
             searchHref={ui.hrefs.search()}
