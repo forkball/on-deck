@@ -155,17 +155,10 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
       const caption = css({ margin: '10px 0 0', fontSize: '12px', color: '#888', lineHeight: 1.4 })
 
-      // The label's default inline layout aligns the radio glyph and its text
-      // on a text baseline, which sits noticeably above the glyph's own visual
-      // centre — flexing the label re-centres the text on the glyph's box instead.
-      //
-      // That's as far as this goes without guessing: a further pixel nudge to
-      // seat Short Stack's own ink exactly on the glyph's centre would need
-      // measuring against the real font, and this app's dev tooling can't load
-      // it (its web-font request gets reset before render), so any offset
-      // tuned here would be tuned against the wrong glyph shapes entirely.
-      // Check by eye against a real build before adding one.
-      const radioLabel = css({ display: 'inline-flex', alignItems: 'center', gap: '8px' })
+      // vertical-align, not flex: this sits the glyph on the text's own
+      // baseline instead of centring two boxes whose heights disagree, so it
+      // holds regardless of what line-height the font ends up with.
+      const radioInput = css({ verticalAlign: 'middle', marginRight: '8px' })
 
       // The one radio look used everywhere in this form — shortlist/lucky and
       // self/group all render through here, so the fix above only ever needs
@@ -179,14 +172,14 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         children: string
       }) {
         return (
-          <label mix={radioLabel}>
+          <label>
             <input
               type="radio"
               name={props.name}
               value={props.value}
               disabled={props.disabled}
               defaultChecked={props.checked}
-              mix={on('change', props.onChange)}
+              mix={[radioInput, on('change', props.onChange)]}
             />
             {props.children}
           </label>
@@ -247,7 +240,10 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 which read as a comparison table with two competing columns. */}
             <div mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}>
               <div>
-                <div mix={css({ display: 'flex', alignItems: 'center', gap: '10px' })}>
+                {/* Baseline, not centre: the pill and the label text are two
+                    different font sizes, and baseline is the flex alignment
+                    that's actually meant for lining up mixed-size text. */}
+                <div mix={css({ display: 'flex', alignItems: 'baseline', gap: '10px' })}>
                   {radioOption({
                     name: 'run_kind',
                     value: 'shortlist',
