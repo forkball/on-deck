@@ -16,6 +16,15 @@
   border-image: url(/border-light.svg) 10 10 10 10 stretch stretch;
 }
 
+/* A disabled radio already greys its `-` glyph (DoodleCSS's own
+   `:disabled:after { color: grey }`), but the ring is a border-image — an SVG
+   stroke baked at #3c3c3c — which `color` can't touch, so the border stayed
+   full black and the option still read as selectable. Fading the whole glyph
+   dims the ring along with it. */
+.doodle input[type='radio']:disabled {
+  opacity: 0.4;
+}
+
 .doodle button:hover:not(:disabled),
 .doodle .doodle-border:hover,
 .doodle select:hover,
