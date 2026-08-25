@@ -17,8 +17,7 @@ import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../me
 
 export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
-  // Past lucky draws, kept and pruned on their own track (see runs.ts) and
-  // shown in their own section below rather than mixed into `runs`.
+  // Past lucky draws — shown in their own section rather than mixed into `runs`.
   luckyRuns: RecommendationRunSummary[]
   runsFromOthers: RecommendationRunSummary[]
   friends: User[]
@@ -55,6 +54,24 @@ export interface RecommendationsPageProps {
     createdAt: number
     // Name/value pairs that reproduce the blocked request verbatim.
     fields: [string, string][]
+  }
+}
+
+const sectionCaption = css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })
+
+// A run list section that only appears once it has something to show —
+// "Recommendations from others" and "Lucky picks" both work this way. Past
+// recommendations doesn't reuse this: it always renders, with an empty state.
+function RunsSection(handle: Handle<{ title: string; caption: string; runs: RecommendationRunSummary[] }>) {
+  return () => {
+    const { title, caption, runs } = handle.props
+    return (
+      <section mix={css({ marginTop: '40px' })}>
+        <h2>{title}</h2>
+        <p mix={sectionCaption}>{caption}</p>
+        <RunList runs={runs} />
+      </section>
+    )
   }
 }
 
@@ -205,29 +222,25 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
           />
 
           {runsFromOthers.length > 0 && (
-            <section mix={css({ marginTop: '40px' })}>
-              <h2>Recommendations from others</h2>
-              <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
-                Group runs that included you.
-              </p>
-              <RunList runs={runsFromOthers} />
-            </section>
+            <RunsSection
+              title="Recommendations from others"
+              caption="Group runs that included you."
+              runs={runsFromOthers}
+            />
           )}
 
           {luckyRuns.length > 0 && (
-            <section mix={css({ marginTop: '40px' })}>
-              <h2>Lucky picks</h2>
-              <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
-                Your last {MAX_LUCKY_RUNS_PER_USER} draws.
-              </p>
-              <RunList runs={luckyRuns} />
-            </section>
+            <RunsSection
+              title="Lucky picks"
+              caption={`Your last ${MAX_LUCKY_RUNS_PER_USER} draws.`}
+              runs={luckyRuns}
+            />
           )}
 
           <section mix={css({ marginTop: '40px' })}>
             <h2>Past recommendations</h2>
             {runs.length > 0 && (
-              <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
+              <p mix={sectionCaption}>
                 Your last {MAX_RUNS_PER_USER} {ui.attributive} runs.
               </p>
             )}

@@ -66,9 +66,7 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     getLuckyState(user),
   ])
 
-  // Split once here rather than in the page: the two are kept on separate
-  // tracks all the way down to pruning (see pruneOldRuns), and the page shows
-  // them as separate sections rather than one list distinguished by an emoji.
+  // The page shows these as separate sections rather than one list.
   const runs = allRuns.filter((run) => !run.isLucky)
   const luckyRuns = allRuns.filter((run) => run.isLucky)
 
