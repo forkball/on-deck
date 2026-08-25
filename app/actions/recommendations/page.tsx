@@ -205,7 +205,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             <section mix={css({ marginTop: '40px' })}>
               <h2>Recommendations from others</h2>
               <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
-                Group runs friends generated that included you — only shown here once you both follow each other.
+                Group runs that included you.
               </p>
               <RunList runs={runsFromOthers} />
             </section>
@@ -215,8 +215,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             <section mix={css({ marginTop: '40px' })}>
               <h2>Lucky picks</h2>
               <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
-                Your last {MAX_LUCKY_RUNS_PER_USER} draws. Kept on their own track, so
-                generating a run above never pushes one out.
+                Your last {MAX_LUCKY_RUNS_PER_USER} draws.
               </p>
               <RunList runs={luckyRuns} />
             </section>
@@ -226,8 +225,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             <h2>Past recommendations</h2>
             {runs.length > 0 && (
               <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
-                Only your {MAX_RUNS_PER_USER} most recent {ui.attributive} runs are kept —
-                generating a new one removes the oldest.
+                Your last {MAX_RUNS_PER_USER} {ui.attributive} runs.
               </p>
             )}
             {runs.length === 0 ? (
