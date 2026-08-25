@@ -148,6 +148,9 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             Rewrites your {ui.attributive} taste profile from what you've logged, then finds
             picks to try next.
           </p>
+          <p mix={css({ margin: '6px 0 0', color: '#888', fontSize: '13px' })}>
+            Only your last {MAX_RUNS_PER_USER} runs are kept — generating a new one deletes the oldest.
+          </p>
           <MediaTabLinks
             current={mediaType}
             hrefFor={(type) => `${recsHref}?mediaType=${type}`}
