@@ -260,8 +260,15 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             </div>
           ) : (
             <p mix={css({ margin: '24px 0', color: '#555' })}>
-              <a href={luckyRecommendationsHref()}>🎲 Draw today's lucky pick</a> — one
-              thing nobody's logged, picked for you.
+              {/* rmx-document forces a full document load — see media-tab-links.tsx.
+                  Otherwise a client-side frame reload can land on the recommendations
+                  form with fresh `startLucky` props but stale local `runKind` state,
+                  leaving the shortlist/lucky radio and the settings it hides out of
+                  sync until a radio is clicked directly. */}
+              <a href={luckyRecommendationsHref()} rmx-document="">
+                🎲 Draw today's lucky pick
+              </a>{' '}
+              — one thing nobody's logged, picked for you.
             </p>
           )}
 
