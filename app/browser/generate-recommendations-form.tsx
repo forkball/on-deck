@@ -1,4 +1,4 @@
-import { clientEntry, css, on } from 'remix/ui'
+import { clientEntry, css, on, ref } from 'remix/ui'
 
 import { Field } from '../ui/shared/field.tsx'
 
@@ -92,6 +92,51 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let settingsOpen = false
     const selectedSources = new Set<string>([handle.props.mediaType])
     const selectedFriends = new Set<number>()
+
+    // The form works before this module does — it is server-rendered, and the
+    // controls that drive the state above are plain ones the browser owns:
+    // radios it sets from the `checked` attribute, selects from `defaultValue`.
+    // Nothing here writes them back on a re-render, so whenever the browser got
+    // there first the two disagree, and stay disagreeing: a click that lands
+    // while this bundle is still loading, or the selection a browser restores
+    // on reload or Back. A radio clicked while already selected fires no
+    // `change`, so clicking it again never repairs it — the panel keeps showing
+    // the other kind of run's fields, and the form keeps posting to the other
+    // kind's action, however many times it is pressed.
+    //
+    // So read those controls once, on hydration, and start from whatever the
+    // browser is actually showing. Only these: the checkboxes and the panel are
+    // written from here on every render, so the first render has already put
+    // them back before this runs, and there is nothing left to read.
+    function adoptRenderedState(form: HTMLFormElement) {
+      const checkedValue = (name: string) =>
+        form.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`)?.value
+      const selectValue = (name: string) =>
+        form.querySelector<HTMLSelectElement>(`select[name="${name}"]`)?.value ?? ''
+
+      // Both fall back to the safe answer rather than to the value read: a
+      // disabled radio can never be the checked one, so anything that isn't the
+      // other kind is the kind this form can actually submit.
+      const nextRunKind = checkedValue('run_kind') === 'lucky' ? 'lucky' : 'shortlist'
+      const nextMode = checkedValue('mode') === 'group' ? 'group' : 'self'
+      const nextDecade = selectValue('decade')
+      const nextPlayerType = selectValue('player_type')
+
+      if (
+        nextRunKind === runKind &&
+        nextMode === mode &&
+        nextDecade === decade &&
+        nextPlayerType === playerType
+      ) {
+        return
+      }
+
+      runKind = nextRunKind
+      mode = nextMode
+      decade = nextDecade
+      playerType = nextPlayerType
+      handle.update()
+    }
 
     return () => {
       const {
@@ -251,6 +296,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               borderRadius: '8px',
               padding: '20px',
             }),
+            ref((node) => adoptRenderedState(node as HTMLFormElement)),
             on('submit', () => {
               submitting = true
               handle.update()
