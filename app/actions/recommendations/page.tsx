@@ -144,11 +144,11 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
           <h1>Recommendations</h1>
-          <p mix={css({ color: '#555' })}>
+          <p mix={css({ margin: 0, color: '#555' })}>
             Rewrites your {ui.attributive} taste profile from what you've logged, then finds
             picks to try next.
           </p>
-          <p mix={css({ margin: '6px 0 0', color: '#888', fontSize: '13px' })}>
+          <p mix={css({ margin: '4px 0 0', color: '#888', fontSize: '13px' })}>
             Only your last {MAX_RUNS_PER_USER} runs are kept — generating a new one deletes the oldest.
           </p>
           <MediaTabLinks
