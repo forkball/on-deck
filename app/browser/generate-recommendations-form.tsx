@@ -158,7 +158,15 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       // vertical-align, not flex: this sits the glyph on the text's own
       // baseline instead of centring two boxes whose heights disagree, so it
       // holds regardless of what line-height the font ends up with.
-      const radioInput = css({ verticalAlign: 'middle', marginRight: '8px' })
+      //
+      // `middle` itself lands on baseline + half the font's x-height — the
+      // height of a lowercase "o", not the full word — so a leading capital
+      // ("A shortlist") pulls the word's true visual centre above that point.
+      // No vertical-align keyword targets "this glyph run's visual centre";
+      // that's a font metric CSS doesn't expose. Measured directly against a
+      // real screenshot (this sandbox can't load Short Stack to check it
+      // live): the glyph sat 5px below where the word actually centres.
+      const radioInput = css({ verticalAlign: 'middle', marginRight: '8px', position: 'relative', top: '-5px' })
 
       // The one radio look used everywhere in this form — shortlist/lucky and
       // self/group all render through here, so the fix above only ever needs
