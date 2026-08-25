@@ -155,18 +155,35 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
       const caption = css({ margin: '10px 0 0', fontSize: '12px', color: '#888', lineHeight: 1.4 })
 
-      // vertical-align, not flex: this sits the glyph on the text's own
-      // baseline instead of centring two boxes whose heights disagree, so it
-      // holds regardless of what line-height the font ends up with.
+      // Flex does the aligning, but it has to live on a span rather than the
+      // label: DoodleCSS sets `.doodle label { display: inline-block }`
+      // unlayered, which beats a layered css() rule at any specificity, so a
+      // flex label is silently dropped (same trap app.css documents for
+      // label padding). Inside the wrapper, centring puts the radio's ring on
+      // the row's centre line — the hand-drawn ring is a border-image painted
+      // across the whole input box, so its box centre is its visual centre.
       //
-      // `middle` itself lands on baseline + half the font's x-height — the
-      // height of a lowercase "o", not the full word — so a leading capital
-      // ("A shortlist") pulls the word's true visual centre above that point.
-      // No vertical-align keyword targets "this glyph run's visual centre";
-      // that's a font metric CSS doesn't expose. Measured directly against a
-      // real screenshot (this sandbox can't load Short Stack to check it
-      // live): the glyph sat 5px below where the word actually centres.
-      const radioInput = css({ verticalAlign: 'middle', marginRight: '8px', position: 'relative', top: '-5px' })
+      // line-height: 1 keeps the text's own box from out-growing the 32px
+      // input and pulling the centre off it.
+      const radioRow = css({
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        lineHeight: 1,
+      })
+
+      // The browser's own default for a radio is `margin: 3px 3px 0 5px` —
+      // top and bottom differ, so centring the margin box leaves the control
+      // itself sitting 1.5px low. Zeroing it lets the ring land where flex
+      // actually put it.
+      const radioInput = css({ margin: 0 })
+
+      // The one thing flex can't reach. Letters don't sit centred in their own
+      // line box: the space above the capitals and below the baseline differ,
+      // by an amount baked into the font's metrics that no CSS keyword
+      // exposes. Measured off a real render of Short Stack and kept in em so
+      // it survives a change of type scale.
+      const radioLabelText = css({ position: 'relative', top: '0.05em' })
 
       // The one radio look used everywhere in this form — shortlist/lucky and
       // self/group all render through here, so the fix above only ever needs
@@ -181,15 +198,17 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       }) {
         return (
           <label>
-            <input
-              type="radio"
-              name={props.name}
-              value={props.value}
-              disabled={props.disabled}
-              defaultChecked={props.checked}
-              mix={[radioInput, on('change', props.onChange)]}
-            />
-            {props.children}
+            <span mix={radioRow}>
+              <input
+                type="radio"
+                name={props.name}
+                value={props.value}
+                disabled={props.disabled}
+                defaultChecked={props.checked}
+                mix={[radioInput, on('change', props.onChange)]}
+              />
+              <span mix={radioLabelText}>{props.children}</span>
+            </span>
           </label>
         )
       }
@@ -248,10 +267,11 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 which read as a comparison table with two competing columns. */}
             <div mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}>
               <div>
-                {/* Baseline, not centre: the pill and the label text are two
-                    different font sizes, and baseline is the flex alignment
-                    that's actually meant for lining up mixed-size text. */}
-                <div mix={css({ display: 'flex', alignItems: 'baseline', gap: '10px' })}>
+                {/* Centre, not baseline: the pill is a shape, not a run of
+                    text, so what should line up with the words is the middle
+                    of that shape — baseline would hang it off its own text
+                    instead, which sits low inside its padding. */}
+                <div mix={css({ display: 'flex', alignItems: 'center', gap: '10px' })}>
                   {radioOption({
                     name: 'run_kind',
                     value: 'shortlist',
