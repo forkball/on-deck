@@ -9,7 +9,13 @@ import { Nav } from '../../ui/components/nav.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { Field } from '../../ui/shared/field.tsx'
-import { MEDIA_TYPE_UI, statusLabelsFor, statusOptionsFor, type ActiveMediaType } from '../../mediaTypes.ts'
+import {
+  DEFAULT_MEDIA_TYPE,
+  MEDIA_TYPE_UI,
+  statusLabelsFor,
+  statusOptionsFor,
+  type ActiveMediaType,
+} from '../../mediaTypes.ts'
 
 export interface ProfileWatchedPageProps {
   movieLog: Awaited<ReturnType<typeof listUserMediaLog>>
@@ -25,7 +31,9 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
   return () => {
     const { movieLog, mediaType, status, page, totalPages, displayName } = handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
-    const typeQuery = mediaType === 'movie' ? '' : `&type=${mediaType}`
+    // Omitted for the default type, because a reader that finds no `type` falls
+    // back to DEFAULT_MEDIA_TYPE — the two ends have to name the same constant.
+    const typeQuery = mediaType === DEFAULT_MEDIA_TYPE ? '' : `&type=${mediaType}`
     // Everything that has to survive a page change. Kept as one string so the
     // pagination links and the "back to here" the edit modal posts can't
     // disagree about which list you were looking at.
@@ -51,7 +59,7 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
             action={routes.profile.watched.href()}
             mix={css({ display: 'flex', alignItems: 'flex-end', gap: '8px', margin: '0 0 24px' })}
           >
-            {mediaType !== 'movie' && <input type="hidden" name="type" value={mediaType} />}
+            {mediaType !== DEFAULT_MEDIA_TYPE && <input type="hidden" name="type" value={mediaType} />}
             {/* Field spans its container by design, so it needs a bounded box
                 of its own here or it squeezes the button off the row. */}
             <div mix={css({ flex: '0 1 200px' })}>
