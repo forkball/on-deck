@@ -2,7 +2,12 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
-import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import {
+  DEFAULT_MEDIA_TYPE,
+  enabledMediaTypes,
+  MEDIA_TYPE_UI,
+  type ActiveMediaType,
+} from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
@@ -164,7 +169,9 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
                           detailHref={(id) =>
                             `${ui.hrefs.show(id)}?from=${encodeURIComponent(`${returnTo}?tab=${type}`)}`
                           }
-                          seeAllHref={type === 'movie' ? watchedHref : `${watchedHref}?type=${type}`}
+                          seeAllHref={
+                            type === DEFAULT_MEDIA_TYPE ? watchedHref : `${watchedHref}?type=${type}`
+                          }
                         />
                       </>,
                     ]

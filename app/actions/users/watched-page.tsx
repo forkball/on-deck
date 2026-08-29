@@ -9,7 +9,7 @@ import { Document } from '../../ui/components/document.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
-import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
 export interface UserWatchedPageProps {
   user: User
@@ -26,7 +26,9 @@ export function UserWatchedPage(handle: Handle<UserWatchedPageProps>) {
     const label = displayLabel(user)
     const watchedHref = routes.users.watched.href({ userId: String(user.id) })
     const ui = MEDIA_TYPE_UI[mediaType]
-    const typeQuery = mediaType === 'movie' ? '' : `&type=${mediaType}`
+    // Omitted for the default type, because a reader that finds no `type` falls
+    // back to DEFAULT_MEDIA_TYPE — the two ends have to name the same constant.
+    const typeQuery = mediaType === DEFAULT_MEDIA_TYPE ? '' : `&type=${mediaType}`
     const returnTo = `${watchedHref}?page=${page}${typeQuery}`
     const noun = ui.tabLabel
     // See the profile copy of this page — the verb is per medium.

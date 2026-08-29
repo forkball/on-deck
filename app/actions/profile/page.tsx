@@ -4,7 +4,12 @@ import { css } from 'remix/ui'
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
 import type { LuckyState } from '../../data/recommendations/lucky.ts'
 import type { TasteProfileSettings } from '../../data/recommendations/tasteProfile.ts'
-import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import {
+  DEFAULT_MEDIA_TYPE,
+  enabledMediaTypes,
+  MEDIA_TYPE_UI,
+  type ActiveMediaType,
+} from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { Toast } from '../../ui/components/toast.tsx'
 import { luckyRecommendationsHref, routes } from '../../routes.ts'
@@ -273,7 +278,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                 const ui = MEDIA_TYPE_UI[type]
                 const { summary, profileUpdatedAt, log, total } = media[type]
                 const seeAllHref =
-                  type === 'movie'
+                  type === DEFAULT_MEDIA_TYPE
                     ? routes.profile.watched.href()
                     : `${routes.profile.watched.href()}?type=${type}`
 

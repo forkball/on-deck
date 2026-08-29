@@ -45,7 +45,7 @@ const generateSchema = f.object({
   // Validated against the registry below rather than a literal union here: a
   // union would reject any newly-wired-up type until someone edited this
   // schema, and TypeScript can't flag the omission in a runtime schema.
-  mediaType: f.field(s.defaulted(s.string(), 'movie')),
+  mediaType: f.field(s.defaulted(s.string(), DEFAULT_MEDIA_TYPE)),
   genre: f.field(s.defaulted(s.string(), '')),
   decade: f.field(s.defaulted(s.string(), '')),
   decade_relation: f.field(s.defaulted(s.string(), '')),
