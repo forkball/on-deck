@@ -1,79 +1,26 @@
-import { Database } from 'remix/data-table'
-import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
-import { redirect } from 'remix/response/redirect'
 
-import { activeBatch, createBatch } from '../../../data/imports/batches.ts'
 import { parseLetterboxdUpload } from '../../../data/imports/letterboxd.ts'
 import type { User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
-import { displayLabel } from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
+import { createFileImportActions } from '../fileImportActions.tsx'
 import { LetterboxdImportPage } from './page.tsx'
 
+// The upload flow itself is createFileImportActions — see import-books for the
+// other one. Only the parser, the page and the wording are per source.
 export default createController(routes.profile.importMovies, {
   middleware: [requireAuth<User>()],
-  actions: {
-    async index(context) {
-      const auth = context.get(Auth)
-
-      // An import someone is midway through outranks the upload form: starting
-      // a second one would orphan the review they haven't finished.
-      const pending = await activeBatch(context.get(Database), auth.identity.id, 'movie')
-
-      return context.render(
-        <LetterboxdImportPage
-          displayName={displayLabel(auth.identity)}
-          pendingHref={pending ? routes.profile.imports.show.href({ batchId: pending.id }) : undefined}
-        />,
-      )
-    },
-
-    async upload(context) {
-      const auth = context.get(Auth)
-
-      const formData = context.get(FormData)
-      const file = formData.get('ratings')
-
-      if (!(file instanceof File) || file.size === 0) {
-        return context.render(
-          <LetterboxdImportPage
-            error="Choose your Letterboxd export .zip first."
-            displayName={displayLabel(auth.identity)}
-          />,
-          { status: 400 },
-        )
-      }
-
-      const db = context.get(Database)
-
-      try {
-        const { rows, reviewsOnly } = parseLetterboxdUpload(new Uint8Array(await file.arrayBuffer()))
-
-        if (rows.length === 0) {
-          return context.render(
-            <LetterboxdImportPage
-              error="That export has no rated or reviewed films in it."
-              displayName={displayLabel(auth.identity)}
-            />,
-            { status: 400 },
-          )
-        }
-
-        // The request ends here: matching a few hundred rows is tens of seconds
-        // of catalog lookups, which a worker does while this redirect lands.
-        const batchId = await createBatch(db, auth.identity.id, 'movie', 'letterboxd', rows)
-        const href = routes.profile.imports.show.href({ batchId })
-        return redirect(reviewsOnly ? `${href}?partial=reviews` : href, 303)
-      } catch (error) {
-        return context.render(
-          <LetterboxdImportPage
-            error={error instanceof Error ? error.message : 'Something went wrong reading that file.'}
-            displayName={displayLabel(auth.identity)}
-          />,
-          { status: 400 },
-        )
-      }
-    },
-  },
+  actions: createFileImportActions({
+    mediaType: 'movie',
+    source: 'letterboxd',
+    page: LetterboxdImportPage,
+    fieldName: 'ratings',
+    // A .zip with the ratings and reviews as separate files inside, so this one
+    // needs the bytes. It also answers reviewsOnly, which is what puts the
+    // `partial=reviews` marker on the redirect.
+    parse: async (file) => parseLetterboxdUpload(new Uint8Array(await file.arrayBuffer())),
+    missingFileError: 'Choose your Letterboxd export .zip first.',
+    emptyError: 'That export has no rated or reviewed films in it.',
+  }),
 })
