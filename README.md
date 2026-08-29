@@ -1,50 +1,116 @@
-# On Deck Scaffold
+# On Deck
 
-A minimal Remix application starter with a home page.
+A media log and recommendation app. You keep a log across four media types —
+movies, TV, books and games — rate and annotate what you've finished, follow
+other people, and read an activity feed of what they've logged.
 
-## Starter Shape
+On top of that log it generates recommendations: a shortlist built from your
+taste profile (optionally pooled with friends' for a group pick), and a
+once-a-day "lucky" draw of a single title. Generation runs as a queued
+background job, so the page reports real stages rather than blocking.
 
-- `app/actions/controller.tsx` owns the top-level route actions.
-- `app/routes.ts` defines the route contract.
-- `app/router.ts` wires routes to handlers.
-- `app/middleware/render.tsx` installs the request-scoped renderer used by actions.
-- `app/ui/` holds the shared document shell and home page UI.
-- `app/assets.ts` owns the server-side asset pipeline used by the asset route and renderer.
-- `public/` contains static files served from the app root.
+Existing libraries can be imported rather than re-entered: a Letterboxd export
+(.zip), a Goodreads CSV, or a linked Steam account. Imports are staged — rows
+are matched against the catalogs in the background, then you review the
+uncertain matches, conflicts and duplicates before anything is written to your
+log.
 
-## Growing The App
+Metadata comes from TMDB (movies, TV), Google Books with an Open Library
+fallback (books), and IGDB (games); recommendations and taste-profile summaries
+come from the Anthropic API.
 
-- Put top-level route actions in `app/actions/controller.tsx`.
-- Add `app/actions/<route-key>/controller.tsx` when a nested route map needs its own actions or middleware.
-- Add directories like `app/data/` or `test/` when the app actually needs them.
-- Move shared UI into `app/ui/` once more than one route needs it.
+## Requirements
+
+Node >= 24.3.0, and Docker for the local Postgres in `docker-compose.yml`.
+
+## Setup
+
+```sh
+npm i
+cp .env.example .env    # then fill it in — see below
+npm run db:up           # starts Postgres in Docker
+npm run db:migrate      # applies pending migrations
+npm run dev
+```
+
+`.env.example` is the record of which variables the app needs, with a comment
+on each explaining what it is and where to get it. `DATABASE_URL` and
+`SESSION_SECRET` are needed to boot; the provider keys are needed per feature —
+without `TMDB_API_KEY` you can't search movies or TV, without
+`ANTHROPIC_API_KEY` you can't generate recommendations, and so on.
+
+Point `DATABASE_URL` at the local container, not the hosted database: every
+process runs a worker that claims recommendation jobs from the queue, so a
+local server pointed at production will execute real users' jobs.
 
 ## Commands
 
 ```sh
-npm i
-npm run start
+npm run dev             # watch mode
+npm start               # serve (does not migrate — see Deployment)
 npm test
-npm run typecheck
+npm run typecheck       # tsc, then the browser-bundle check
+npm run db:up           # start local Postgres
+npm run db:down
+npm run db:migrate
+npm run db:migrate:down
+npm run prod:query      # read-only SELECT against production
 ```
+
+`npm test` runs the suite under `test/`. Database-backed tests skip themselves
+unless `DATABASE_URL` is set, so the suite is runnable with no Postgres — it
+just covers less. Run `npm run db:up && npm run db:migrate` first to include
+them.
+
+`npm run typecheck` is two checks: `tsc`, then `scripts/check-browser-bundle.ts`,
+which compiles every client entry through the real asset server and fails if one
+has picked up an import that can't reach the browser.
+
+## Layout
+
+`AGENTS.md` holds the full contract — which directory owns what, and why the
+boundaries sit where they do. In brief:
+
+- `app/routes.ts` defines the routes; `app/router.ts` wires them to controllers
+- `app/actions/` holds controllers and the pages they own
+- `app/mediaTypes.ts` is the media-type registry: the per-type nouns, copy,
+  status verbs and href builders that keep the four types consistent
+- `app/data/` holds persistence and the services on it — `catalog/` for the
+  metadata providers, `imports/` for the staged importers, `recommendations/`
+  for the generation pipeline
+- `app/browser/` is code that reaches the browser; `app/ui/` is server-rendered
+  UI. The split is enforced by the bundle check above, not by convention
+- `db/` holds migrations, `public/` static files served from the app root
 
 ## Deployment (Fly.io)
 
 The app is a plain long-running Node server (`server.ts`) with no build
 step — it runs TypeScript directly at runtime via `remix/node-tsx` — so the
-`Dockerfile` just installs production dependencies and runs `npm start`,
-which applies pending DB migrations then starts the server.
+`Dockerfile` just installs production dependencies and runs `npm start`.
+
+Migrations are a deploy step, not a boot step: `release_command` in `fly.toml`
+runs `npm run db:migrate` once per deploy. Booting deliberately doesn't migrate
+— the app runs on more than one machine, so migrating from there meant every
+machine racing to apply the same migration on every boot.
+
+Pushing to `main` deploys: `.github/workflows/fly-deploy.yml` runs
+`flyctl deploy` on every push. There is no test gate on that workflow.
 
 First-time setup:
 
 ```sh
 fly auth login
 fly launch --no-deploy   # rename the app in fly.toml first if "on-deck" is taken
+# DATABASE_URL is the same Postgres (Supabase) instance used locally.
 fly secrets set \
   SESSION_SECRET=... \
+  DATABASE_URL=... \
   TMDB_API_KEY=... \
   ANTHROPIC_API_KEY=... \
-  DATABASE_URL=...       # same Postgres (Supabase) instance used locally
+  GOOGLE_BOOKS_API_KEY=... \
+  STEAM_API_KEY=... \
+  TWITCH_CLIENT_ID=... \
+  TWITCH_CLIENT_SECRET=...
 fly deploy
 ```
 

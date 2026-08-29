@@ -107,4 +107,15 @@ does nothing on its own.
   A member correcting a bad match for themselves does it through the import
   review (`repointRow`), which changes which existing row a staged row points at
   and leaves the catalog alone.
-- There is no `test/` directory yet, despite `npm test` being wired up.
+- Tests live in `test/`, usually one file per module under test
+  (`import-review.test.ts` covers `data/imports/review.ts`), though a few cover
+  a pair — `lucky.test.ts` holds both `lucky` and `exclusions`. `npm test` runs
+  them on the node:test runner.
+- Database-backed tests skip themselves unless `DATABASE_URL` is set, so the
+  suite runs on a machine with no Postgres — it just covers less. This is what
+  the database-free modules buy: `classify`, `review` and `exclusions` hold the
+  rules and are tested directly, so the rules stay covered either way.
+  `test/support/db.ts` exports `skipWithoutDatabase` to hold that condition in
+  one place, but only `feed` and `following-activity` use it — five other files
+  inline the same expression, which is the duplication the helper was added to
+  prevent. Reach for the helper when writing a new one.
