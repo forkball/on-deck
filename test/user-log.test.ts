@@ -8,6 +8,7 @@ import {
   matchesLogFilter,
   type UserLogFilter,
 } from '../app/data/mediaItems.ts'
+import { skipWithoutDatabase } from './support/db.ts'
 
 // listUserMediaLog and countUserMediaLog filter and paginate in SQL. The
 // predicate they encode has to stay identical to matchesLogFilter, which is what
@@ -15,9 +16,7 @@ import {
 // whose rows and whose pagination disagree.
 //
 // Needs a migrated database: `npm run db:up && npm run db:migrate`.
-const skip = process.env.DATABASE_URL ? false : 'set DATABASE_URL to run (npm run db:up && npm run db:migrate)'
-
-describe('user media log queries', { skip }, () => {
+describe('user media log queries', { skip: skipWithoutDatabase }, () => {
   let userId: number
   const itemIds: number[] = []
 
