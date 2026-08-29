@@ -3,15 +3,14 @@ import { after, before, describe, it } from 'node:test'
 
 import { db, pool } from '../app/data/db.ts'
 import { completeJob, enqueueJob, failJob, getJob, requeueJob } from '../app/data/recommendations/jobs.ts'
+import { skipWithoutDatabase } from './support/db.ts'
 
 // A user may have one queued-or-running job at a time. The rule is enforced by a
 // partial unique index, not by a read before the insert: two requests arriving
 // together both pass a prior check, and each run costs several model calls.
 //
 // Needs a migrated database: `npm run db:up && npm run db:migrate`.
-const skip = process.env.DATABASE_URL ? false : 'set DATABASE_URL to run (npm run db:up && npm run db:migrate)'
-
-describe('one active job per user', { skip }, () => {
+describe('one active job per user', { skip: skipWithoutDatabase }, () => {
   let userId: number
   let otherId: number
 

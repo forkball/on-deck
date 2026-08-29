@@ -13,6 +13,7 @@ import {
   saveRun,
 } from '../app/data/recommendations/runs.ts'
 import type { MediaItem, User, UserMediaInteraction } from '../app/data/schema.ts'
+import { skipWithoutDatabase } from './support/db.ts'
 
 // A log row, cut down to the two fields the exclusion rule reads.
 function entry(externalId: string, title: string, status: string): UserLogEntry {
@@ -87,9 +88,7 @@ describe('buildExclusions', () => {
 })
 
 // Needs a migrated database: `npm run db:up && npm run db:migrate`.
-const skip = process.env.DATABASE_URL ? false : 'set DATABASE_URL to run (npm run db:up && npm run db:migrate)'
-
-describe("I'm feeling lucky", { skip }, () => {
+describe("I'm feeling lucky", { skip: skipWithoutDatabase }, () => {
   let user: User
   let itemId: number
 

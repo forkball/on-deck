@@ -115,7 +115,9 @@ does nothing on its own.
   suite runs on a machine with no Postgres — it just covers less. This is what
   the database-free modules buy: `classify`, `review` and `exclusions` hold the
   rules and are tested directly, so the rules stay covered either way.
-  `test/support/db.ts` exports `skipWithoutDatabase` to hold that condition in
-  one place, but only `feed` and `following-activity` use it — five other files
-  inline the same expression, which is the duplication the helper was added to
-  prevent. Reach for the helper when writing a new one.
+  The condition itself is `skipWithoutDatabase` in `test/support/db.ts`, and
+  every database-backed file takes it from there — `describe('…', { skip:
+  skipWithoutDatabase }, …)`. Use it rather than spelling the check again: the
+  message names the two commands that make the tests runnable, and half the
+  suite telling you a different way to run the other half is the failure this
+  prevents.

@@ -4,6 +4,7 @@ import { after, before, describe, it } from 'node:test'
 import { db, pool } from '../app/data/db.ts'
 import { logInteraction, updateInteraction } from '../app/data/mediaItems.ts'
 import { userMediaInteractions } from '../app/data/schema.ts'
+import { skipWithoutDatabase } from './support/db.ts'
 
 // notes is three-state, like rating: undefined leaves whatever is stored, null
 // clears it, a string sets it. This needs a database to be worth anything —
@@ -17,9 +18,7 @@ import { userMediaInteractions } from '../app/data/schema.ts'
 // 834-row import erased every note in the log.
 //
 // Needs a migrated database: `npm run db:up && npm run db:migrate`.
-const skip = process.env.DATABASE_URL ? false : 'set DATABASE_URL to run (npm run db:up && npm run db:migrate)'
-
-describe('interaction notes', { skip }, () => {
+describe('interaction notes', { skip: skipWithoutDatabase }, () => {
   let userId: number
   let itemId: number
 

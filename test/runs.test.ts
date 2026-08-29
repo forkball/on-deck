@@ -9,15 +9,14 @@ import {
   listRecommendationRunsFromOthers,
   saveRun,
 } from '../app/data/recommendations/runs.ts'
+import { skipWithoutDatabase } from './support/db.ts'
 
 // These functions used to issue a query per run to build its group label, and
 // listRecommendationRuns returned every media type for the caller to discard.
 // The counts below are the point of the change, so they are asserted.
 //
 // Needs a migrated database: `npm run db:up && npm run db:migrate`.
-const skip = process.env.DATABASE_URL ? false : 'set DATABASE_URL to run (npm run db:up && npm run db:migrate)'
-
-describe('recommendation run listings', { skip }, () => {
+describe('recommendation run listings', { skip: skipWithoutDatabase }, () => {
   let viewer: number
   let friend: number
   let stranger: number
