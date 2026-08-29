@@ -16,7 +16,6 @@ export default createController(routes.notifications, {
   actions: {
     async index(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
       const notifications = await listNotifications(db, auth.identity.id)
@@ -28,7 +27,6 @@ export default createController(routes.notifications, {
 
     async unreadCount(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
       const count = await countUnreadNotifications(db, auth.identity.id)
@@ -40,7 +38,6 @@ export default createController(routes.notifications, {
     // list flips to read the moment you land on the page.
     async read(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const notificationId = Number(context.params.notificationId)
       const db = context.get(Database)

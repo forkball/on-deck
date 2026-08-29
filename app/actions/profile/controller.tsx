@@ -47,7 +47,6 @@ export default createController(routes.profile, {
   actions: {
     async index(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
       const media = await loadMediaSummaries(db, auth.identity.id, RECENT_COUNT)
@@ -80,7 +79,6 @@ export default createController(routes.profile, {
 
     async settings(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const formData = context.get(FormData)
       await updateProfileSettings(context.get(Database), auth.identity.id, {
@@ -95,7 +93,6 @@ export default createController(routes.profile, {
 
     async rebuild(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const mediaType = parseEnabledMediaType(context.params.mediaType)
       if (!mediaType) return new Response('Not Found', { status: 404 })
@@ -138,7 +135,6 @@ export default createController(routes.profile, {
 
     async watched(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
@@ -169,7 +165,6 @@ export default createController(routes.profile, {
 
     async following(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
       const users = await listFollowedUsers(db, auth.identity.id)
@@ -191,7 +186,6 @@ export default createController(routes.profile, {
 
     async followers(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
       const users = await listFollowers(db, auth.identity.id)

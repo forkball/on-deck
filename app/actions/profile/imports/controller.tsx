@@ -30,7 +30,6 @@ type Found = { ok: true; batch: ImportBatch; displayName: string } | { ok: false
 // not on its own authority to read someone else's import.
 async function findBatch(context: ImportBatchContext | ImportRowContext): Promise<Found> {
   const auth = context.get(Auth)
-  if (!auth.ok) return { ok: false, response: new Response('Unauthorized', { status: 401 }) }
 
   const batch = await loadBatch(context.get(Database), context.params.batchId, auth.identity.id)
   if (!batch) return { ok: false, response: new Response('Not found', { status: 404 }) }

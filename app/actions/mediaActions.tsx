@@ -55,7 +55,6 @@ export function createMediaActions(mediaType: ActiveMediaType) {
     async search(context: MediaControllerContext) {
       const db: Db = context.get(Database)
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
       const identity: User = auth.identity
 
       const query = context.url.searchParams.get('q')?.trim() ?? ''
@@ -80,9 +79,6 @@ export function createMediaActions(mediaType: ActiveMediaType) {
     },
 
     async suggest(context: MediaControllerContext) {
-      const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
-
       const query = context.url.searchParams.get('q')?.trim() ?? ''
       if (query.length < 2) return Response.json({ suggestions: [] })
 
@@ -101,9 +97,6 @@ export function createMediaActions(mediaType: ActiveMediaType) {
     },
 
     async import(context: MediaControllerContext) {
-      const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
-
       const externalId = context.url.searchParams.get('externalId')?.trim() ?? ''
       if (!externalId) return redirect(ui.hrefs.search(), 303)
 
@@ -120,7 +113,6 @@ export function createMediaActions(mediaType: ActiveMediaType) {
 
     async show(context: MediaItemControllerContext) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
       const identity: User = auth.identity
 
       const mediaItemId = Number(context.params.mediaItemId)
@@ -163,7 +155,6 @@ export function createMediaActions(mediaType: ActiveMediaType) {
     // against your own rows and leaves the catalog alone.
     async rematch(context: MediaItemControllerContext) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
       if (!auth.identity.is_admin) return new Response('Forbidden', { status: 403 })
 
       const mediaItemId = Number(context.params.mediaItemId)
@@ -195,7 +186,6 @@ export function createMediaActions(mediaType: ActiveMediaType) {
 
     async log(context: MediaItemControllerContext) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
       const identity: User = auth.identity
 
       const mediaItemId = Number(context.params.mediaItemId)

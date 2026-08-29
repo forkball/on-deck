@@ -54,7 +54,6 @@ export default createController(routes.users, {
   actions: {
     async search(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
       const query = context.url.searchParams.get('q')?.trim() ?? ''
@@ -74,7 +73,6 @@ export default createController(routes.users, {
 
     async suggest(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const query = context.url.searchParams.get('q')?.trim() ?? ''
       if (query.length < 2) return Response.json({ suggestions: [] })
@@ -93,7 +91,6 @@ export default createController(routes.users, {
 
     async show(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const userId = Number(context.params.userId)
       if (userId === auth.identity.id) return redirect(routes.profile.index.href(), 303)
@@ -141,7 +138,6 @@ export default createController(routes.users, {
 
     async watched(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const userId = Number(context.params.userId)
       const db = context.get(Database)
@@ -174,7 +170,6 @@ export default createController(routes.users, {
 
     async following(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const userId = Number(context.params.userId)
       const db = context.get(Database)
@@ -201,7 +196,6 @@ export default createController(routes.users, {
 
     async followers(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const userId = Number(context.params.userId)
       const db = context.get(Database)
@@ -228,7 +222,6 @@ export default createController(routes.users, {
 
     async follow(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const userId = Number(context.params.userId)
       const db = context.get(Database)
@@ -241,7 +234,6 @@ export default createController(routes.users, {
 
     async unfollow(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const userId = Number(context.params.userId)
       const db = context.get(Database)
