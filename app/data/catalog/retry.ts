@@ -1,5 +1,11 @@
-const FETCH_ATTEMPTS = 3
-const RETRY_BASE_MS = 400
+// Six rather than three, and cheap: a Google Books rejection comes back in
+// ~70ms against ~550ms for a real answer, so the attempts that fail cost a
+// fraction of the one that works. Measured from the app's own machine, six
+// attempts served 27/27 searches where three served 21/27 — the difference
+// between a search reaching Google Books and one quietly resolving against
+// Open Library instead.
+const FETCH_ATTEMPTS = 6
+const RETRY_BASE_MS = 250
 
 // A 5xx body is where a provider says which 5xx this is. Google Books answers
 // an exhausted quota and a genuinely overloaded backend with the same 503, and
@@ -7,13 +13,20 @@ const RETRY_BASE_MS = 400
 // outage that isn't there. Truncated because a failed attempt logs it.
 const ERROR_BODY_MAX = 200
 
-// Exponential, and half of each delay random. A generation run puts several
-// searches on the wire at once; a fixed schedule sleeps all of them for the
-// same 400ms and retries them in the same instant, which is the burst that drew
-// the failures being retried. The fixed half keeps a floor under the delay.
-export function backoffMs(attempt: number): number {
-  const ceiling = RETRY_BASE_MS * 2 ** (attempt - 1)
-  return ceiling / 2 + Math.random() * (ceiling / 2)
+// Flat, and half of each delay random.
+//
+// Exponential backoff assumes congestion that eases while you wait. That is not
+// what these failures are: they arrive in bursts that outlast any delay worth
+// adding to a search someone is sitting in front of. Ladders of 1s/2s/4s served
+// no more requests than 250ms ones and cost seconds doing it, so the budget is
+// better spent on more attempts than on longer gaps between them.
+//
+// The random half is what keeps a generation run's concurrent searches from
+// retrying in lockstep — a fixed delay sleeps them all for the same 250ms and
+// re-fires them in the same instant, recreating the burst being retried. The
+// fixed half keeps a floor under the delay.
+export function backoffMs(): number {
+  return RETRY_BASE_MS / 2 + Math.random() * (RETRY_BASE_MS / 2)
 }
 
 // Only ever called on a response that is about to be thrown away, so consuming
@@ -68,7 +81,7 @@ export async function fetchWithRetry(url: URL, provider: string): Promise<Respon
     )
 
     if (attempt < FETCH_ATTEMPTS) {
-      await new Promise((resolve) => setTimeout(resolve, backoffMs(attempt)))
+      await new Promise((resolve) => setTimeout(resolve, backoffMs()))
     }
   }
 

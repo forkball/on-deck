@@ -5,20 +5,18 @@ import { createProviderCircuit } from '../app/data/catalog/circuit.ts'
 import { backoffMs } from '../app/data/catalog/retry.ts'
 
 describe('backoffMs', () => {
-  it('grows the ceiling exponentially per attempt', () => {
-    const ceilings = [400, 800]
-    ceilings.forEach((ceiling, index) => {
-      const attempt = index + 1
-      for (let i = 0; i < 200; i++) {
-        const delay = backoffMs(attempt)
-        assert.ok(delay >= ceiling / 2, `attempt ${attempt} delay ${delay} below floor`)
-        assert.ok(delay < ceiling, `attempt ${attempt} delay ${delay} at or above ceiling`)
-      }
-    })
+  // Flat, not exponential: the sixth attempt has to be as affordable as the
+  // first, or six attempts do not fit in a search someone is waiting on.
+  it('stays within the same bounds however many attempts have been made', () => {
+    for (let i = 0; i < 500; i++) {
+      const delay = backoffMs()
+      assert.ok(delay >= 125, `delay ${delay} below floor`)
+      assert.ok(delay < 250, `delay ${delay} at or above ceiling`)
+    }
   })
 
   it('spreads retries out instead of scheduling them all together', () => {
-    const delays = new Set(Array.from({ length: 50 }, () => backoffMs(1)))
+    const delays = new Set(Array.from({ length: 50 }, () => backoffMs()))
     assert.ok(delays.size > 1, 'every retry got the same delay')
   })
 })
