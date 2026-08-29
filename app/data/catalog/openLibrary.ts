@@ -1,6 +1,17 @@
 import { fetchWithRetry } from './retry.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
 
+// Open Library allows anonymous callers 1 request/second and identified ones 3,
+// and asks for a contact so they can reach a heavy caller instead of throttling
+// it silently. The 3x only matters for imports, where hundreds of books resolve
+// back to back — interactive search comes nowhere near either limit.
+//
+// A plus-alias rather than the plain address, so anything arriving through it is
+// filterable and can be retired on its own. Safe to keep in the source while
+// this repository is private; move it to an environment variable before opening
+// the repository up.
+const USER_AGENT = 'on-deck/1.0 (erosdipede+openlibrary@gmail.com)'
+
 // Open Library needs no API key, but three quirks shape this file:
 //  1. Covers 200 on a *missing* image (a 43-byte blank), so `?default=false`
 //     is required to make absence detectable.
@@ -137,7 +148,7 @@ async function searchOpenLibrary(query: string, limit: number): Promise<OpenLibr
   // Open Library resets connections often — measured two ECONNRESETs in three
   // consecutive identical requests — so without the retry a wobble fails a
   // search page or kills an import mid-way.
-  const response = await fetchWithRetry(url, 'Open Library')
+  const response = await fetchWithRetry(url, 'Open Library', { 'User-Agent': USER_AGENT })
   if (!response.ok) {
     throw new Error(`Open Library search failed: ${response.status} ${await response.text()}`)
   }

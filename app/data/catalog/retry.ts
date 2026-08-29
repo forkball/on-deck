@@ -53,7 +53,11 @@ async function describeResponse(response: Response): Promise<string> {
 
 // GET-by-URL only, which is what Google Books and Open Library need. IGDB posts
 // with headers and TMDB retries nothing, so neither goes through here yet.
-export async function fetchWithRetry(url: URL, provider: string): Promise<Response> {
+export async function fetchWithRetry(
+  url: URL,
+  provider: string,
+  headers?: Record<string, string>,
+): Promise<Response> {
   let lastError: unknown
 
   for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
@@ -61,7 +65,7 @@ export async function fetchWithRetry(url: URL, provider: string): Promise<Respon
     let detail: string
 
     try {
-      const response = await fetch(url)
+      const response = await fetch(url, headers ? { headers } : undefined)
       // 5xx is worth another go; a 4xx means the request itself is wrong.
       if (response.ok || response.status < 500) return response
       detail = await describeResponse(response)
