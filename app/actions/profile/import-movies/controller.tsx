@@ -16,7 +16,6 @@ export default createController(routes.profile.importMovies, {
   actions: {
     async index(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       // An import someone is midway through outranks the upload form: starting
       // a second one would orphan the review they haven't finished.
@@ -32,7 +31,6 @@ export default createController(routes.profile.importMovies, {
 
     async upload(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const formData = context.get(FormData)
       const file = formData.get('ratings')

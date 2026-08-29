@@ -52,7 +52,6 @@ export default createController(routes.profile.edit, {
   actions: {
     index(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       return context.render(
         <ProfileEditPage
@@ -71,7 +70,6 @@ export default createController(routes.profile.edit, {
 
     async update(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const formData = context.get(FormData)
 

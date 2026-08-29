@@ -27,7 +27,6 @@ export default createController(routes.profile.importGames, {
   actions: {
     index(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       return context.render(
         <SteamImportPage
@@ -41,7 +40,6 @@ export default createController(routes.profile.importGames, {
 
     async upload(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const steamId = auth.identity.steam_id
       // The button only renders once linked, so reaching here means the link

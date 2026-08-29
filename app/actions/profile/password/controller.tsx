@@ -25,14 +25,12 @@ export default createController(routes.profile.password, {
   actions: {
     index(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       return context.render(<ProfilePasswordPage displayName={displayLabel(auth.identity)} />)
     },
 
     async update(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       // Nothing is echoed back: every field here is a password.
       const reject = (errors: Record<string, string>, status: number, confirming = false) =>

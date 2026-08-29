@@ -141,7 +141,6 @@ export default createController(routes.recommendations, {
   actions: {
     async index(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const mediaType =
         parseEnabledMediaType(context.url.searchParams.get('mediaType')) ?? getRememberedMediaType(context)
@@ -162,7 +161,6 @@ export default createController(routes.recommendations, {
 
     async generate(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const formData = context.get(FormData)
       const parsed = s.parseSafe(generateSchema, formData)
@@ -319,7 +317,6 @@ export default createController(routes.recommendations, {
     // arrives here. Everything but those two fields is ignored on purpose.
     async lucky(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
       const formData = context.get(FormData)
@@ -411,7 +408,6 @@ export default createController(routes.recommendations, {
 
     async generating(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const job = await getJob(context.get(Database), context.params.jobId, auth.identity.id)
       if (!job) return new Response('Not Found', { status: 404 })
@@ -437,7 +433,6 @@ export default createController(routes.recommendations, {
 
     async status(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const job = await getJob(context.get(Database), context.params.jobId, auth.identity.id)
       if (!job) return Response.json({ error: 'not_found' }, { status: 404 })
@@ -459,7 +454,6 @@ export default createController(routes.recommendations, {
 
     async show(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
       const run = await getRecommendationRun(db, Number(context.params.runId), auth.identity.id)

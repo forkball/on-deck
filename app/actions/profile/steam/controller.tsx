@@ -17,9 +17,6 @@ export default createController(routes.profile.steam, {
   middleware: [requireEnabledMediaType('game'), requireAuth<User>()],
   actions: {
     connect(context) {
-      const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
-
       // Steam requires `realm` and `return_to` to agree with each other and
       // with where the browser actually is — including the scheme, which
       // behind Fly's TLS proxy only the forwarded header knows.
@@ -29,7 +26,6 @@ export default createController(routes.profile.steam, {
 
     async callback(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       // Every parameter here came back through the browser and is therefore
       // attacker-supplied. verifySteamCallback hands them to Steam to
@@ -54,7 +50,6 @@ export default createController(routes.profile.steam, {
 
     async disconnect(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
       // `undefined` writes NULL here rather than skipping the field —

@@ -18,7 +18,6 @@ export default createController(routes.profile.importBooks, {
   actions: {
     async index(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const pending = await activeBatch(context.get(Database), auth.identity.id, 'book')
 
@@ -32,7 +31,6 @@ export default createController(routes.profile.importBooks, {
 
     async upload(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const formData = context.get(FormData)
       const file = formData.get('library')

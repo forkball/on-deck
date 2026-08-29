@@ -26,7 +26,6 @@ export default createController(routes.interactions, {
   actions: {
     async update(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const interactionId = Number(context.params.interactionId)
       const formData = context.get(FormData)
@@ -56,7 +55,6 @@ export default createController(routes.interactions, {
 
     async destroy(context) {
       const auth = context.get(Auth)
-      if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const interactionId = Number(context.params.interactionId)
       const formData = context.get(FormData)
