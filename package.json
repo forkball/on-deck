@@ -10,7 +10,8 @@
     "db:up": "docker compose up -d && docker compose exec -T postgres pg_isready -U ondeck -d ondeck",
     "db:down": "docker compose down",
     "db:migrate": "node --env-file-if-exists=.env --import remix/node-tsx db/migrate.ts up",
-    "db:migrate:down": "node --env-file-if-exists=.env --import remix/node-tsx db/migrate.ts down"
+    "db:migrate:down": "node --env-file-if-exists=.env --import remix/node-tsx db/migrate.ts down",
+    "prod:query": "node --env-file-if-exists=.env --import remix/node-tsx scripts/prod-query.ts"
   },
   "engines": {
     "node": ">=24.3.0"
