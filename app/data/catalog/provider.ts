@@ -186,10 +186,62 @@ export function getCatalogProvider(type: MediaType): CatalogProvider {
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000
 const SEARCH_CACHE_MAX_ENTRIES = 50
 
-const searchCache = new Map<string, { storedAt: number; results: MediaItem[] }>()
+// A Map iterates in insertion order, so deleting and re-inserting on every read
+// leaves the first key as the least recently used one — which is what makes
+// eviction a single `keys().next()` rather than a scan.
+function createSearchCache<T>(maxEntries: number) {
+  const entries = new Map<string, { storedAt: number; value: T }>()
+
+  return {
+    get(key: string): T | undefined {
+      const hit = entries.get(key)
+      if (!hit) return undefined
+      if (Date.now() - hit.storedAt >= SEARCH_CACHE_TTL_MS) {
+        entries.delete(key)
+        return undefined
+      }
+      entries.delete(key)
+      entries.set(key, hit)
+      return hit.value
+    },
+    set(key: string, value: T): void {
+      entries.set(key, { storedAt: Date.now(), value })
+      if (entries.size > maxEntries) {
+        const oldest = entries.keys().next().value
+        if (oldest !== undefined) entries.delete(oldest)
+      }
+    },
+  }
+}
+
+// Two layers, because they spare different things. `imported` skips the network
+// *and* the upserts, so a repeated search costs nothing at all. `answers` skips
+// only the network, and exists for callers that must not write rows — the
+// typeahead being the one that matters, since it fires while someone is still
+// typing.
+//
+// The typeahead is also what makes this pay: it populates `answers` for the
+// exact query about to be submitted, so the submit that follows spends no
+// provider request at all. At Google Books' current refusal rate every request
+// skipped is a coin flip not taken.
+const imported = createSearchCache<MediaItem[]>(SEARCH_CACHE_MAX_ENTRIES)
+const answers = createSearchCache<CatalogSearchResult[]>(SEARCH_CACHE_MAX_ENTRIES * 2)
 
 function cacheKey(type: MediaType, query: string): string {
   return `${type}:${query.trim().toLowerCase()}`
+}
+
+// The provider call every caller should use, so none of them can miss the
+// cache by reaching past it. Returns the provider's own results untouched —
+// nothing here writes to the database.
+export async function searchCatalog(type: MediaType, query: string): Promise<CatalogSearchResult[]> {
+  const key = cacheKey(type, query)
+  const cached = answers.get(key)
+  if (cached) return cached
+
+  const results = await getCatalogProvider(type).search(query)
+  answers.set(key, results)
+  return results
 }
 
 // Milliseconds below a second rather than "0.0s" — a cache hit is supposed to
@@ -212,7 +264,17 @@ function sourcesOf(results: MediaItem[]): string {
 
 // The query is quoted because it is raw user input: trailing spaces, empty-ish
 // strings and embedded punctuation all have to survive into the log legibly.
-function logSearch(type: MediaType, query: string, cache: 'hit' | 'miss', results: MediaItem[], startedAt: number): void {
+// `warm` is the middle state the two layers create: the provider answer was
+// reused but the rows were written again. Distinguished from `miss` because
+// only one of them spent a request on a provider that is currently refusing
+// most of them.
+function logSearch(
+  type: MediaType,
+  query: string,
+  cache: 'hit' | 'warm' | 'miss',
+  results: MediaItem[],
+  startedAt: number,
+): void {
   console.info(
     `[search] ${type} ${JSON.stringify(query)} ${cache} ${results.length} result(s) ` +
       `via ${sourcesOf(results)} ${duration(Date.now() - startedAt)}`,
@@ -226,18 +288,19 @@ function logSearch(type: MediaType, query: string, cache: 'hit' | 'miss', result
 export async function searchAndImport(db: Db, type: MediaType, query: string): Promise<MediaItem[]> {
   const key = cacheKey(type, query)
   const startedAt = Date.now()
-  const cached = searchCache.get(key)
-  if (cached && Date.now() - cached.storedAt < SEARCH_CACHE_TTL_MS) {
-    searchCache.delete(key)
-    searchCache.set(key, cached)
-    logSearch(type, query, 'hit', cached.results, startedAt)
-    return cached.results
+  const cached = imported.get(key)
+  if (cached) {
+    logSearch(type, query, 'hit', cached, startedAt)
+    return cached
   }
 
   const provider = getCatalogProvider(type)
+  // Read before the call, only to tell `warm` from `miss` in the log — the
+  // request itself is skipped by searchCatalog either way.
+  const reused = answers.get(key) !== undefined
   let results: CatalogSearchResult[]
   try {
-    results = await provider.search(query)
+    results = await searchCatalog(type, query)
   } catch (error) {
     // Only books catch their own provider failure (googleBooks.ts falls back to
     // Open Library). Everywhere else the throw lands in the server's request
@@ -249,21 +312,17 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
   }
 
   // Promise.all preserves input order, so results keep their relevance ranking.
-  const imported = await Promise.all(
+  const items = await Promise.all(
     // sourceOverride wins when set: a fallback hit carries an id from a different
     // provider than the one registered for this type.
     results.map((result) => upsertMediaItem(db, type, result, result.sourceOverride ?? provider.sourceName)),
   )
 
-  searchCache.set(key, { storedAt: Date.now(), results: imported })
-  if (searchCache.size > SEARCH_CACHE_MAX_ENTRIES) {
-    const oldest = searchCache.keys().next().value
-    if (oldest !== undefined) searchCache.delete(oldest)
-  }
+  imported.set(key, items)
 
   // After the upserts, so the duration is what the person actually waited.
-  logSearch(type, query, 'miss', imported, startedAt)
-  return imported
+  logSearch(type, query, reused ? 'warm' : 'miss', items, startedAt)
+  return items
 }
 
 // sourceOverride wins when set, exactly as in searchAndImport: a fallback hit

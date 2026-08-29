@@ -9,6 +9,7 @@ import {
   getCatalogProvider,
   rematchCatalogItem,
   searchAndImport,
+  searchCatalog,
   upsertCatalogItem,
 } from '../data/catalog/provider.ts'
 import type { Db } from '../data/db.ts'
@@ -85,7 +86,10 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       const query = context.url.searchParams.get('q')?.trim() ?? ''
       if (query.length < 2) return Response.json({ suggestions: [] })
 
-      const results = await provider.search(query)
+      // Through the cache, not the provider: this fires while someone is still
+      // typing, so it is the heaviest caller in the app and the one whose
+      // answer the submitted search is about to want anyway.
+      const results = await searchCatalog(mediaType, query)
       const suggestions = results.slice(0, SUGGESTION_LIMIT).map((result) => ({
         key: result.externalId,
         label: result.title,
