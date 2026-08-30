@@ -3,7 +3,7 @@ import { css } from 'remix/ui'
 
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
-import { statusLabel } from '../../mediaTypes.ts'
+import { statusLabel } from '../../interactionStatus.ts'
 import { routes } from '../../routes.ts'
 import { PlatformList } from './platform-list.tsx'
 import { DislikedDisplay, StarRatingDisplay } from './star-rating.tsx'

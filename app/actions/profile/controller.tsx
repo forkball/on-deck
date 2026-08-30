@@ -29,12 +29,8 @@ import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import {
-  DEFAULT_MEDIA_TYPE,
-  mediaTypeUiFor,
-  parseMediaType,
-  parseInteractionStatus,
-} from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
+import { parseInteractionStatus } from '../../interactionStatus.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { ProfilePage } from './page.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'

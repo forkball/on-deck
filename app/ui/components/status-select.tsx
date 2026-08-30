@@ -1,6 +1,7 @@
 import type { Handle } from 'remix/ui'
 
-import { DEFAULT_MEDIA_TYPE, statusOptionsFor, type ActiveMediaType } from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, type ActiveMediaType } from '../../mediaTypes.ts'
+import { statusOptionsFor } from '../../interactionStatus.ts'
 
 // `<select defaultValue>` doesn't preselect in this framework — HTML needs
 // `selected` on the matching <option>. `defaultValue` is a plain string because

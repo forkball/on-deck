@@ -23,6 +23,11 @@ Refer to ./.agents/skills/remix/SKILL.md
   `parseMediaType`) plus the per-type table of nouns, copy, status verbs and href
   builders. Lives at the app root because every layer reads it and it depends on
   `routes.ts`.
+- `app/interactionStatus.ts` holds the interaction-status vocabulary — parsing,
+  per-type labels and badge colors for `want_to_consume`/`in_progress`/`consumed`/
+  `not_interested`. Split out from `mediaTypes.ts` since a status isn't a media
+  type; it still reads the per-type verb table off `MEDIA_TYPE_UI` rather than
+  duplicating it.
 - `app/actions/` holds controllers and the pages they own
 - `app/assets.ts` owns the server-side asset pipeline used by the asset route and renderer
 - `app/browser/` is the code that reaches the browser: one module per
