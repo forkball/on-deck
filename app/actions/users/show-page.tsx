@@ -16,6 +16,7 @@ import { Document } from '../../ui/components/document.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
+import { withReturnTo } from '../../ui/backLink.ts'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
@@ -167,7 +168,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
                           log={log}
                           total={total}
                           detailHref={(id) =>
-                            `${ui.hrefs.show(id)}?from=${encodeURIComponent(`${returnTo}?tab=${type}`)}`
+                            withReturnTo(ui.hrefs.show(id), `${returnTo}?tab=${type}`)
                           }
                           seeAllHref={
                             type === DEFAULT_MEDIA_TYPE ? watchedHref : `${watchedHref}?type=${type}`

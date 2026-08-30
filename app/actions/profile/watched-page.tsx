@@ -7,11 +7,12 @@ import { Document } from '../../ui/components/document.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
-import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
+import { WatchedList } from '../../ui/components/watched-list.tsx'
 import { Field } from '../../ui/shared/field.tsx'
 import {
   DEFAULT_MEDIA_TYPE,
   MEDIA_TYPE_UI,
+  mediaTypeQuery,
   statusLabelsFor,
   statusOptionsFor,
   type ActiveMediaType,
@@ -31,9 +32,7 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
   return () => {
     const { movieLog, mediaType, status, page, totalPages, displayName } = handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
-    // Omitted for the default type, because a reader that finds no `type` falls
-    // back to DEFAULT_MEDIA_TYPE — the two ends have to name the same constant.
-    const typeQuery = mediaType === DEFAULT_MEDIA_TYPE ? '' : `&type=${mediaType}`
+    const typeQuery = mediaTypeQuery(mediaType)
     // Everything that has to survive a page change. Kept as one string so the
     // pagination links and the "back to here" the edit modal posts can't
     // disagree about which list you were looking at.
@@ -87,30 +86,20 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
             </p>
           )}
 
-          <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
-            {movieLog.map(({ interaction, item }) => {
-              const detailHref = item
-                ? `${ui.hrefs.show(item.id)}?from=${encodeURIComponent(returnTo)}`
-                : '#'
-
-              return (
-                <WatchedListItem
-                  key={interaction.id}
-                  interaction={interaction}
-                  item={item}
-                  detailHref={detailHref}
-                  actions={
-                    <MediaLogEditModal
-                      mediaType={mediaType}
-                      interaction={interaction}
-                      title={item?.title ?? 'Unknown title'}
-                      returnTo={returnTo}
-                    />
-                  }
-                />
-              )
-            })}
-          </ul>
+          {/* Your own log, so every row can be edited in place. */}
+          <WatchedList
+            log={movieLog}
+            mediaType={mediaType}
+            returnTo={returnTo}
+            actions={({ interaction, item }) => (
+              <MediaLogEditModal
+                mediaType={mediaType}
+                interaction={interaction}
+                title={item?.title ?? 'Unknown title'}
+                returnTo={returnTo}
+              />
+            )}
+          />
 
           {totalPages > 1 && (
             <Pagination

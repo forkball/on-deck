@@ -18,6 +18,7 @@ import { StatusSelect } from '../components/status-select.tsx'
 import { Field } from '../shared/field.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { PlatformList } from '../components/platform-list.tsx'
+import { withReturnTo } from '../backLink.ts'
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
@@ -76,7 +77,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
               >
                 {results.map((item) => {
                   const { releaseYear, posterUrl, platforms, tags } = parseMediaMetadata(item.metadata)
-                  const detailHref = `${ui.hrefs.show(item.id)}?from=${encodeURIComponent(returnTo)}`
+                  const detailHref = withReturnTo(ui.hrefs.show(item.id), returnTo)
                   const interaction = interactionsByItemId.get(item.id)
                   return (
                     <li

@@ -17,7 +17,7 @@ import { Collapsible } from '../shared/collapsible.tsx'
 import { Field } from '../shared/field.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
-import { backLinkFrom } from '../backLink.ts'
+import { backLinkFrom, withReturnTo } from '../backLink.ts'
 
 export interface MediaDetailPageProps {
   mediaType: ActiveMediaType
@@ -49,7 +49,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
     // first still is that same art, so nothing is lost by dropping the slot.
     const showStills = images.length > 0
     const showHref = ui.hrefs.show(item.id)
-    const returnTo = from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref
+    const returnTo = from ? withReturnTo(showHref, from) : showHref
     const backLink = backLinkFrom(from)
 
     return (

@@ -8,8 +8,8 @@ import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
-import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
-import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import { WatchedList } from '../../ui/components/watched-list.tsx'
+import { MEDIA_TYPE_UI, mediaTypeQuery, type ActiveMediaType } from '../../mediaTypes.ts'
 
 export interface UserWatchedPageProps {
   user: User
@@ -26,9 +26,7 @@ export function UserWatchedPage(handle: Handle<UserWatchedPageProps>) {
     const label = displayLabel(user)
     const watchedHref = routes.users.watched.href({ userId: String(user.id) })
     const ui = MEDIA_TYPE_UI[mediaType]
-    // Omitted for the default type, because a reader that finds no `type` falls
-    // back to DEFAULT_MEDIA_TYPE — the two ends have to name the same constant.
-    const typeQuery = mediaType === DEFAULT_MEDIA_TYPE ? '' : `&type=${mediaType}`
+    const typeQuery = mediaTypeQuery(mediaType)
     const returnTo = `${watchedHref}?page=${page}${typeQuery}`
     const noun = ui.tabLabel
     // See the profile copy of this page — the verb is per medium.
@@ -40,17 +38,8 @@ export function UserWatchedPage(handle: Handle<UserWatchedPageProps>) {
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
           <h1>{heading}</h1>
 
-          <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
-            {movieLog.map(({ interaction, item }) => {
-              const detailHref = item
-                ? `${ui.hrefs.show(item.id)}?from=${encodeURIComponent(returnTo)}`
-                : '#'
-
-              return (
-                <WatchedListItem key={interaction.id} interaction={interaction} item={item} detailHref={detailHref} />
-              )
-            })}
-          </ul>
+          {/* No actions: this is someone else's log, not yours to edit. */}
+          <WatchedList log={movieLog} mediaType={mediaType} returnTo={returnTo} />
 
           {totalPages > 1 && (
             <Pagination page={page} totalPages={totalPages} pageHref={(p) => `${watchedHref}?page=${p}${typeQuery}`} />

@@ -12,6 +12,15 @@ export function parseMediaType(value: unknown): ActiveMediaType | null {
   return ACTIVE_MEDIA_TYPES.includes(value as ActiveMediaType) ? (value as ActiveMediaType) : null
 }
 
+// The `type` a list URL carries, for appending to a query string that already
+// has something in it — hence the leading `&`. Empty for the default type,
+// because a reader that finds no `type` falls back to DEFAULT_MEDIA_TYPE: the
+// writing end and the reading end have to name the same constant, so it is
+// named once, here.
+export function mediaTypeQuery(mediaType: ActiveMediaType): string {
+  return mediaType === DEFAULT_MEDIA_TYPE ? '' : `&type=${mediaType}`
+}
+
 // Types in the vocabulary that aren't ready to be shown. Empty today.
 //
 // A gated type stays in ACTIVE_MEDIA_TYPES — that tuple forces every consumer to
