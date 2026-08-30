@@ -124,7 +124,15 @@ const circuit = createProviderCircuit('Google Books', 3, 60_000)
 
 const SEARCH_MAX_RESULTS = 20
 
-async function searchGoogleBooksOnly(query: string): Promise<CatalogSearchResult[]> {
+// Exported for the backfill, which must never accept an Open Library answer:
+// its whole job is moving rows off Open Library, so a fallback hit there is a
+// row "upgraded" to where it already was.
+//
+// It also keeps the backfill out of the circuit below. That circuit is a module
+// singleton shared with the live app, so a long run failing its way through
+// hundreds of rows would open it and push real searches to the fallback while
+// it worked.
+export async function searchGoogleBooksOnly(query: string): Promise<CatalogSearchResult[]> {
   const apiKey = requireApiKey()
 
   const url = new URL(`${GOOGLE_BOOKS_BASE}/volumes`)

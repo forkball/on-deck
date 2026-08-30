@@ -26,7 +26,8 @@ import { createPostgresDatabaseAdapter } from 'remix/data-table/postgres'
 
 import { mediaItems, type MediaItem } from '../app/data/schema.ts'
 import { rematchMediaItem } from '../app/data/mediaItems.ts'
-import { getBookById, searchBooks } from '../app/data/catalog/googleBooks.ts'
+import { getBookById, searchGoogleBooksOnly } from '../app/data/catalog/googleBooks.ts'
+import type { TmdbSearchResult as CatalogSearchResult } from '../app/data/catalog/tmdb.ts'
 import { runBounded } from '../app/data/imports/csv.ts'
 
 types.setTypeParser(types.builtins.INT8, (value) => parseInt(value, 10))
@@ -179,7 +180,7 @@ type Row = MediaItem
 
 interface ReportLine {
   row: Row
-  outcome: 'matched' | 'no-isbn' | 'no-google-hit' | 'title-mismatch' | 'error'
+  outcome: 'matched' | 'no-isbn' | 'no-google-hit' | 'google-unavailable' | 'title-mismatch' | 'error'
   detail: string
 }
 
@@ -208,7 +209,26 @@ async function main() {
       }
 
       await throttleGoogleBooks()
-      const candidates = await searchBooks(`isbn:${isbn}`)
+      // Google Books only, never searchBooks: that one falls back to Open
+      // Library, which would answer with the source this row is being moved off
+      // and report it as a match. fetchWithRetry has already spent its attempts
+      // by the time this throws, so a throw here means Google would not answer,
+      // which is a row to leave alone rather than resolve some other way.
+      let candidates: CatalogSearchResult[]
+      try {
+        candidates = await searchGoogleBooksOnly(`isbn:${isbn}`)
+      } catch (error) {
+        lines.push({
+          row,
+          outcome: 'google-unavailable',
+          // Kept apart from no-google-hit: one means Google says this book does
+          // not exist, the other means Google did not answer. Only the first is
+          // a fact about the catalogue, and a re-run turns the second into one.
+          detail: `ISBN ${isbn} — Google Books did not answer: ${error instanceof Error ? error.message : String(error)}`,
+        })
+        return
+      }
+
       const candidate = candidates[0]
       if (!candidate) {
         lines.push({ row, outcome: 'no-google-hit', detail: `ISBN ${isbn} — no Google Books hit` })
