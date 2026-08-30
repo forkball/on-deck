@@ -19,6 +19,7 @@ import { LuckyPickCard } from '../../ui/components/lucky-pick-card.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
+import { withReturnTo } from '../../ui/backLink.ts'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
@@ -318,7 +319,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                       total={total}
                       // Carries the tab, so "back" returns to the one you left.
                       detailHref={(id) =>
-                        `${ui.hrefs.show(id)}?from=${encodeURIComponent(`${profileHref}?tab=${type}`)}`
+                        withReturnTo(ui.hrefs.show(id), `${profileHref}?tab=${type}`)
                       }
                       seeAllHref={seeAllHref}
                       emptyHref={ui.hrefs.search()}

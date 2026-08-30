@@ -23,6 +23,7 @@ import {
   statusBadgeColor,
   statusLabelsFor,
 } from '../../mediaTypes.ts'
+import { withReturnTo } from '../../ui/backLink.ts'
 
 const SOURCE_LABELS: Record<MediaType, string> = {
   movie: 'Movie taste',
@@ -108,7 +109,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
               // Where a log submitted from this row comes back to, and what
               // the detail link offers as a way back.
               const runHref = routes.recommendations.show.href({ runId: String(run.id) })
-              const detailHref = `${itemUi.hrefs.show(item.id)}?from=${encodeURIComponent(runHref)}`
+              const detailHref = withReturnTo(itemUi.hrefs.show(item.id), runHref)
 
               return (
                 <li

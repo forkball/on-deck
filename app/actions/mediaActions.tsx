@@ -27,6 +27,7 @@ import { MEDIA_TYPE_UI, type ActiveMediaType } from '../mediaTypes.ts'
 import { parseMediaMetadata } from '../data/mediaMetadata.ts'
 import { MediaDetailPage } from '../ui/pages/media-detail-page.tsx'
 import { MediaSearchPage } from '../ui/pages/media-search-page.tsx'
+import { RETURN_TO_PARAM, withReturnTo } from '../ui/backLink.ts'
 
 const SUGGESTION_LIMIT = 6
 
@@ -106,9 +107,9 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       const db: Db = context.get(Database)
       const item = await upsertCatalogItem(db, mediaType, result, true)
 
-      const from = context.url.searchParams.get('from') || undefined
+      const from = context.url.searchParams.get(RETURN_TO_PARAM) || undefined
       const showHref = ui.hrefs.show(item.id)
-      return redirect(from ? `${showHref}?from=${encodeURIComponent(from)}` : showHref, 303)
+      return redirect(from ? withReturnTo(showHref, from) : showHref, 303)
     },
 
     async show(context: MediaItemControllerContext) {
@@ -130,7 +131,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       }
 
       const interaction = await getUserInteractionForItem(db, identity.id, mediaItemId)
-      const from = context.url.searchParams.get('from') || undefined
+      const from = context.url.searchParams.get(RETURN_TO_PARAM) || undefined
 
       return context.render(
         <MediaDetailPage
@@ -175,11 +176,11 @@ export function createMediaActions(mediaType: ActiveMediaType) {
 
       // A merge deletes the original, so `returnTo` is only valid when nothing
       // merged; otherwise land on the item everything merged into.
-      const from = new URL(returnTo, context.url.origin).searchParams.get('from')
+      const from = new URL(returnTo, context.url.origin).searchParams.get(RETURN_TO_PARAM)
       const successPath = ui.hrefs.show(outcome.item.id)
       const query = new URLSearchParams({ rematched: '1' })
       if (outcome.merged) query.set('merged', '1')
-      if (from) query.set('from', from)
+      if (from) query.set(RETURN_TO_PARAM, from)
 
       return redirect(`${successPath}?${query.toString()}`, 303)
     },

@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import { WatchedListItem } from './watched-list-item.tsx'
+import { withReturnTo } from '../backLink.ts'
 
 type LogEntries = Awaited<ReturnType<typeof listUserMediaLog>>
 
@@ -48,7 +49,7 @@ export function WatchedList(handle: Handle<WatchedListProps>) {
           const { interaction, item } = entry
           // A row whose match was never settled has no detail page to open.
           const detailHref = item
-            ? `${ui.hrefs.show(item.id)}?from=${encodeURIComponent(returnTo)}`
+            ? withReturnTo(ui.hrefs.show(item.id), returnTo)
             : '#'
 
           return (

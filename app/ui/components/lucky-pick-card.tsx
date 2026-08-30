@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import type { LuckyPick } from '../../data/recommendations/lucky.ts'
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
+import { withReturnTo } from '../backLink.ts'
 
 // What the day's pick is called, wherever it is named. Exported because the
 // home page heads its own column with it (see showLabel) and two copies of the
@@ -38,7 +39,7 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
     const { pick, returnTo, showLabel = true } = handle.props
     const { releaseYear, posterUrl } = parseMediaMetadata(pick.metadata)
     const ui = mediaTypeUiFor(pick.mediaType)
-    const detailHref = `${ui.hrefs.show(pick.mediaItemId)}?from=${encodeURIComponent(returnTo)}`
+    const detailHref = withReturnTo(ui.hrefs.show(pick.mediaItemId), returnTo)
 
     return (
       <div mix={css({ ...LUCKY_CARD_BOX, display: 'flex', gap: '14px' })}>
