@@ -55,6 +55,17 @@ export interface FileImportConfig {
   emptyError: string
 }
 
+// Where a staged batch is sent to be looked at. `partial=reviews` is how the
+// review page knows to say that only the written-about entries came across;
+// a source that never sets reviewsOnly always lands on the bare href.
+//
+// Its own function because the staging write next to it needs a database, so
+// this is the part of the redirect a test can hold still.
+export function stagedBatchHref(batchId: string, reviewsOnly?: boolean): string {
+  const href = routes.profile.imports.show.href({ batchId })
+  return reviewsOnly ? `${href}?partial=reviews` : href
+}
+
 export function createFileImportActions(config: FileImportConfig) {
   const { mediaType, source, page: Page, fieldName, parse, missingFileError, emptyError } = config
 
@@ -97,8 +108,7 @@ export function createFileImportActions(config: FileImportConfig) {
         // The request ends here: matching a few hundred rows is tens of seconds
         // of catalog lookups, which a worker does while this redirect lands.
         const batchId = await createBatch(db, auth.identity.id, mediaType, source, rows)
-        const href = routes.profile.imports.show.href({ batchId })
-        return redirect(reviewsOnly ? `${href}?partial=reviews` : href, 303)
+        return redirect(stagedBatchHref(batchId, reviewsOnly), 303)
       } catch (error) {
         return fail(
           context,
