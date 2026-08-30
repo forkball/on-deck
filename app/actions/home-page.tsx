@@ -67,8 +67,15 @@ function LuckyPickCta() {
       <p mix={css({ margin: '6px 0 0', color: '#555' })}>
         One thing to watch, read or play — no filters, nothing to decide.
       </p>
+      {/* rmx-document forces a full document load — see media-tab-links.tsx.
+          Without it, a client-side frame reload can land on the recommendations
+          form with `startLucky` in its fresh props but the form's own local
+          `runKind` state still whatever it was on a previous visit, so the
+          shortlist/lucky radio and the settings it hides go out of sync until
+          the visitor clicks a radio directly. */}
       <a
         href={luckyRecommendationsHref()}
+        rmx-document=""
         class="doodle-border"
         mix={css({ display: 'inline-block', marginTop: '12px', textDecoration: 'none' })}
       >
