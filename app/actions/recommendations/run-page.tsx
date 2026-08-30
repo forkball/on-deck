@@ -23,7 +23,7 @@ import {
   statusBadgeColor,
   statusLabelsFor,
 } from '../../mediaTypes.ts'
-import { withReturnTo } from '../../ui/backLink.ts'
+import { backLinkFrom, withReturnTo } from '../../ui/backLink.ts'
 
 const SOURCE_LABELS: Record<MediaType, string> = {
   movie: 'Movie taste',
@@ -65,11 +65,14 @@ export interface RecommendationRunPageProps {
   run: RecommendationRunDetail
   displayName: string
   prunedOldestRun?: boolean
+  // Where this run was opened from, if it was opened from a list rather than
+  // reached directly. Same contract as the media detail page's.
+  from?: string
 }
 
 export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>) {
   return () => {
-    const { run, displayName, prunedOldestRun } = handle.props
+    const { run, displayName, prunedOldestRun, from } = handle.props
     const date = new Date(run.createdAt).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
@@ -77,6 +80,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
     })
     const forLabel = ['you', ...run.otherMemberLabels].join(', ')
     const paramLines = describeParams(run.params, run.mediaType)
+    const backLink = backLinkFrom(from)
 
     return (
       <Document title={`${run.name || `Recommendations for ${forLabel}`} | On Deck`}>
@@ -85,6 +89,11 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
           <Toast message="You can keep up to 3 recommendation runs at a time, so your oldest one was removed." />
         )}
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
+          {backLink && (
+            <p mix={css({ margin: '0 0 16px' })}>
+              <a href={backLink.href}>{backLink.label}</a>
+            </p>
+          )}
           <h1>{run.name || `Recommendations for ${forLabel}`}</h1>
           <p mix={css({ color: '#555' })}>
             {date}

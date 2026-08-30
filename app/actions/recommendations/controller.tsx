@@ -36,6 +36,7 @@ import {
   parseEnabledMediaType,
   type ActiveMediaType,
 } from '../../mediaTypes.ts'
+import { RETURN_TO_PARAM } from '../../ui/backLink.ts'
 import { GeneratingPage } from './generating-page.tsx'
 import { RecommendationsPage, type RecommendationsPageProps } from './page.tsx'
 import { RecommendationRunPage } from './run-page.tsx'
@@ -464,6 +465,7 @@ export default createController(routes.recommendations, {
           run={run}
           displayName={displayLabel(auth.identity)}
           prunedOldestRun={context.url.searchParams.get('prunedOldest') === '1'}
+          from={context.url.searchParams.get(RETURN_TO_PARAM) || undefined}
         />,
       )
     },

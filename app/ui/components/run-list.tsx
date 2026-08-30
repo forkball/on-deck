@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import type { RecommendationRunSummary } from '../../data/recommendations/runs.ts'
 import { routes } from '../../routes.ts'
+import { withReturnTo } from '../backLink.ts'
 
 // 'list' is a full-width row, everything on one line, the way the
 // recommendations index has always shown a run. 'feed' is the home page's
@@ -15,6 +16,14 @@ export type RunListVariant = 'list' | 'feed'
 export interface RunListItemProps {
   run: RecommendationRunSummary
   variant?: RunListVariant
+  // The list this row sits in, so the run it opens can offer a way back to it.
+  // Absent leaves the link bare, and the run page shows no back link.
+  returnTo?: string
+}
+
+function runHref(runId: number, returnTo?: string): string {
+  const href = routes.recommendations.show.href({ runId: String(runId) })
+  return returnTo ? withReturnTo(href, returnTo) : href
 }
 
 function formatDate(at: number): string {
@@ -25,7 +34,7 @@ function formatDate(at: number): string {
 // these with log rows in a single <ul> — it needs the row without the list.
 export function RunListItem(handle: Handle<RunListItemProps>) {
   return () => {
-    const { run, variant = 'list' } = handle.props
+    const { run, variant = 'list', returnTo } = handle.props
     const feed = variant === 'feed'
     const date = formatDate(run.createdAt)
 
@@ -48,7 +57,7 @@ export function RunListItem(handle: Handle<RunListItemProps>) {
               }),
         })}
       >
-        <a href={routes.recommendations.show.href({ runId: String(run.id) })}>
+        <a href={runHref(run.id, returnTo)}>
           {run.isLucky && '🎲 '}
           <strong>{run.name || date}</strong>
           {!feed && (run.name ? <> — {date}</> : <> — {run.groupLabel}</>)}
@@ -85,11 +94,13 @@ export function RunListItem(handle: Handle<RunListItemProps>) {
 export interface RunListProps {
   runs: RecommendationRunSummary[]
   variant?: RunListVariant
+  // Passed to each row — see RunListItemProps.
+  returnTo?: string
 }
 
 export function RunList(handle: Handle<RunListProps>) {
   return () => {
-    const { runs, variant = 'list' } = handle.props
+    const { runs, variant = 'list', returnTo } = handle.props
 
     return (
       <ul
@@ -103,7 +114,7 @@ export function RunList(handle: Handle<RunListProps>) {
         })}
       >
         {runs.map((run) => (
-          <RunListItem key={run.id} run={run} variant={variant} />
+          <RunListItem key={run.id} run={run} variant={variant} returnTo={returnTo} />
         ))}
       </ul>
     )

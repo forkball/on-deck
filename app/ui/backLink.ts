@@ -37,6 +37,9 @@ const DESTINATIONS: [test: RegExp, label: string][] = [
   [/^\/users\/\d+/, 'their profile'],
   [/^\/users\/search/, 'people'],
   [/^\/notifications/, 'notifications'],
+  // Exact, so it can't swallow every other path. The landing page's feed links
+  // into runs, and without this those come back as a bare "Back".
+  [/^\/$/, 'home'],
 ]
 
 // Only when there's somewhere meaningful to go back to. A fixed parent link

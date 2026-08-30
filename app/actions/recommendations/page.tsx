@@ -69,7 +69,7 @@ function RunsSection(handle: Handle<{ title: string; caption: string; runs: Reco
       <section mix={css({ marginTop: '40px' })}>
         <h2>{title}</h2>
         <p mix={sectionCaption}>{caption}</p>
-        <RunList runs={runs} />
+        <RunList runs={runs} returnTo={routes.recommendations.index.href()} />
       </section>
     )
   }
@@ -250,7 +250,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
                 <a href={routes.profile.index.href()}>profile page</a>, then get recommendations above.
               </p>
             ) : (
-              <RunList runs={runs} />
+              <RunList runs={runs} returnTo={routes.recommendations.index.href()} />
             )}
           </section>
         </main>

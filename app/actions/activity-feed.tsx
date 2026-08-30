@@ -3,6 +3,7 @@ import { css } from 'remix/ui'
 
 import type { FeedItem } from '../data/feed.ts'
 import { mediaTypeUiFor } from '../mediaTypes.ts'
+import { routes } from '../routes.ts'
 import { RunListItem } from '../ui/components/run-list.tsx'
 import { WatchedListItem } from '../ui/components/watched-list-item.tsx'
 
@@ -10,6 +11,12 @@ import { WatchedListItem } from '../ui/components/watched-list-item.tsx'
 // and the fragment route renders rows for it, so the two have to agree on a
 // name — it lives here rather than being spelled out in both.
 export const FEED_LIST_ID = 'home-activity'
+
+// Where a run opened from the feed goes back to. The feed is only ever the
+// landing page's, and it is rendered both by that page and by the fragment
+// route the auto-loader appends from, so it is named here rather than threaded
+// identically through both.
+const FEED_RETURN_TO = routes.home.href()
 
 // The rows of one page of the feed, and nothing around them.
 //
@@ -23,7 +30,7 @@ export function FeedRows(handle: Handle<{ items: FeedItem[] }>) {
     <>
       {handle.props.items.map((item) =>
         item.kind === 'run' ? (
-          <RunListItem key={`run-${item.id}`} run={item.run} variant="feed" />
+          <RunListItem key={`run-${item.id}`} run={item.run} variant="feed" returnTo={FEED_RETURN_TO} />
         ) : (
           <WatchedListItem
             key={`log-${item.id}`}
