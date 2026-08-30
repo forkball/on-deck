@@ -6,15 +6,13 @@ import { redirect } from 'remix/response/redirect'
 import { buildSteamLoginUrl, verifySteamCallback } from '../../../data/imports/steamApi.ts'
 import { users, type User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
-import { requireEnabledMediaType } from '../../../middleware/gatedMediaType.ts'
 import { routes } from '../../../routes.ts'
 import { externalOrigin } from './requestOrigin.ts'
 
 // Not an app login — this only records which Steam account to read a library
 // from.
 export default createController(routes.profile.steam, {
-  // Steam exists only to feed the games library, so it is gated with it.
-  middleware: [requireEnabledMediaType('game'), requireAuth<User>()],
+  middleware: [requireAuth<User>()],
   actions: {
     connect(context) {
       // Steam requires `realm` and `return_to` to agree with each other and

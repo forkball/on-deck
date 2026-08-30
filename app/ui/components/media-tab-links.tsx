@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
 const PLACEHOLDER_TYPES: string[] = []
 
@@ -47,7 +47,7 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
           marginBottom: '20px',
         })}
       >
-        {enabledMediaTypes().map((type) => (
+        {ACTIVE_MEDIA_TYPES.map((type) => (
           <a key={type} href={hrefFor(type)} rmx-document="" mix={current === type ? activeTab : tab}>
             {MEDIA_TYPE_UI[type].tabLabel}
           </a>

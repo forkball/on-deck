@@ -5,7 +5,6 @@ import { createController } from 'remix/router'
 import type { User } from '../../../data/schema.ts'
 import { importSteamLibrary } from '../../../data/imports/steam.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
-import { requireEnabledMediaType } from '../../../middleware/gatedMediaType.ts'
 import { displayLabel } from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
 import { SteamImportPage } from './page.tsx'
@@ -22,8 +21,7 @@ function connectError(code: string | null): string | undefined {
 }
 
 export default createController(routes.profile.importGames, {
-  // Steam exists only to feed the games library, so it is gated with it.
-  middleware: [requireEnabledMediaType('game'), requireAuth<User>()],
+  middleware: [requireAuth<User>()],
   actions: {
     index(context) {
       const auth = context.get(Auth)

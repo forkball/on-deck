@@ -13,7 +13,7 @@ import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { RunList } from '../../ui/components/run-list.tsx'
-import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
 export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
@@ -203,7 +203,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             runsLeftLabel={runsLeftLabel(dailyRuns)}
             runsRemaining={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.remaining : undefined}
             runsLimit={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.limit : undefined}
-            sources={enabledMediaTypes().map((type) => ({
+            sources={ACTIVE_MEDIA_TYPES.map((type) => ({
               value: type,
               label: `${MEDIA_TYPE_UI[type].attributive} taste`,
             }))}

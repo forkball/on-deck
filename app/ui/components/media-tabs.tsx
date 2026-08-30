@@ -1,14 +1,14 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { enabledMediaTypes, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
 // Mirrors media-tab-links.tsx.
 const PLACEHOLDER_MEDIA_TYPES = [] as const
 
 // The registry's `slug` reconciles plural route segments with singular
 // MediaType, and keeps rendered ids stable.
-const ACTIVE_SLUGS = enabledMediaTypes().map((type) => MEDIA_TYPE_UI[type].slug)
+const ACTIVE_SLUGS = ACTIVE_MEDIA_TYPES.map((type) => MEDIA_TYPE_UI[type].slug)
 const TYPES = [...ACTIVE_SLUGS, ...PLACEHOLDER_MEDIA_TYPES]
 
 function capitalize(type: string): string {
@@ -96,7 +96,7 @@ export function MediaTabs(handle: Handle<MediaTabsProps>) {
           ))}
         </div>
 
-        {enabledMediaTypes().map((type) => (
+        {ACTIVE_MEDIA_TYPES.map((type) => (
           <div key={type} class={`panel-${MEDIA_TYPE_UI[type].slug}`}>
             {/* A wired-up media type whose caller hasn't supplied a panel
                 would otherwise render as a blank tab, which reads as broken

@@ -33,7 +33,7 @@ import { LUCKY_KIND, routes, RUN_KIND_PARAM } from '../../routes.ts'
 import {
   DEFAULT_MEDIA_TYPE,
   mediaTypeUiFor,
-  parseEnabledMediaType,
+  parseMediaType,
   type ActiveMediaType,
 } from '../../mediaTypes.ts'
 import { RETURN_TO_PARAM } from '../../ui/backLink.ts'
@@ -144,7 +144,7 @@ export default createController(routes.recommendations, {
       const auth = context.get(Auth)
 
       const mediaType =
-        parseEnabledMediaType(context.url.searchParams.get('mediaType')) ?? getRememberedMediaType(context)
+        parseMediaType(context.url.searchParams.get('mediaType')) ?? getRememberedMediaType(context)
       context.get(Session).set('mediaType', mediaType)
 
       const db = context.get(Database)
@@ -203,12 +203,12 @@ export default createController(routes.recommendations, {
       const sourceTypes = formData
         .getAll('source')
         .map((value) => String(value))
-        .map((value) => parseEnabledMediaType(value))
+        .map((value) => parseMediaType(value))
         .filter((value): value is ActiveMediaType => value !== null)
 
       const db = context.get(Database)
       const memberIds = [auth.identity.id, ...friendIds]
-      const mediaType = parseEnabledMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
+      const mediaType = parseMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
       const profileTypes = sourceTypes.length > 0 ? sourceTypes : [mediaType]
 
       const missing = await findMembersMissingSourceLogs(db, memberIds, profileTypes)
@@ -323,7 +323,7 @@ export default createController(routes.recommendations, {
       const formData = context.get(FormData)
 
       const mediaType =
-        parseEnabledMediaType(formData.get('mediaType')) ?? getRememberedMediaType(context)
+        parseMediaType(formData.get('mediaType')) ?? getRememberedMediaType(context)
       context.get(Session).set('mediaType', mediaType)
 
       // `mode` decides whether the checkboxes count at all, the same way it does

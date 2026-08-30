@@ -21,39 +21,6 @@ export function mediaTypeQuery(mediaType: ActiveMediaType): string {
   return mediaType === DEFAULT_MEDIA_TYPE ? '' : `&type=${mediaType}`
 }
 
-// Types in the vocabulary that aren't ready to be shown. Empty today.
-//
-// A gated type stays in ACTIVE_MEDIA_TYPES — that tuple forces every consumer to
-// have an answer, so removing one would silently delete the guarantee. Opt-in,
-// so a forgotten variable hides a half-finished type rather than shipping it.
-const EXPERIMENTAL_MEDIA_TYPES: readonly ActiveMediaType[] = []
-
-function experimentalEnabled(): Set<string> {
-  return new Set(
-    (process.env.EXPERIMENTAL_MEDIA_TYPES ?? '')
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean),
-  )
-}
-
-export function isMediaTypeEnabled(type: ActiveMediaType): boolean {
-  if (!EXPERIMENTAL_MEDIA_TYPES.includes(type)) return true
-  return experimentalEnabled().has(type)
-}
-
-export function enabledMediaTypes(): ActiveMediaType[] {
-  return ACTIVE_MEDIA_TYPES.filter(isMediaTypeEnabled)
-}
-
-// For anything a visitor supplies. parseMediaType stays ungated because it also
-// reads back existing rows — a logged game needs its verbs whether or not its
-// tab is showing.
-export function parseEnabledMediaType(value: unknown): ActiveMediaType | null {
-  const type = parseMediaType(value)
-  return type && isMediaTypeEnabled(type) ? type : null
-}
-
 interface StatusVerbs {
   want: string
   inProgress: string
@@ -209,17 +176,6 @@ export const MEDIA_TYPE_UI = {
 export function mediaTypeUiFor(type: MediaType): MediaTypeUi {
   return MEDIA_TYPE_UI[parseMediaType(type) ?? DEFAULT_MEDIA_TYPE]
 }
-
-export function mediaTypeLabel(value: unknown): string {
-  const type = parseMediaType(value)
-  return type ? MEDIA_TYPE_UI[type].tabLabel : String(value)
-}
-
-export function isActiveMediaType(type: MediaType): type is ActiveMediaType {
-  return parseMediaType(type) !== null
-}
-
-export type { InteractionStatus }
 
 export function parseInteractionStatus(value: unknown): InteractionStatus | null {
   return INTERACTION_STATUSES.includes(value as InteractionStatus) ? (value as InteractionStatus) : null
