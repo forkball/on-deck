@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import type { LuckyPick } from '../../data/recommendations/lucky.ts'
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
+import { routes } from '../../routes.ts'
 import { withReturnTo } from '../backLink.ts'
 
 // What the day's pick is called, wherever it is named. Exported because the
@@ -25,7 +26,7 @@ export const LUCKY_CARD_BOX = {
 // and neither owns it — see AGENTS.md.
 export interface LuckyPickCardProps {
   pick: LuckyPick
-  // Where the "back" link on the media page should return to. Each place this
+  // Where the "back" link on the run page should return to. Each place this
   // appears is a different answer.
   returnTo: string
   // The card names itself by default. The home page turns that off because it
@@ -39,12 +40,16 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
     const { pick, returnTo, showLabel = true } = handle.props
     const { releaseYear, posterUrl } = parseMediaMetadata(pick.metadata)
     const ui = mediaTypeUiFor(pick.mediaType)
-    const detailHref = withReturnTo(ui.hrefs.show(pick.mediaItemId), returnTo)
+    // Goes to the run page rather than straight to the media item's detail
+    // page: a bare detail page drops the visitor onto whatever the pick is
+    // with no explanation, while the run page carries the reason it was
+    // picked and a way back.
+    const pickHref = withReturnTo(routes.recommendations.show.href({ runId: String(pick.runId) }), returnTo)
 
     return (
       <div mix={css({ ...LUCKY_CARD_BOX, display: 'flex', gap: '14px' })}>
         {posterUrl ? (
-          <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
+          <a href={pickHref} mix={css({ flex: '0 0 auto' })}>
             <img
               src={posterUrl}
               alt={`${pick.title} poster`}
@@ -69,7 +74,7 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
             </p>
           )}
           <p mix={css({ margin: 0 })}>
-            <a href={detailHref} mix={css({ fontWeight: 700 })}>
+            <a href={pickHref} mix={css({ fontWeight: 700 })}>
               {pick.title}
             </a>
             {releaseYear ? ` (${releaseYear})` : ''}{' '}
