@@ -21,7 +21,7 @@ import { users, type User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, searchUsers } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, parseEnabledMediaType } from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { UserSearchPage } from './search-page.tsx'
 import { UserProfilePage } from './show-page.tsx'
@@ -119,7 +119,7 @@ export default createController(routes.users, {
       }
 
       const media = await loadMediaSummaries(db, userId, RECENT_COUNT)
-      const activeTab = parseEnabledMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
+      const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
       return context.render(
         <UserProfilePage
@@ -145,7 +145,7 @@ export default createController(routes.users, {
       if (target instanceof Response) return target
 
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
-      const mediaType = parseEnabledMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
+      const mediaType = parseMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
       // Someone else's log, so no status filter and no declined items — what
       // they turned down is a note to themselves, not something to browse.
       const filter = { type: mediaType, statuses: CONSUMPTION_STATUSES }

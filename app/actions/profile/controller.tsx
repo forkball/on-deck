@@ -29,12 +29,8 @@ import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import {
-  DEFAULT_MEDIA_TYPE,
-  mediaTypeUiFor,
-  parseEnabledMediaType,
-  parseInteractionStatus,
-} from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
+import { parseInteractionStatus } from '../../interactionStatus.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { ProfilePage } from './page.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
@@ -50,7 +46,7 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
       const media = await loadMediaSummaries(db, auth.identity.id, RECENT_COUNT)
-      const activeTab = parseEnabledMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
+      const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
       const followingCount = await countFollowing(db, auth.identity.id)
       const followersCount = await countFollowers(db, auth.identity.id)
@@ -94,7 +90,7 @@ export default createController(routes.profile, {
     async rebuild(context) {
       const auth = context.get(Auth)
 
-      const mediaType = parseEnabledMediaType(context.params.mediaType)
+      const mediaType = parseMediaType(context.params.mediaType)
       if (!mediaType) return new Response('Not Found', { status: 404 })
 
       const db = context.get(Database)
@@ -138,7 +134,7 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
-      const mediaType = parseEnabledMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
+      const mediaType = parseMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
       const status = parseInteractionStatus(context.url.searchParams.get('status'))
       const filter = { type: mediaType, statuses: status ? [status] : undefined }
 

@@ -3,8 +3,8 @@ import { css } from 'remix/ui'
 
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
 import {
+  ACTIVE_MEDIA_TYPES,
   DEFAULT_MEDIA_TYPE,
-  enabledMediaTypes,
   MEDIA_TYPE_UI,
   type ActiveMediaType,
 } from '../../mediaTypes.ts'
@@ -152,7 +152,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
                 idPrefix="user-profile"
                 active={activeTab!}
                 panels={Object.fromEntries(
-                  enabledMediaTypes().map((type) => {
+                  ACTIVE_MEDIA_TYPES.map((type) => {
                     const ui = MEDIA_TYPE_UI[type]
                     const { summary, log, total } = media![type]
                     const watchedHref = routes.users.watched.href({ userId: String(user.id) })

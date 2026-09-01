@@ -1,5 +1,4 @@
-import type { InteractionStatus, MediaType } from './data/mediaItems.ts'
-import { INTERACTION_STATUSES } from './data/schema.ts'
+import type { MediaType } from './data/mediaItems.ts'
 import { routes } from './routes.ts'
 
 export const ACTIVE_MEDIA_TYPES = ['movie', 'tv', 'book', 'game'] as const
@@ -19,39 +18,6 @@ export function parseMediaType(value: unknown): ActiveMediaType | null {
 // named once, here.
 export function mediaTypeQuery(mediaType: ActiveMediaType): string {
   return mediaType === DEFAULT_MEDIA_TYPE ? '' : `&type=${mediaType}`
-}
-
-// Types in the vocabulary that aren't ready to be shown. Empty today.
-//
-// A gated type stays in ACTIVE_MEDIA_TYPES — that tuple forces every consumer to
-// have an answer, so removing one would silently delete the guarantee. Opt-in,
-// so a forgotten variable hides a half-finished type rather than shipping it.
-const EXPERIMENTAL_MEDIA_TYPES: readonly ActiveMediaType[] = []
-
-function experimentalEnabled(): Set<string> {
-  return new Set(
-    (process.env.EXPERIMENTAL_MEDIA_TYPES ?? '')
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean),
-  )
-}
-
-export function isMediaTypeEnabled(type: ActiveMediaType): boolean {
-  if (!EXPERIMENTAL_MEDIA_TYPES.includes(type)) return true
-  return experimentalEnabled().has(type)
-}
-
-export function enabledMediaTypes(): ActiveMediaType[] {
-  return ACTIVE_MEDIA_TYPES.filter(isMediaTypeEnabled)
-}
-
-// For anything a visitor supplies. parseMediaType stays ungated because it also
-// reads back existing rows — a logged game needs its verbs whether or not its
-// tab is showing.
-export function parseEnabledMediaType(value: unknown): ActiveMediaType | null {
-  const type = parseMediaType(value)
-  return type && isMediaTypeEnabled(type) ? type : null
 }
 
 interface StatusVerbs {
@@ -208,55 +174,4 @@ export const MEDIA_TYPE_UI = {
 // to `string`, so those callers can't index MEDIA_TYPE_UI directly.
 export function mediaTypeUiFor(type: MediaType): MediaTypeUi {
   return MEDIA_TYPE_UI[parseMediaType(type) ?? DEFAULT_MEDIA_TYPE]
-}
-
-export function mediaTypeLabel(value: unknown): string {
-  const type = parseMediaType(value)
-  return type ? MEDIA_TYPE_UI[type].tabLabel : String(value)
-}
-
-export function isActiveMediaType(type: MediaType): type is ActiveMediaType {
-  return parseMediaType(type) !== null
-}
-
-export type { InteractionStatus }
-
-export function parseInteractionStatus(value: unknown): InteractionStatus | null {
-  return INTERACTION_STATUSES.includes(value as InteractionStatus) ? (value as InteractionStatus) : null
-}
-
-// Same four statuses everywhere; only the verbs differ, and those live on the
-// registry above so adding a type doesn't mean editing a second table.
-//
-// "Not interested" takes no verb — you decline a book as you decline a film — so
-// it isn't in StatusVerbs, and it goes last as the one that isn't a stage of
-// consuming anything.
-export function statusOptionsFor(mediaType: ActiveMediaType): { value: InteractionStatus; label: string }[] {
-  const verbs = MEDIA_TYPE_UI[mediaType].statusVerbs
-  return [
-    { value: 'want_to_consume', label: verbs.want },
-    { value: 'in_progress', label: verbs.inProgress },
-    { value: 'consumed', label: verbs.done },
-    { value: 'not_interested', label: 'Not interested' },
-  ]
-}
-
-export function statusLabelsFor(mediaType: ActiveMediaType): Record<string, string> {
-  return Object.fromEntries(statusOptionsFor(mediaType).map((o) => [o.value, o.label]))
-}
-
-export function statusLabel(status: string, mediaType?: unknown): string {
-  const type = parseMediaType(mediaType) ?? DEFAULT_MEDIA_TYPE
-  return statusLabelsFor(type)[status] ?? status
-}
-
-const STATUS_BADGE_COLORS: Record<InteractionStatus, string> = {
-  want_to_consume: '#1d4ed8',
-  in_progress: '#b45309',
-  consumed: '#15803d',
-  not_interested: '#6b7280',
-}
-
-export function statusBadgeColor(status: string): string {
-  return STATUS_BADGE_COLORS[status as InteractionStatus] ?? '#555'
 }

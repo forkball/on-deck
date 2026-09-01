@@ -5,8 +5,8 @@ import type { MediaSummaries } from '../../data/mediaSummary.ts'
 import type { LuckyState } from '../../data/recommendations/lucky.ts'
 import type { TasteProfileSettings } from '../../data/recommendations/tasteProfile.ts'
 import {
+  ACTIVE_MEDIA_TYPES,
   DEFAULT_MEDIA_TYPE,
-  enabledMediaTypes,
   MEDIA_TYPE_UI,
   type ActiveMediaType,
 } from '../../mediaTypes.ts'
@@ -282,7 +282,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             idPrefix="profile"
             active={activeTab}
             panels={Object.fromEntries(
-              enabledMediaTypes().map((type) => {
+              ACTIVE_MEDIA_TYPES.map((type) => {
                 const ui = MEDIA_TYPE_UI[type]
                 const { summary, profileUpdatedAt, log, total } = media[type]
                 const seeAllHref =

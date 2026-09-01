@@ -16,13 +16,8 @@ import { Nav } from '../../ui/components/nav.tsx'
 import { PlatformList } from '../../ui/components/platform-list.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { getCatalogProvider } from '../../data/catalog/provider.ts'
-import {
-  DEFAULT_MEDIA_TYPE,
-  MEDIA_TYPE_UI,
-  parseMediaType,
-  statusBadgeColor,
-  statusLabelsFor,
-} from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, parseMediaType } from '../../mediaTypes.ts'
+import { statusBadgeColor, statusLabelsFor } from '../../interactionStatus.ts'
 import { backLinkFrom, withReturnTo } from '../../ui/backLink.ts'
 
 const SOURCE_LABELS: Record<MediaType, string> = {

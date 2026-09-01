@@ -9,14 +9,8 @@ import { Nav } from '../../ui/components/nav.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedList } from '../../ui/components/watched-list.tsx'
 import { Field } from '../../ui/shared/field.tsx'
-import {
-  DEFAULT_MEDIA_TYPE,
-  MEDIA_TYPE_UI,
-  mediaTypeQuery,
-  statusLabelsFor,
-  statusOptionsFor,
-  type ActiveMediaType,
-} from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, mediaTypeQuery, type ActiveMediaType } from '../../mediaTypes.ts'
+import { statusLabelsFor, statusOptionsFor } from '../../interactionStatus.ts'
 
 export interface ProfileWatchedPageProps {
   movieLog: Awaited<ReturnType<typeof listUserMediaLog>>
