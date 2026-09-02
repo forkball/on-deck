@@ -40,10 +40,8 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
     const { pick, returnTo, showLabel = true } = handle.props
     const { releaseYear, posterUrl } = parseMediaMetadata(pick.metadata)
     const ui = mediaTypeUiFor(pick.mediaType)
-    // Goes to the run page rather than straight to the media item's detail
-    // page: a bare detail page drops the visitor onto whatever the pick is
-    // with no explanation, while the run page carries the reason it was
-    // picked and a way back.
+    // The run page, not the bare media detail page: it carries the reason
+    // this was picked and a way back.
     const pickHref = withReturnTo(routes.recommendations.show.href({ runId: String(pick.runId) }), returnTo)
 
     return (

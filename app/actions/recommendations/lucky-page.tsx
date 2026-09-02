@@ -6,11 +6,12 @@ import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
-import { DrawLuckyForm, type LuckyFriendOption } from '../../browser/draw-lucky-form.tsx'
+import { DrawLuckyForm } from '../../browser/draw-lucky-form.tsx'
+import type { FriendOption } from '../../browser/friend-picker.tsx'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
 export interface LuckyPickPageProps {
-  friends: LuckyFriendOption[]
+  friends: FriendOption[]
   viewerLoggedTypes: string[]
   mediaType: ActiveMediaType
   lucky: LuckyState
@@ -19,12 +20,8 @@ export interface LuckyPickPageProps {
   error?: string
 }
 
-// The dedicated home for the "🎲 Draw today's pick" call to action — reached
-// straight from it rather than through the general recommendations page,
-// which asks questions (a shortlist or a draw? filters? which run to keep?)
-// that a once-a-day, one-pick, no-levers draw has no use for. What it does
-// share with that page is the action it posts to (routes.recommendations.lucky)
-// and everywhere downstream of a successful draw.
+// The dedicated home for the "🎲 Draw today's pick" call to action, so it
+// skips the general recommendations page's shortlist-only questions.
 export function LuckyPickPage(handle: Handle<LuckyPickPageProps>) {
   return () => {
     const { friends, viewerLoggedTypes, mediaType, lucky, displayName, findPeopleHref, error } = handle.props

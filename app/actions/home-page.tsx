@@ -51,13 +51,9 @@ function Empty(handle: Handle<{ children?: RemixNode }>) {
   return () => <p mix={css({ margin: 0, color: '#555' })}>{handle.props.children}</p>
 }
 
-// Opens the dedicated lucky-pick page rather than drawing on the spot. Drawing
-// on the spot spent the day's one pick on a click that couldn't say who it was
-// for — that page carries the group picker, and it's the only thing left to
-// decide there.
-//
-// Styled as a button the way the sign-in link is, so the call to action still
-// reads as one thing to press.
+// Opens the dedicated lucky-pick page rather than drawing on the spot — a
+// click here can't say who the pick is for, and that page still can.
+// Styled as a button the way the sign-in link is.
 function LuckyPickCta() {
   return () => (
     <div mix={css({ ...LUCKY_CARD_BOX, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' })}>

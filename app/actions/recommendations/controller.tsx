@@ -37,6 +37,7 @@ import {
   type ActiveMediaType,
 } from '../../mediaTypes.ts'
 import { RETURN_TO_PARAM } from '../../ui/backLink.ts'
+import { LUCKY_PAGE_ORIGIN } from '../../browser/draw-lucky-form.tsx'
 import { GeneratingPage } from './generating-page.tsx'
 import { LuckyPickPage, type LuckyPickPageProps } from './lucky-page.tsx'
 import { RecommendationsPage, type RecommendationsPageProps } from './page.tsx'
@@ -139,10 +140,7 @@ async function loadLuckyPageData(db: Db, user: User, mediaType: ActiveMediaType)
   }
 }
 
-// The dedicated draw page's counterpart to indexPage above — built the same
-// way, for the same reason: `draw`'s failure paths re-render this rather than
-// redirecting, so the reader lands back where they submitted from with
-// something to say instead of on the general page.
+// The lucky page's counterpart to indexPage above.
 async function luckyDrawPage(
   db: Db,
   user: User,
@@ -329,22 +327,15 @@ export default createController(routes.recommendations, {
       return redirect(routes.recommendations.generating.href({ jobId: enqueued.jobId }), 303)
     },
 
-    // One pick, no levers, once a day. Deliberately short next to `generate`:
-    // there is nothing to read but the medium and who's in the draw, and that is
-    // the feature — everything the long form asks about is answered by not
-    // asking.
-    //
-    // Reachable from two places — the general form's own radio, and the
-    // dedicated draw page's — both posting the same two fields to the same
-    // action. `origin` says which one to bounce a failure back to, so an
-    // error lands the reader back where they submitted from rather than on
-    // whichever page happens to be this action's default.
+    // One pick, no levers, once a day: nothing to read but the medium and
+    // who's in the draw. Reachable from the general form's radio and from the
+    // dedicated draw page, so `origin` says which one a failure bounces back to.
     async lucky(context) {
       const auth = context.get(Auth)
 
       const db = context.get(Database)
       const formData = context.get(FormData)
-      const fromLuckyPage = formData.get('origin') === 'lucky_page'
+      const fromLuckyPage = formData.get('origin') === LUCKY_PAGE_ORIGIN
       const renderFailure = (mediaType: ActiveMediaType, error: string) =>
         fromLuckyPage
           ? luckyDrawPage(db, auth.identity, mediaType, { error })
