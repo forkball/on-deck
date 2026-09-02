@@ -51,10 +51,10 @@ function Empty(handle: Handle<{ children?: RemixNode }>) {
   return () => <p mix={css({ margin: 0, color: '#555' })}>{handle.props.children}</p>
 }
 
-// Opens the recommendations page with the draw already selected rather than
-// posting it from here. Drawing on the spot spent the day's one pick on a click
-// that couldn't say who it was for — the form on the other end carries the group
-// picker, and the draw is still the only thing selected when it opens.
+// Opens the dedicated lucky-pick page rather than drawing on the spot. Drawing
+// on the spot spent the day's one pick on a click that couldn't say who it was
+// for — that page carries the group picker, and it's the only thing left to
+// decide there.
 //
 // Styled as a button the way the sign-in link is, so the call to action still
 // reads as one thing to press.
@@ -67,12 +67,7 @@ function LuckyPickCta() {
       <p mix={css({ margin: '6px 0 0', color: '#555' })}>
         One thing to watch, read or play — no filters, nothing to decide.
       </p>
-      {/* rmx-document forces a full document load — see media-tab-links.tsx.
-          Without it, a client-side frame reload can land on the recommendations
-          form with `startLucky` in its fresh props but the form's own local
-          `runKind` state still whatever it was on a previous visit, so the
-          shortlist/lucky radio and the settings it hides go out of sync until
-          the visitor clicks a radio directly. */}
+      {/* rmx-document forces a full document load — see media-tab-links.tsx. */}
       <a
         href={luckyRecommendationsHref()}
         rmx-document=""

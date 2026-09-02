@@ -107,6 +107,10 @@ export const routes = route({
     // and folding those into the general form's action would put both behind the
     // same parse.
     lucky: post('lucky'),
+    // The dedicated page the draw is made from — same path as the POST above,
+    // different method, the way profile's import routes pair an `index`
+    // GET with an `upload` POST on '/'.
+    luckyPage: get('lucky'),
     generating: get('generating/:jobId'),
     status: get('status/:jobId'),
     show: get(':runId'),
@@ -123,14 +127,8 @@ export const routes = route({
   }),
 })
 
-// The query a "today's pick" call to action carries, so the recommendations page
-// opens on the draw rather than the shortlist. Spelled here rather than at each
-// end: the landing page and the profile write it, the index action reads it back
-// — and it decides nothing on its own, since that action only honours it while
-// the draw is actually available.
-export const RUN_KIND_PARAM = 'kind'
-export const LUCKY_KIND = 'lucky'
-
+// Where a "today's pick" call to action goes. Spelled once here rather than at
+// each end: the landing page and the profile both link to it.
 export function luckyRecommendationsHref(): string {
-  return `${routes.recommendations.index.href()}?${RUN_KIND_PARAM}=${LUCKY_KIND}`
+  return routes.recommendations.luckyPage.href()
 }

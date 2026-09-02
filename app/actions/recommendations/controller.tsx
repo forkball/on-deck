@@ -29,7 +29,7 @@ import {
   listRecommendationRunsFromOthers,
 } from '../../data/recommendations/runs.ts'
 import { displayLabel } from '../../data/users.ts'
-import { LUCKY_KIND, routes, RUN_KIND_PARAM } from '../../routes.ts'
+import { routes } from '../../routes.ts'
 import {
   DEFAULT_MEDIA_TYPE,
   mediaTypeUiFor,
@@ -38,6 +38,7 @@ import {
 } from '../../mediaTypes.ts'
 import { RETURN_TO_PARAM } from '../../ui/backLink.ts'
 import { GeneratingPage } from './generating-page.tsx'
+import { LuckyPickPage, type LuckyPickPageProps } from './lucky-page.tsx'
 import { RecommendationsPage, type RecommendationsPageProps } from './page.tsx'
 import { RecommendationRunPage } from './run-page.tsx'
 
@@ -59,12 +60,11 @@ const generateSchema = f.object({
 })
 
 async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
-  const [allRuns, runsFromOthers, friends, dailyRuns, lucky] = await Promise.all([
+  const [allRuns, runsFromOthers, friends, dailyRuns] = await Promise.all([
     listRecommendationRuns(db, user.id, mediaType),
     listRecommendationRunsFromOthers(db, user.id, mediaType),
     listFollowedUsers(db, user.id),
     getDailyRunAllowance(db, user),
-    getLuckyState(user),
   ])
 
   // The page shows these as separate sections rather than one list.
@@ -78,7 +78,6 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
 
   return {
     dailyRuns,
-    lucky,
     runs,
     luckyRuns,
     runsFromOthers,
@@ -110,31 +109,46 @@ function describeMissingLogs(missing: MissingSourceLogs[], viewerId: number): st
 
 // Every path through `generate` that doesn't redirect re-renders the index with
 // something to say. Building the element in one place is what keeps a prop added
-// to the page from reaching four of the five call sites.
+// to the page from reaching every call site.
 async function indexPage(
   db: Db,
   user: User,
   mediaType: ActiveMediaType,
   extras: Pick<RecommendationsPageProps, 'error' | 'duplicate'> = {},
-  // Only the index route passes this. Every other caller is re-rendering after a
-  // submit that failed, where the reader already chose a kind and having the
-  // form jump under them would be the wrong answer.
-  //
-  // `available` is checked here rather than trusted from the link: the draw may
-  // have been spent since the call to action was rendered, or the URL typed by
-  // hand, and opening on a radio that is disabled would strand the form on a
-  // kind it can't submit.
-  luckyRequested = false,
 ) {
   const data = await loadIndexData(db, user, mediaType)
-  return (
-    <RecommendationsPage
-      {...data}
-      mediaType={mediaType}
-      startLucky={luckyRequested && data.lucky.available}
-      {...extras}
-    />
-  )
+  return <RecommendationsPage {...data} mediaType={mediaType} {...extras} />
+}
+
+async function loadLuckyPageData(db: Db, user: User, mediaType: ActiveMediaType) {
+  const [friends, lucky] = await Promise.all([listFollowedUsers(db, user.id), getLuckyState(user)])
+
+  const loggedByUser = await loadLoggedTypesByUser([user.id, ...friends.map((friend) => friend.id)])
+
+  return {
+    lucky,
+    friends: friends.map((friend) => ({
+      id: friend.id,
+      label: displayLabel(friend),
+      loggedTypes: [...(loggedByUser.get(friend.id) ?? [])],
+    })),
+    viewerLoggedTypes: [...(loggedByUser.get(user.id) ?? [])],
+    displayName: displayLabel(user),
+  }
+}
+
+// The dedicated draw page's counterpart to indexPage above — built the same
+// way, for the same reason: `draw`'s failure paths re-render this rather than
+// redirecting, so the reader lands back where they submitted from with
+// something to say instead of on the general page.
+async function luckyDrawPage(
+  db: Db,
+  user: User,
+  mediaType: ActiveMediaType,
+  extras: Pick<LuckyPickPageProps, 'error'> = {},
+) {
+  const data = await loadLuckyPageData(db, user, mediaType)
+  return <LuckyPickPage {...data} mediaType={mediaType} findPeopleHref={routes.users.search.href()} {...extras} />
 }
 
 export default createController(routes.recommendations, {
@@ -149,15 +163,19 @@ export default createController(routes.recommendations, {
 
       const db = context.get(Database)
 
-      return context.render(
-        await indexPage(
-          db,
-          auth.identity,
-          mediaType,
-          {},
-          context.url.searchParams.get(RUN_KIND_PARAM) === LUCKY_KIND,
-        ),
-      )
+      return context.render(await indexPage(db, auth.identity, mediaType))
+    },
+
+    async luckyPage(context) {
+      const auth = context.get(Auth)
+
+      const mediaType =
+        parseMediaType(context.url.searchParams.get('mediaType')) ?? getRememberedMediaType(context)
+      context.get(Session).set('mediaType', mediaType)
+
+      const db = context.get(Database)
+
+      return context.render(await luckyDrawPage(db, auth.identity, mediaType))
     },
 
     async generate(context) {
@@ -355,7 +373,7 @@ export default createController(routes.recommendations, {
       const lucky = await getLuckyState(auth.identity)
       if (!lucky.available) {
         return context.render(
-          await indexPage(db, auth.identity, mediaType, {
+          await luckyDrawPage(db, auth.identity, mediaType, {
             error:
               lucky.nextAt == null
                 ? `You've already drawn today's lucky pick.`
@@ -372,7 +390,7 @@ export default createController(routes.recommendations, {
       if (missing.length > 0) {
         const detail = describeMissingLogs(missing, auth.identity.id)
         return context.render(
-          await indexPage(db, auth.identity, mediaType, {
+          await luckyDrawPage(db, auth.identity, mediaType, {
             error: `Can't draw a lucky pick — ${detail}. Everyone in the draw needs something logged.`,
           }),
           { status: 400 },
@@ -397,7 +415,7 @@ export default createController(routes.recommendations, {
 
       if (!enqueued.ok) {
         return context.render(
-          await indexPage(db, auth.identity, mediaType, {
+          await luckyDrawPage(db, auth.identity, mediaType, {
             error: 'You already have a run in progress — give that one a moment to finish first.',
           }),
           { status: 409 },
