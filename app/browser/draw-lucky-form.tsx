@@ -205,6 +205,9 @@ export const DrawLuckyForm = clientEntry<DrawLuckyFormProps>(
           </div>
 
           <input type="hidden" name="mediaType" value={mediaType} />
+          {/* Tells the shared `lucky` action which page a failure should
+              bounce back to — see the controller. */}
+          <input type="hidden" name="origin" value="lucky_page" />
 
           {blockedBy.length > 0 && (
             <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>

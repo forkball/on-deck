@@ -5,6 +5,7 @@ import { GenerateRecommendationsForm } from '../../browser/generate-recommendati
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { timeUntil, type DailyRunAllowance } from '../../data/recommendations/dailyLimit.ts'
 import { TARGET_COUNT } from '../../data/recommendations/generate.ts'
+import type { LuckyState } from '../../data/recommendations/lucky.ts'
 import { MAX_LUCKY_RUNS_PER_USER, MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations/runs.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
@@ -36,6 +37,14 @@ export interface RecommendationsPageProps {
   // How much of the daily cap is left. Nothing is rendered for admins, who
   // aren't capped — see data/recommendations/dailyLimit.ts.
   dailyRuns: DailyRunAllowance
+  // Whether today's one-click draw is still available. The pick it produced is
+  // not shown again up here — it is in the run list at the bottom, marked, and
+  // the landing page and profile lead with it.
+  lucky: LuckyState
+  // Arrived from a "today's pick" call to action, so the form opens on the draw
+  // rather than the shortlist. Already checked against `lucky.available` by the
+  // controller — see indexPage.
+  startLucky?: boolean
   error?: string
   // Set when the request matched an earlier run the user hasn't taken
   // anything from — see DuplicateNotice.
@@ -139,6 +148,8 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       seriesTypes,
       displayName,
       dailyRuns,
+      lucky,
+      startLucky,
       error,
       duplicate,
     } = handle.props
@@ -187,6 +198,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             viewerLoggedTypes={viewerLoggedTypes}
             mediaType={mediaType}
             mediaTypeLabel={ui.attributive}
+            itemNoun={ui.singular}
             shortlistCount={TARGET_COUNT}
             runsLeftLabel={runsLeftLabel(dailyRuns)}
             runsRemaining={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.remaining : undefined}
@@ -202,6 +214,10 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             platforms={platforms}
             seriesTypes={seriesTypes}
             generateHref={routes.recommendations.generate.href()}
+            luckyHref={routes.recommendations.lucky.href()}
+            luckyAvailable={lucky.available}
+            luckyWaitLabel={lucky.nextAt == null ? '' : `about ${timeUntil(lucky.nextAt)}`}
+            startLucky={startLucky === true}
             findPeopleHref={routes.users.search.href()}
           />
 

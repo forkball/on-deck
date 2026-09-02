@@ -13,6 +13,8 @@ export type GenerateRecommendationsFormProps = {
   viewerLoggedTypes: string[]
   mediaType: string
   mediaTypeLabel: string
+  // Singular noun for one of them — "movie", "TV show", "book", "game".
+  itemNoun: string
   sources: { value: string; label: string }[]
   genres: string[]
   lengthOptions: { value: string; label: string }[]
@@ -20,8 +22,8 @@ export type GenerateRecommendationsFormProps = {
   multiplayerTypes: string[]
   platforms: string[]
   seriesTypes: string[]
-  // How many picks a full run comes back with, so the caption can say what it
-  // produces. Passed in from the pipeline's own constant.
+  // How many picks a full run comes back with, so the two buttons can say what
+  // they each produce. Passed in from the pipeline's own constant.
   shortlistCount: number
   // "3 of 5 runs left today", already phrased — the fallback once the cap is
   // spent (or for an account with no cap, where it's empty). While runs remain,
@@ -32,6 +34,21 @@ export type GenerateRecommendationsFormProps = {
   runsRemaining?: number
   runsLimit?: number
   generateHref: string
+  // The lucky draw posts this same form to its own action, so the group picked
+  // above carries over and there is no second copy of it to keep in step.
+  luckyHref: string
+  // False once today's draw is spent. The button stays, greyed, so the cap is
+  // visible before it is hit rather than after.
+  luckyAvailable: boolean
+  // How long until the next draw, already phrased ("about 7 hours"). Empty
+  // while one is available.
+  luckyWaitLabel: string
+  // Opens the form already set to the draw, for the "today's pick" calls to
+  // action elsewhere that land here instead of drawing on the spot. The server
+  // only sets it when the draw is actually available, which is what keeps the
+  // `isLucky` reasoning below true — the radio it selects is never a disabled
+  // one.
+  startLucky: boolean
   findPeopleHref: string
 }
 
@@ -60,6 +77,11 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
   import.meta.url,
   function GenerateRecommendationsForm(handle) {
     let submitting = false
+    // Which of the two runs this form is currently set up to make. It picks the
+    // action the form posts to and decides which of the fields below apply —
+    // `mode` below is a different question (who the run is for), and keeps its
+    // name because that one is a field the server reads.
+    let runKind: 'shortlist' | 'lucky' = handle.props.startLucky ? 'lucky' : 'shortlist'
     let mode: 'self' | 'group' = 'self'
     let search = ''
     let page = 1
@@ -77,6 +99,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         viewerLoggedTypes,
         mediaType,
         mediaTypeLabel,
+        itemNoun,
         sources,
         genres,
         lengthOptions,
@@ -89,6 +112,10 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         runsRemaining,
         runsLimit,
         generateHref,
+        luckyHref,
+        luckyAvailable,
+        luckyWaitLabel,
+        startLucky,
         findPeopleHref,
       } = handle.props
       const hasSource = selectedSources.size > 0
@@ -109,7 +136,15 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         }))
         .filter((entry) => entry.missing.length > 0)
 
-      const disabled = submitting || !hasSource || blockedBy.length > 0
+      // A lucky draw reads one taste — the type being generated — and ignores
+      // every lever under Settings, so it needs its own answer to "could this
+      // go anywhere". Unchecking every source blocks a shortlist, not this.
+      // `isLucky` already implies the draw is available — the radio for it is
+      // disabled when it isn't — so only the per-kind rule is left to check.
+      const isLucky = runKind === 'lucky'
+      const luckyBlockedBy = membersInRun.filter((member) => !member.loggedTypes.includes(mediaType))
+      const disabled =
+        submitting || (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
 
       const query = search.trim().toLowerCase()
       const filtered = query ? friends.filter((friend) => friend.label.toLowerCase().includes(query)) : friends
@@ -150,8 +185,9 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       // it survives a change of type scale.
       const radioLabelText = css({ position: 'relative', top: '0.05em' })
 
-      // The one radio look used everywhere in this form — self/group renders
-      // through here, so the fix above only ever needs to be right in one place.
+      // The one radio look used everywhere in this form — shortlist/lucky and
+      // self/group all render through here, so the fix above only ever needs
+      // to be right in one place.
       function radioOption(props: {
         name: string
         value: string
@@ -186,6 +222,12 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         color: '#555',
       })
 
+      // Only ever one field's worth of it on screen, so a field that does not
+      // apply to the run being made is hidden rather than dropped: unmounting
+      // would lose a typed name, a chosen genre and the panel's open state
+      // every time someone looked at the other kind of run.
+      const onlyForShortlist = css({ display: isLucky ? 'none' : 'block' })
+
       const sectionLabel = css({
         margin: '0 0 10px',
         fontSize: '12px',
@@ -198,7 +240,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       return (
         <form
           method="post"
-          action={generateHref}
+          action={isLucky ? luckyHref : generateHref}
           mix={[
             css({
               display: 'flex',
@@ -215,29 +257,70 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             }),
           ]}
         >
+          {/* The first question, because it decides which of the rest apply.
+              `run_kind` is not read by either action — the form posts to a
+              different one for each — it is here so the two radios group. */}
           <div>
-            {/* Centre, not baseline: the pill is a shape, not a run of text, so
-                what should line up with the words is the middle of that shape —
-                baseline would hang it off its own text instead, which sits low
-                inside its padding. */}
-            <div mix={css({ display: 'flex', alignItems: 'center', gap: '10px' })}>
-              <p mix={sectionLabel}>A shortlist</p>
-              {/* Only ever shows once runs actually remain — the exhausted-cap
-                  and no-cap cases have no count worth badging, and fall back
-                  to the plain-text caption below instead. */}
-              {runsRemaining != null && runsLimit != null && (
-                <span mix={runsPill}>
-                  {runsRemaining}/{runsLimit} runs left today
-                </span>
-              )}
+            <p mix={sectionLabel}>What are you after?</p>
+            {/* Stacked like a description list — each radio is the term, the
+                caption under it the description — rather than side by side,
+                which read as a comparison table with two competing columns. */}
+            <div mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}>
+              <div>
+                {/* Centre, not baseline: the pill is a shape, not a run of
+                    text, so what should line up with the words is the middle
+                    of that shape — baseline would hang it off its own text
+                    instead, which sits low inside its padding. */}
+                <div mix={css({ display: 'flex', alignItems: 'center', gap: '10px' })}>
+                  {radioOption({
+                    name: 'run_kind',
+                    value: 'shortlist',
+                    checked: !startLucky,
+                    onChange: () => {
+                      runKind = 'shortlist'
+                      handle.update()
+                    },
+                    children: 'A shortlist',
+                  })}
+                  {/* Only ever shows once runs actually remain — the exhausted-cap
+                      and no-cap cases have no count worth badging, and fall back
+                      to the plain-text caption below instead. */}
+                  {runsRemaining != null && runsLimit != null && (
+                    <span mix={runsPill}>
+                      {runsRemaining}/{runsLimit} runs left today
+                    </span>
+                  )}
+                </div>
+                <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
+                  {`Up to ${shortlistCount} picks, minus what most of you have already finished.`}
+                  {runsRemaining == null && runsLeftLabel && ` ${runsLeftLabel}.`}
+                </p>
+              </div>
+              <div mix={css({ color: luckyAvailable ? 'inherit' : '#888' })}>
+                {radioOption({
+                  name: 'run_kind',
+                  value: 'lucky',
+                  checked: startLucky,
+                  disabled: !luckyAvailable,
+                  onChange: () => {
+                    runKind = 'lucky'
+                    handle.update()
+                  },
+                  children: "Today's lucky pick",
+                })}
+                <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
+                  {`One ${itemNoun} nobody in the run has logged.`}
+                </p>
+                {!luckyAvailable && (
+                  <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
+                    Already drawn — another in {luckyWaitLabel}.
+                  </p>
+                )}
+              </div>
             </div>
-            <p mix={caption}>
-              {`Up to ${shortlistCount} picks, minus what most of you have already finished.`}
-              {runsRemaining == null && runsLeftLabel && ` ${runsLeftLabel}.`}
-            </p>
           </div>
 
-          <div>
+          <div mix={onlyForShortlist}>
             <Field label="Name this run (optional)">
               <input type="text" name="name" placeholder="e.g. Cozy weekend picks" />
             </Field>
@@ -351,7 +434,9 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
           <input type="hidden" name="mediaType" value={mediaType} />
 
-          <div mix={css({ borderTop: '1px solid #eee', paddingTop: '16px' })}>
+          <div
+            mix={[css({ borderTop: '1px solid #eee', paddingTop: '16px' }), onlyForShortlist]}
+          >
             <details
               open={settingsOpen}
               mix={on('toggle', (event) => {
@@ -517,31 +602,48 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             </details>
           </div>
 
-          {(!hasSource || blockedBy.length > 0) && (
-            <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
-              {!hasSource
-                ? 'Pick at least one taste to base picks on, under Settings.'
-                : blockedBy
-                    .map(
-                      (entry) =>
-                        `${entry.label} ${entry.label === 'You' ? 'have' : 'has'} nothing logged under ` +
-                        `${entry.missing.map(sourceLabel).join(' or ')}`,
-                    )
-                    .join(', and ') +
-                  '. Everyone in the run needs something logged for each taste it reads.'}
-            </p>
-          )}
+          {/* Whichever rule the run being made actually has to clear. Both used
+              to live inside the sources block, which is folded away — and one of
+              them is about a setting a lucky draw never reads. */}
+          {isLucky
+            ? luckyBlockedBy.length > 0 && (
+                <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
+                  {luckyBlockedBy.map((member) => member.label).join(', ')}{' '}
+                  {luckyBlockedBy.length === 1 && luckyBlockedBy[0].label === 'You' ? 'have' : 'has'}{' '}
+                  nothing {mediaTypeLabel} logged to draw from.
+                </p>
+              )
+            : (!hasSource || blockedBy.length > 0) && (
+                <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
+                  {!hasSource
+                    ? 'Pick at least one taste to base picks on, under Settings.'
+                    : blockedBy
+                        .map(
+                          (entry) =>
+                            `${entry.label} ${entry.label === 'You' ? 'have' : 'has'} nothing logged under ` +
+                            `${entry.missing.map(sourceLabel).join(' or ')}`,
+                        )
+                        .join(', and ') +
+                      '. Everyone in the run needs something logged for each taste it reads.'}
+                </p>
+              )}
 
-          {/* One button, because there is one thing to press. minHeight rather
-              than padding — app.css sets the padding unlayered, where a rule
-              from here cannot reach it — which also gives it a thumb-sized
-              target. */}
+          {/* One button, because there is one thing to press: the choice it
+              makes was made at the top of the form. minHeight rather than
+              padding — app.css sets the padding unlayered, where a rule from
+              here cannot reach it — which also gives it a thumb-sized target. */}
           <button
             type="submit"
             disabled={disabled}
             mix={css({ minHeight: '44px', width: '100%' })}
           >
-            {submitting ? 'Starting…' : 'Get recommendations'}
+            {submitting
+              ? isLucky
+                ? 'Drawing…'
+                : 'Starting…'
+              : isLucky
+                ? `🎲 Draw today's pick`
+                : 'Get recommendations'}
           </button>
         </form>
       )
