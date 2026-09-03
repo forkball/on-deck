@@ -29,7 +29,7 @@ import {
   listRecommendationRunsFromOthers,
 } from '../../data/recommendations/runs.ts'
 import { displayLabel } from '../../data/users.ts'
-import { LUCKY_KIND, routes, RUN_KIND_PARAM } from '../../routes.ts'
+import { routes } from '../../routes.ts'
 import {
   DEFAULT_MEDIA_TYPE,
   mediaTypeUiFor,
@@ -37,7 +37,9 @@ import {
   type ActiveMediaType,
 } from '../../mediaTypes.ts'
 import { RETURN_TO_PARAM } from '../../ui/backLink.ts'
+import { LUCKY_PAGE_ORIGIN } from '../../browser/draw-lucky-form.tsx'
 import { GeneratingPage } from './generating-page.tsx'
+import { LuckyPickPage, type LuckyPickPageProps } from './lucky-page.tsx'
 import { RecommendationsPage, type RecommendationsPageProps } from './page.tsx'
 import { RecommendationRunPage } from './run-page.tsx'
 
@@ -110,31 +112,43 @@ function describeMissingLogs(missing: MissingSourceLogs[], viewerId: number): st
 
 // Every path through `generate` that doesn't redirect re-renders the index with
 // something to say. Building the element in one place is what keeps a prop added
-// to the page from reaching four of the five call sites.
+// to the page from reaching every call site.
 async function indexPage(
   db: Db,
   user: User,
   mediaType: ActiveMediaType,
   extras: Pick<RecommendationsPageProps, 'error' | 'duplicate'> = {},
-  // Only the index route passes this. Every other caller is re-rendering after a
-  // submit that failed, where the reader already chose a kind and having the
-  // form jump under them would be the wrong answer.
-  //
-  // `available` is checked here rather than trusted from the link: the draw may
-  // have been spent since the call to action was rendered, or the URL typed by
-  // hand, and opening on a radio that is disabled would strand the form on a
-  // kind it can't submit.
-  luckyRequested = false,
 ) {
   const data = await loadIndexData(db, user, mediaType)
-  return (
-    <RecommendationsPage
-      {...data}
-      mediaType={mediaType}
-      startLucky={luckyRequested && data.lucky.available}
-      {...extras}
-    />
-  )
+  return <RecommendationsPage {...data} mediaType={mediaType} {...extras} />
+}
+
+async function loadLuckyPageData(db: Db, user: User, mediaType: ActiveMediaType) {
+  const [friends, lucky] = await Promise.all([listFollowedUsers(db, user.id), getLuckyState(user)])
+
+  const loggedByUser = await loadLoggedTypesByUser([user.id, ...friends.map((friend) => friend.id)])
+
+  return {
+    lucky,
+    friends: friends.map((friend) => ({
+      id: friend.id,
+      label: displayLabel(friend),
+      loggedTypes: [...(loggedByUser.get(friend.id) ?? [])],
+    })),
+    viewerLoggedTypes: [...(loggedByUser.get(user.id) ?? [])],
+    displayName: displayLabel(user),
+  }
+}
+
+// The lucky page's counterpart to indexPage above.
+async function luckyDrawPage(
+  db: Db,
+  user: User,
+  mediaType: ActiveMediaType,
+  extras: Pick<LuckyPickPageProps, 'error'> = {},
+) {
+  const data = await loadLuckyPageData(db, user, mediaType)
+  return <LuckyPickPage {...data} mediaType={mediaType} findPeopleHref={routes.users.search.href()} {...extras} />
 }
 
 export default createController(routes.recommendations, {
@@ -149,15 +163,19 @@ export default createController(routes.recommendations, {
 
       const db = context.get(Database)
 
-      return context.render(
-        await indexPage(
-          db,
-          auth.identity,
-          mediaType,
-          {},
-          context.url.searchParams.get(RUN_KIND_PARAM) === LUCKY_KIND,
-        ),
-      )
+      return context.render(await indexPage(db, auth.identity, mediaType))
+    },
+
+    async luckyPage(context) {
+      const auth = context.get(Auth)
+
+      const mediaType =
+        parseMediaType(context.url.searchParams.get('mediaType')) ?? getRememberedMediaType(context)
+      context.get(Session).set('mediaType', mediaType)
+
+      const db = context.get(Database)
+
+      return context.render(await luckyDrawPage(db, auth.identity, mediaType))
     },
 
     async generate(context) {
@@ -309,18 +327,19 @@ export default createController(routes.recommendations, {
       return redirect(routes.recommendations.generating.href({ jobId: enqueued.jobId }), 303)
     },
 
-    // One pick, no levers, once a day. Deliberately short next to `generate`:
-    // there is nothing to read but the medium and who's in the draw, and that is
-    // the feature — everything the long form asks about is answered by not
-    // asking.
-    //
-    // It is posted from the same form, via formaction, so the whole of it
-    // arrives here. Everything but those two fields is ignored on purpose.
+    // One pick, no levers, once a day: nothing to read but the medium and
+    // who's in the draw. Reachable from the general form's radio and from the
+    // dedicated draw page, so `origin` says which one a failure bounces back to.
     async lucky(context) {
       const auth = context.get(Auth)
 
       const db = context.get(Database)
       const formData = context.get(FormData)
+      const fromLuckyPage = formData.get('origin') === LUCKY_PAGE_ORIGIN
+      const renderFailure = (mediaType: ActiveMediaType, error: string) =>
+        fromLuckyPage
+          ? luckyDrawPage(db, auth.identity, mediaType, { error })
+          : indexPage(db, auth.identity, mediaType, { error })
 
       const mediaType =
         parseMediaType(formData.get('mediaType')) ?? getRememberedMediaType(context)
@@ -355,12 +374,12 @@ export default createController(routes.recommendations, {
       const lucky = await getLuckyState(auth.identity)
       if (!lucky.available) {
         return context.render(
-          await indexPage(db, auth.identity, mediaType, {
-            error:
-              lucky.nextAt == null
-                ? `You've already drawn today's lucky pick.`
-                : `You've already drawn today's lucky pick — the next one frees up in about ${timeUntil(lucky.nextAt)}.`,
-          }),
+          await renderFailure(
+            mediaType,
+            lucky.nextAt == null
+              ? `You've already drawn today's lucky pick.`
+              : `You've already drawn today's lucky pick — the next one frees up in about ${timeUntil(lucky.nextAt)}.`,
+          ),
           { status: 429 },
         )
       }
@@ -372,9 +391,10 @@ export default createController(routes.recommendations, {
       if (missing.length > 0) {
         const detail = describeMissingLogs(missing, auth.identity.id)
         return context.render(
-          await indexPage(db, auth.identity, mediaType, {
-            error: `Can't draw a lucky pick — ${detail}. Everyone in the draw needs something logged.`,
-          }),
+          await renderFailure(
+            mediaType,
+            `Can't draw a lucky pick — ${detail}. Everyone in the draw needs something logged.`,
+          ),
           { status: 400 },
         )
       }
@@ -397,9 +417,10 @@ export default createController(routes.recommendations, {
 
       if (!enqueued.ok) {
         return context.render(
-          await indexPage(db, auth.identity, mediaType, {
-            error: 'You already have a run in progress — give that one a moment to finish first.',
-          }),
+          await renderFailure(
+            mediaType,
+            'You already have a run in progress — give that one a moment to finish first.',
+          ),
           { status: 409 },
         )
       }
