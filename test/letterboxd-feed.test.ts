@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 
 import {
   isLetterboxdSyncEnabled,
+  letterboxdSyncAvailableTo,
   letterboxdFeedUrl,
   normalizeLetterboxdUsername,
   parseLetterboxdFeed,
@@ -106,28 +107,32 @@ describe('normalizeLetterboxdUsername', () => {
   })
 })
 
-describe('isLetterboxdSyncEnabled', () => {
-  const original = process.env.LETTERBOXD_FEED_SYNC
+const original = process.env.LETTERBOXD_FEED_SYNC
 
-  function withFlag(value: string | undefined): boolean {
-    if (value === undefined) delete process.env.LETTERBOXD_FEED_SYNC
-    else process.env.LETTERBOXD_FEED_SYNC = value
-    try {
-      return isLetterboxdSyncEnabled()
-    } finally {
-      if (original === undefined) delete process.env.LETTERBOXD_FEED_SYNC
-      else process.env.LETTERBOXD_FEED_SYNC = original
-    }
+function withFlag<T>(value: string | undefined, read: () => T): T {
+  if (value === undefined) delete process.env.LETTERBOXD_FEED_SYNC
+  else process.env.LETTERBOXD_FEED_SYNC = value
+  try {
+    return read()
+  } finally {
+    if (original === undefined) delete process.env.LETTERBOXD_FEED_SYNC
+    else process.env.LETTERBOXD_FEED_SYNC = original
+  }
+}
+
+describe('isLetterboxdSyncEnabled', () => {
+  function flagged(value: string | undefined): boolean {
+    return withFlag(value, isLetterboxdSyncEnabled)
   }
 
   it('is off when nothing is set, so a forgotten variable ships nothing', () => {
-    assert.equal(withFlag(undefined), false)
-    assert.equal(withFlag(''), false)
+    assert.equal(flagged(undefined), false)
+    assert.equal(flagged(''), false)
   })
 
   it('is on for the values someone switching it on would write', () => {
     for (const value of ['1', 'true', 'TRUE', ' true ']) {
-      assert.equal(withFlag(value), true, value)
+      assert.equal(flagged(value), true, value)
     }
   })
 
@@ -135,7 +140,25 @@ describe('isLetterboxdSyncEnabled', () => {
     // The trap this avoids: treating any non-empty string as on would make
     // LETTERBOXD_FEED_SYNC=0 enable the feature.
     for (const value of ['0', 'false', 'no', 'off']) {
-      assert.equal(withFlag(value), false, value)
+      assert.equal(flagged(value), false, value)
     }
+  })
+})
+
+describe('letterboxdSyncAvailableTo', () => {
+  const member = { is_admin: false }
+  const admin = { is_admin: true }
+
+  it('is closed to an ordinary member while the flag is unset', () => {
+    assert.equal(withFlag(undefined, () => letterboxdSyncAvailableTo(member)), false)
+  })
+
+  it('is open to an admin even then, which is what makes a production beta possible', () => {
+    assert.equal(withFlag(undefined, () => letterboxdSyncAvailableTo(admin)), true)
+  })
+
+  it('is open to everyone once the flag is set', () => {
+    assert.equal(withFlag('1', () => letterboxdSyncAvailableTo(member)), true)
+    assert.equal(withFlag('1', () => letterboxdSyncAvailableTo(admin)), true)
   })
 })

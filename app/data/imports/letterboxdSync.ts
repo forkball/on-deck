@@ -5,7 +5,7 @@ import { logInteraction, normalizeRating } from '../mediaItems.ts'
 import { mediaItems, users, type MediaItem, type User } from '../schema.ts'
 import {
   fetchLetterboxdFeed,
-  isLetterboxdSyncEnabled,
+  letterboxdSyncAvailableTo,
   type LetterboxdEntry,
 } from './letterboxdFeed.ts'
 
@@ -131,9 +131,9 @@ async function resolveMovie(db: Db, tmdbId: string): Promise<MediaItem | null> {
 const inFlight = new Map<number, Promise<void>>()
 
 function startSync(db: Db, user: User): Promise<void> | null {
-  // The one place both triggers pass through, so the flag is checked here
+  // The one place both triggers pass through, so the gate is checked here
   // rather than at each of them.
-  if (!isLetterboxdSyncEnabled()) return null
+  if (!letterboxdSyncAvailableTo(user)) return null
 
   const username = user.letterboxd_username
   if (!username) return null

@@ -5,7 +5,7 @@ import { redirect } from 'remix/response/redirect'
 
 import {
   fetchLetterboxdFeed,
-  isLetterboxdSyncEnabled,
+  letterboxdSyncAvailableTo,
   normalizeLetterboxdUsername,
 } from '../../../data/imports/letterboxdFeed.ts'
 import { syncLetterboxdInBackground } from '../../../data/imports/letterboxdSync.ts'
@@ -14,11 +14,23 @@ import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
 
 // Hiding the form isn't enough: these routes stay mapped, so a POST would
-// still connect an account the flag is meant to have switched off. 404 rather
-// than 403, matching requireEnabledMediaType — a gated feature shouldn't
-// advertise that it exists.
-const requireLetterboxdSync: Middleware = async (_context, next) =>
-  isLetterboxdSyncEnabled() ? next() : new Response('Not Found', { status: 404 })
+// still connect an account the gate is meant to have closed. 404 rather than
+// 403, matching requireEnabledMediaType — a gated feature shouldn't advertise
+// that it exists.
+//
+// Ordered after requireAuth in the list below, not before: the gate reads the
+// signed-in member to answer for admins, so it needs Auth already resolved.
+const requireLetterboxdSync: Middleware = async (context, next) => {
+  // Typed loosely because a standalone middleware carries none of the identity
+  // type requireAuth gives the actions. Written to fail closed rather than
+  // asserted: if the ordering below is ever changed back, this answers 404
+  // instead of throwing on an identity that isn't there yet.
+  const auth = context.get(Auth) as { identity?: User } | undefined
+
+  return auth?.identity && letterboxdSyncAvailableTo(auth.identity)
+    ? next()
+    : new Response('Not Found', { status: 404 })
+}
 
 function back(query = ''): Response {
   return redirect(`${routes.profile.importMovies.index.href()}${query}`, 303)
@@ -27,7 +39,7 @@ function back(query = ''): Response {
 // Not a linked account — the feed this names is public, so nothing here proves
 // the member typing it is the member it belongs to. The page says as much.
 export default createController(routes.profile.letterboxd, {
-  middleware: [requireLetterboxdSync, requireAuth<User>()],
+  middleware: [requireAuth<User>(), requireLetterboxdSync],
   actions: {
     async connect(context) {
       const auth = context.get(Auth)

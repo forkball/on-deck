@@ -2,7 +2,7 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 
 import { parseLetterboxdUpload } from '../../../data/imports/letterboxd.ts'
-import { isLetterboxdSyncEnabled } from '../../../data/imports/letterboxdFeed.ts'
+import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import type { User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
@@ -31,16 +31,21 @@ export default createController(routes.profile.importMovies, {
     missingFileError: 'Choose your Letterboxd export .zip first.',
     emptyError: 'That export has no rated or reviewed films in it.',
     // The connect form redirects back here with its outcome, since it has no
-    // page of its own to report on. Null with the feed flag off, which takes
-    // the whole section off the page and leaves the upload flow as it was.
-    extraProps: (context) => ({
-      connection: isLetterboxdSyncEnabled()
-        ? {
-            username: context.get(Auth).identity.letterboxd_username ?? null,
-            justConnected: context.url.searchParams.get('letterboxdConnected') === '1',
-            error: context.url.searchParams.get('letterboxdError') ?? undefined,
-          }
-        : null,
-    }),
+    // page of its own to report on. Null for anyone the feed is gated from,
+    // which takes the whole section off the page and leaves the upload flow
+    // reading as it did before.
+    extraProps: (context) => {
+      const { identity } = context.get(Auth)
+
+      return {
+        connection: letterboxdSyncAvailableTo(identity)
+          ? {
+              username: identity.letterboxd_username ?? null,
+              justConnected: context.url.searchParams.get('letterboxdConnected') === '1',
+              error: context.url.searchParams.get('letterboxdError') ?? undefined,
+            }
+          : null,
+      }
+    },
   }),
 })

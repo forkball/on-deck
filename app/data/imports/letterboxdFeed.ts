@@ -1,3 +1,5 @@
+import type { User } from '../schema.ts'
+
 // Letterboxd publishes every member's diary as public RSS, with no auth and no
 // API key. What makes it worth reading over the CSV export is `tmdb:movieId`:
 // the export carries only a title and year, so `matchMovie` has to search for
@@ -10,11 +12,8 @@ const USERNAME_PATTERN = /^[a-z0-9_]{1,32}$/
 
 const FEED_TIMEOUT_MS = 10_000
 
-// Off unless switched on, the same way EXPERIMENTAL_MEDIA_TYPES is: a forgotten
-// variable should hide the feature rather than ship it. Gating the whole thing
-// on one flag also means turning it off is a kill switch for the outbound
-// requests, not just for the UI — an already-connected member's username stays
-// on their row, dormant, and starts syncing again if the flag comes back.
+// Off for everyone unless switched on, the same way EXPERIMENTAL_MEDIA_TYPES
+// is: a forgotten variable should hide the feature rather than ship it.
 //
 // Read per call rather than captured at import: a test can set it, and the
 // value is only ever consulted off the hot path.
@@ -23,6 +22,22 @@ export function isLetterboxdSyncEnabled(): boolean {
   // Named values only. "Any non-empty string" would make LETTERBOXD_FEED_SYNC=0
   // turn the feature on, which is the opposite of what anyone writing that means.
   return flag === '1' || flag === 'true'
+}
+
+// The gate everything actually asks, and the only one worth calling: the env
+// flag opens the feature to everyone, and an admin has it either way, so it can
+// be exercised against production before it is turned on for everyone.
+//
+// Admin is otherwise a maintenance role — today it only lifts the daily
+// recommendation cap — so this does lean on it for something it wasn't invented
+// for. It is the narrowest gate that already exists, has no UI, and is granted
+// only by scripts/set-admin.ts, which is exactly the shape a beta needs.
+//
+// Gating here rather than only in the UI keeps it a real switch: with it closed
+// there are no outbound requests, and an already-connected member's username
+// stays on their row, dormant, until it opens again.
+export function letterboxdSyncAvailableTo(user: Pick<User, 'is_admin'>): boolean {
+  return isLetterboxdSyncEnabled() || user.is_admin
 }
 
 export interface LetterboxdEntry {
