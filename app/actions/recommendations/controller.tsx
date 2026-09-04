@@ -78,6 +78,8 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
   // out a run before it's requested rather than after it's refused.
   const loggedByUser = await loadLoggedTypesByUser([user.id, ...friends.map((friend) => friend.id)])
 
+  const provider = getCatalogProvider(mediaType)
+
   return {
     dailyRuns,
     lucky,
@@ -89,12 +91,12 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
       friends.map((friend) => [friend.id, [...(loggedByUser.get(friend.id) ?? [])]]),
     ),
     viewerLoggedTypes: [...(loggedByUser.get(user.id) ?? [])],
-    genres: getCatalogProvider(mediaType).genres,
-    lengthOptions: getCatalogProvider(mediaType).lengthOptions.map(({ value, label }) => ({ value, label })),
-    playerTypes: getCatalogProvider(mediaType).playerTypes ?? [],
-    multiplayerTypes: getCatalogProvider(mediaType).multiplayerTypes ?? [],
-    platforms: getCatalogProvider(mediaType).platforms ?? [],
-    seriesTypes: getCatalogProvider(mediaType).seriesTypes ?? [],
+    genres: provider.genres,
+    lengthOptions: provider.lengthOptions.map(({ value, label }) => ({ value, label })),
+    playerTypes: provider.playerTypes ?? [],
+    multiplayerTypes: provider.multiplayerTypes ?? [],
+    platforms: provider.platforms ?? [],
+    seriesTypes: provider.seriesTypes ?? [],
     displayName: displayLabel(user),
   }
 }
