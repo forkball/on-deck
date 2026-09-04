@@ -15,7 +15,9 @@ import { routes } from '../../routes.ts'
 //
 // The pages are deliberately not shared. Their copy, their layout and what they
 // tell you to export all differ per source; only the three props a controller
-// fills in are common, which is what ImportPageProps names.
+// fills in are common, which is what ImportPageProps names. A source needing
+// more than those says so through `extraProps` rather than by widening
+// ImportPageProps with fields the other page has no meaning for.
 //
 // Written out rather than inferred, like createMediaActions: createController
 // derives action types from the concrete route map, and importBooks and
@@ -38,11 +40,11 @@ export interface ParsedUpload {
   reviewsOnly?: boolean
 }
 
-export interface FileImportConfig {
+export interface FileImportConfig<Extra extends object> {
   mediaType: MediaType
   // Recorded on the batch, so the review page can say where a row came from.
   source: string
-  page: (handle: Handle<ImportPageProps>) => () => RemixNode
+  page: (handle: Handle<ImportPageProps & Extra>) => () => RemixNode
   // The form field the file arrives in.
   fieldName: string
   // Decoding belongs to the source: a Goodreads export is text, a Letterboxd
@@ -53,6 +55,11 @@ export interface FileImportConfig {
   // held nothing importable. Both name the actual export, so they're per source.
   missingFileError: string
   emptyError: string
+  // Anything the page needs that isn't common to every file import — the
+  // Letterboxd page also carries a feed connection, which Goodreads has no
+  // equivalent of. Read on both render paths so a failed upload doesn't draw
+  // the page as though nothing were connected.
+  extraProps?: (context: AuthedControllerContext) => Extra | Promise<Extra>
 }
 
 // Where a staged batch is sent to be looked at. `partial=reviews` is how the
@@ -66,12 +73,39 @@ export function stagedBatchHref(batchId: string, reviewsOnly?: boolean): string 
   return reviewsOnly ? `${href}?partial=reviews` : href
 }
 
-export function createFileImportActions(config: FileImportConfig) {
-  const { mediaType, source, page: Page, fieldName, parse, missingFileError, emptyError } = config
+export function createFileImportActions<Extra extends object = Record<string, never>>(
+  config: FileImportConfig<Extra>,
+) {
+  const { mediaType, source, fieldName, parse, missingFileError, emptyError } = config
 
-  function fail(context: AuthedControllerContext, error: string): Response {
+  // Rendered through the common shape rather than `ImportPageProps & Extra`:
+  // the JSX types wrap every component's props in `ExpandMixProp`, a
+  // conditional type TypeScript cannot resolve while `Extra` is still generic.
+  // Nothing is lost by asserting it here — the extra props are spread in below
+  // and `FileImportConfig` typechecks them at the call site, where Extra is a
+  // concrete type.
+  const Page = config.page as (handle: Handle<ImportPageProps>) => () => RemixNode
+
+  // Merged in one place because TypeScript won't narrow a generic spread on its
+  // own: `Extra` could in principle redeclare a field of ImportPageProps, so the
+  // combination is asserted here rather than at each render. The common props go
+  // last, which is what settles it if a source ever does collide.
+  async function props(
+    context: AuthedControllerContext,
+    common: ImportPageProps,
+  ): Promise<ImportPageProps & Extra> {
+    const extra = config.extraProps ? await config.extraProps(context) : ({} as Extra)
+    return { ...extra, ...common } as ImportPageProps & Extra
+  }
+
+  async function fail(context: AuthedControllerContext, error: string): Promise<Response> {
     return context.render(
-      <Page error={error} displayName={displayLabel(context.get(Auth).identity)} />,
+      <Page
+        {...await props(context, {
+          error,
+          displayName: displayLabel(context.get(Auth).identity),
+        })}
+      />,
       { status: 400 },
     )
   }
@@ -86,8 +120,12 @@ export function createFileImportActions(config: FileImportConfig) {
 
       return context.render(
         <Page
-          displayName={displayLabel(auth.identity)}
-          pendingHref={pending ? routes.profile.imports.show.href({ batchId: pending.id }) : undefined}
+          {...await props(context, {
+            displayName: displayLabel(auth.identity),
+            pendingHref: pending
+              ? routes.profile.imports.show.href({ batchId: pending.id })
+              : undefined,
+          })}
         />,
       )
     },
@@ -96,21 +134,21 @@ export function createFileImportActions(config: FileImportConfig) {
       const auth = context.get(Auth)
       const file = context.get(FormData).get(fieldName)
 
-      if (!(file instanceof File) || file.size === 0) return fail(context, missingFileError)
+      if (!(file instanceof File) || file.size === 0) return await fail(context, missingFileError)
 
       const db = context.get(Database)
 
       try {
         const { rows, reviewsOnly } = await parse(file)
 
-        if (rows.length === 0) return fail(context, emptyError)
+        if (rows.length === 0) return await fail(context, emptyError)
 
         // The request ends here: matching a few hundred rows is tens of seconds
         // of catalog lookups, which a worker does while this redirect lands.
         const batchId = await createBatch(db, auth.identity.id, mediaType, source, rows)
         return redirect(stagedBatchHref(batchId, reviewsOnly), 303)
       } catch (error) {
-        return fail(
+        return await fail(
           context,
           error instanceof Error ? error.message : 'Something went wrong reading that file.',
         )

@@ -98,6 +98,14 @@ export const routes = route({
       callback: get('callback'),
       disconnect: post('disconnect'),
     }),
+    // Naming a Letterboxd member to read the public diary feed of. Both POST,
+    // and there is no callback: nothing is being authorized, so there is no
+    // round-trip to come back from — which is also why the name is a claim
+    // rather than a verified link.
+    letterboxd: route('letterboxd', {
+      connect: post('connect'),
+      disconnect: post('disconnect'),
+    }),
   }),
   recommendations: route('recommendations', {
     index: get('/'),

@@ -3,6 +3,7 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
+import { syncLetterboxdInBackground } from '../../data/imports/letterboxdSync.ts'
 import {
   getProfileRebuildAllowance,
   recordProfileRebuild,
@@ -54,6 +55,12 @@ export default createController(routes.profile, {
         getProfileRebuildAllowance(db, auth.identity),
         getLuckyState(auth.identity),
       ])
+
+      // Kicked off beside the render, never awaited into it: reading the feed
+      // and looking up any film new to the catalog is seconds of network, and
+      // the log it updates is the one this page draws next time. No-op unless a
+      // Letterboxd account is connected and the fetch cooldown has passed.
+      syncLetterboxdInBackground(db, auth.identity)
 
       return context.render(
         <ProfilePage
@@ -146,6 +153,8 @@ export default createController(routes.profile, {
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
       })
+
+      syncLetterboxdInBackground(db, auth.identity)
 
       return context.render(
         <ProfileWatchedPage

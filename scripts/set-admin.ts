@@ -2,8 +2,10 @@
 // role, not something users hand each other, so it has no UI and no route —
 // this script is the only way to set it.
 //
-// Its one effect today is exemption from the daily recommendation cap; see
-// app/data/recommendations/dailyLimit.ts.
+// Two effects today: exemption from the daily recommendation cap (see
+// app/data/recommendations/dailyLimit.ts), and access to the Letterboxd feed
+// sync before LETTERBOXD_FEED_SYNC opens it to everyone (see
+// letterboxdSyncAvailableTo in app/data/imports/letterboxdFeed.ts).
 //
 //   node --env-file-if-exists=.env --import remix/node-tsx scripts/set-admin.ts someone@example.com
 //   node --env-file-if-exists=.env --import remix/node-tsx scripts/set-admin.ts someone --revoke
