@@ -9,6 +9,7 @@ import { redirect } from 'remix/response/redirect'
 import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import type { Db } from '../../data/db.ts'
 import { listFollowedUsers } from '../../data/follows.ts'
+import { syncLetterboxdBeforeRun } from '../../data/imports/letterboxdSync.ts'
 import { loadLoggedTypesByUser } from '../../data/mediaItems.ts'
 import { getDailyRunAllowance, runCostFor, timeUntil } from '../../data/recommendations/dailyLimit.ts'
 import { enqueueJob, getJob, PHASE_LABELS } from '../../data/recommendations/jobs.ts'
@@ -227,6 +228,15 @@ export default createController(routes.recommendations, {
         .filter((value): value is ActiveMediaType => value !== null)
 
       const db = context.get(Database)
+
+      // Ahead of everything that reads the log, including the gate below: a run
+      // built on a week-stale diary recommends films already watched, and
+      // someone whose movies live entirely on Letterboxd would otherwise be
+      // turned away for having nothing logged. Bounded, so a slow feed delays
+      // the run rather than failing it — and it is a no-op for the vast
+      // majority of runs, which are inside the fetch cooldown.
+      await syncLetterboxdBeforeRun(db, auth.identity)
+
       const memberIds = [auth.identity.id, ...friendIds]
       const mediaType = parseMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
       const profileTypes = sourceTypes.length > 0 ? sourceTypes : [mediaType]

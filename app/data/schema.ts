@@ -11,6 +11,13 @@ export const users = table({
     display_name: c.text().notNull().unique(),
     bio: c.text(),
     steam_id: c.text(),
+    // A Letterboxd member name, not a linked account: the RSS feed it reads is
+    // public, so nothing proves the person typing it owns it. Hence no unique
+    // index, where steam_id has one.
+    letterboxd_username: c.text(),
+    // Throttles the feed fetch — not a watermark over what has been seen. See
+    // syncLetterboxdDiary for why the entries themselves are always re-read.
+    letterboxd_synced_at: c.integer().nullable(),
     // Gates the bio and media log behind a follow (see follows.ts,
     // canViewProfile) — everyone still sees the name and follow counts.
     is_private: c.boolean().notNull().default(false),

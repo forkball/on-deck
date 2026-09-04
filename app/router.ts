@@ -21,6 +21,7 @@ import profileImportsController from './actions/profile/imports/controller.tsx'
 import profileImportBooksController from './actions/profile/import-books/controller.tsx'
 import profileImportGamesController from './actions/profile/import-games/controller.tsx'
 import profileSteamController from './actions/profile/steam/controller.tsx'
+import profileLetterboxdController from './actions/profile/letterboxd/controller.tsx'
 import recommendationsController from './actions/recommendations/controller.tsx'
 import tvController from './actions/tv/controller.tsx'
 import usersController from './actions/users/controller.tsx'
@@ -68,5 +69,6 @@ router.map(routes.profile.imports, profileImportsController)
 router.map(routes.profile.importBooks, profileImportBooksController)
 router.map(routes.profile.importGames, profileImportGamesController)
 router.map(routes.profile.steam, profileSteamController)
+router.map(routes.profile.letterboxd, profileLetterboxdController)
 router.map(routes.recommendations, recommendationsController)
 router.map(routes.users, usersController)
