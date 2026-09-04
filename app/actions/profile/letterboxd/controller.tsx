@@ -18,13 +18,15 @@ import { routes } from '../../../routes.ts'
 // 403, matching requireEnabledMediaType — a gated feature shouldn't advertise
 // that it exists.
 //
-// Ordered after requireAuth in the list below, not before: the gate reads the
-// signed-in member to answer for admins, so it needs Auth already resolved.
+// Ordered after requireAuth in the list below, not before. loadAuth() populates
+// Auth for every request, so either order sees it — but anonymous requests
+// resolve to a state with no identity, and this gate would answer 404 to
+// someone who simply isn't signed in yet. Behind requireAuth they get the login
+// redirect instead, and only a signed-in member is ever judged on admin.
 const requireLetterboxdSync: Middleware = async (context, next) => {
   // Typed loosely because a standalone middleware carries none of the identity
-  // type requireAuth gives the actions. Written to fail closed rather than
-  // asserted: if the ordering below is ever changed back, this answers 404
-  // instead of throwing on an identity that isn't there yet.
+  // type requireAuth gives the actions, and read defensively so a gate that
+  // cannot identify the caller closes rather than throws.
   const auth = context.get(Auth) as { identity?: User } | undefined
 
   return auth?.identity && letterboxdSyncAvailableTo(auth.identity)
