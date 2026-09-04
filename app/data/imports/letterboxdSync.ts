@@ -3,7 +3,11 @@ import { runBounded } from './csv.ts'
 import type { Db } from '../db.ts'
 import { logInteraction, normalizeRating } from '../mediaItems.ts'
 import { mediaItems, users, type MediaItem, type User } from '../schema.ts'
-import { fetchLetterboxdFeed, type LetterboxdEntry } from './letterboxdFeed.ts'
+import {
+  fetchLetterboxdFeed,
+  isLetterboxdSyncEnabled,
+  type LetterboxdEntry,
+} from './letterboxdFeed.ts'
 
 // Only the entries needing a TMDB detail lookup do any network work, and after
 // the first sync that is usually none of them — so this bounds a list that is
@@ -127,6 +131,10 @@ async function resolveMovie(db: Db, tmdbId: string): Promise<MediaItem | null> {
 const inFlight = new Map<number, Promise<void>>()
 
 function startSync(db: Db, user: User): Promise<void> | null {
+  // The one place both triggers pass through, so the flag is checked here
+  // rather than at each of them.
+  if (!isLetterboxdSyncEnabled()) return null
+
   const username = user.letterboxd_username
   if (!username) return null
 

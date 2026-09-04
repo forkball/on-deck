@@ -20,7 +20,9 @@ export interface LetterboxdImportPageProps {
   error?: string
   // Set when an earlier upload is still waiting to be matched or reviewed.
   pendingHref?: string
-  connection: LetterboxdConnection
+  // Null when the feed sync is switched off, which takes the connect section
+  // off the page entirely and leaves the upload flow exactly as it was.
+  connection: LetterboxdConnection | null
 }
 
 const PANEL = css({
@@ -31,6 +33,11 @@ const PANEL = css({
 })
 
 const NOTE = css({ fontSize: '13px', color: '#888' })
+
+// Only true when the feed is switched on, and it is what explains why an upload
+// is still worth doing once it is: the feed can't reach back past ~50 films.
+const BACKFILL_LEAD =
+  'The feed only carries your fifty most recent films, so your back catalogue comes across as a file. '
 
 // The ongoing half of the page. The upload below it backfills history; this
 // keeps up with it afterwards, and the two are worth seeing together.
@@ -100,7 +107,7 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
     return (
       <Document title="Import from Letterboxd | On Deck">
         <Nav authed={true} displayName={displayName} />
-        {connection.justConnected && (
+        {connection?.justConnected && (
           <Toast message="Connected. Your recent films are on their way in." />
         )}
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
@@ -123,15 +130,18 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
             </div>
           )}
 
-          <FeedConnection connection={connection} />
-
-          <h2 mix={css({ fontSize: '16px' })}>Bring across everything you've logged</h2>
+          {connection && (
+            <>
+              <FeedConnection connection={connection} />
+              <h2 mix={css({ fontSize: '16px' })}>Bring across everything you've logged</h2>
+            </>
+          )}
 
           <p mix={css({ color: '#555' })}>
-            The feed only carries your fifty most recent films, so your back catalogue comes across
-            as a file. Export your data from Letterboxd (Settings → Data → Export) and upload the
-            resulting <code>.zip</code>, unopened — ratings and reviews live in separate files
-            inside, and both come across in one import.
+            {connection && BACKFILL_LEAD}
+            Export your data from Letterboxd (Settings → Data → Export) and upload the resulting{' '}
+            <code>.zip</code>, unopened — ratings and reviews live in separate files inside, and
+            both come across in one import.
           </p>
 
           <p mix={css({ color: '#555' })}>

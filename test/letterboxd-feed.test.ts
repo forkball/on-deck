@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 
 import {
+  isLetterboxdSyncEnabled,
   letterboxdFeedUrl,
   normalizeLetterboxdUsername,
   parseLetterboxdFeed,
@@ -102,5 +103,39 @@ describe('normalizeLetterboxdUsername', () => {
 
   it('builds the feed url from the member name', () => {
     assert.equal(letterboxdFeedUrl('davidehrlich'), 'https://letterboxd.com/davidehrlich/rss/')
+  })
+})
+
+describe('isLetterboxdSyncEnabled', () => {
+  const original = process.env.LETTERBOXD_FEED_SYNC
+
+  function withFlag(value: string | undefined): boolean {
+    if (value === undefined) delete process.env.LETTERBOXD_FEED_SYNC
+    else process.env.LETTERBOXD_FEED_SYNC = value
+    try {
+      return isLetterboxdSyncEnabled()
+    } finally {
+      if (original === undefined) delete process.env.LETTERBOXD_FEED_SYNC
+      else process.env.LETTERBOXD_FEED_SYNC = original
+    }
+  }
+
+  it('is off when nothing is set, so a forgotten variable ships nothing', () => {
+    assert.equal(withFlag(undefined), false)
+    assert.equal(withFlag(''), false)
+  })
+
+  it('is on for the values someone switching it on would write', () => {
+    for (const value of ['1', 'true', 'TRUE', ' true ']) {
+      assert.equal(withFlag(value), true, value)
+    }
+  })
+
+  it('stays off for values that read as "no"', () => {
+    // The trap this avoids: treating any non-empty string as on would make
+    // LETTERBOXD_FEED_SYNC=0 enable the feature.
+    for (const value of ['0', 'false', 'no', 'off']) {
+      assert.equal(withFlag(value), false, value)
+    }
   })
 })

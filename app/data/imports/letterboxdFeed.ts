@@ -10,6 +10,21 @@ const USERNAME_PATTERN = /^[a-z0-9_]{1,32}$/
 
 const FEED_TIMEOUT_MS = 10_000
 
+// Off unless switched on, the same way EXPERIMENTAL_MEDIA_TYPES is: a forgotten
+// variable should hide the feature rather than ship it. Gating the whole thing
+// on one flag also means turning it off is a kill switch for the outbound
+// requests, not just for the UI — an already-connected member's username stays
+// on their row, dormant, and starts syncing again if the flag comes back.
+//
+// Read per call rather than captured at import: a test can set it, and the
+// value is only ever consulted off the hot path.
+export function isLetterboxdSyncEnabled(): boolean {
+  const flag = (process.env.LETTERBOXD_FEED_SYNC ?? '').trim().toLowerCase()
+  // Named values only. "Any non-empty string" would make LETTERBOXD_FEED_SYNC=0
+  // turn the feature on, which is the opposite of what anyone writing that means.
+  return flag === '1' || flag === 'true'
+}
+
 export interface LetterboxdEntry {
   // TMDB's own id, straight from the feed — no title search, no year tiebreak.
   tmdbId: string

@@ -1,16 +1,24 @@
 import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
-import { createController } from 'remix/router'
+import { createController, type Middleware } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import {
   fetchLetterboxdFeed,
+  isLetterboxdSyncEnabled,
   normalizeLetterboxdUsername,
 } from '../../../data/imports/letterboxdFeed.ts'
 import { syncLetterboxdInBackground } from '../../../data/imports/letterboxdSync.ts'
 import { users, type User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
+
+// Hiding the form isn't enough: these routes stay mapped, so a POST would
+// still connect an account the flag is meant to have switched off. 404 rather
+// than 403, matching requireEnabledMediaType — a gated feature shouldn't
+// advertise that it exists.
+const requireLetterboxdSync: Middleware = async (_context, next) =>
+  isLetterboxdSyncEnabled() ? next() : new Response('Not Found', { status: 404 })
 
 function back(query = ''): Response {
   return redirect(`${routes.profile.importMovies.index.href()}${query}`, 303)
@@ -19,7 +27,7 @@ function back(query = ''): Response {
 // Not a linked account — the feed this names is public, so nothing here proves
 // the member typing it is the member it belongs to. The page says as much.
 export default createController(routes.profile.letterboxd, {
-  middleware: [requireAuth<User>()],
+  middleware: [requireLetterboxdSync, requireAuth<User>()],
   actions: {
     async connect(context) {
       const auth = context.get(Auth)
