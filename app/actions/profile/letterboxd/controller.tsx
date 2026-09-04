@@ -15,8 +15,7 @@ import { routes } from '../../../routes.ts'
 
 // Hiding the form isn't enough: these routes stay mapped, so a POST would
 // still connect an account the gate is meant to have closed. 404 rather than
-// 403, matching requireEnabledMediaType — a gated feature shouldn't advertise
-// that it exists.
+// 403, because a gated feature shouldn't advertise that it exists.
 //
 // Ordered after requireAuth in the list below, not before. loadAuth() populates
 // Auth for every request, so either order sees it — but anonymous requests

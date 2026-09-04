@@ -12,8 +12,8 @@ const USERNAME_PATTERN = /^[a-z0-9_]{1,32}$/
 
 const FEED_TIMEOUT_MS = 10_000
 
-// Off for everyone unless switched on, the same way EXPERIMENTAL_MEDIA_TYPES
-// is: a forgotten variable should hide the feature rather than ship it.
+// Off for everyone unless switched on. Opt-in on purpose: a forgotten variable
+// should hide the feature rather than ship it.
 //
 // Read per call rather than captured at import: a test can set it, and the
 // value is only ever consulted off the hot path.
