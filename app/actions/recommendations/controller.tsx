@@ -2,7 +2,6 @@ import * as s from 'remix/data-schema'
 import * as f from 'remix/data-schema/form-data'
 import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
-import { Session } from 'remix/session'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
@@ -16,7 +15,6 @@ import { enqueueJob, getJob, PHASE_LABELS } from '../../data/recommendations/job
 import { getLuckyState, LUCKY_RUN_NAME } from '../../data/recommendations/lucky.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
-import { getRememberedMediaType } from '../../middleware/mediaType.ts'
 import {
   findMembersMissingSourceLogs,
   generateRecommendations,
@@ -161,8 +159,7 @@ export default createController(routes.recommendations, {
       const auth = context.get(Auth)
 
       const mediaType =
-        parseMediaType(context.url.searchParams.get('mediaType')) ?? getRememberedMediaType(context)
-      context.get(Session).set('mediaType', mediaType)
+        parseMediaType(context.url.searchParams.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
 
       const db = context.get(Database)
 
@@ -173,8 +170,7 @@ export default createController(routes.recommendations, {
       const auth = context.get(Auth)
 
       const mediaType =
-        parseMediaType(context.url.searchParams.get('mediaType')) ?? getRememberedMediaType(context)
-      context.get(Session).set('mediaType', mediaType)
+        parseMediaType(context.url.searchParams.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
 
       const db = context.get(Database)
 
@@ -353,9 +349,7 @@ export default createController(routes.recommendations, {
           ? luckyDrawPage(db, auth.identity, mediaType, { error })
           : indexPage(db, auth.identity, mediaType, { error })
 
-      const mediaType =
-        parseMediaType(formData.get('mediaType')) ?? getRememberedMediaType(context)
-      context.get(Session).set('mediaType', mediaType)
+      const mediaType = parseMediaType(formData.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
 
       // `mode` decides whether the checkboxes count at all, the same way it does
       // in `generate`: the shared form keeps every friend checkbox mounted and

@@ -10,11 +10,9 @@ import { countFollowing } from '../data/follows.ts'
 import { getLuckyState } from '../data/recommendations/lucky.ts'
 import type { User } from '../data/schema.ts'
 import { displayLabel } from '../data/users.ts'
-import { getRememberedMediaType } from '../middleware/mediaType.ts'
 import { routes } from '../routes.ts'
 import { FeedRows } from './activity-feed.tsx'
 import { HomePage, type HomeDashboard } from './home-page.tsx'
-import { MEDIA_TYPE_UI } from '../mediaTypes.ts'
 
 // One screenful and a bit. Small enough that the landing page isn't paying for
 // rows nobody scrolls to, big enough that the first auto-load isn't immediate.
@@ -107,8 +105,8 @@ export default createController(routes, {
 
       return Response.json({ html, cursor: page.cursor && JSON.stringify(page.cursor) })
     },
-    media(context) {
-      return redirect(MEDIA_TYPE_UI[getRememberedMediaType(context)].hrefs.search(), 303)
+    media() {
+      return redirect(routes.movies.search.href(), 303)
     },
   },
 })
