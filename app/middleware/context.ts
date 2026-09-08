@@ -5,7 +5,6 @@ import type { session } from 'remix/middleware/session'
 import type { loadDatabase } from '../data/db.ts'
 import type { User } from '../data/schema.ts'
 import type { loadAuth, requireAuth } from './auth.ts'
-import type { rememberMediaType } from './mediaType.ts'
 import type { render } from './render.tsx'
 
 // What every action receives, derived from the middleware stack in router.ts —
@@ -25,10 +24,10 @@ export type AppContext = MiddlewareContext<
 >
 
 // The context inside a media-type controller: the router's stack above, plus
-// the middleware those controllers add. Reconstructed rather than inferred
-// because createController resolves action types from the concrete route map,
-// and routes.movies.show and routes.tv.show are different generic
-// instantiations — so a factory over the route map can't typecheck.
+// requireAuth. Reconstructed rather than inferred because createController
+// resolves action types from the concrete route map, and routes.movies.show
+// and routes.tv.show are different generic instantiations — so a factory over
+// the route map can't typecheck.
 //
 // requireAuth is part of this: it narrows the Auth entry, which is why
 // `context.get(Auth)` inside these actions is already known to have identified
@@ -41,7 +40,6 @@ export type MediaControllerContext = MiddlewareContext<
     ReturnType<typeof loadDatabase>,
     ReturnType<typeof loadAuth>,
     ReturnType<typeof requireAuth<User>>,
-    ReturnType<typeof rememberMediaType>,
   ]
 >
 
