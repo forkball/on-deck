@@ -3,6 +3,7 @@ import { runBounded } from './csv.ts'
 import { IGDB_MAX_CONCURRENCY } from '../catalog/igdb.ts'
 import type { Db } from '../db.ts'
 import { logInteraction, type LogInteractionInput } from '../mediaItems.ts'
+import { INTERACTION_SOURCES } from '../schema.ts'
 import { fetchSteamLibrary, type SteamGame } from './steamApi.ts'
 
 export interface SteamImportResult {
@@ -66,6 +67,7 @@ export async function importSteamLibrary(db: Db, userId: number, steamId: string
       // re-importing a library must leave whatever was written here alone
       // rather than clearing it.
       // Steam knows how long, never when, so this stays unset.
+      source: INTERACTION_SOURCES.steam,
     })
 
     if (status === 'consumed') played++

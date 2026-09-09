@@ -24,6 +24,19 @@ export function isLetterboxdSyncEnabled(): boolean {
   return flag === '1' || flag === 'true'
 }
 
+// Whether a sync may actually remove rows, as opposed to reporting the ones it
+// would have removed. Separate from the sync flag and off by default, because
+// this is the only part of the sync that destroys anything: everything else
+// costs a wrong rating when it misjudges, and this costs a log entry with
+// nothing to restore it from.
+//
+// Read per call, like the flag above, so the dry run can be left on in
+// production while the reports are checked against real diaries.
+export function letterboxdDeleteEnabled(): boolean {
+  const flag = (process.env.LETTERBOXD_FEED_DELETE ?? '').trim().toLowerCase()
+  return flag === '1' || flag === 'true'
+}
+
 // The gate everything actually asks, and the only one worth calling: the env
 // flag opens the feature to everyone, and an admin has it either way, so it can
 // be exercised against production before it is turned on for everyone.
@@ -48,6 +61,12 @@ export interface LetterboxdEntry {
   // Null where the member logged a watch without rating it.
   rating: number | null
   watchedAt: number | null
+  // When the entry was published to the diary, which is not when the film was
+  // watched: watchedDate is whatever the member typed, and backdating a
+  // catch-up watch by years is ordinary use. publishedAt is the axis the feed
+  // itself is ordered and truncated along, so it is the only one that supports
+  // "the feed still covers this" — see deletableEntries in letterboxdSync.ts.
+  publishedAt: number | null
   // Only a review entry carries one. A plain watch entry's description is a
   // poster image and the sentence "Watched on Saturday August 22, 2026." —
   // boilerplate, not something anyone wrote.
@@ -133,6 +152,7 @@ export function parseLetterboxdFeed(xml: string): LetterboxdEntry[] {
       year: numberOrNull(tag(item, 'letterboxd:filmYear')),
       rating: numberOrNull(tag(item, 'letterboxd:memberRating')),
       watchedAt: watchedAt(tag(item, 'letterboxd:watchedDate')),
+      publishedAt: publishedAt(tag(item, 'pubDate')),
       notes: isReview ? reviewText(item) : null,
     })
   }
@@ -159,6 +179,14 @@ function numberOrNull(raw: string | null): number | null {
 // `2026-09-03`, which Date.parse reads as UTC midnight — deliberately, so the
 // stored day doesn't shift with the server's zone.
 function watchedAt(raw: string | null): number | null {
+  if (!raw) return null
+  const parsed = Date.parse(raw)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+// RFC 822, as RSS requires: `Fri, 4 Sep 2026 05:33:38 +1200`. Carries its own
+// offset, so unlike watchedDate this is an instant and not a day.
+function publishedAt(raw: string | null): number | null {
   if (!raw) return null
   const parsed = Date.parse(raw)
   return Number.isFinite(parsed) ? parsed : null

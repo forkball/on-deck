@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 
 import {
   isLetterboxdSyncEnabled,
+  letterboxdDeleteEnabled,
   letterboxdSyncAvailableTo,
   letterboxdFeedUrl,
   normalizeLetterboxdUsername,
@@ -24,6 +25,17 @@ describe('parseLetterboxdFeed', () => {
     assert.equal(entry!.year, 2026)
     assert.equal(entry!.rating, 3)
     assert.equal(entry!.watchedAt, Date.parse('2026-09-03'))
+  })
+
+  // Two different dates, and the gap between them is the point: this entry was
+  // published to the diary on the 4th for a film watched on the 3rd. Backdating
+  // stretches that gap arbitrarily, which is why only pubDate can be used to
+  // reason about what the feed still covers.
+  it('reads the publication date apart from the watched date', () => {
+    const [entry] = parseLetterboxdFeed(FIXTURE)
+
+    assert.equal(entry!.publishedAt, Date.parse('Fri, 4 Sep 2026 05:33:38 +1200'))
+    assert.notEqual(entry!.publishedAt, entry!.watchedAt)
   })
 
   it('drops the lists Letterboxd puts in the same feed', () => {
@@ -119,6 +131,53 @@ function withFlag<T>(value: string | undefined, read: () => T): T {
     else process.env.LETTERBOXD_FEED_SYNC = original
   }
 }
+
+const originalDelete = process.env.LETTERBOXD_FEED_DELETE
+
+function withDeleteFlag<T>(value: string | undefined, read: () => T): T {
+  if (value === undefined) delete process.env.LETTERBOXD_FEED_DELETE
+  else process.env.LETTERBOXD_FEED_DELETE = value
+  try {
+    return read()
+  } finally {
+    if (originalDelete === undefined) delete process.env.LETTERBOXD_FEED_DELETE
+    else process.env.LETTERBOXD_FEED_DELETE = originalDelete
+  }
+}
+
+describe('letterboxdDeleteEnabled', () => {
+  function flagged(value: string | undefined): boolean {
+    return withDeleteFlag(value, letterboxdDeleteEnabled)
+  }
+
+  // The dry run is the default, and it is the whole safety story for the one
+  // part of the sync that destroys anything.
+  it('is off when nothing is set, so removal never happens by accident', () => {
+    assert.equal(flagged(undefined), false)
+    assert.equal(flagged(''), false)
+  })
+
+  it('is on for the values someone switching it on would write', () => {
+    for (const value of ['1', 'true', 'TRUE', ' true ']) {
+      assert.equal(flagged(value), true, value)
+    }
+  })
+
+  it('stays off for values that read as "no"', () => {
+    for (const value of ['0', 'false', 'no', 'off']) {
+      assert.equal(flagged(value), false, value)
+    }
+  })
+
+  // Two flags, deliberately: syncing and deleting are separate decisions, and
+  // opening the feature to everyone must not start removing their rows.
+  it('is independent of the sync flag', () => {
+    assert.equal(
+      withFlag('1', () => withDeleteFlag(undefined, letterboxdDeleteEnabled)),
+      false,
+    )
+  })
+})
 
 describe('isLetterboxdSyncEnabled', () => {
   function flagged(value: string | undefined): boolean {

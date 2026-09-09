@@ -1,10 +1,20 @@
+import { inList } from 'remix/data-table'
+
 import { getCatalogProvider, upsertCatalogItem } from '../catalog/provider.ts'
 import { runBounded } from './csv.ts'
 import type { Db } from '../db.ts'
 import { logInteraction, normalizeRating } from '../mediaItems.ts'
-import { mediaItems, users, type MediaItem, type User } from '../schema.ts'
+import {
+  INTERACTION_SOURCES,
+  mediaItems,
+  userMediaInteractions,
+  users,
+  type MediaItem,
+  type User,
+} from '../schema.ts'
 import {
   fetchLetterboxdFeed,
+  letterboxdDeleteEnabled,
   letterboxdSyncAvailableTo,
   type LetterboxdEntry,
 } from './letterboxdFeed.ts'
@@ -28,6 +38,11 @@ export interface LetterboxdSyncResult {
   logged: number
   // Entries whose TMDB id no longer resolves — a deleted or merged record.
   unresolved: number
+  // Rows the feed no longer accounts for. Counted whether or not they were
+  // actually removed, so the dry run reports the same number the live pass
+  // would act on.
+  removable: number
+  deleted: number
 }
 
 // Reads the member's public diary and writes it into the log.
@@ -37,6 +52,12 @@ export interface LetterboxdSyncResult {
 // rows, so a rating or review revised on Letterboxd has to be able to reach a
 // film logged weeks ago. `letterboxd_synced_at` throttles how often the fetch
 // happens; it is not a watermark over which entries have been handled.
+//
+// Removals travel the same way, within limits the feed imposes: it carries a
+// bounded number of the most recently published entries, so it can only speak
+// for that window. What falls outside it is unknown, not gone. findRemovable
+// holds that line, and until LETTERBOXD_FEED_DELETE is set it only reports what
+// it would have done.
 export async function syncLetterboxdDiary(
   db: Db,
   userId: number,
@@ -48,7 +69,9 @@ export async function syncLetterboxdDiary(
   let logged = 0
   let unresolved = 0
 
-  await runBounded(foldRewatches(outcome.entries), CONCURRENCY, async (entry) => {
+  const entries = foldRewatches(outcome.entries)
+
+  await runBounded(entries, CONCURRENCY, async (entry) => {
     const item = await resolveMovie(db, entry.tmdbId)
     if (!item) {
       unresolved++
@@ -66,12 +89,132 @@ export async function syncLetterboxdDiary(
       // undefined so its boilerplate description can't overwrite a real note.
       notes: entry.notes ?? undefined,
       consumedAt: entry.watchedAt ?? undefined,
+      // Claims the row for the feed only if the feed is what created it. An
+      // existing row keeps whatever source it already had — see the note on
+      // LogInteractionInput.source.
+      source: INTERACTION_SOURCES.letterboxdFeed,
+      sourceEntryAt: entry.publishedAt ?? undefined,
     })
 
     logged++
   })
 
-  return { logged, unresolved }
+  const removable = await findRemovable(db, userId, entries)
+  let deleted = 0
+
+  if (removable.length === 0) {
+    // Nothing to say, and nothing to decide.
+  } else if (letterboxdDeleteEnabled()) {
+    // One at a time rather than a bulk delete by id list: this is the only
+    // destructive statement in the sync, and a row that has since been removed
+    // by its owner should count as not-deleted rather than fail the batch.
+    for (const row of removable) {
+      if (await db.delete(userMediaInteractions, row.interactionId)) deleted++
+    }
+  } else {
+    // The dry run, and it names films rather than counting them: the question
+    // it exists to answer is "would it have taken the right ones", which a
+    // number can't be checked against anyone's diary. Repeats every sync until
+    // the flag is set, which is the cost of not writing state to remember it.
+    console.info(
+      `Letterboxd sync would remove ${removable.length} row(s) for user ${userId} (LETTERBOXD_FEED_DELETE unset): ` +
+        removable.map((row) => `${row.title} [tmdb:${row.tmdbId}]`).join(', '),
+    )
+  }
+
+  return { logged, unresolved, removable: removable.length, deleted }
+}
+
+// A row the feed created, as the rule below needs to see it: what it points at
+// in the catalog, and when the entry behind it was published.
+export interface SyncedRow {
+  interactionId: number
+  tmdbId: string | null
+  title: string
+  sourceEntryAt: number | null
+}
+
+// Which of a member's feed-written rows the current feed says are gone.
+//
+// Separated from the query that feeds it because this is the whole of the
+// decision, and it is the part worth being able to check: everything that makes
+// deletion safe is one of the refusals below, and none of them needs a database
+// to demonstrate.
+export function selectRemovable(entries: LetterboxdEntry[], rows: SyncedRow[]): SyncedRow[] {
+  const watermark = coverageWatermark(entries)
+  if (watermark == null) return []
+
+  const present = new Set(entries.map((entry) => entry.tmdbId))
+
+  return rows.filter((row) => {
+    // No catalog id, nothing to compare against the feed. No evidence either
+    // way is not grounds for removing anything.
+    if (row.tmdbId == null) return false
+    if (present.has(row.tmdbId)) return false
+    return withinCoverage(row.sourceEntryAt, watermark)
+  })
+}
+
+// Everything the feed sync has written for this member. Two queries rather than
+// a join because the table API can't express one; the set is small — it is one
+// member's feed-sourced films, not their log.
+async function findRemovable(db: Db, userId: number, entries: LetterboxdEntry[]): Promise<SyncedRow[]> {
+  const rows = await db.findMany(userMediaInteractions, {
+    where: { user_id: userId, source: INTERACTION_SOURCES.letterboxdFeed },
+  })
+  if (rows.length === 0) return []
+
+  const items = await db.findMany(mediaItems, {
+    where: inList(
+      'id',
+      rows.map((row) => row.media_item_id),
+    ),
+  })
+  const itemsById = new Map(items.map((item) => [item.id, item]))
+
+  return selectRemovable(
+    entries,
+    rows.map((row) => {
+      const item = itemsById.get(row.media_item_id)
+      return {
+        interactionId: row.id,
+        tmdbId: item?.external_id ?? null,
+        title: item?.title ?? `media item ${row.media_item_id}`,
+        sourceEntryAt: row.source_entry_at,
+      }
+    }),
+  )
+}
+
+// The oldest entry the feed is currently showing. Everything published after
+// this point is something the feed would still be carrying if it existed, so
+// its absence is a deletion rather than a truncation — and everything before it
+// is simply out of view, which is not the same as gone.
+//
+// Null when the feed carries no dated diary entry at all: a member who cleared
+// their diary, or a feed that is all lists. That is exactly the case where a
+// naive diff decides everything was deleted, so it has to be a refusal to act
+// rather than a watermark of zero.
+export function coverageWatermark(entries: LetterboxdEntry[]): number | null {
+  let oldest: number | null = null
+
+  for (const entry of entries) {
+    if (entry.publishedAt == null) continue
+    if (oldest == null || entry.publishedAt < oldest) oldest = entry.publishedAt
+  }
+
+  return oldest
+}
+
+// Strictly newer, so the entry sitting exactly on the boundary is left alone.
+// It is the one the watermark was read from, and a tie there means two entries
+// published in the same instant — too thin a basis for deleting someone's log.
+//
+// A row with no entry date is anything written before this column existed, or
+// by a feed entry that carried no pubDate. Neither can be placed against the
+// window, so neither is touched.
+function withinCoverage(sourceEntryAt: number | null, watermark: number): boolean {
+  return sourceEntryAt != null && sourceEntryAt > watermark
 }
 
 // A rewatch is a second diary entry for a film already in the feed, and an
@@ -100,6 +243,11 @@ export function foldRewatches(entries: LetterboxdEntry[]): LetterboxdEntry[] {
     seen.rating ??= entry.rating
     seen.notes ??= entry.notes
     seen.watchedAt ??= entry.watchedAt
+    // Kept from the newest entry for the same reason the others are, and it
+    // matters more here: this is what holds the film inside the feed's window,
+    // so taking the older entry's date would age a row out of coverage while
+    // the feed is still carrying it.
+    seen.publishedAt ??= entry.publishedAt
   }
 
   return [...byFilm.values()]
