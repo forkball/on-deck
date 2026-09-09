@@ -12,12 +12,7 @@ import {
   type MediaItem,
   type User,
 } from '../schema.ts'
-import {
-  fetchLetterboxdFeed,
-  letterboxdDeleteEnabled,
-  letterboxdSyncAvailableTo,
-  type LetterboxdEntry,
-} from './letterboxdFeed.ts'
+import { fetchLetterboxdFeed, letterboxdSyncAvailableTo, type LetterboxdEntry } from './letterboxdFeed.ts'
 
 // Only the entries needing a TMDB detail lookup do any network work, and after
 // the first sync that is usually none of them — so this bounds a list that is
@@ -38,10 +33,7 @@ export interface LetterboxdSyncResult {
   logged: number
   // Entries whose TMDB id no longer resolves — a deleted or merged record.
   unresolved: number
-  // Rows the feed no longer accounts for. Counted whether or not they were
-  // actually removed, so the dry run reports the same number the live pass
-  // would act on.
-  removable: number
+  // Rows removed because the feed no longer accounts for them.
   deleted: number
 }
 
@@ -55,9 +47,8 @@ export interface LetterboxdSyncResult {
 //
 // Removals travel the same way, within limits the feed imposes: it carries a
 // bounded number of the most recently published entries, so it can only speak
-// for that window. What falls outside it is unknown, not gone. findRemovable
-// holds that line, and until LETTERBOXD_FEED_DELETE is set it only reports what
-// it would have done.
+// for that window. What falls outside it is unknown, not gone, and
+// selectRemovable is where that line is held.
 export async function syncLetterboxdDiary(
   db: Db,
   userId: number,
@@ -100,29 +91,27 @@ export async function syncLetterboxdDiary(
   })
 
   const removable = await findRemovable(db, userId, entries)
-  let deleted = 0
+  const removed: string[] = []
 
-  if (removable.length === 0) {
-    // Nothing to say, and nothing to decide.
-  } else if (letterboxdDeleteEnabled()) {
-    // One at a time rather than a bulk delete by id list: this is the only
-    // destructive statement in the sync, and a row that has since been removed
-    // by its owner should count as not-deleted rather than fail the batch.
-    for (const row of removable) {
-      if (await db.delete(userMediaInteractions, row.interactionId)) deleted++
+  // One at a time rather than a bulk delete by id list: this is the only
+  // destructive statement in the sync, and a row already removed by its owner
+  // should count as nothing to do rather than fail the rest of the batch.
+  for (const row of removable) {
+    if (await db.delete(userMediaInteractions, row.interactionId)) {
+      removed.push(`${row.title} [tmdb:${row.tmdbId}]`)
     }
-  } else {
-    // The dry run, and it names films rather than counting them: the question
-    // it exists to answer is "would it have taken the right ones", which a
-    // number can't be checked against anyone's diary. Repeats every sync until
-    // the flag is set, which is the cost of not writing state to remember it.
+  }
+
+  if (removed.length > 0) {
+    // Named rather than counted, and written after the fact: nothing else in
+    // the log records that a row existed, so this line is the only account of
+    // what a background job took and why it believed it should.
     console.info(
-      `Letterboxd sync would remove ${removable.length} row(s) for user ${userId} (LETTERBOXD_FEED_DELETE unset): ` +
-        removable.map((row) => `${row.title} [tmdb:${row.tmdbId}]`).join(', '),
+      `Letterboxd sync removed ${removed.length} row(s) for user ${userId}, absent from the feed: ${removed.join(', ')}`,
     )
   }
 
-  return { logged, unresolved, removable: removable.length, deleted }
+  return { logged, unresolved, deleted: removed.length }
 }
 
 // A row the feed created, as the rule below needs to see it: what it points at

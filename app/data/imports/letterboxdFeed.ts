@@ -15,25 +15,17 @@ const FEED_TIMEOUT_MS = 10_000
 // Off for everyone unless switched on. Opt-in on purpose: a forgotten variable
 // should hide the feature rather than ship it.
 //
+// One flag for the whole of the RSS feature, removals included. Reading the
+// diary and mirroring it are not two features to be sized up separately — a
+// mirror that can only ever add is a half-kept promise — so there is one thing
+// to switch on and one thing to reason about when deciding whether it is on.
+//
 // Read per call rather than captured at import: a test can set it, and the
 // value is only ever consulted off the hot path.
 export function isLetterboxdSyncEnabled(): boolean {
   const flag = (process.env.LETTERBOXD_FEED_SYNC ?? '').trim().toLowerCase()
   // Named values only. "Any non-empty string" would make LETTERBOXD_FEED_SYNC=0
   // turn the feature on, which is the opposite of what anyone writing that means.
-  return flag === '1' || flag === 'true'
-}
-
-// Whether a sync may actually remove rows, as opposed to reporting the ones it
-// would have removed. Separate from the sync flag and off by default, because
-// this is the only part of the sync that destroys anything: everything else
-// costs a wrong rating when it misjudges, and this costs a log entry with
-// nothing to restore it from.
-//
-// Read per call, like the flag above, so the dry run can be left on in
-// production while the reports are checked against real diaries.
-export function letterboxdDeleteEnabled(): boolean {
-  const flag = (process.env.LETTERBOXD_FEED_DELETE ?? '').trim().toLowerCase()
   return flag === '1' || flag === 'true'
 }
 
@@ -65,7 +57,7 @@ export interface LetterboxdEntry {
   // watched: watchedDate is whatever the member typed, and backdating a
   // catch-up watch by years is ordinary use. publishedAt is the axis the feed
   // itself is ordered and truncated along, so it is the only one that supports
-  // "the feed still covers this" — see deletableEntries in letterboxdSync.ts.
+  // "the feed still covers this" — see selectRemovable in letterboxdSync.ts.
   publishedAt: number | null
   // Only a review entry carries one. A plain watch entry's description is a
   // poster image and the sentence "Watched on Saturday August 22, 2026." —
