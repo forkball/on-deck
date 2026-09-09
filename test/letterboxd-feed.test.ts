@@ -26,6 +26,17 @@ describe('parseLetterboxdFeed', () => {
     assert.equal(entry!.watchedAt, Date.parse('2026-09-03'))
   })
 
+  // Two different dates, and the gap between them is the point: this entry was
+  // published to the diary on the 4th for a film watched on the 3rd. Backdating
+  // stretches that gap arbitrarily, which is why only pubDate can be used to
+  // reason about what the feed still covers.
+  it('reads the publication date apart from the watched date', () => {
+    const [entry] = parseLetterboxdFeed(FIXTURE)
+
+    assert.equal(entry!.publishedAt, Date.parse('Fri, 4 Sep 2026 05:33:38 +1200'))
+    assert.notEqual(entry!.publishedAt, entry!.watchedAt)
+  })
+
   it('drops the lists Letterboxd puts in the same feed', () => {
     const entries = parseLetterboxdFeed(FIXTURE)
 
@@ -120,6 +131,9 @@ function withFlag<T>(value: string | undefined, read: () => T): T {
   }
 }
 
+// The only switch the RSS feature has, and it covers removals as well as
+// writes — so "off when nothing is set" is also what keeps a forgotten
+// variable from deleting anyone's rows.
 describe('isLetterboxdSyncEnabled', () => {
   function flagged(value: string | undefined): boolean {
     return withFlag(value, isLetterboxdSyncEnabled)

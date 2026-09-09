@@ -59,7 +59,9 @@ function FeedConnection(handle: Handle<{ connection: LetterboxdConnection }>) {
             </p>
             <p mix={NOTE}>
               Letterboxd is the source of truth for these films: a rating or review you change there
-              replaces what's here. Editing one of them in On Deck won't last.
+              replaces what's here, and a recent diary entry you delete there is removed here too.
+              Editing one of them in On Deck won't last. Films you logged in On Deck yourself are
+              never touched.
             </p>
             <form method="post" action={routes.profile.letterboxd.disconnect.href()}>
               <button type="submit">Disconnect</button>

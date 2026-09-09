@@ -179,6 +179,20 @@ export interface LogInteractionInput {
   // review text, Letterboxd's ratings export and Steam carry none.
   notes?: string | null
   consumedAt?: number
+  // Who is writing this row, for a caller that wants to be able to take it back
+  // later. Written when the row is created and never afterwards: the question
+  // it answers is "would this row exist if that source hadn't said so", which
+  // is about origin, not about who touched it last.
+  //
+  // The case that settles it: a member adds a film to their watchlist by hand,
+  // then watches it and logs it on Letterboxd. The sync flips the row to
+  // consumed. If that write took ownership of the row, deleting the diary entry
+  // afterwards would destroy something the member created — so it doesn't.
+  source?: string
+  // Only meaningful alongside a source that has entries. Rewritten on every
+  // write, unlike `source`, because it tracks the latest entry rather than the
+  // first one.
+  sourceEntryAt?: number
 }
 
 // 0 is not the bottom of the scale: "never rated" and "rated the lowest it goes"
@@ -225,6 +239,12 @@ export async function logInteraction(
     rating: input.rating ?? undefined,
     disliked: input.disliked ?? undefined,
     notes: input.notes ?? undefined,
+    // Insert-only, and the omission from `update` below is the mechanism: this
+    // key is written when the row is created and is never part of a conflict
+    // update, so a later writer can enrich the row without inheriting it. Same
+    // shape as created_at, one line up, and for the same reason.
+    source: input.source,
+    source_entry_at: input.sourceEntryAt,
     created_at: now,
     updated_at: activityAt,
   }
@@ -232,6 +252,13 @@ export async function logInteraction(
   const update: Partial<UserMediaInteraction> = {
     status: input.status,
     updated_at: activityAt,
+  }
+  // Not three-state like the fields below: there is no "clear the entry date",
+  // only "this write knows one". Conditional for the same reason they are —
+  // a present-but-undefined key is written as NULL, which would blank the date
+  // every time a non-feed writer touched a feed-sourced row.
+  if (input.sourceEntryAt !== undefined) {
+    update.source_entry_at = input.sourceEntryAt
   }
   // Written only when the caller has an opinion. Two rules, and they compose:
   //
@@ -263,6 +290,11 @@ export async function logInteraction(
   })
 }
 
+// Shares LogInteractionInput but ignores its `source` and `sourceEntryAt`, and
+// that is the intended reading rather than an oversight: this edits a row that
+// already exists, and origin is a fact about how it came to exist. A member
+// editing a synced film by hand does not take it over — the page says as much,
+// and the next sync overwrites the edit either way.
 export async function updateInteraction(
   db: Db,
   interactionId: number,

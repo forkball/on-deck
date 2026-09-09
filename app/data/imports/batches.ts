@@ -353,6 +353,11 @@ export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult>
       rating: row.rating ?? undefined,
       notes: row.notes ?? undefined,
       consumedAt: row.consumed_at ?? undefined,
+      // The batch's own name for where the file came from — 'letterboxd' for a
+      // CSV export, which is deliberately not the 'letterboxd-feed' the RSS
+      // sync writes. An upload is a snapshot of a moment that can't be checked
+      // again, so nothing may later conclude a row from it has been removed.
+      source: batch.source,
     })
   }
 

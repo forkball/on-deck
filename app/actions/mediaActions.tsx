@@ -20,7 +20,7 @@ import {
   logInteraction,
   parseRatingSubmission,
 } from '../data/mediaItems.ts'
-import { INTERACTION_STATUSES, type User } from '../data/schema.ts'
+import { INTERACTION_SOURCES, INTERACTION_STATUSES, type User } from '../data/schema.ts'
 import type { MediaControllerContext, MediaItemControllerContext } from '../middleware/context.ts'
 import { displayLabel } from '../data/users.ts'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../mediaTypes.ts'
@@ -205,6 +205,9 @@ export function createMediaActions(mediaType: ActiveMediaType) {
         rating,
         disliked,
         notes: parsed.value.notes || null,
+        // A person, at the keyboard. Recorded so an importer that later touches
+        // this row can't mistake it for one of its own and take it back.
+        source: INTERACTION_SOURCES.manual,
       })
 
       return redirect(parsed.value.return_to || ui.hrefs.search(), 303)

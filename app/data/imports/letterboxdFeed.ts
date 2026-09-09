@@ -15,6 +15,11 @@ const FEED_TIMEOUT_MS = 10_000
 // Off for everyone unless switched on. Opt-in on purpose: a forgotten variable
 // should hide the feature rather than ship it.
 //
+// One flag for the whole of the RSS feature, removals included. Reading the
+// diary and mirroring it are not two features to be sized up separately — a
+// mirror that can only ever add is a half-kept promise — so there is one thing
+// to switch on and one thing to reason about when deciding whether it is on.
+//
 // Read per call rather than captured at import: a test can set it, and the
 // value is only ever consulted off the hot path.
 export function isLetterboxdSyncEnabled(): boolean {
@@ -48,6 +53,12 @@ export interface LetterboxdEntry {
   // Null where the member logged a watch without rating it.
   rating: number | null
   watchedAt: number | null
+  // When the entry was published to the diary, which is not when the film was
+  // watched: watchedDate is whatever the member typed, and backdating a
+  // catch-up watch by years is ordinary use. publishedAt is the axis the feed
+  // itself is ordered and truncated along, so it is the only one that supports
+  // "the feed still covers this" — see selectRemovable in letterboxdSync.ts.
+  publishedAt: number | null
   // Only a review entry carries one. A plain watch entry's description is a
   // poster image and the sentence "Watched on Saturday August 22, 2026." —
   // boilerplate, not something anyone wrote.
@@ -132,7 +143,8 @@ export function parseLetterboxdFeed(xml: string): LetterboxdEntry[] {
       title,
       year: numberOrNull(tag(item, 'letterboxd:filmYear')),
       rating: numberOrNull(tag(item, 'letterboxd:memberRating')),
-      watchedAt: watchedAt(tag(item, 'letterboxd:watchedDate')),
+      watchedAt: dateOrNull(tag(item, 'letterboxd:watchedDate')),
+      publishedAt: dateOrNull(tag(item, 'pubDate')),
       notes: isReview ? reviewText(item) : null,
     })
   }
@@ -156,9 +168,13 @@ function numberOrNull(raw: string | null): number | null {
   return Number.isFinite(value) ? value : null
 }
 
-// `2026-09-03`, which Date.parse reads as UTC midnight — deliberately, so the
-// stored day doesn't shift with the server's zone.
-function watchedAt(raw: string | null): number | null {
+// Both dates in the feed, since Date.parse reads either: watchedDate is a bare
+// `2026-09-03`, taken as UTC midnight so the stored day doesn't shift with the
+// server's zone, and pubDate is the RFC 822 form RSS requires
+// (`Fri, 4 Sep 2026 05:33:38 +1200`), which carries its own offset and is an
+// instant rather than a day. What that difference means is on the fields
+// themselves; here they parse the same way.
+function dateOrNull(raw: string | null): number | null {
   if (!raw) return null
   const parsed = Date.parse(raw)
   return Number.isFinite(parsed) ? parsed : null

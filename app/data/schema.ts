@@ -72,10 +72,32 @@ export const userMediaInteractions = table({
     // written as NULL, so the workaround silently cleared notes.
     notes: c.text().nullable(),
     consumed_at: c.integer(),
+    // Which system created this row: 'letterboxd-feed', 'steam', 'manual', or
+    // an importer's own name for a staged CSV. Nullable because every row
+    // written before it existed has no answer, and because null is the value
+    // the delete pass refuses to act on — see INTERACTION_SOURCES.
+    source: c.text().nullable(),
+    // For a feed-synced row, when the diary entry behind it was published.
+    // Nullable: only the feed sync has one to give.
+    source_entry_at: c.integer().nullable(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
   },
 })
+
+// Not an enum column: the set grows with every importer, and a check
+// constraint would make adding one a migration. Named here so the writers and
+// the delete pass agree on the spelling, which is the only thing that matters.
+//
+// 'letterboxd' and 'letterboxd-feed' are deliberately different sources for
+// the same website. The CSV export is a snapshot someone uploaded once; the
+// feed is a live window that can be checked again. Only the second can support
+// "this is gone now", so only the second is ever deleted from.
+export const INTERACTION_SOURCES = {
+  manual: 'manual',
+  letterboxdFeed: 'letterboxd-feed',
+  steam: 'steam',
+} as const
 
 export const userTasteProfiles = table({
   name: 'user_taste_profiles',
