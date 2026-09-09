@@ -27,8 +27,18 @@ alter table user_media_interactions add column source text;
 -- whether the feed can still speak for that row.
 alter table user_media_interactions add column source_entry_at bigint;
 
--- The delete pass scans one member's feed-sourced rows. Partial, because that
--- is a small slice of a table that is mostly rows this index would never serve.
-create index user_media_interactions_source_idx
-  on user_media_interactions (user_id, source)
-  where source is not null;
+-- Deliberately no index on source. The obvious one — (user_id, source) — would
+-- be the third btree on this table led by user_id, after the (user_id,
+-- media_item_id) unique constraint and the (user_id, updated_at desc, id desc)
+-- the feed reads through. Either already gets a scan down to one member, after
+-- which filtering a few hundred rows on source is nothing, and the delete pass
+-- runs at most a handful of times an hour per member.
+--
+-- The cost would land on the other side: this table's hot path is bulk writes,
+-- a whole CSV or a whole Steam library through logInteraction a row at a time,
+-- and every index is maintained on each of them. A partial index wouldn't help
+-- either, since after this change every writer stamps a source, so `where
+-- source is not null` excludes almost nothing.
+--
+-- If a measurement ever says otherwise, the index to add is the one matching
+-- what loadSyncedRows actually asks: (user_id, source, source_entry_at).

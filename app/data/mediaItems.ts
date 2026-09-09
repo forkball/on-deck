@@ -290,6 +290,11 @@ export async function logInteraction(
   })
 }
 
+// Shares LogInteractionInput but ignores its `source` and `sourceEntryAt`, and
+// that is the intended reading rather than an oversight: this edits a row that
+// already exists, and origin is a fact about how it came to exist. A member
+// editing a synced film by hand does not take it over — the page says as much,
+// and the next sync overwrites the edit either way.
 export async function updateInteraction(
   db: Db,
   interactionId: number,

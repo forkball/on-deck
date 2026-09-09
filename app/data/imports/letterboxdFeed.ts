@@ -143,8 +143,8 @@ export function parseLetterboxdFeed(xml: string): LetterboxdEntry[] {
       title,
       year: numberOrNull(tag(item, 'letterboxd:filmYear')),
       rating: numberOrNull(tag(item, 'letterboxd:memberRating')),
-      watchedAt: watchedAt(tag(item, 'letterboxd:watchedDate')),
-      publishedAt: publishedAt(tag(item, 'pubDate')),
+      watchedAt: dateOrNull(tag(item, 'letterboxd:watchedDate')),
+      publishedAt: dateOrNull(tag(item, 'pubDate')),
       notes: isReview ? reviewText(item) : null,
     })
   }
@@ -168,17 +168,13 @@ function numberOrNull(raw: string | null): number | null {
   return Number.isFinite(value) ? value : null
 }
 
-// `2026-09-03`, which Date.parse reads as UTC midnight — deliberately, so the
-// stored day doesn't shift with the server's zone.
-function watchedAt(raw: string | null): number | null {
-  if (!raw) return null
-  const parsed = Date.parse(raw)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-// RFC 822, as RSS requires: `Fri, 4 Sep 2026 05:33:38 +1200`. Carries its own
-// offset, so unlike watchedDate this is an instant and not a day.
-function publishedAt(raw: string | null): number | null {
+// Both dates in the feed, since Date.parse reads either: watchedDate is a bare
+// `2026-09-03`, taken as UTC midnight so the stored day doesn't shift with the
+// server's zone, and pubDate is the RFC 822 form RSS requires
+// (`Fri, 4 Sep 2026 05:33:38 +1200`), which carries its own offset and is an
+// instant rather than a day. What that difference means is on the fields
+// themselves; here they parse the same way.
+function dateOrNull(raw: string | null): number | null {
   if (!raw) return null
   const parsed = Date.parse(raw)
   return Number.isFinite(parsed) ? parsed : null

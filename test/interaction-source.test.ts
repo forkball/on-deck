@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
 
 import { db, pool } from '../app/data/db.ts'
-import { logInteraction } from '../app/data/mediaItems.ts'
-import { INTERACTION_SOURCES, userMediaInteractions } from '../app/data/schema.ts'
+import { getUserInteractionForItem, logInteraction } from '../app/data/mediaItems.ts'
+import { INTERACTION_SOURCES } from '../app/data/schema.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 
 // `source` is what the Letterboxd sync consults before removing anything, so
@@ -20,13 +20,10 @@ describe('interaction provenance', { skip: skipWithoutDatabase }, () => {
   let userId: number
   let itemId: number
 
-  const stored = async () => {
-    const [row] = await db.findMany(userMediaInteractions, {
-      where: { user_id: userId, media_item_id: itemId },
-      limit: 1,
-    })
-    return { source: row?.source ?? null, entryAt: row?.source_entry_at ?? null }
-  }
+  // The read is the app's own, not a hand-rolled query: logInteraction is what
+  // is under test here, and getUserInteractionForItem is just how the rest of
+  // the app looks a row up.
+  const stored = () => getUserInteractionForItem(db, userId, itemId)
 
   const clear = () => pool.query('delete from user_media_interactions where user_id = $1', [userId])
 
@@ -57,7 +54,7 @@ describe('interaction provenance', { skip: skipWithoutDatabase }, () => {
       source: INTERACTION_SOURCES.letterboxdFeed,
     })
 
-    assert.equal((await stored()).source, 'letterboxd-feed')
+    assert.equal((await stored())?.source, 'letterboxd-feed')
   })
 
   // The one that matters. A member adds a film by hand, then watches it and
@@ -79,15 +76,11 @@ describe('interaction provenance', { skip: skipWithoutDatabase }, () => {
     })
 
     const row = await stored()
-    assert.equal(row.source, 'manual', 'the sync must not take ownership of a row it did not create')
+    assert.equal(row?.source, 'manual', 'the sync must not take ownership of a row it did not create')
     // The rest of the write still lands — this is about ownership, not about
     // refusing the update.
-    const [stored_] = await db.findMany(userMediaInteractions, {
-      where: { user_id: userId, media_item_id: itemId },
-      limit: 1,
-    })
-    assert.equal(stored_!.status, 'consumed')
-    assert.equal(Number(stored_!.rating), 4)
+    assert.equal(row?.status, 'consumed')
+    assert.equal(Number(row?.rating), 4)
   })
 
   it('does not let an importer claim a row the feed created either', async () => {
@@ -98,7 +91,7 @@ describe('interaction provenance', { skip: skipWithoutDatabase }, () => {
     })
     await logInteraction(db, userId, itemId, { status: 'consumed', source: 'letterboxd' })
 
-    assert.equal((await stored()).source, 'letterboxd-feed')
+    assert.equal((await stored())?.source, 'letterboxd-feed')
   })
 
   it('leaves source null on a row written by a caller that names none', async () => {
@@ -107,7 +100,7 @@ describe('interaction provenance', { skip: skipWithoutDatabase }, () => {
 
     // Null is what the delete pass refuses to act on, so this is the safe
     // default rather than an oversight.
-    assert.equal((await stored()).source, null)
+    assert.equal((await stored())?.source, null)
   })
 
   // Unlike source, this one does move: it tracks the newest entry holding the
@@ -125,7 +118,7 @@ describe('interaction provenance', { skip: skipWithoutDatabase }, () => {
       sourceEntryAt: 9_000,
     })
 
-    assert.equal((await stored()).entryAt, 9_000)
+    assert.equal((await stored())?.source_entry_at, 9_000)
   })
 
   // The bug interaction-notes.test.ts was written for, in a new column: a key
@@ -141,6 +134,6 @@ describe('interaction provenance', { skip: skipWithoutDatabase }, () => {
     })
     await logInteraction(db, userId, itemId, { status: 'consumed', rating: 3 })
 
-    assert.equal((await stored()).entryAt, 7_000)
+    assert.equal((await stored())?.source_entry_at, 7_000)
   })
 })

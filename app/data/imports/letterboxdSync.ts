@@ -1,4 +1,4 @@
-import { inList } from 'remix/data-table'
+import { and, eq, gt, inList } from 'remix/data-table'
 
 import { getCatalogProvider, upsertCatalogItem } from '../catalog/provider.ts'
 import { runBounded } from './csv.ts'
@@ -90,12 +90,17 @@ export async function syncLetterboxdDiary(
     logged++
   })
 
-  const removable = await findRemovable(db, userId, entries)
+  // Composed here rather than inside a loader, so the rule that decides what
+  // gets destroyed is visible at the point it runs. A feed that can't place
+  // its own window answers for nothing and never reaches the database.
+  const watermark = coverageWatermark(entries)
+  const removable = watermark == null ? [] : selectRemovable(entries, await loadSyncedRows(db, userId, watermark))
+
   const removed: string[] = []
 
-  // One at a time rather than a bulk delete by id list: this is the only
-  // destructive statement in the sync, and a row already removed by its owner
-  // should count as nothing to do rather than fail the rest of the batch.
+  // One at a time rather than a bulk delete by id list, which would be a single
+  // statement: what the loop buys is knowing which rows actually went, and the
+  // audit line below is the only record any of them existed.
   for (const row of removable) {
     if (await db.delete(userMediaInteractions, row.interactionId)) {
       removed.push(`${row.title} [tmdb:${row.tmdbId}]`)
@@ -140,16 +145,31 @@ export function selectRemovable(entries: LetterboxdEntry[], rows: SyncedRow[]): 
     // way is not grounds for removing anything.
     if (row.tmdbId == null) return false
     if (present.has(row.tmdbId)) return false
-    return withinCoverage(row.sourceEntryAt, watermark)
+    // Strictly newer, so the entry sitting exactly on the watermark is left
+    // alone: it is the one the watermark was read from, and a tie there means
+    // two entries published in the same instant — too thin a basis for deleting
+    // someone's log. An undated row is anything written before the column
+    // existed; it cannot be placed against the window at all.
+    return row.sourceEntryAt != null && row.sourceEntryAt > watermark
   })
 }
 
-// Everything the feed sync has written for this member. Two queries rather than
-// a join because the table API can't express one; the set is small — it is one
-// member's feed-sourced films, not their log.
-async function findRemovable(db: Db, userId: number, entries: LetterboxdEntry[]): Promise<SyncedRow[]> {
+// Everything the feed sync has written for this member that the feed's current
+// window can speak for. Two queries rather than a join because the table API
+// can't express one.
+//
+// The watermark is applied in SQL as well as in selectRemovable, which is not
+// redundant so much as differently motivated: there it is the rule, here it is
+// what keeps the read proportional to the feed rather than to a member's whole
+// history. `source_entry_at > watermark` also excludes NULLs in SQL exactly as
+// the rule does in JS, so the narrower read cannot change the answer.
+async function loadSyncedRows(db: Db, userId: number, watermark: number): Promise<SyncedRow[]> {
   const rows = await db.findMany(userMediaInteractions, {
-    where: { user_id: userId, source: INTERACTION_SOURCES.letterboxdFeed },
+    where: and(
+      eq('user_id', userId),
+      eq('source', INTERACTION_SOURCES.letterboxdFeed),
+      gt('source_entry_at', watermark),
+    ),
   })
   if (rows.length === 0) return []
 
@@ -161,18 +181,15 @@ async function findRemovable(db: Db, userId: number, entries: LetterboxdEntry[])
   })
   const itemsById = new Map(items.map((item) => [item.id, item]))
 
-  return selectRemovable(
-    entries,
-    rows.map((row) => {
-      const item = itemsById.get(row.media_item_id)
-      return {
-        interactionId: row.id,
-        tmdbId: item?.external_id ?? null,
-        title: item?.title ?? `media item ${row.media_item_id}`,
-        sourceEntryAt: row.source_entry_at,
-      }
-    }),
-  )
+  return rows.map((row) => {
+    const item = itemsById.get(row.media_item_id)
+    return {
+      interactionId: row.id,
+      tmdbId: item?.external_id ?? null,
+      title: item?.title ?? `media item ${row.media_item_id}`,
+      sourceEntryAt: row.source_entry_at,
+    }
+  })
 }
 
 // The oldest entry the feed is currently showing. Everything published after
@@ -185,25 +202,9 @@ async function findRemovable(db: Db, userId: number, entries: LetterboxdEntry[])
 // naive diff decides everything was deleted, so it has to be a refusal to act
 // rather than a watermark of zero.
 export function coverageWatermark(entries: LetterboxdEntry[]): number | null {
-  let oldest: number | null = null
+  const published = entries.map((entry) => entry.publishedAt).filter((at) => at != null)
 
-  for (const entry of entries) {
-    if (entry.publishedAt == null) continue
-    if (oldest == null || entry.publishedAt < oldest) oldest = entry.publishedAt
-  }
-
-  return oldest
-}
-
-// Strictly newer, so the entry sitting exactly on the boundary is left alone.
-// It is the one the watermark was read from, and a tie there means two entries
-// published in the same instant — too thin a basis for deleting someone's log.
-//
-// A row with no entry date is anything written before this column existed, or
-// by a feed entry that carried no pubDate. Neither can be placed against the
-// window, so neither is touched.
-function withinCoverage(sourceEntryAt: number | null, watermark: number): boolean {
-  return sourceEntryAt != null && sourceEntryAt > watermark
+  return published.length === 0 ? null : Math.min(...published)
 }
 
 // A rewatch is a second diary entry for a film already in the feed, and an
