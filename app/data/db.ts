@@ -15,9 +15,10 @@ types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value))
 // 20 rather than pg's default 10: a search page fans out ~20 concurrent upserts
 // at ~45ms a round trip, so a smaller pool makes queueing the dominant cost.
 //
-// Exported for the dozen-odd queries the table API can't express: skip-locked
-// queue claims, aggregates and lateral joins, and regexp_replace title matching.
-// The table API is the default; raw SQL is the deliberate exception.
+// Exported for the dozen-odd queries the table API can't express — among them
+// skip-locked queue claims, conditional and multi-row writes, aggregates and
+// lateral joins, and regexp_replace title matching. The table API is the
+// default; raw SQL is the deliberate exception.
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 20 })
 
 export const db = createDatabase(createPostgresDatabaseAdapter(pool))
