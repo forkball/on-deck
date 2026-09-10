@@ -132,7 +132,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                     <input type="hidden" name="return_to" value={returnTo} />
                     <input
                       type="text"
-                      name="tmdb_link"
+                      name="catalog_link"
                       placeholder={ui.rematchPlaceholder}
                       mix={css({ flex: '1 1 240px' })}
                     />
