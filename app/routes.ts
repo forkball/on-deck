@@ -1,9 +1,8 @@
 import { del, form, get, put, post, route } from 'remix/routes'
 
-// The four media types serve the same six leaves. Written once here so a
-// seventh is one edit rather than four, and so they can't silently diverge.
-// Returns the leaf map rather than the route: each type still names its own URL
-// prefix at the call site, and `route()` is what binds the two.
+// Returns the leaves, not a whole route: a factory over the route map can't
+// typecheck, since each media type is a different generic instantiation. See
+// app/middleware/context.ts.
 const mediaLeaves = () => ({
   search: get('search'),
   suggest: get('suggest'),
