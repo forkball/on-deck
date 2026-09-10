@@ -1,5 +1,18 @@
 import { del, form, get, put, post, route } from 'remix/routes'
 
+// The four media types serve the same six leaves. Written once here so a
+// seventh is one edit rather than four, and so they can't silently diverge.
+// Returns the leaf map rather than the route: each type still names its own URL
+// prefix at the call site, and `route()` is what binds the two.
+const mediaLeaves = () => ({
+  search: get('search'),
+  suggest: get('suggest'),
+  import: get('import'),
+  show: get(':mediaItemId'),
+  log: post(':mediaItemId/log'),
+  rematch: post(':mediaItemId/rematch'),
+})
+
 export const routes = route({
   assets: get('/assets/*path'),
   home: '/',
@@ -18,38 +31,10 @@ export const routes = route({
     unreadCount: get('unread-count'),
     read: get(':notificationId/read'),
   }),
-  movies: route('movies', {
-    search: get('search'),
-    suggest: get('suggest'),
-    import: get('import'),
-    show: get(':mediaItemId'),
-    log: post(':mediaItemId/log'),
-    rematch: post(':mediaItemId/rematch'),
-  }),
-  books: route('books', {
-    search: get('search'),
-    suggest: get('suggest'),
-    import: get('import'),
-    show: get(':mediaItemId'),
-    log: post(':mediaItemId/log'),
-    rematch: post(':mediaItemId/rematch'),
-  }),
-  games: route('games', {
-    search: get('search'),
-    suggest: get('suggest'),
-    import: get('import'),
-    show: get(':mediaItemId'),
-    log: post(':mediaItemId/log'),
-    rematch: post(':mediaItemId/rematch'),
-  }),
-  tv: route('tv', {
-    search: get('search'),
-    suggest: get('suggest'),
-    import: get('import'),
-    show: get(':mediaItemId'),
-    log: post(':mediaItemId/log'),
-    rematch: post(':mediaItemId/rematch'),
-  }),
+  movies: route('movies', mediaLeaves()),
+  books: route('books', mediaLeaves()),
+  games: route('games', mediaLeaves()),
+  tv: route('tv', mediaLeaves()),
   interactions: route('interactions', {
     update: put(':interactionId'),
     destroy: del(':interactionId'),
