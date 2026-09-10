@@ -10,7 +10,7 @@ import {
   stagedBatchHref,
   type ImportPageProps,
   type ParsedUpload,
-} from '../app/actions/profile/fileImportActions.tsx'
+} from '../app/actions/profile/file-import-actions.tsx'
 import type { AuthedControllerContext } from '../app/middleware/context.ts'
 import type { ImportBatch, User } from '../app/data/schema.ts'
 
