@@ -28,7 +28,7 @@ export interface MediaDetailPageProps {
   displayName: string
   // Repointing a media_items row changes it for everyone who logged that work,
   // so the form is only offered to admins — see the rematch action in
-  // actions/mediaActions.tsx, which enforces it.
+  // actions/media-actions.tsx, which enforces it.
   canRematch?: boolean
   rematchError?: string
   rematched?: boolean
@@ -132,7 +132,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                     <input type="hidden" name="return_to" value={returnTo} />
                     <input
                       type="text"
-                      name="tmdb_link"
+                      name="catalog_link"
                       placeholder={ui.rematchPlaceholder}
                       mix={css({ flex: '1 1 240px' })}
                     />

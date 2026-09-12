@@ -7,7 +7,7 @@ import { buildSteamLoginUrl, verifySteamCallback } from '../../../data/imports/s
 import { users, type User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
-import { externalOrigin } from './requestOrigin.ts'
+import { externalOrigin } from './request-origin.ts'
 
 // Not an app login — this only records which Steam account to read a library
 // from.

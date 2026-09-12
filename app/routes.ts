@@ -1,5 +1,17 @@
 import { del, form, get, put, post, route } from 'remix/routes'
 
+// Returns the leaves, not a whole route: a factory over the route map can't
+// typecheck, since each media type is a different generic instantiation. See
+// app/middleware/context.ts.
+const mediaLeaves = () => ({
+  search: get('search'),
+  suggest: get('suggest'),
+  import: get('import'),
+  show: get(':mediaItemId'),
+  log: post(':mediaItemId/log'),
+  rematch: post(':mediaItemId/rematch'),
+})
+
 export const routes = route({
   assets: get('/assets/*path'),
   home: '/',
@@ -18,38 +30,10 @@ export const routes = route({
     unreadCount: get('unread-count'),
     read: get(':notificationId/read'),
   }),
-  movies: route('movies', {
-    search: get('search'),
-    suggest: get('suggest'),
-    import: get('import'),
-    show: get(':mediaItemId'),
-    log: post(':mediaItemId/log'),
-    rematch: post(':mediaItemId/rematch'),
-  }),
-  books: route('books', {
-    search: get('search'),
-    suggest: get('suggest'),
-    import: get('import'),
-    show: get(':mediaItemId'),
-    log: post(':mediaItemId/log'),
-    rematch: post(':mediaItemId/rematch'),
-  }),
-  games: route('games', {
-    search: get('search'),
-    suggest: get('suggest'),
-    import: get('import'),
-    show: get(':mediaItemId'),
-    log: post(':mediaItemId/log'),
-    rematch: post(':mediaItemId/rematch'),
-  }),
-  tv: route('tv', {
-    search: get('search'),
-    suggest: get('suggest'),
-    import: get('import'),
-    show: get(':mediaItemId'),
-    log: post(':mediaItemId/log'),
-    rematch: post(':mediaItemId/rematch'),
-  }),
+  movies: route('movies', mediaLeaves()),
+  books: route('books', mediaLeaves()),
+  games: route('games', mediaLeaves()),
+  tv: route('tv', mediaLeaves()),
   interactions: route('interactions', {
     update: put(':interactionId'),
     destroy: del(':interactionId'),

@@ -4,7 +4,7 @@ import { parseGoodreadsLibrary } from '../../../data/imports/goodreads.ts'
 import type { User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
-import { createFileImportActions } from '../fileImportActions.tsx'
+import { createFileImportActions } from '../file-import-actions.tsx'
 import { GoodreadsImportPage } from './page.tsx'
 
 // The upload flow itself is createFileImportActions — see import-movies for the

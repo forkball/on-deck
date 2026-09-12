@@ -17,6 +17,11 @@ Refer to ./.agents/skills/remix/SKILL.md
 
 ## Layout
 
+File names are kebab-case under `app/actions`, `app/ui` and `app/browser`, and
+camelCase under `app/data` and `app/middleware`. The split is by layer, not by
+preference: route-area files are named after the URL segment they serve, data
+and middleware modules after the export they carry.
+
 - `app/routes.ts` defines the route contract
 - `app/router.ts` wires routes to route handlers
 - `app/mediaTypes.ts` is the media-type registry — the vocabulary (`ActiveMediaType`,

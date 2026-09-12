@@ -160,7 +160,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
 
       const mediaItemId = Number(context.params.mediaItemId)
       const formData = context.get(FormData)
-      const link = String(formData.get('tmdb_link') || '')
+      const link = String(formData.get('catalog_link') || '')
       const returnTo = String(formData.get('return_to') || '') || ui.hrefs.show(mediaItemId)
       const separator = returnTo.includes('?') ? '&' : '?'
 
