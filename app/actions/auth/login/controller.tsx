@@ -19,9 +19,14 @@ const loginSchema = f.object({
 })
 
 const passwordProvider = createCredentialsAuthProvider<{ identifier: string; password: string }, User>({
+  // Both fields default to empty, so an absent one parses fine. What doesn't is
+  // a field present with a non-string value — a file part where text is
+  // expected. Under `parse` that threw past the controller and answered a bare
+  // 500; empty credentials fall through to the same 401 a wrong password gets.
   parse(context) {
     const formData = context.get(FormData)
-    return s.parse(loginSchema, formData)
+    const parsed = s.parseSafe(loginSchema, formData)
+    return parsed.success ? parsed.value : { identifier: '', password: '' }
   },
   // `identifier` matches either handle — email and display_name can never
   // collide, since both are unique and usernames may not contain '@' (see

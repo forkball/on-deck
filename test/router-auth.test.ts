@@ -3,7 +3,7 @@ import { after, before, describe, it } from 'node:test'
 
 import { pool } from '../app/data/db.ts'
 import { hashPassword } from '../app/actions/auth/password.ts'
-import { get, post, sessionCookieFrom } from './support/router.ts'
+import { get, post, postMultipart, sessionCookieFrom } from './support/router.ts'
 import { deleteUsers, skipWithoutDatabase } from './support/db.ts'
 
 // The login route at the HTTP boundary, which is where its interesting failures
@@ -49,6 +49,22 @@ describe('login route', { skip: skipWithoutDatabase }, () => {
   it('answers a body missing just the password', async () => {
     const response = await post('/auth/login', { identifier: email })
     assert.equal(response.status, 401)
+  })
+
+  // The regression this suite was written for. A default covers an absent
+  // field, but not one present with the wrong type: a File where a string is
+  // expected fails validation. Under s.parse that threw out of the auth
+  // provider, past the controller, and reached the server boundary as a bare
+  // 500 — the one input in the app where malformed data was an error rather
+  // than a response.
+  it('answers a field sent as a file, rather than throwing', async () => {
+    const body = new FormData()
+    body.set('identifier', new File(['x'], 'x.txt', { type: 'text/plain' }))
+    body.set('password', PASSWORD)
+
+    const response = await postMultipart('/auth/login', body)
+    assert.equal(response.status, 401)
+    assert.match(response.body, /Invalid email\/username or password/)
   })
 
   it('refuses a wrong password without setting a session', async () => {
