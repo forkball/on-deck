@@ -1,4 +1,5 @@
 import { router } from '../../app/router.ts'
+import { sessionCookie } from '../../app/middleware/session.ts'
 
 // Drives the real router in process: the same middleware stack, controllers and
 // route map server.ts serves, minus the socket. `router.fetch` is what the
@@ -8,14 +9,14 @@ import { router } from '../../app/router.ts'
 // NODE_ENV=test is what makes this importable without SESSION_SECRET — see
 // app/middleware/session.ts.
 
-const ORIGIN = 'http://router.test'
+export const ORIGIN = 'http://router.test'
 
 export interface RouterResponse {
   status: number
   headers: Headers
   body: string
-  // Where a redirect points, as written. Relative paths are left relative,
-  // since whether one stays same-origin is usually the thing under test.
+  // Left as written rather than resolved against ORIGIN, since whether a
+  // redirect stays same-origin is usually the thing under test.
   location: string | null
 }
 
@@ -28,26 +29,19 @@ async function toRouterResponse(response: Response): Promise<RouterResponse> {
   }
 }
 
-export async function get(path: string, init: RequestInit = {}): Promise<RouterResponse> {
-  const response = await router.fetch(new Request(new URL(path, ORIGIN), init))
-  return toRouterResponse(response)
+export async function get(path: string): Promise<RouterResponse> {
+  return toRouterResponse(await router.fetch(new Request(new URL(path, ORIGIN))))
 }
 
 // Posts a form the way a browser would, so the form-data middleware sees the
-// content type it expects. Pass a string body to send something malformed on
-// purpose.
-export async function post(
-  path: string,
-  body: Record<string, string> | string = {},
-  init: RequestInit = {},
-): Promise<RouterResponse> {
+// content type it expects. Pass a string to send something malformed on purpose.
+export async function post(path: string, body: Record<string, string> | string): Promise<RouterResponse> {
   const encoded = typeof body === 'string' ? body : new URLSearchParams(body).toString()
   const response = await router.fetch(
     new Request(new URL(path, ORIGIN), {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded', ...(init.headers ?? {}) },
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: encoded,
-      ...init,
     }),
   )
   return toRouterResponse(response)
@@ -57,14 +51,14 @@ export async function post(
 // Passing a File where a route expects text is the shape of malformed input a
 // urlencoded body cannot express.
 export async function postMultipart(path: string, body: FormData): Promise<RouterResponse> {
-  const response = await router.fetch(new Request(new URL(path, ORIGIN), { method: 'POST', body }))
-  return toRouterResponse(response)
+  return toRouterResponse(await router.fetch(new Request(new URL(path, ORIGIN), { method: 'POST', body })))
 }
 
 // The session cookie off a response, in the form a following request sends it
-// back. Returns null when the response set no cookie, which is itself worth
-// asserting on a failed login.
+// back. Reads the name off the cookie itself: spelled here instead, renaming it
+// would leave this returning null forever and every assertion passing vacuously.
 export function sessionCookieFrom(response: RouterResponse): string | null {
-  const setCookie = response.headers.getSetCookie().find((value) => value.startsWith('session='))
+  const prefix = `${sessionCookie.name}=`
+  const setCookie = response.headers.getSetCookie().find((value) => value.startsWith(prefix))
   return setCookie ? setCookie.split(';')[0]! : null
 }

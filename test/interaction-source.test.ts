@@ -28,7 +28,7 @@ describe('interaction provenance', { skip: skipWithoutDatabase }, () => {
   const clear = () => pool.query('delete from user_media_interactions where user_id = $1', [userId])
 
   before(async () => {
-    userId = await insertUser('source-test')
+    userId = (await insertUser('source-test')).id
 
     const stamp = Date.now()
     const {

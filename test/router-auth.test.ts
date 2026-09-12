@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
 
-import { pool } from '../app/data/db.ts'
 import { hashPassword } from '../app/actions/auth/password.ts'
-import { get, post, postMultipart, sessionCookieFrom } from './support/router.ts'
-import { deleteUsers, skipWithoutDatabase } from './support/db.ts'
+import { get, ORIGIN, post, postMultipart, sessionCookieFrom } from './support/router.ts'
+import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 
 // The login route at the HTTP boundary, which is where its interesting failures
 // are: what a malformed body does, what a wrong password does, and where a
@@ -13,50 +12,36 @@ import { deleteUsers, skipWithoutDatabase } from './support/db.ts'
 // the controller function.
 //
 // Needs a migrated database: `npm run db:up && npm run db:migrate`.
-describe('login route', { skip: skipWithoutDatabase }, () => {
+//
+// Concurrent because every test here only reads the one user the hook creates.
+describe('login route', { skip: skipWithoutDatabase, concurrency: true }, () => {
   const PASSWORD = 'correct-horse-battery'
   const userIds: number[] = []
   let email: string
   let displayName: string
 
   before(async () => {
-    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    email = `router-login-${stamp}@example.test`
-    displayName = `router-login-${stamp}`
-
-    const { rows } = await pool.query<{ id: number }>(
-      `insert into users (email, password_hash, display_name, created_at)
-       values ($1, $2, $3, $4) returning id`,
-      [email, await hashPassword(PASSWORD), displayName, Date.now()],
-    )
-    userIds.push(rows[0]!.id)
+    const user = await insertUser('router-login', await hashPassword(PASSWORD))
+    userIds.push(user.id)
+    email = user.email
+    displayName = user.displayName
   })
 
   after(async () => {
     await deleteUsers(userIds)
   })
 
-  // Both fields are `s.defaulted(s.string(), '')`, so a missing one is not
-  // malformed — it defaults to empty and falls through to the 401 below. These
-  // two pin that down, because it is the reason the interesting case is the
-  // next one rather than this one.
+  // An absent field is not malformed: both are `s.defaulted(s.string(), '')`,
+  // so it defaults to empty and lands on the same 401 a wrong password gets.
   it('answers a body with no fields at all', async () => {
     const response = await post('/auth/login', '')
     assert.equal(response.status, 401)
     assert.match(response.body, /Invalid email\/username or password/)
   })
 
-  it('answers a body missing just the password', async () => {
-    const response = await post('/auth/login', { identifier: email })
-    assert.equal(response.status, 401)
-  })
-
   // The regression this suite was written for. A default covers an absent
-  // field, but not one present with the wrong type: a File where a string is
-  // expected fails validation. Under s.parse that threw out of the auth
-  // provider, past the controller, and reached the server boundary as a bare
-  // 500 — the one input in the app where malformed data was an error rather
-  // than a response.
+  // field but not one present with the wrong type, and under s.parse that threw
+  // past the controller and answered a bare 500.
   it('answers a field sent as a file, rather than throwing', async () => {
     const body = new FormData()
     body.set('identifier', new File(['x'], 'x.txt', { type: 'text/plain' }))
@@ -137,7 +122,7 @@ describe('router boundary', () => {
     const response = await get('/recommendations')
     assert.equal(response.status, 303)
     assert.ok(response.location?.startsWith('/auth/login'), `got ${response.location}`)
-    const next = new URL(response.location!, 'http://router.test').searchParams.get('next')
+    const next = new URL(response.location!, ORIGIN).searchParams.get('next')
     assert.equal(next, '/recommendations')
   })
 

@@ -34,9 +34,9 @@ describe('following log activity', { skip: skipWithoutDatabase }, () => {
     )
 
   before(async () => {
-    viewer = await insertUser('feed-viewer')
-    friend = await insertUser('feed-friend')
-    stranger = await insertUser('feed-stranger')
+    viewer = (await insertUser('feed-viewer')).id
+    friend = (await insertUser('feed-friend')).id
+    stranger = (await insertUser('feed-stranger')).id
     await followUser(db, viewer, friend)
 
     const stamp = Date.now()
