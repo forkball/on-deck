@@ -39,9 +39,8 @@ describe('login route', { skip: skipWithoutDatabase, concurrency: true }, () => 
     assert.match(response.body, /Invalid email\/username or password/)
   })
 
-  // The regression this suite was written for. A default covers an absent
-  // field but not one present with the wrong type, and under s.parse that threw
-  // past the controller and answered a bare 500.
+  // A default covers an absent field, but not one present with the wrong type,
+  // which is why this is the malformed case worth pinning.
   it('answers a field sent as a file, rather than throwing', async () => {
     const body = new FormData()
     body.set('identifier', new File(['x'], 'x.txt', { type: 'text/plain' }))

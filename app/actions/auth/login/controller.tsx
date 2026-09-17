@@ -19,10 +19,10 @@ const loginSchema = f.object({
 })
 
 const passwordProvider = createCredentialsAuthProvider<{ identifier: string; password: string }, User>({
-  // Both fields default to empty, so an absent one parses fine. What doesn't is
-  // a field present with a non-string value — a file part where text is
-  // expected. Under `parse` that threw past the controller and answered a bare
-  // 500; empty credentials fall through to the same 401 a wrong password gets.
+  // An absent field is not a parse failure — both default to empty. One present
+  // with a non-string value is: a file part where text is expected. Empty
+  // credentials fall through to the same 401 a wrong password gets, which is
+  // why this doesn't need a branch of its own.
   parse(context) {
     const formData = context.get(FormData)
     const parsed = s.parseSafe(loginSchema, formData)
