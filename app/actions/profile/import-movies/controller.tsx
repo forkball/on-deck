@@ -7,19 +7,19 @@ import type { User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
 import { createFileImportActions } from '../file-import-actions.tsx'
-import { LetterboxdImportPage, type LetterboxdConnection } from './page.tsx'
+import { LetterboxdImportPage } from './page.tsx'
 
 // The upload flow itself is createFileImportActions — see import-books for the
 // other one. Only the parser, the page and the wording are per source.
 //
-// This page carries a second, unrelated flow as well: the RSS feed connection,
-// which keeps the log current after the one-time upload. The two belong
-// together because they are the same question ("get my Letterboxd into On
-// Deck") answered at two timescales — the export backfills history the ~50-item
-// feed can't reach, the feed keeps up with it afterwards.
+// The feed connection used to live on this page too, on the reasoning that the
+// export and the feed answer one question at two timescales. They do, but a
+// connection is account state that outlives any import, so it is managed in
+// settings now; what stays here is the sentence explaining the division of
+// labour, which only makes sense to someone the feed is available to.
 export default createController(routes.profile.importMovies, {
   middleware: [requireAuth<User>()],
-  actions: createFileImportActions<{ connection: LetterboxdConnection | null }>({
+  actions: createFileImportActions<{ syncAvailable: boolean }>({
     mediaType: 'movie',
     source: 'letterboxd',
     page: LetterboxdImportPage,
@@ -30,22 +30,10 @@ export default createController(routes.profile.importMovies, {
     parse: async (file) => parseLetterboxdUpload(new Uint8Array(await file.arrayBuffer())),
     missingFileError: 'Choose your Letterboxd export .zip first.',
     emptyError: 'That export has no rated or reviewed films in it.',
-    // The connect form redirects back here with its outcome, since it has no
-    // page of its own to report on. Null for anyone the feed is gated from,
-    // which takes the whole section off the page and leaves the upload flow
-    // reading as it did before.
-    extraProps: (context) => {
-      const { identity } = context.get(Auth)
-
-      return {
-        connection: letterboxdSyncAvailableTo(identity)
-          ? {
-              username: identity.letterboxd_username ?? null,
-              justConnected: context.url.searchParams.get('letterboxdConnected') === '1',
-              error: context.url.searchParams.get('letterboxdError') ?? undefined,
-            }
-          : null,
-      }
-    },
+    // Gated off, the page reads exactly as it did before the feed existed:
+    // an upload, and nothing about keeping up.
+    extraProps: (context) => ({
+      syncAvailable: letterboxdSyncAvailableTo(context.get(Auth).identity),
+    }),
   }),
 })

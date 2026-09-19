@@ -33,8 +33,11 @@ const requireLetterboxdSync: Middleware = async (context, next) => {
     : new Response('Not Found', { status: 404 })
 }
 
+// Back to the settings page, which is where the connection is managed from —
+// these actions have no page of their own, so its outcome has to land on the
+// one that offered the form.
 function back(query = ''): Response {
-  return redirect(`${routes.profile.importMovies.index.href()}${query}`, 303)
+  return redirect(`${routes.profile.edit.index.href()}${query}`, 303)
 }
 
 // Not a linked account — the feed this names is public, so nothing here proves

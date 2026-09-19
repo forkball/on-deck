@@ -30,7 +30,7 @@ export default createController(routes.profile.steam, {
       // confirm it signed them; anything forged or replayed returns null.
       const steamId = await verifySteamCallback(context.url.searchParams)
       if (!steamId) {
-        return redirect(`${routes.profile.importGames.index.href()}?error=1`, 303)
+        return redirect(`${routes.profile.edit.index.href()}?steamError=1`, 303)
       }
 
       const db = context.get(Database)
@@ -39,11 +39,11 @@ export default createController(routes.profile.steam, {
       // library; surface that rather than letting the write throw.
       const existing = await db.findOne(users, { where: { steam_id: steamId } })
       if (existing && existing.id !== auth.identity.id) {
-        return redirect(`${routes.profile.importGames.index.href()}?error=taken`, 303)
+        return redirect(`${routes.profile.edit.index.href()}?steamError=taken`, 303)
       }
 
       await db.update(users, auth.identity.id, { steam_id: steamId })
-      return redirect(`${routes.profile.importGames.index.href()}?connected=1`, 303)
+      return redirect(`${routes.profile.edit.index.href()}?steamConnected=1`, 303)
     },
 
     async disconnect(context) {
@@ -54,7 +54,7 @@ export default createController(routes.profile.steam, {
       // verified against the database, and the same thing updateUserBio
       // relies on. The column type won't accept a literal null.
       await db.update(users, auth.identity.id, { steam_id: undefined })
-      return redirect(routes.profile.importGames.index.href(), 303)
+      return redirect(routes.profile.edit.index.href(), 303)
     },
   },
 })

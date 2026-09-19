@@ -10,15 +10,8 @@ import { routes } from '../../../routes.ts'
 import { SteamImportPage } from './page.tsx'
 
 // Like import-movies and import-books, but the source is a linked account
-// rather than an uploaded file, so this page owns the connection state.
-//
-// The OpenID callback can only redirect with a code, so the wording lives here
-// rather than travelling through the URL.
-function connectError(code: string | null): string | undefined {
-  if (!code) return undefined
-  if (code === 'taken') return 'That Steam account is already connected to another profile.'
-  return "Couldn't verify that Steam sign-in. Try connecting again."
-}
+// rather than an uploaded file. Linking it is settings' job — the sign-in
+// outcome and its wording land there, not here; this page only imports.
 
 export default createController(routes.profile.importGames, {
   middleware: [requireAuth<User>()],
@@ -30,8 +23,6 @@ export default createController(routes.profile.importGames, {
         <SteamImportPage
           displayName={displayLabel(auth.identity)}
           steamId={auth.identity.steam_id ?? null}
-          connected={context.url.searchParams.get('connected') === '1'}
-          error={connectError(context.url.searchParams.get('error'))}
         />,
       )
     },

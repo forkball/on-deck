@@ -9,6 +9,7 @@ import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
 import { PasswordConfirmModal } from '../../../ui/components/password-confirm-modal.tsx'
 import { Field } from '../../../ui/shared/field.tsx'
+import { Connections, type ConnectionsProps } from './connections.tsx'
 
 export interface ProfileEditPageProps {
   // What to put back in the inputs: the stored row on a first load, whatever
@@ -22,6 +23,7 @@ export interface ProfileEditPageProps {
   // Set when the taste settings below were just saved.
   saved?: boolean
   displayName: string
+  connections: ConnectionsProps
 }
 
 const LIMIT_LABELS = new Map<number | null, string>([
@@ -102,12 +104,16 @@ function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSetting
 
 export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
   return () => {
-    const { values, errors, confirming, settings, saved, displayName } = handle.props
+    const { values, errors, confirming, settings, saved, displayName, connections } = handle.props
 
     return (
       <Document title="Edit profile | On Deck">
         <Nav authed={true} displayName={displayName} />
         {saved && <Toast message="Taste settings saved." />}
+        {connections.letterboxd?.justConnected && (
+          <Toast message="Connected. Your recent films are on their way in." />
+        )}
+        {connections.steam.justConnected && <Toast message="Steam account connected." />}
         {/* Same width as the profile page, so this heading lands on the
             same left edge as the name it edits rather than 80px in from it.
             The form keeps its own narrower measure — inputs 640px wide read
@@ -187,6 +193,8 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
           </form>
 
           <TasteProfileSettingsForm settings={settings} saved={saved} />
+
+          <Connections letterboxd={connections.letterboxd} steam={connections.steam} />
         </main>
       </Document>
     )
