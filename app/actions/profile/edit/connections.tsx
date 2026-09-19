@@ -203,9 +203,11 @@ export function Connections(handle: Handle<ConnectionsProps>) {
   return () => {
     const { letterboxd, steam } = handle.props
 
+    // Inside a tab panel the bar above is the separator, so this carries no
+    // top margin of its own.
     return (
-      <section mix={css({ marginTop: '40px', maxWidth: '480px' })}>
-        <h2>Connected accounts</h2>
+      <section mix={css({ maxWidth: '480px' })}>
+        <h2 mix={css({ marginTop: 0 })}>Connected accounts</h2>
         <p mix={css({ margin: '0 0 16px', color: '#555' })}>
           Libraries On Deck reads from. Disconnecting one stops the reading — it leaves everything
           already in your log exactly where it is.

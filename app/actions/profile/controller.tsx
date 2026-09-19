@@ -91,7 +91,7 @@ export default createController(routes.profile, {
         useNotes: formData.get('use_notes') != null,
       })
 
-      return redirect(`${routes.profile.edit.index.href()}?saved=1`, 303)
+      return redirect(`${routes.profile.edit.index.href()}?tab=taste&saved=1`, 303)
     },
 
     async rebuild(context) {
