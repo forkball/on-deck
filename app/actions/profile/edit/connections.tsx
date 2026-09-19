@@ -100,23 +100,20 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
               defaultValue={username ?? ''}
             />
           </Field>
-          <div>
+          {/* Both buttons submit this one form — Disconnect only overrides
+              where to. A second <form> can't be nested to sit beside the
+              first, and `formaction` is what HTML offers instead; the
+              username field rides along in the body, which the disconnect
+              action doesn't read. */}
+          <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px' })}>
             <button type="submit">{username ? 'Save username' : 'Connect'}</button>
+            {username && (
+              <button type="submit" formaction={routes.profile.letterboxd.disconnect.href()}>
+                Disconnect
+              </button>
+            )}
           </div>
         </form>
-
-        {/* Its own form, so it sits below rather than beside Save — they are
-            not a pair of options, and putting a destructive button next to the
-            one you press to correct a typo invites the wrong one. */}
-        {username && (
-          <form
-            method="post"
-            action={routes.profile.letterboxd.disconnect.href()}
-            mix={css({ marginTop: '12px' })}
-          >
-            <button type="submit">Disconnect</button>
-          </form>
-        )}
       </section>
     )
   }
