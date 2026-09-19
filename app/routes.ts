@@ -89,6 +89,12 @@ export const routes = route({
     letterboxd: route('letterboxd', {
       connect: post('connect'),
       disconnect: post('disconnect'),
+      // Reading the diary on demand. The background sync holds a cooldown so
+      // page loads don't each pull the whole feed, which leaves no way to see
+      // an edit made a minute ago — and no way to tell a feed that is quiet
+      // from one that is failing. A click is not a page load, so this one
+      // skips the cooldown and answers with what it found.
+      sync: post('sync'),
     }),
   }),
   recommendations: route('recommendations', {

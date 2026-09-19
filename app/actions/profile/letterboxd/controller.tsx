@@ -8,7 +8,11 @@ import {
   letterboxdSyncAvailableTo,
   normalizeLetterboxdUsername,
 } from '../../../data/imports/letterboxdFeed.ts'
-import { syncLetterboxdInBackground } from '../../../data/imports/letterboxdSync.ts'
+import {
+  syncLetterboxdInBackground,
+  syncLetterboxdNow,
+  type LetterboxdSyncResult,
+} from '../../../data/imports/letterboxdSync.ts'
 import { users, type User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
@@ -38,6 +42,40 @@ const requireLetterboxdSync: Middleware = async (context, next) => {
 // one that offered the form.
 function back(query = ''): Response {
   return redirect(`${routes.profile.edit.index.href()}${query}`, 303)
+}
+
+function count(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`
+}
+
+// What a member gets back for pressing Sync now. Counts rather than a bare
+// "done", because the question behind the button is usually whether the feed
+// carries a particular entry at all — and a number that moved between two
+// presses answers that, where "synced" answers nothing.
+//
+// Exported for its own test: it is the whole of what the button communicates,
+// and it needs no database to demonstrate.
+export function describeSync(result: LetterboxdSyncResult): string {
+  // Not an error. A diary of nothing but lists, or a brand new account, reads
+  // exactly like this, and saying "0 entries" invites the reading that
+  // something went wrong on our side.
+  if (result.logged === 0 && result.unresolved === 0) {
+    return "Read your feed — Letterboxd isn't publishing any diary entries for that name yet."
+  }
+
+  const parts = [`Read ${count(result.logged, 'diary entry', 'diary entries')} from Letterboxd.`]
+
+  if (result.deleted > 0) {
+    parts.push(`Removed ${count(result.deleted, 'film', 'films')} your diary no longer lists.`)
+  }
+
+  // Worth naming rather than hiding: an entry the catalog can't place is a film
+  // that will never appear here, and counting it is the only sign of that.
+  if (result.unresolved > 0) {
+    parts.push(`${count(result.unresolved, 'entry', 'entries')} couldn't be matched to a film.`)
+  }
+
+  return parts.join(' ')
 }
 
 // Not a linked account — the feed this names is public, so nothing here proves
@@ -83,6 +121,32 @@ export default createController(routes.profile.letterboxd, {
       })
 
       return back('?letterboxdConnected=1')
+    },
+
+    // Deliberately the only path that skips the cooldown, and deliberately
+    // awaited. Everything else reads the feed beside a render and leaves the
+    // result for next time, which is right for a page load and useless to
+    // someone checking whether an edit made a minute ago has landed.
+    async sync(context) {
+      const auth = context.get(Auth)
+      const db = context.get(Database)
+
+      let result: LetterboxdSyncResult | null
+      try {
+        result = await syncLetterboxdNow(db, auth.identity)
+      } catch (error) {
+        // fetchLetterboxdFeed's messages are already written for a member — a
+        // private profile, a bad name, Letterboxd being down — so the one case
+        // worth rewording is anything else that got this far.
+        const message = error instanceof Error ? error.message : 'Something went wrong reading your diary.'
+        return back(`?letterboxdError=${encodeURIComponent(message)}`)
+      }
+
+      if (!result) {
+        return back(`?letterboxdError=${encodeURIComponent('Connect a Letterboxd username first.')}`)
+      }
+
+      return back(`?letterboxdNotice=${encodeURIComponent(describeSync(result))}`)
     },
 
     async disconnect(context) {

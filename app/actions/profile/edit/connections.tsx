@@ -20,6 +20,8 @@ export interface LetterboxdConnection {
   justConnected: boolean
   // The connect form has no page of its own, so its failures arrive here.
   error?: string
+  // What the last Sync now found, when that is what brought us back here.
+  notice?: string
 }
 
 export interface SteamConnection {
@@ -52,13 +54,14 @@ const ERROR = css({ color: '#b91c1c' })
 
 function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
   return () => {
-    const { username, error } = handle.props.connection
+    const { username, error, notice } = handle.props.connection
 
     return (
       <section mix={PANEL}>
         <h3 mix={css({ marginTop: 0, fontSize: '15px' })}>Letterboxd</h3>
 
         {error && <p mix={ERROR}>{error}</p>}
+        {notice && <p mix={css({ margin: '0 0 12px', color: '#555' })}>{notice}</p>}
 
         {/* Ahead of the form, so the block reads as a state with a way to
             change it rather than a form with a footnote — and so the two
@@ -70,7 +73,9 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
         {username ? (
           <p mix={NOTE}>
             New entries follow on their own, and so do changes and recent deletions — Letterboxd
-            wins. Films you logged here yourself are never touched.
+            wins. Films you logged here yourself are never touched. The feed is re-read every
+            quarter of an hour; <strong>Sync now</strong> reads it immediately and says what it
+            found.
           </p>
         ) : (
           <p mix={NOTE}>
@@ -113,6 +118,16 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
               action doesn't read. */}
           <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px' })}>
             <button type="submit">{username ? 'Save username' : 'Connect'}</button>
+            {/* Rides the same form as the other two — see the note above — and
+                like Disconnect it ignores the username field it carries. It
+                syncs the name already stored, not whatever is half-typed in
+                the box, so pressing it after an unsaved edit reads the diary
+                you are actually connected to. */}
+            {username && (
+              <button type="submit" formaction={routes.profile.letterboxd.sync.href()}>
+                Sync now
+              </button>
+            )}
             {username && (
               <button type="submit" formaction={routes.profile.letterboxd.disconnect.href()}>
                 Disconnect
