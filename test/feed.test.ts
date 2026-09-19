@@ -72,8 +72,8 @@ describe('activity feed', { skip: skipWithoutDatabase }, () => {
   const key = (item: FeedItem) => `${item.kind}-${item.id}`
 
   before(async () => {
-    viewer = await insertUser('feedpage-viewer')
-    friend = await insertUser('feedpage-friend')
+    viewer = (await insertUser('feedpage-viewer')).id
+    friend = (await insertUser('feedpage-friend')).id
     await followUser(db, viewer, friend)
     await followUser(db, friend, viewer)
 
