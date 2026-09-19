@@ -2,7 +2,6 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { SteamImportResult } from '../../../data/imports/steam.ts'
-import { Toast } from '../../../ui/components/toast.tsx'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
@@ -10,9 +9,9 @@ import { Nav } from '../../../ui/components/nav.tsx'
 export interface SteamImportPageProps {
   displayName: string
   // SteamID64 of the linked account, or null when nothing is connected yet.
+  // Connecting happens in settings; this page only reads the result of it, and
+  // says where to go when there isn't one.
   steamId: string | null
-  connected?: boolean
-  // The controller turns failure codes into wording before they get here.
   error?: string
   result?: SteamImportResult
 }
@@ -69,16 +68,16 @@ function ImportSummary(handle: Handle<{ result: SteamImportResult }>) {
   }
 }
 
-// Carries the connection state too, since the source is a linked account
-// rather than an uploaded file.
+// Reads the connection rather than owning it: linking a Steam account is
+// account state that outlives any one import, so it is managed in settings and
+// this page is the import itself.
 export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
   return () => {
-    const { displayName, steamId, connected, error, result } = handle.props
+    const { displayName, steamId, error, result } = handle.props
 
     return (
       <Document title="Import from Steam | On Deck">
         <Nav authed={true} displayName={displayName} />
-        {connected && <Toast message="Steam account connected." />}
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
           <h1>Import from Steam</h1>
 
@@ -97,38 +96,20 @@ export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
                 A large library takes a few minutes — each game is looked up individually. Leave the tab
                 open until it finishes.
               </p>
-              <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px' })}>
+              <div mix={css({ marginTop: '16px' })}>
                 <form method="post" action={routes.profile.importGames.upload.href()}>
                   <button type="submit">Import my library</button>
-                </form>
-                <form method="post" action={routes.profile.steam.disconnect.href()}>
-                  <button type="submit">Disconnect</button>
                 </form>
               </div>
             </>
           ) : (
             <>
               <p mix={css({ color: '#555' })}>
-                Sign in through Steam to import your library. On Deck only reads which games you own and
-                how long you've played them — it can't post or change anything on your account.
+                No Steam account connected yet. Importing your library needs one, since the library is
+                read from Steam rather than uploaded.
               </p>
-              <p mix={css({ color: '#555' })}>
-                Your Steam profile's <strong>Game details</strong> setting needs to be Public, otherwise
-                Steam won't share the list even after you've signed in.
-              </p>
-              {/*
-                `rmx-document` is load-bearing here for a different reason than
-                on the media tabs. This href is same-origin, so the framework
-                intercepts the click and fetches it as a frame — but the route
-                answers with a 303 to steamcommunity.com, and a fetch follows
-                that redirect cross-origin, where Steam sends no CORS headers.
-                The browser blocks it and the sign-in never starts. Leaving the
-                origin is a document navigation, not a data fetch.
-              */}
               <p>
-                <a href={routes.profile.steam.connect.href()} rmx-document="">
-                  Sign in through Steam →
-                </a>
+                <a href={routes.profile.edit.index.href()}>Connect Steam in settings →</a>
               </p>
             </>
           )}

@@ -3,8 +3,8 @@ import { runBounded } from './csv.ts'
 import { IGDB_MAX_CONCURRENCY } from '../catalog/igdb.ts'
 import type { Db } from '../db.ts'
 import { logInteraction, type LogInteractionInput } from '../mediaItems.ts'
-import { INTERACTION_SOURCES } from '../schema.ts'
-import { fetchSteamLibrary, type SteamGame } from './steamApi.ts'
+import { INTERACTION_SOURCES, users } from '../schema.ts'
+import { fetchSteamLibrary, fetchSteamPersona, type SteamGame } from './steamApi.ts'
 
 export interface SteamImportResult {
   totalGames: number
@@ -30,6 +30,13 @@ const TRAILING_PARENTHETICAL = /\s*\([^)]*\)\s*$/
 export async function importSteamLibrary(db: Db, userId: number, steamId: string): Promise<SteamImportResult> {
   const outcome = await fetchSteamLibrary(steamId)
   if (!outcome.ok) throw new Error(outcome.message)
+
+  // Refreshed on the way past, since an import is already talking to Steam and
+  // a rename there would otherwise leave settings naming an account by a name
+  // its owner has stopped using. Null means Steam wouldn't say this time, which
+  // is no reason to throw away the name it gave last time.
+  const persona = await fetchSteamPersona(steamId)
+  if (persona) await db.update(users, userId, { steam_persona: persona })
 
   const games = outcome.games
   const playable = games.filter((game) => !NOT_A_GAME.test(game.name))

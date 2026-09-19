@@ -7,111 +7,30 @@ import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
 import { Toast } from '../../../ui/components/toast.tsx'
 
-export interface LetterboxdConnection {
-  // The member name whose feed is being read, or null when nothing is connected.
-  username: string | null
-  justConnected: boolean
-  // The connect form has no page of its own, so its failures arrive here.
-  error?: string
-}
-
 export interface LetterboxdImportPageProps {
   displayName: string
   error?: string
   // Set when an earlier upload is still waiting to be matched or reviewed.
   pendingHref?: string
-  // Null when the feed sync is switched off, which takes the connect section
-  // off the page entirely and leaves the upload flow exactly as it was.
-  connection: LetterboxdConnection | null
+  // Whether the feed sync is available to this member. The connection itself is
+  // managed in settings; all this decides is whether the page explains how the
+  // upload and the feed divide the work, which is meaningless when there is no
+  // feed to divide it with.
+  syncAvailable: boolean
 }
-
-const PANEL = css({
-  border: '1px solid #d9cfbe',
-  borderRadius: '8px',
-  padding: '16px 18px',
-  marginBottom: '28px',
-})
-
-const NOTE = css({ fontSize: '13px', color: '#888' })
 
 // Only true when the feed is switched on, and it is what explains why an upload
 // is still worth doing once it is: the feed can't reach back past ~50 films.
 const BACKFILL_LEAD =
   'The feed only carries your fifty most recent films, so your back catalogue comes across as a file. '
 
-// The ongoing half of the page. The upload below it backfills history; this
-// keeps up with it afterwards, and the two are worth seeing together.
-function FeedConnection(handle: Handle<{ connection: LetterboxdConnection }>) {
-  return () => {
-    const { username, error } = handle.props.connection
-
-    return (
-      <section mix={PANEL}>
-        <h2 mix={css({ marginTop: 0, fontSize: '16px' })}>Keep it up to date</h2>
-
-        {error && <p mix={css({ color: '#b91c1c' })}>{error}</p>}
-
-        {username ? (
-          <>
-            <p mix={css({ color: '#555' })}>
-              Reading the public diary of <code>{username}</code>. New entries appear here when you
-              next visit On Deck — there's nothing to run.
-            </p>
-            <p mix={NOTE}>
-              Letterboxd is the source of truth for these films: a rating or review you change there
-              replaces what's here, and a recent diary entry you delete there is removed here too.
-              Editing one of them in On Deck won't last. Films you logged in On Deck yourself are
-              never touched.
-            </p>
-            <form method="post" action={routes.profile.letterboxd.disconnect.href()}>
-              <button type="submit">Disconnect</button>
-            </form>
-          </>
-        ) : (
-          <>
-            <p mix={css({ color: '#555' })}>
-              Your Letterboxd diary is public, so On Deck can read it without you signing in
-              anywhere. Give it your username — the last part of your profile URL,
-              <code>letterboxd.com/<strong>yourname</strong>/</code> — and new watches will follow
-              on their own.
-            </p>
-            <form
-              method="post"
-              action={routes.profile.letterboxd.connect.href()}
-              mix={css({ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' })}
-            >
-              <input
-                type="text"
-                name="username"
-                placeholder="yourname"
-                autocomplete="off"
-                spellcheck={false}
-                aria-label="Letterboxd username"
-                mix={css({ padding: '6px 8px' })}
-              />
-              <button type="submit">Connect</button>
-            </form>
-            <p mix={NOTE}>
-              Anyone's username works here — nothing proves the account is yours, so double-check
-              the spelling. A private Letterboxd account publishes no feed and can't be read.
-            </p>
-          </>
-        )}
-      </section>
-    )
-  }
-}
-
 export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) {
   return () => {
-    const { displayName, error, pendingHref, connection } = handle.props
+    const { displayName, error, pendingHref, syncAvailable } = handle.props
 
     return (
       <Document title="Import from Letterboxd | On Deck">
         <Nav authed={true} displayName={displayName} />
-        {connection?.justConnected && (
-          <Toast message="Connected. Your recent films are on their way in." />
-        )}
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
           <h1>Import from Letterboxd</h1>
 
@@ -132,15 +51,16 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
             </div>
           )}
 
-          {connection && (
-            <>
-              <FeedConnection connection={connection} />
-              <h2 mix={css({ fontSize: '16px' })}>Bring across everything you've logged</h2>
-            </>
+          {syncAvailable && (
+            <p mix={css({ fontSize: '13px', color: '#888' })}>
+              Keeping up with new films is a separate thing, and it's already handled elsewhere:{' '}
+              <a href={routes.profile.edit.index.href()}>connect your Letterboxd account in settings</a>{' '}
+              and new entries arrive on their own. This page is for the history that predates it.
+            </p>
           )}
 
           <p mix={css({ color: '#555' })}>
-            {connection && BACKFILL_LEAD}
+            {syncAvailable && BACKFILL_LEAD}
             Export your data from Letterboxd (Settings → Data → Export) and upload the resulting{' '}
             <code>.zip</code>, unopened — ratings and reviews live in separate files inside, and
             both come across in one import.

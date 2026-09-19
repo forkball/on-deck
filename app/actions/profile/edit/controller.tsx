@@ -16,10 +16,12 @@ import {
   userFieldErrors,
   usernameSchema,
 } from '../../../data/users.ts'
+import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
 import { verifyPassword } from '../../auth/password.ts'
 import { profileSettingsFor } from '../../../data/recommendations/tasteProfile.ts'
+import type { ConnectionsProps } from './connections.tsx'
 import { ProfileEditPage } from './page.tsx'
 
 const profileSchema = f.object({
@@ -35,6 +37,37 @@ const profileSchema = f.object({
   // below, once it's known what actually changed.
   current_password: f.field(s.defaulted(s.string(), '')),
 })
+
+// The Steam OpenID callback can only redirect with a code, so the wording lives
+// here rather than travelling through the URL.
+function steamError(code: string | null): string | undefined {
+  if (!code) return undefined
+  if (code === 'taken') return 'That Steam account is already connected to another profile.'
+  return "Couldn't verify that Steam sign-in. Try connecting again."
+}
+
+// Both connections read off the identity and the query string the connect
+// actions redirect back with. Built for every render of this page, the rejected
+// submits included — the panels are part of the page, not of the form that
+// failed, and dropping them on a bad password would be a strange thing to do to
+// someone who mistyped one.
+function connectionsFor(identity: User, url: URL): ConnectionsProps {
+  return {
+    letterboxd: letterboxdSyncAvailableTo(identity)
+      ? {
+          username: identity.letterboxd_username ?? null,
+          justConnected: url.searchParams.get('letterboxdConnected') === '1',
+          error: url.searchParams.get('letterboxdError') ?? undefined,
+        }
+      : null,
+    steam: {
+      steamId: identity.steam_id ?? null,
+      persona: identity.steam_persona ?? null,
+      justConnected: url.searchParams.get('steamConnected') === '1',
+      error: steamError(url.searchParams.get('steamError')),
+    },
+  }
+}
 
 // Whatever was typed, so a rejected submit comes back with the person's own
 // text (and checkbox state) in the inputs rather than the stored row.
@@ -64,6 +97,7 @@ export default createController(routes.profile.edit, {
           settings={profileSettingsFor(auth.identity)}
           saved={context.url.searchParams.get('saved') === '1'}
           displayName={displayLabel(auth.identity)}
+          connections={connectionsFor(auth.identity, context.url)}
         />,
       )
     },
@@ -83,6 +117,7 @@ export default createController(routes.profile.edit, {
             confirming={confirming}
             settings={profileSettingsFor(auth.identity)}
             displayName={displayLabel(auth.identity)}
+            connections={connectionsFor(auth.identity, context.url)}
           />,
           { status },
         )

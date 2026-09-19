@@ -11,6 +11,11 @@ export const users = table({
     display_name: c.text().notNull().unique(),
     bio: c.text(),
     steam_id: c.text(),
+    // What Steam calls the linked account, for a settings page that would
+    // otherwise show seventeen digits. Nullable and always optional: every
+    // reader falls back to steam_id, since this is only ever a nicer label for
+    // an id that already works.
+    steam_persona: c.text().nullable(),
     // A Letterboxd member name, not a linked account: the RSS feed it reads is
     // public, so nothing proves the person typing it owns it. Hence no unique
     // index, where steam_id has one.
