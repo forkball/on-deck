@@ -33,10 +33,14 @@ const requireLetterboxdSync: Middleware = async (context, next) => {
     : new Response('Not Found', { status: 404 })
 }
 
-// Back to the settings page, which is where the connection is managed from —
-// these actions have no page of their own, so its outcome has to land on the
-// one that offered the form.
-function back(query = ''): Response {
+// Back to the connections pane of the settings page. These actions have no
+// page of their own, so their outcome has to land on the one that offered the
+// form — and on the part of it the person was actually looking at.
+//
+// Callers pass bare `key=value`, since the leading `?` belongs to the tab that
+// always comes first.
+function back(params = ''): Response {
+  const query = params ? `?tab=connections&${params}` : '?tab=connections'
   return redirect(`${routes.profile.edit.index.href()}${query}`, 303)
 }
 
@@ -52,7 +56,7 @@ export default createController(routes.profile.letterboxd, {
       const username = normalizeLetterboxdUsername(String(formData.get('username') ?? ''))
       if (!username) {
         return back(
-          `?letterboxdError=${encodeURIComponent(
+          `letterboxdError=${encodeURIComponent(
             'That doesn\'t look like a Letterboxd username. They\'re letters, numbers and underscores — the last part of your profile URL.',
           )}`,
         )
@@ -62,7 +66,7 @@ export default createController(routes.profile.letterboxd, {
       // failing silently in a background sync nobody is watching.
       const outcome = await fetchLetterboxdFeed(username)
       if (!outcome.ok) {
-        return back(`?letterboxdError=${encodeURIComponent(outcome.message)}`)
+        return back(`letterboxdError=${encodeURIComponent(outcome.message)}`)
       }
 
       const db = context.get(Database)
@@ -82,7 +86,7 @@ export default createController(routes.profile.letterboxd, {
         letterboxd_synced_at: null,
       })
 
-      return back('?letterboxdConnected=1')
+      return back('letterboxdConnected=1')
     },
 
     async disconnect(context) {

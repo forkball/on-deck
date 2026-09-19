@@ -9,7 +9,20 @@ import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
 import { PasswordConfirmModal } from '../../../ui/components/password-confirm-modal.tsx'
 import { Field } from '../../../ui/shared/field.tsx'
+import { Tabs } from '../../../ui/components/tabs.tsx'
 import { Connections, type ConnectionsProps } from './connections.tsx'
+
+// The three things this page holds have nothing to do with each other beyond
+// belonging to the same account, and each is its own form with its own submit —
+// so they were three stacked sections you scrolled past to reach the third.
+//
+// URL-backed, because every form here leaves and comes back: a rejected profile
+// edit re-renders, and the taste and connection actions redirect. Without a tab
+// in the query string they would all land on the first pane, which is the one
+// pane the person was not using.
+export const PROFILE_TABS = { profile: 'profile', taste: 'taste', connections: 'connections' } as const
+
+export type ProfileTab = (typeof PROFILE_TABS)[keyof typeof PROFILE_TABS]
 
 export interface ProfileEditPageProps {
   // What to put back in the inputs: the stored row on a first load, whatever
@@ -24,6 +37,7 @@ export interface ProfileEditPageProps {
   saved?: boolean
   displayName: string
   connections: ConnectionsProps
+  activeTab?: ProfileTab
 }
 
 const LIMIT_LABELS = new Map<number | null, string>([
@@ -42,9 +56,11 @@ function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSetting
   return () => {
     const { settings, saved } = handle.props
 
+    // No top margin of its own any more: the tab bar above supplies the
+    // separation this used to need from the form it sat under.
     return (
-      <section mix={css({ marginTop: '40px', maxWidth: '480px' })}>
-        <h2>What my taste profiles are written from</h2>
+      <section mix={css({ maxWidth: '480px' })}>
+        <h2 mix={css({ marginTop: 0 })}>What my taste profiles are written from</h2>
         <p mix={css({ margin: '0 0 16px', color: '#555' })}>
           Unlike the bio above, these do change your recommendations — they decide what gets read of
           your log when a taste profile is written.
@@ -104,7 +120,8 @@ function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSetting
 
 export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
   return () => {
-    const { values, errors, confirming, settings, saved, displayName, connections } = handle.props
+    const { values, errors, confirming, settings, saved, displayName, connections, activeTab } =
+      handle.props
 
     return (
       <Document title="Edit profile | On Deck">
@@ -123,11 +140,25 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
             <a href={routes.profile.index.href()}>← Back to your profile</a>
           </p>
           <h1>Edit profile</h1>
-          <form
-            method="post"
-            action={routes.profile.edit.update.href()}
-            mix={css({ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '480px' })}
-          >
+
+          <Tabs
+            idPrefix="profile-edit"
+            active={activeTab}
+            tabs={[
+              {
+                id: PROFILE_TABS.profile,
+                label: 'Profile',
+                panel: (
+                  <form
+                    method="post"
+                    action={routes.profile.edit.update.href()}
+                    mix={css({
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px',
+                      maxWidth: '480px',
+                    })}
+                  >
             <input type="hidden" name="_method" value="PUT" />
             <Field
               label="Email"
@@ -190,11 +221,21 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
                 Change password
               </a>
             </div>
-          </form>
-
-          <TasteProfileSettingsForm settings={settings} saved={saved} />
-
-          <Connections letterboxd={connections.letterboxd} steam={connections.steam} />
+                  </form>
+                ),
+              },
+              {
+                id: PROFILE_TABS.taste,
+                label: 'Taste',
+                panel: <TasteProfileSettingsForm settings={settings} saved={saved} />,
+              },
+              {
+                id: PROFILE_TABS.connections,
+                label: 'Connections',
+                panel: <Connections letterboxd={connections.letterboxd} steam={connections.steam} />,
+              },
+            ]}
+          />
         </main>
       </Document>
     )

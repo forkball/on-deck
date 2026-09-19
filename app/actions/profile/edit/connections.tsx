@@ -60,66 +60,68 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
 
         {error && <p mix={ERROR}>{error}</p>}
 
-        {/* Ahead of the form, so the block reads as a state with a way to
-            change it rather than a form with a footnote — and so the two
-            buttons end up together at the bottom instead of with a paragraph
-            wedged between them. */}
-        {/* Kept to the part with consequences. That Letterboxd overwrites, and
-            that it can now delete, is the thing someone would be annoyed not to
-            have been told; how often it polls is not. */}
-        {username ? (
-          <p mix={NOTE}>
-            New entries follow on their own, and so do changes and recent deletions — Letterboxd
-            wins. Films you logged here yourself are never touched.
-          </p>
-        ) : (
-          <p mix={NOTE}>
-            Reads your public diary, no sign-in needed. For older films, use the{' '}
-            <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
-          </p>
-        )}
+        {/* Connected and disconnected are two states, not one form with a
+            different button on it: the field is for naming a diary that isn't
+            named yet, so once one is, it goes away and the only thing left to
+            do is stop. Same shape as Steam below.
 
-        {/* One form either way, and the same action behind it. Connecting and
-            changing the name are the same act — naming the diary to read — so
-            the connected state is this field with a value in it rather than a
-            separate display that has to be dismantled before it can be
-            corrected. */}
-        <form
-          method="post"
-          action={routes.profile.letterboxd.connect.href()}
-          mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
-        >
-          {/* The warnings the hint used to carry — that nothing proves the
-              account is yours, that a private one publishes no feed — are both
-              in the error the connect action returns when they bite, so they
-              were being read by everyone to help the few who need them. */}
-          <Field
-            label="Letterboxd username"
-            hint="The last part of your profile URL — letterboxd.com/yourname/"
-          >
-            <input
-              type="text"
-              name="username"
-              placeholder="yourname"
-              autocomplete="off"
-              spellcheck={false}
-              defaultValue={username ?? ''}
-            />
-          </Field>
-          {/* Both buttons submit this one form — Disconnect only overrides
-              where to. A second <form> can't be nested to sit beside the
-              first, and `formaction` is what HTML offers instead; the
-              username field rides along in the body, which the disconnect
-              action doesn't read. */}
-          <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px' })}>
-            <button type="submit">{username ? 'Save username' : 'Connect'}</button>
-            {username && (
-              <button type="submit" formaction={routes.profile.letterboxd.disconnect.href()}>
-                Disconnect
-              </button>
-            )}
-          </div>
-        </form>
+            The cost is that correcting a typo means disconnecting and
+            connecting again — the connect action would take a new name
+            perfectly well, there is just nowhere to type one. */}
+        {username ? (
+          <>
+            {/* Kept to the part with consequences. That Letterboxd overwrites,
+                and that it can now delete, is the thing someone would be
+                annoyed not to have been told; how often it polls is not. */}
+            <p mix={css({ margin: '0 0 12px', color: '#555' })}>
+              Reading the public diary of <code>{username}</code>.
+            </p>
+            <p mix={NOTE}>
+              New entries follow on their own, and so do changes and recent deletions — Letterboxd
+              wins. Films you logged here yourself are never touched.
+            </p>
+            <form
+              method="post"
+              action={routes.profile.letterboxd.disconnect.href()}
+              mix={css({ marginTop: '12px' })}
+            >
+              <button type="submit">Disconnect</button>
+            </form>
+          </>
+        ) : (
+          <>
+            <p mix={NOTE}>
+              Reads your public diary, no sign-in needed. For older films, use the{' '}
+              <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
+            </p>
+            <form
+              method="post"
+              action={routes.profile.letterboxd.connect.href()}
+              mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
+            >
+              {/* The warnings the hint used to carry — that nothing proves the
+                  account is yours, that a private one publishes no feed — are
+                  both in the error the connect action returns when they bite,
+                  so they were being read by everyone to help the few who need
+                  them. */}
+              <Field
+                label="Letterboxd username"
+                hint="The last part of your profile URL — letterboxd.com/yourname/"
+              >
+                <input
+                  type="text"
+                  name="username"
+                  placeholder="yourname"
+                  autocomplete="off"
+                  spellcheck={false}
+                />
+              </Field>
+              <div>
+                <button type="submit">Connect</button>
+              </div>
+            </form>
+          </>
+        )}
       </section>
     )
   }
@@ -203,9 +205,11 @@ export function Connections(handle: Handle<ConnectionsProps>) {
   return () => {
     const { letterboxd, steam } = handle.props
 
+    // Inside a tab panel the bar above is the separator, so this carries no
+    // top margin of its own.
     return (
-      <section mix={css({ marginTop: '40px', maxWidth: '480px' })}>
-        <h2>Connected accounts</h2>
+      <section mix={css({ maxWidth: '480px' })}>
+        <h2 mix={css({ marginTop: 0 })}>Connected accounts</h2>
         <p mix={css({ margin: '0 0 16px', color: '#555' })}>
           Libraries On Deck reads from. Disconnecting one stops the reading — it leaves everything
           already in your log exactly where it is.
