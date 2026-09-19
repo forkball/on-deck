@@ -50,6 +50,40 @@ export async function verifySteamCallback(params: URLSearchParams): Promise<stri
   return match ? match[1] : null
 }
 
+interface PlayerSummariesResponse {
+  response?: { players?: { steamid?: string; personaname?: string }[] }
+}
+
+// The display name Steam shows for an account, so a connection can be named
+// rather than numbered. OpenID hands back only the SteamID64 — nobody knows
+// their own — and a member looking at their settings is asking "is this the
+// right account", which seventeen digits cannot answer.
+//
+// Null on every failure, deliberately and quietly: this is decoration over an
+// id that already works, so a missing key, a rate limit or a private profile
+// costs the nicer label and nothing else. Every caller falls back to the number.
+export async function fetchSteamPersona(steamId: string): Promise<string | null> {
+  const key = process.env.STEAM_API_KEY
+  if (!key) return null
+
+  const url = new URL(`${STEAM_API_BASE}/ISteamUser/GetPlayerSummaries/v2/`)
+  url.searchParams.set('key', key)
+  url.searchParams.set('steamids', steamId)
+
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return null
+
+    const data = (await response.json()) as PlayerSummariesResponse
+    // Asked for one id, but the endpoint answers in a list and omits accounts
+    // it won't talk about rather than returning a blank entry.
+    const name = data.response?.players?.find((player) => player.steamid === steamId)?.personaname
+    return name?.trim() || null
+  } catch {
+    return null
+  }
+}
+
 export interface SteamGame {
   appId: number
   name: string

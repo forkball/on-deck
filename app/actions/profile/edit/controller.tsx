@@ -62,6 +62,7 @@ function connectionsFor(identity: User, url: URL): ConnectionsProps {
       : null,
     steam: {
       steamId: identity.steam_id ?? null,
+      persona: identity.steam_persona ?? null,
       justConnected: url.searchParams.get('steamConnected') === '1',
       error: steamError(url.searchParams.get('steamError')),
     },

@@ -25,6 +25,9 @@ export interface LetterboxdConnection {
 export interface SteamConnection {
   // SteamID64 of the linked account, or null when nothing is connected yet.
   steamId: string | null
+  // What Steam calls that account. Null when Steam wouldn't say — the id is
+  // shown on its own then, which is worse to read but never wrong.
+  persona: string | null
   justConnected: boolean
   error?: string
 }
@@ -121,7 +124,7 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
 
 function SteamBlock(handle: Handle<{ connection: SteamConnection }>) {
   return () => {
-    const { steamId, error } = handle.props.connection
+    const { steamId, persona, error } = handle.props.connection
 
     return (
       <section mix={PANEL}>
@@ -131,9 +134,25 @@ function SteamBlock(handle: Handle<{ connection: SteamConnection }>) {
 
         {steamId ? (
           <>
-            <p mix={css({ margin: '0 0 12px', color: '#555' })}>
-              Connected to Steam account <code>{steamId}</code>.
+            {/* The name when Steam gives one, with the id kept underneath in
+                small print: the name answers "is this my account", and the id
+                is what to quote when something needs identifying exactly. */}
+            <p mix={css({ margin: '0 0 4px', color: '#555' })}>
+              {persona ? (
+                <>
+                  Connected as <strong>{persona}</strong>.
+                </>
+              ) : (
+                <>
+                  Connected to Steam account <code>{steamId}</code>.
+                </>
+              )}
             </p>
+            {persona && (
+              <p mix={css({ margin: '0 0 12px', fontSize: '12px', color: '#888' })}>
+                <code>{steamId}</code>
+              </p>
+            )}
             <p mix={NOTE}>
               Unlike Letterboxd, nothing is read until you ask for it —{' '}
               <a href={routes.profile.importGames.index.href()}>import your library</a> to bring your
