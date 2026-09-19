@@ -64,19 +64,18 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
             change it rather than a form with a footnote — and so the two
             buttons end up together at the bottom instead of with a paragraph
             wedged between them. */}
+        {/* Kept to the part with consequences. That Letterboxd overwrites, and
+            that it can now delete, is the thing someone would be annoyed not to
+            have been told; how often it polls is not. */}
         {username ? (
           <p mix={NOTE}>
-            Reading the public diary of <code>{username}</code>. New entries arrive on their own —
-            there's nothing to run. Letterboxd is the source of truth for these films: a rating or
-            review you change there replaces what's here, and a recent diary entry you delete there is
-            removed here too. Films you logged in On Deck yourself are never touched.
+            New entries follow on their own, and so do changes and recent deletions — Letterboxd
+            wins. Films you logged here yourself are never touched.
           </p>
         ) : (
           <p mix={NOTE}>
-            Your Letterboxd diary is public, so On Deck can read it without you signing in anywhere.
-            To bring across everything you've already logged, use the{' '}
-            <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a> — the feed only
-            carries your fifty most recent films.
+            Reads your public diary, no sign-in needed. For older films, use the{' '}
+            <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
           </p>
         )}
 
@@ -90,9 +89,13 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
           action={routes.profile.letterboxd.connect.href()}
           mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
         >
+          {/* The warnings the hint used to carry — that nothing proves the
+              account is yours, that a private one publishes no feed — are both
+              in the error the connect action returns when they bite, so they
+              were being read by everyone to help the few who need them. */}
           <Field
             label="Letterboxd username"
-            hint="The last part of your profile URL — letterboxd.com/yourname/. Nothing proves the account is yours, so check the spelling. A private account publishes no feed and can't be read."
+            hint="The last part of your profile URL — letterboxd.com/yourname/"
           >
             <input
               type="text"
