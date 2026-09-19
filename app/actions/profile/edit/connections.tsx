@@ -57,6 +57,26 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
 
         {error && <p mix={ERROR}>{error}</p>}
 
+        {/* Ahead of the form, so the block reads as a state with a way to
+            change it rather than a form with a footnote — and so the two
+            buttons end up together at the bottom instead of with a paragraph
+            wedged between them. */}
+        {username ? (
+          <p mix={NOTE}>
+            Reading the public diary of <code>{username}</code>. New entries arrive on their own —
+            there's nothing to run. Letterboxd is the source of truth for these films: a rating or
+            review you change there replaces what's here, and a recent diary entry you delete there is
+            removed here too. Films you logged in On Deck yourself are never touched.
+          </p>
+        ) : (
+          <p mix={NOTE}>
+            Your Letterboxd diary is public, so On Deck can read it without you signing in anywhere.
+            To bring across everything you've already logged, use the{' '}
+            <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a> — the feed only
+            carries your fifty most recent films.
+          </p>
+        )}
+
         {/* One form either way, and the same action behind it. Connecting and
             changing the name are the same act — naming the diary to read — so
             the connected state is this field with a value in it rather than a
@@ -85,29 +105,17 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
           </div>
         </form>
 
-        {username ? (
-          <>
-            <p mix={NOTE}>
-              Reading the public diary of <code>{username}</code>. New entries arrive on their own —
-              there's nothing to run. Letterboxd is the source of truth for these films: a rating or
-              review you change there replaces what's here, and a recent diary entry you delete there
-              is removed here too. Films you logged in On Deck yourself are never touched.
-            </p>
-            <form
-              method="post"
-              action={routes.profile.letterboxd.disconnect.href()}
-              mix={css({ marginTop: '12px' })}
-            >
-              <button type="submit">Disconnect</button>
-            </form>
-          </>
-        ) : (
-          <p mix={NOTE}>
-            Your Letterboxd diary is public, so On Deck can read it without you signing in anywhere.
-            To bring across everything you've already logged, use the{' '}
-            <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a> — the feed only
-            carries your fifty most recent films.
-          </p>
+        {/* Its own form, so it sits below rather than beside Save — they are
+            not a pair of options, and putting a destructive button next to the
+            one you press to correct a typo invites the wrong one. */}
+        {username && (
+          <form
+            method="post"
+            action={routes.profile.letterboxd.disconnect.href()}
+            mix={css({ marginTop: '12px' })}
+          >
+            <button type="submit">Disconnect</button>
+          </form>
         )}
       </section>
     )
