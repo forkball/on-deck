@@ -124,7 +124,7 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
       handle.props
 
     return (
-      <Document title="Edit profile | On Deck">
+      <Document title="Settings | On Deck">
         <Nav authed={true} displayName={displayName} />
         {saved && <Toast message="Taste settings saved." />}
         {connections.letterboxd?.justConnected && (
@@ -139,7 +139,7 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
           <p mix={css({ margin: '0 0 16px' })}>
             <a href={routes.profile.index.href()}>← Back to your profile</a>
           </p>
-          <h1>Edit profile</h1>
+          <h1>Settings</h1>
 
           <Tabs
             idPrefix="profile-edit"

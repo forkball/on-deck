@@ -20,14 +20,47 @@ import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
+import { PROFILE_TABS } from './edit/page.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
+// Whether the source behind a medium is already wired up. Two of the three
+// importers sit behind a connection, and which link to offer depends on it.
+export interface MediaSources {
+  // False when the feed is gated off this account, in which case there is no
+  // connecting to offer and the upload is the only way in.
+  letterboxdAvailable: boolean
+  letterboxdConnected: boolean
+  steamConnected: boolean
+}
+
+const CONNECTIONS_HREF = `${routes.profile.edit.index.href()}?tab=${PROFILE_TABS.connections}`
+
 // TV has no equivalent worth importing.
-const IMPORT_LINKS: Partial<Record<ActiveMediaType, { href: string; label: string }>> = {
-  movie: { href: routes.profile.importMovies.index.href(), label: 'Import from Letterboxd' },
-  book: { href: routes.profile.importBooks.index.href(), label: 'Import from Goodreads' },
-  game: { href: routes.profile.importGames.index.href(), label: 'Import from Steam' },
+//
+// The import pages backfill a history; connecting is what keeps up with one
+// afterwards. Offering the import to someone with nothing connected sends them
+// to upload a file when what they almost certainly want is to name an account —
+// which is how this link kept being the wrong door once connecting moved to
+// settings.
+function sourceLink(
+  type: ActiveMediaType,
+  sources: MediaSources,
+): { href: string; label: string } | undefined {
+  switch (type) {
+    case 'movie':
+      return sources.letterboxdAvailable && !sources.letterboxdConnected
+        ? { href: CONNECTIONS_HREF, label: 'Connect Letterboxd' }
+        : { href: routes.profile.importMovies.index.href(), label: 'Import from Letterboxd' }
+    case 'game':
+      return sources.steamConnected
+        ? { href: routes.profile.importGames.index.href(), label: 'Import from Steam' }
+        : { href: CONNECTIONS_HREF, label: 'Connect Steam' }
+    case 'book':
+      return { href: routes.profile.importBooks.index.href(), label: 'Import from Goodreads' }
+    default:
+      return undefined
+  }
 }
 
 export interface ProfilePageProps {
@@ -39,6 +72,7 @@ export interface ProfilePageProps {
   followersCount: number
   saved?: boolean
   settings: TasteProfileSettings
+  sources: MediaSources
   // Null when this account has no ceiling.
   rebuildsLeft: number | null
   rebuilt?: boolean
@@ -209,6 +243,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       followersCount,
       saved,
       settings,
+      sources,
       rebuildsLeft,
       rebuilt,
       rebuildError,
@@ -235,8 +270,8 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             <h1>{displayName}</h1>
             <a
               href={routes.profile.edit.index.href()}
-              title="Edit profile"
-              aria-label="Edit profile"
+              title="Settings"
+              aria-label="Settings"
               mix={css({ fontSize: '20px', textDecoration: 'none' })}
             >
               ✎
@@ -280,6 +315,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             panels={Object.fromEntries(
               ACTIVE_MEDIA_TYPES.map((type) => {
                 const ui = MEDIA_TYPE_UI[type]
+                const source = sourceLink(type, sources)
                 const { summary, profileUpdatedAt, log, total } = media[type]
                 const seeAllHref =
                   type === DEFAULT_MEDIA_TYPE
@@ -300,7 +336,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                     />
                     {/* Each importer only understands one medium, so the
                         entry point lives on that medium's tab. */}
-                    {IMPORT_LINKS[type] ? (
+                    {source ? (
                       <div
                         mix={css({
                           display: 'flex',
@@ -310,8 +346,8 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                         })}
                       >
                         <h2>What I've {ui.pastParticiple}</h2>
-                        <a href={IMPORT_LINKS[type]!.href} mix={css({ fontSize: '13px', textAlign: 'right' })}>
-                          {IMPORT_LINKS[type]!.label}
+                        <a href={source.href} mix={css({ fontSize: '13px', textAlign: 'right' })}>
+                          {source.label}
                         </a>
                       </div>
                     ) : (
