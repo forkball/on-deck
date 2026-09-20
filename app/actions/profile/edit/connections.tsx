@@ -69,18 +69,40 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
             wedged between them. */}
         {/* Kept to the part with consequences. That Letterboxd overwrites, and
             that it can now delete, is the thing someone would be annoyed not to
-            have been told; how often it polls is not. */}
+            have been told; how often it polls is not.
+
+            What is read comes first, and it is stated before connecting as well
+            as after, because it is the question both states are actually being
+            asked: "will this bring my films across" before, and "why isn't this
+            one here" after. Both have the same answer, and it is narrower than
+            "reads your Letterboxd" sounds — the feed is the diary and nothing
+            else, so a film that never got a diary entry is invisible to this no
+            matter what else was done to it on Letterboxd.
+
+            Named as what *is* carried rather than as a list of what isn't: the
+            exclusions are open-ended (lists, watchlist, likes, follows, a bare
+            rating), and only the diary is a promise we can keep. Lists and the
+            watchlist are called out anyway — they are the two people expect to
+            arrive, and the watchlist is the one that would otherwise read as a
+            bug. */}
         {username ? (
-          <p mix={NOTE}>
-            New entries follow on their own, and so do changes and recent deletions — Letterboxd
-            wins. Films you logged here yourself are never touched. The feed is re-read every
-            quarter of an hour; <strong>Sync now</strong> reads it immediately and says what it
-            found.
-          </p>
+          <>
+            <p mix={NOTE}>
+              Only diary entries come across — the films you've logged there, with the rating and
+              review on each. Lists and your watchlist aren't read.
+            </p>
+            <p mix={NOTE}>
+              New entries follow on their own, and so do changes and recent deletions — Letterboxd
+              wins. Films you logged here yourself are never touched. The feed is re-read every
+              quarter of an hour; <strong>Sync now</strong> reads it immediately and says what it
+              found.
+            </p>
+          </>
         ) : (
           <p mix={NOTE}>
-            Reads your public diary, no sign-in needed. For older films, use the{' '}
-            <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
+            Reads your public diary, no sign-in needed — only the films you've logged there, with
+            the rating and review on each. Lists and your watchlist aren't read. For older films,
+            use the <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
           </p>
         )}
 
