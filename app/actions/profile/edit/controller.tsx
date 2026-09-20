@@ -58,6 +58,7 @@ function connectionsFor(identity: User, url: URL): ConnectionsProps {
           username: identity.letterboxd_username ?? null,
           justConnected: url.searchParams.get('letterboxdConnected') === '1',
           error: url.searchParams.get('letterboxdError') ?? undefined,
+          notice: url.searchParams.get('letterboxdNotice') ?? undefined,
         }
       : null,
     steam: {

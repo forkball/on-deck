@@ -266,10 +266,20 @@ async function resolveMovie(db: Db, tmdbId: string): Promise<MediaItem | null> {
 // One sync per user at a time within this process. Deduped the way
 // backfillCatalogDetail is: the same page can be loaded twice before the first
 // fetch returns.
-const inFlight = new Map<number, Promise<void>>()
+//
+// The promise carries the result rather than void, because one of the three
+// callers below has somebody waiting on the answer. It can also reject, and
+// every caller that takes it either awaits it or attaches a handler — a stored
+// promise nobody handles is an unhandled rejection, which takes the process
+// down.
+const inFlight = new Map<number, Promise<LetterboxdSyncResult>>()
 
-function startSync(db: Db, user: User): Promise<void> | null {
-  // The one place both triggers pass through, so the gate is checked here
+// `force` skips the cooldown, and only a member's own request passes it. The
+// cooldown is there to keep page loads off Letterboxd — see COOLDOWN_MS — and
+// a click is not a page load. It does not skip the dedup above: a sync already
+// reading the feed is the fresh read being asked for, so the caller joins it.
+function startSync(db: Db, user: User, force = false): Promise<LetterboxdSyncResult> | null {
+  // The one place all three triggers pass through, so the gate is checked here
   // rather than at each of them.
   if (!letterboxdSyncAvailableTo(user)) return null
 
@@ -280,34 +290,42 @@ function startSync(db: Db, user: User): Promise<void> | null {
   if (running) return running
 
   const syncedAt = user.letterboxd_synced_at
-  if (syncedAt != null && Date.now() - syncedAt < COOLDOWN_MS) return null
+  if (!force && syncedAt != null && Date.now() - syncedAt < COOLDOWN_MS) return null
 
   const run = (async () => {
     // Stamped before the work, not after: a sync that fails should wait out the
     // cooldown like any other, or a member whose feed has gone private would
     // have every page load retry the fetch.
     await db.update(users, user.id, { letterboxd_synced_at: Date.now() })
-    await syncLetterboxdDiary(db, user.id, username)
-  })()
-    .catch((error) => {
-      // Nothing here is on a response, so there is nobody to tell — but an
-      // unhandled rejection takes the process down, and a member who connected
-      // an account deserves better than silence in the log.
-      console.error(`Letterboxd sync failed for user ${user.id}:`, error)
-    })
-    .finally(() => {
-      inFlight.delete(user.id)
-    })
+    return syncLetterboxdDiary(db, user.id, username)
+  })().finally(() => {
+    inFlight.delete(user.id)
+  })
 
   inFlight.set(user.id, run)
   return run
+}
+
+// What the two triggers with nobody waiting on them do with a failure. There is
+// no response to put it on, and a member who connected an account deserves
+// better than silence in the log.
+function swallow(userId: number, run: Promise<LetterboxdSyncResult>): Promise<void> {
+  return run.then(
+    () => undefined,
+    (error: unknown) => {
+      console.error(`Letterboxd sync failed for user ${userId}:`, error)
+    },
+  )
 }
 
 // Fire-and-forget, for a page that only needs the log to be current the next
 // time it is looked at. Never awaited on a render: a feed fetch plus a detail
 // lookup per new film does not belong on the response path.
 export function syncLetterboxdInBackground(db: Db, user: User): void {
-  void startSync(db, user)
+  const run = startSync(db, user)
+  if (!run) return
+
+  void swallow(user.id, run)
 }
 
 // For a caller that would rather not act on a stale log — a recommendation run
@@ -318,5 +336,22 @@ export async function syncLetterboxdBeforeRun(db: Db, user: User): Promise<void>
   const run = startSync(db, user)
   if (!run) return
 
-  await Promise.race([run, new Promise((resolve) => setTimeout(resolve, WAIT_MS).unref())])
+  await Promise.race([swallow(user.id, run), new Promise((resolve) => setTimeout(resolve, WAIT_MS).unref())])
+}
+
+// A member asking for the diary to be read now, and waiting for it. Awaited
+// rather than raced: they pressed a button and the page they land on is the
+// answer, so a slow feed is worth waiting out here in a way it never is on a
+// render.
+//
+// The failure is thrown rather than logged, which is the whole difference from
+// the two above: a sync nobody asked for has nowhere to put an error, and this
+// one has a person reading the page it lands on. A feed gone private should say
+// so rather than look like a diary with nothing in it.
+//
+// Null when there is nothing to sync — no username, or the gate is closed.
+export async function syncLetterboxdNow(db: Db, user: User): Promise<LetterboxdSyncResult | null> {
+  const run = startSync(db, user, true)
+
+  return run ? run : null
 }

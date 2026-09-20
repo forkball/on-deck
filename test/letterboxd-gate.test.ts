@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 
 import { Auth } from 'remix/middleware/auth'
 
-import controller from '../app/actions/profile/letterboxd/controller.tsx'
+import controller, { describeSync } from '../app/actions/profile/letterboxd/controller.tsx'
 import type { User } from '../app/data/schema.ts'
 
 // The connect routes are gated twice over — by LETTERBOXD_FEED_SYNC and by
@@ -74,5 +74,46 @@ describe('the Letterboxd connect routes', () => {
     const response = await withFlag('1', () => runGate({ signedIn: true }))
 
     assert.equal(response, REACHED)
+  })
+})
+
+// What Sync now puts on the page. The counts are the point: someone presses
+// this because they want to know whether the feed carries an entry, and a
+// number that moves between two presses is the only thing that answers that.
+describe('what a manual sync reports', () => {
+  it('counts the entries it read', () => {
+    assert.equal(
+      describeSync({ logged: 47, unresolved: 0, deleted: 0 }),
+      'Read 47 diary entries from Letterboxd.',
+    )
+  })
+
+  it('names removals rather than leaving them to be noticed', () => {
+    assert.equal(
+      describeSync({ logged: 46, unresolved: 0, deleted: 2 }),
+      'Read 46 diary entries from Letterboxd. Removed 2 films your diary no longer lists.',
+    )
+  })
+
+  // An entry the catalog can't place is a film that will never show up here,
+  // and this count is the only sign of it.
+  it('admits what it could not match', () => {
+    assert.equal(
+      describeSync({ logged: 45, unresolved: 3, deleted: 1 }),
+      "Read 45 diary entries from Letterboxd. Removed 1 film your diary no longer lists. 3 entries couldn't be matched to a film.",
+    )
+  })
+
+  it('reads as one of each rather than 1 films', () => {
+    assert.equal(
+      describeSync({ logged: 1, unresolved: 1, deleted: 1 }),
+      "Read 1 diary entry from Letterboxd. Removed 1 film your diary no longer lists. 1 entry couldn't be matched to a film.",
+    )
+  })
+
+  // A diary of nothing but lists, or a name that isn't publishing yet. Saying
+  // "0 entries" invites the reading that something broke on our side.
+  it('explains an empty feed instead of counting it', () => {
+    assert.match(describeSync({ logged: 0, unresolved: 0, deleted: 0 }), /isn't publishing any diary entries/)
   })
 })

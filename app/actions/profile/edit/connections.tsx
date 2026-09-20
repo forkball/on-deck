@@ -20,6 +20,8 @@ export interface LetterboxdConnection {
   justConnected: boolean
   // The connect form has no page of its own, so its failures arrive here.
   error?: string
+  // What the last Sync now found, when that is what brought us back here.
+  notice?: string
 }
 
 export interface SteamConnection {
@@ -52,46 +54,68 @@ const ERROR = css({ color: '#b91c1c' })
 
 function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
   return () => {
-    const { username, error } = handle.props.connection
+    const { username, error, notice } = handle.props.connection
 
     return (
       <section mix={PANEL}>
         <h3 mix={css({ marginTop: 0, fontSize: '15px' })}>Letterboxd</h3>
 
         {error && <p mix={ERROR}>{error}</p>}
+        {notice && <p mix={css({ margin: '0 0 12px', color: '#555' })}>{notice}</p>}
 
         {/* Connected and disconnected are two states, not one form with a
             different button on it: the field is for naming a diary that isn't
-            named yet, so once one is, it goes away and the only thing left to
-            do is stop. Same shape as Steam below.
+            named yet, so once one is, it goes away and what's left is acting
+            on the connection. Same shape as Steam below.
 
             The cost is that correcting a typo means disconnecting and
             connecting again — the connect action would take a new name
             perfectly well, there is just nowhere to type one. */}
+        {/* Kept to the part with consequences, and no longer than it takes to
+            say: what is read, that Letterboxd wins, and how to make it happen
+            now. What is read comes first in both states, because it is the
+            question each is being asked — "will this bring my films across"
+            before, "why isn't this one here" after — and the answer is
+            narrower than "reads your Letterboxd" sounds.
+
+            Stated as what is carried rather than as a list of what isn't; the
+            exclusions are open-ended and only the diary is a promise the sync
+            can keep. Lists and the watchlist are named anyway, being the two
+            people expect to arrive. */}
         {username ? (
           <>
-            {/* Kept to the part with consequences. That Letterboxd overwrites,
-                and that it can now delete, is the thing someone would be
-                annoyed not to have been told; how often it polls is not. */}
             <p mix={css({ margin: '0 0 12px', color: '#555' })}>
               Reading the public diary of <code>{username}</code>.
             </p>
             <p mix={NOTE}>
-              New entries follow on their own, and so do changes and recent deletions — Letterboxd
-              wins. Films you logged here yourself are never touched.
+              Diary entries only — logged films, with their rating and review. Lists and your
+              watchlist aren't read.
             </p>
+            <p mix={NOTE}>
+              Edits and deletions follow too, and Letterboxd wins. Films you logged here are never
+              touched. Re-read every 15 minutes, or press <strong>Sync now</strong>.
+            </p>
+
+            {/* Sync is the form's own action and Disconnect overrides it,
+                rather than two forms: nesting is not allowed, and `formaction`
+                is what HTML offers instead. Nothing is submitted with either —
+                both act on the username already stored. */}
             <form
               method="post"
-              action={routes.profile.letterboxd.disconnect.href()}
-              mix={css({ marginTop: '12px' })}
+              action={routes.profile.letterboxd.sync.href()}
+              mix={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px', marginTop: '12px' })}
             >
-              <button type="submit">Disconnect</button>
+              <button type="submit">Sync now</button>
+              <button type="submit" formaction={routes.profile.letterboxd.disconnect.href()}>
+                Disconnect
+              </button>
             </form>
           </>
         ) : (
           <>
             <p mix={NOTE}>
-              Reads your public diary, no sign-in needed. For older films, use the{' '}
+              Reads your public diary, no sign-in needed — diary entries only, with their rating
+              and review. Lists and your watchlist aren't read. For older films, use the{' '}
               <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
             </p>
             <form
