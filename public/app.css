@@ -94,6 +94,30 @@
   padding: 14px 22px;
 }
 
+/* The other half of a form row. A <select> carried no vertical padding at all
+   and a text <input> only the browser's ~1px, so the "Filter" button beside the
+   status dropdown stood 9px taller than it. Only the block padding is stated
+   here: a select's inline padding is DoodleCSS's caret allowance
+   (`padding-right: 1.5em`) and an input's is the browser's, and neither has
+   anything to do with the height. */
+.doodle select,
+.doodle input:not([type='checkbox']):not([type='radio']) {
+  padding-block: 4px;
+}
+
+/* Padding alone still left the select a pixel short of the button: with
+   `line-height: normal` the browser sizes a select's own text box from the
+   font's metrics and a button's line box from something fractionally taller,
+   so the two only agree once a number is stated. 1.125 is 18px at the app's
+   16px — the height a button's line box already had — so the buttons don't
+   move and the fields come up to meet them. */
+.doodle button,
+.doodle .doodle-border,
+.doodle select,
+.doodle input:not([type='checkbox']):not([type='radio']) {
+  line-height: 1.125;
+}
+
 /* Labels that are a click target and nothing more: they must contribute no box
    of their own. Without this they add DoodleCSS's `.doodle label { padding:
    .25em 0 }` — the ~8px that made an "Edit" modal trigger visibly taller than
@@ -101,6 +125,18 @@
    can only be beaten from an unlayered stylesheet, which is why it's here and
    not there. */
 .doodle label.modal-trigger {
+  padding: 0;
+}
+
+/* A Field's <label> is a wrapper around a stacked label-and-control, not a line
+   of text, but `.doodle label { padding: .25em 0 }` still hung 4px under the
+   control. In a row that bottom-aligns its items — the status filter and its
+   button — that padding is what the button lines up with, so the field sat 4px
+   high even once the two were the same height. Forms space stacked fields with
+   their own `gap`, so the padding was only ever incidental. Here rather than in
+   field.tsx for the usual reason: a layered css() rule cannot outrank an
+   unlayered Doodle one. */
+.doodle label.field {
   padding: 0;
 }
 
