@@ -84,7 +84,7 @@ describe('the Letterboxd sync cooldown', { skip: skipWithoutDatabase }, () => {
     const result = await syncLetterboxdNow(db, await load())
 
     assert.equal(fetches, 1)
-    assert.deepEqual(result, { logged: 0, unresolved: 0, deleted: 0 })
+    assert.deepEqual(result, { carried: 0, logged: 0, unresolved: 0, deleted: 0 })
   })
 
   // Skipping the cooldown still stamps it, or a member pressing the button

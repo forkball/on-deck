@@ -376,6 +376,20 @@ export async function listBatches(db: Db, userId: number, limit = 10): Promise<I
   })
 }
 
+// Whether this member has ever brought a library across for this media type.
+//
+// Asked rather than inferred from how many films are logged, because the
+// question is about provenance, not size: someone who logged two hundred films
+// by hand has a full log and no imported history, and someone whose export
+// held four films has imported history and a tiny one. Only a finished batch
+// counts — one abandoned halfway through review wrote nothing.
+export async function hasImportedLibrary(db: Db, userId: number, mediaType: MediaType): Promise<boolean> {
+  const batch = await db.findOne(importBatches, {
+    where: and(eq('user_id', userId), eq('media_type', mediaType), eq('status', 'done')),
+  })
+  return batch != null
+}
+
 // One unfinished import at a time, so a second upload can't quietly orphan the
 // batch someone is halfway through reviewing.
 export async function activeBatch(db: Db, userId: number, mediaType: MediaType): Promise<ImportBatch | null> {

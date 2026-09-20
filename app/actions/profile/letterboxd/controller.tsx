@@ -60,11 +60,14 @@ function count(n: number, one: string, many: string): string {
 // Exported for its own test: it is the whole of what the button communicates,
 // and it needs no database to demonstrate.
 export function describeSync(result: LetterboxdSyncResult): string {
-  // Not an error. A diary of nothing but lists, or a brand new account, reads
-  // exactly like this, and saying "0 entries" invites the reading that
-  // something went wrong on our side.
+  // Neither of these is an error, and they used to read the same. Once
+  // connecting stopped backfilling, "nothing written" became the ordinary
+  // state of a fresh connection to a busy diary — so saying Letterboxd wasn't
+  // publishing anything was both wrong and the first thing a new member saw.
   if (result.logged === 0 && result.unresolved === 0) {
-    return "Read your feed — Letterboxd isn't publishing any diary entries for that name yet."
+    return result.carried === 0
+      ? "Read your feed — Letterboxd isn't publishing any diary entries for that name yet."
+      : 'Read your feed — nothing new since you connected.'
   }
 
   const parts = [`Read ${count(result.logged, 'diary entry', 'diary entries')} from Letterboxd.`]
@@ -108,11 +111,22 @@ export default createController(routes.profile.letterboxd, {
       }
 
       const db = context.get(Database)
+      // Stamped on every connect, including a rename: pointing at a different
+      // diary starts a new subscription, and carrying the old point over would
+      // pull in whatever that diary happened to have published since.
+      const connectedAt = Date.now()
+
       await db.update(users, auth.identity.id, {
         letterboxd_username: username,
+        letterboxd_connected_at: connectedAt,
         // Cleared so connecting always syncs, even for a member who
         // disconnected and reconnected inside the cooldown.
         letterboxd_synced_at: undefined,
+        // The window belongs to the connection that opened it, so a new one
+        // starts with nothing to compare against rather than measuring this
+        // diary against the last one's floor.
+        letterboxd_feed_floor: undefined,
+        letterboxd_feed_items: undefined,
       })
 
       // Not awaited: the first sync looks up every film it hasn't seen, which
@@ -121,6 +135,7 @@ export default createController(routes.profile.letterboxd, {
       syncLetterboxdInBackground(db, {
         ...auth.identity,
         letterboxd_username: username,
+        letterboxd_connected_at: connectedAt,
         letterboxd_synced_at: null,
       })
 
@@ -162,7 +177,10 @@ export default createController(routes.profile.letterboxd, {
       // literal null.
       await db.update(users, auth.identity.id, {
         letterboxd_username: undefined,
+        letterboxd_connected_at: undefined,
         letterboxd_synced_at: undefined,
+        letterboxd_feed_floor: undefined,
+        letterboxd_feed_items: undefined,
       })
 
       return back()

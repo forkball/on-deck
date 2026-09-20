@@ -23,6 +23,10 @@ export const users = table({
     // Throttles the feed fetch — not a watermark over what has been seen. See
     // syncLetterboxdDiary for why the entries themselves are always re-read.
     letterboxd_synced_at: c.integer().nullable(),
+    // When the diary was connected, and so the point the feed speaks from:
+    // entries published after it are followed, entries before it are history
+    // the CSV import exists for. Null for anyone connected before this existed.
+    letterboxd_connected_at: c.integer().nullable(),
     // What the last sync saw of the feed: the oldest entry it showed, and how
     // many <item>s it carried in total, lists included. Together they let the
     // next sync tell a feed that was truncated from one that shrank — see

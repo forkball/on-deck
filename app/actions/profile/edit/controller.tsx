@@ -5,6 +5,7 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
+import type { Db } from '../../../data/db.ts'
 import type { User } from '../../../data/schema.ts'
 import {
   bioSchema,
@@ -16,6 +17,7 @@ import {
   userFieldErrors,
   usernameSchema,
 } from '../../../data/users.ts'
+import { hasImportedLibrary } from '../../../data/imports/batches.ts'
 import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
@@ -51,7 +53,7 @@ function steamError(code: string | null): string | undefined {
 // submits included — the panels are part of the page, not of the form that
 // failed, and dropping them on a bad password would be a strange thing to do to
 // someone who mistyped one.
-function connectionsFor(identity: User, url: URL): ConnectionsProps {
+async function connectionsFor(db: Db, identity: User, url: URL): Promise<ConnectionsProps> {
   return {
     letterboxd: letterboxdSyncAvailableTo(identity)
       ? {
@@ -59,6 +61,8 @@ function connectionsFor(identity: User, url: URL): ConnectionsProps {
           justConnected: url.searchParams.get('letterboxdConnected') === '1',
           error: url.searchParams.get('letterboxdError') ?? undefined,
           notice: url.searchParams.get('letterboxdNotice') ?? undefined,
+          connectedAt: identity.letterboxd_connected_at ?? null,
+          historyImported: await hasImportedLibrary(db, identity.id, 'movie'),
         }
       : null,
     steam: {
@@ -92,8 +96,9 @@ function submittedValues(formData: FormData) {
 export default createController(routes.profile.edit, {
   middleware: [requireAuth<User>()],
   actions: {
-    index(context) {
+    async index(context) {
       const auth = context.get(Auth)
+      const db = context.get(Database)
 
       return context.render(
         <ProfileEditPage
@@ -106,7 +111,7 @@ export default createController(routes.profile.edit, {
           settings={profileSettingsFor(auth.identity)}
           saved={context.url.searchParams.get('saved') === '1'}
           displayName={displayLabel(auth.identity)}
-          connections={connectionsFor(auth.identity, context.url)}
+          connections={await connectionsFor(db, auth.identity, context.url)}
           activeTab={activeTab(context.url)}
         />,
       )
@@ -116,10 +121,11 @@ export default createController(routes.profile.edit, {
       const auth = context.get(Auth)
 
       const formData = context.get(FormData)
+      const db = context.get(Database)
 
       // Every rejection puts the form back with what was typed in it — bar
       // the password box, which submittedValues deliberately never reads.
-      const reject = (errors: Record<string, string>, status: number, confirming = false) =>
+      const reject = async (errors: Record<string, string>, status: number, confirming = false) =>
         context.render(
           <ProfileEditPage
             values={submittedValues(formData)}
@@ -127,7 +133,7 @@ export default createController(routes.profile.edit, {
             confirming={confirming}
             settings={profileSettingsFor(auth.identity)}
             displayName={displayLabel(auth.identity)}
-            connections={connectionsFor(auth.identity, context.url)}
+            connections={await connectionsFor(db, auth.identity, context.url)}
             // This form is the profile pane, and it is the one that failed —
             // so the errors are rendered where the fields carrying them are.
             activeTab={PROFILE_TABS.profile}
@@ -138,7 +144,6 @@ export default createController(routes.profile.edit, {
       const parsed = s.parseSafe(profileSchema, formData)
       if (!parsed.success) return reject(userFieldErrors(parsed.issues), 400)
 
-      const db = context.get(Database)
       const { email, display_name, bio, is_private, current_password } = parsed.value
 
       // The two handles are how the account is reached — an email a reset can

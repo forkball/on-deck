@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
+  coverageFrom,
   feedCoverage,
   foldRewatches,
   selectRemovable,
+  sinceConnected,
   type SyncedRow,
 } from '../app/data/imports/letterboxdSync.ts'
 import type { LetterboxdEntry } from '../app/data/imports/letterboxdFeed.ts'
@@ -268,5 +270,79 @@ describe('selectRemovable at the bottom of the window', () => {
     const coverage = feedCoverage(after, { floor: 1_000, items: 3 })
 
     assert.deepEqual(selectRemovable(after, [row({ tmdbId: 'ancient', sourceEntryAt: 400 })], coverage), [])
+  })
+})
+
+// Connecting is a subscription, not an import: the fifty entries the feed
+// happens to hold are an arbitrary slice of a library, and taking them made a
+// fragment look like the whole.
+describe('sinceConnected', () => {
+  const feed = [
+    entry({ tmdbId: 'after', publishedAt: 3_000 }),
+    entry({ tmdbId: 'on', publishedAt: 2_000 }),
+    entry({ tmdbId: 'before', publishedAt: 1_000 }),
+  ]
+
+  it('takes only what was written after the connection', () => {
+    assert.deepEqual(
+      sinceConnected(feed, 2_000).map((e) => e.tmdbId),
+      ['after'],
+    )
+  })
+
+  // Not a boundary worth agonising over, but it has to be one of the two: the
+  // entry published in the same instant as the connection predates the decision
+  // to follow it.
+  it('leaves the entry sitting on the connection point', () => {
+    assert.equal(
+      sinceConnected(feed, 2_000).some((e) => e.tmdbId === 'on'),
+      false,
+    )
+  })
+
+  // A film watched in 2019 and logged today is a new diary entry. pubDate is
+  // when it was written, so backdating the watch cannot hide it.
+  it('follows a new entry for an old film', () => {
+    const backdated = entry({ tmdbId: 'catch-up', publishedAt: 5_000, watchedAt: 1 })
+
+    assert.deepEqual(sinceConnected([backdated], 2_000), [backdated])
+  })
+
+  it('drops an entry it cannot place against the connection', () => {
+    assert.deepEqual(sinceConnected([entry({ tmdbId: 'undated' })], 2_000), [])
+  })
+
+  // Anyone who connected before this rule existed. Narrowing their window now
+  // would strand the rows they already have outside everything that maintains
+  // them.
+  it('leaves a feed alone when there is no connection point', () => {
+    assert.deepEqual(sinceConnected(feed, null), feed)
+  })
+})
+
+describe('coverageFrom', () => {
+  const mine = [entry({ tmdbId: 'mine', publishedAt: 3_000 })]
+  const theirs = entry({ tmdbId: 'older', publishedAt: 1_000 })
+  const previous = { floor: null, items: null }
+
+  // While the feed still shows something from before the connection, it reaches
+  // past everything this member can own — so nothing of theirs can have been
+  // truncated, and the connection point is the floor.
+  it('reaches to the connection point while the feed still predates it', () => {
+    assert.deepEqual(coverageFrom([...mine, theirs], mine, 2_000, previous), { at: 2_000, inclusive: false })
+  })
+
+  // Once the window is all theirs it can truncate again, so the ordinary rule
+  // takes back over.
+  it("falls back to the feed's own floor once the window is all theirs", () => {
+    assert.deepEqual(coverageFrom(mine, mine, 2_000, previous), { at: 3_000, inclusive: false })
+  })
+
+  it('answers for nothing when the member has logged nothing yet', () => {
+    assert.equal(coverageFrom([theirs], [], 2_000, previous), null)
+  })
+
+  it('is the ordinary rule for a member with no connection point', () => {
+    assert.deepEqual(coverageFrom(mine, mine, null, previous), { at: 3_000, inclusive: false })
   })
 })

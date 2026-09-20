@@ -83,14 +83,14 @@ describe('the Letterboxd connect routes', () => {
 describe('what a manual sync reports', () => {
   it('counts the entries it read', () => {
     assert.equal(
-      describeSync({ logged: 47, unresolved: 0, deleted: 0 }),
+      describeSync({ carried: 47, logged: 47, unresolved: 0, deleted: 0 }),
       'Read 47 diary entries from Letterboxd.',
     )
   })
 
   it('names removals rather than leaving them to be noticed', () => {
     assert.equal(
-      describeSync({ logged: 46, unresolved: 0, deleted: 2 }),
+      describeSync({ carried: 46, logged: 46, unresolved: 0, deleted: 2 }),
       'Read 46 diary entries from Letterboxd. Removed 2 films your diary no longer lists.',
     )
   })
@@ -99,14 +99,14 @@ describe('what a manual sync reports', () => {
   // and this count is the only sign of it.
   it('admits what it could not match', () => {
     assert.equal(
-      describeSync({ logged: 45, unresolved: 3, deleted: 1 }),
+      describeSync({ carried: 48, logged: 45, unresolved: 3, deleted: 1 }),
       "Read 45 diary entries from Letterboxd. Removed 1 film your diary no longer lists. 3 entries couldn't be matched to a film.",
     )
   })
 
   it('reads as one of each rather than 1 films', () => {
     assert.equal(
-      describeSync({ logged: 1, unresolved: 1, deleted: 1 }),
+      describeSync({ carried: 2, logged: 1, unresolved: 1, deleted: 1 }),
       "Read 1 diary entry from Letterboxd. Removed 1 film your diary no longer lists. 1 entry couldn't be matched to a film.",
     )
   })
@@ -114,6 +114,16 @@ describe('what a manual sync reports', () => {
   // A diary of nothing but lists, or a name that isn't publishing yet. Saying
   // "0 entries" invites the reading that something broke on our side.
   it('explains an empty feed instead of counting it', () => {
-    assert.match(describeSync({ logged: 0, unresolved: 0, deleted: 0 }), /isn't publishing any diary entries/)
+    assert.match(describeSync({ carried: 0, logged: 0, unresolved: 0, deleted: 0 }), /isn't publishing any diary entries/)
+  })
+
+  // The ordinary state of a fresh connection to a busy diary: fifty entries in
+  // the feed, none of them written since the member connected. Reporting that
+  // as a silent Letterboxd was both wrong and the first thing they saw.
+  it('separates a quiet diary from an empty one', () => {
+    assert.equal(
+      describeSync({ carried: 50, logged: 0, unresolved: 0, deleted: 0 }),
+      'Read your feed — nothing new since you connected.',
+    )
   })
 })

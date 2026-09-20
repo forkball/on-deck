@@ -88,6 +88,7 @@ describe('syncing a diary that changed', { skip: skipWithoutDatabase }, () => {
 
     body = feed([item(film, 10, 'Wed, 10 Sep 2026 12:00:00 +0000', '2026-09-10'), ...older])
     assert.deepEqual(await syncLetterboxdDiary(db, userId, 'someone'), {
+      carried: 3,
       logged: 3,
       unresolved: 0,
       deleted: 0,
@@ -102,6 +103,7 @@ describe('syncing a diary that changed', { skip: skipWithoutDatabase }, () => {
     // Logged again: a new diary entry, so a new guid and a later pubDate.
     body = feed([item(film, 11, 'Thu, 11 Sep 2026 12:00:00 +0000', '2026-09-11'), ...older])
     assert.deepEqual(await syncLetterboxdDiary(db, userId, 'someone'), {
+      carried: 3,
       logged: 3,
       unresolved: 0,
       deleted: 0,
@@ -181,7 +183,7 @@ describe('the oldest entry the feed carries', { skip: skipWithoutDatabase }, () 
     globalThis.fetch = realFetch
     await deleteUsers([userId])
     for (const id of ids.values()) await pool.query('delete from media_items where id = $1', [id])
-    await pool.end()
+    // The pool is shared across this file, so only the last suite closes it.
   })
 
   const reset = () => pool.query('delete from user_media_interactions where user_id = $1', [userId])
@@ -227,5 +229,99 @@ describe('the oldest entry the feed carries', { skip: skipWithoutDatabase }, () 
     body = feed([NEWEST, MIDDLE])
     assert.equal((await syncLetterboxdDiary(db, userId, 'someone')).deleted, 0)
     assert.equal(await present('oldest'), true)
+  })
+})
+
+// Connecting follows what comes next. The feed is a window on a diary, so the
+// entries it happens to hold at connection time are somebody's last few weeks
+// or last few years depending only on how often they log — and bringing them
+// across made an arbitrary slice look like a library.
+//
+// Needs a migrated database: `npm run db:up && npm run db:migrate`.
+describe('connecting a diary that already has history', { skip: skipWithoutDatabase }, () => {
+  let userId: number
+  const ids = new Map<string, number>()
+  let body = ''
+  const realFetch = globalThis.fetch
+  const stamp = Date.now()
+  const CONNECTED_AT = 2_000_000_000_000
+
+  const ext = (name: string) => `connect-${stamp}-${name}`
+
+  function item(name: string, guid: number, publishedAt: number) {
+    return `<item> <guid isPermaLink="false">letterboxd-watch-${guid}</guid> <pubDate>${new Date(publishedAt).toUTCString()}</pubDate> <letterboxd:watchedDate>2026-09-01</letterboxd:watchedDate> <letterboxd:filmTitle>${name}</letterboxd:filmTitle> <tmdb:movieId>${ext(name)}</tmdb:movieId> </item>`
+  }
+  const feed = (items: string[]) => `<?xml version='1.0'?><rss><channel>${items.join('')}</channel></rss>`
+
+  // Two films already in the diary when the account is connected, and two
+  // logged afterwards.
+  const OLD_ONE = item('old-one', 1, CONNECTED_AT - 200_000)
+  const OLD_TWO = item('old-two', 2, CONNECTED_AT - 100_000)
+  const NEW_ONE = item('new-one', 3, CONNECTED_AT + 100_000)
+  const NEW_TWO = item('new-two', 4, CONNECTED_AT + 200_000)
+
+  const present = async (name: string) =>
+    (await getUserInteractionForItem(db, userId, ids.get(name)!)) != null
+
+  before(async () => {
+    globalThis.fetch = (async () => new Response(body, { status: 200 })) as typeof fetch
+    userId = await insertUser('connect-test')
+    await db.update(users, userId, { letterboxd_connected_at: CONNECTED_AT })
+
+    for (const name of ['old-one', 'old-two', 'new-one', 'new-two']) {
+      const {
+        rows: [row],
+      } = await pool.query<{ id: number }>(
+        `insert into media_items (type, external_source, external_id, title, metadata, created_at)
+         values ('movie', 'tmdb', $1, $2, '{}'::jsonb, $3) returning id`,
+        [ext(name), name, stamp],
+      )
+      ids.set(name, row!.id)
+    }
+  })
+
+  after(async () => {
+    globalThis.fetch = realFetch
+    await deleteUsers([userId])
+    for (const id of ids.values()) await pool.query('delete from media_items where id = $1', [id])
+    await pool.end()
+  })
+
+  it('takes nothing from the diary as it stood', async () => {
+    body = feed([OLD_TWO, OLD_ONE])
+
+    // Carried two, wrote neither: the difference is what tells a quiet diary
+    // from an empty one on the panel.
+    assert.deepEqual(await syncLetterboxdDiary(db, userId, 'someone'), {
+      carried: 2,
+      logged: 0,
+      unresolved: 0,
+      deleted: 0,
+    })
+    assert.equal(await present('old-one'), false)
+    assert.equal(await present('old-two'), false)
+  })
+
+  it('follows what is logged after it', async () => {
+    body = feed([NEW_ONE, OLD_TWO, OLD_ONE])
+
+    assert.equal((await syncLetterboxdDiary(db, userId, 'someone')).logged, 1)
+    assert.equal(await present('new-one'), true)
+    // Still no interest in the history sitting right beside it in the feed.
+    assert.equal(await present('old-one'), false)
+  })
+
+  // The films from before the connection are what keeps the window open: while
+  // the feed still shows them it reaches past everything this member owns, so
+  // an absence can only be a deletion.
+  it('removes one of its own that the diary stopped carrying', async () => {
+    body = feed([NEW_TWO, NEW_ONE, OLD_TWO, OLD_ONE])
+    await syncLetterboxdDiary(db, userId, 'someone')
+    assert.equal(await present('new-two'), true)
+
+    body = feed([NEW_TWO, OLD_TWO, OLD_ONE])
+    assert.equal((await syncLetterboxdDiary(db, userId, 'someone')).deleted, 1)
+    assert.equal(await present('new-one'), false)
+    assert.equal(await present('new-two'), true)
   })
 })

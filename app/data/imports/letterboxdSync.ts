@@ -30,6 +30,12 @@ const COOLDOWN_MS = 15 * 60 * 1000
 const WAIT_MS = 3_000
 
 export interface LetterboxdSyncResult {
+  // Diary entries the feed held, before the connection point narrowed them.
+  // The difference between the two is what separates "your diary is empty"
+  // from "nothing new since you connected" — which read identically once
+  // connecting stopped backfilling, and only one of them is worth worrying
+  // about.
+  carried: number
   logged: number
   // Entries whose TMDB id no longer resolves — a deleted or merged record.
   unresolved: number
@@ -68,7 +74,8 @@ export async function syncLetterboxdDiary(
   let logged = 0
   let unresolved = 0
 
-  const entries = foldRewatches(outcome.entries)
+  const connectedAt = user?.letterboxd_connected_at ?? null
+  const entries = foldRewatches(sinceConnected(outcome.entries, connectedAt))
 
   await runBounded(entries, CONCURRENCY, async (entry) => {
     const item = await resolveMovie(db, entry.tmdbId)
@@ -101,7 +108,7 @@ export async function syncLetterboxdDiary(
   // Composed here rather than inside a loader, so the rule that decides what
   // gets destroyed is visible at the point it runs. A feed that can't place
   // its own window answers for nothing and never reaches the database.
-  const coverage = feedCoverage(entries, previous)
+  const coverage = coverageFrom(outcome.entries, entries, connectedAt, previous)
   const removable = coverage == null ? [] : selectRemovable(entries, await loadSyncedRows(db, userId, coverage), coverage)
 
   const removed: string[] = []
@@ -134,7 +141,53 @@ export async function syncLetterboxdDiary(
     letterboxd_feed_items: entries.length,
   })
 
-  return { logged, unresolved, deleted: removed.length }
+  return { carried: outcome.entries.length, logged, unresolved, deleted: removed.length }
+}
+
+// Everything the feed carries that was written after the member connected.
+//
+// The feed is a window on a diary, not the diary: the fifty entries it happens
+// to hold are the last few weeks for one member and the last few years for
+// another. Taking them at connection time brought an arbitrary slice of a
+// library across as though it were the library, and — because recommendations
+// exclude what the log knows about — made everything it missed look unwatched.
+// So connecting follows what comes next, and the CSV import is what brings the
+// past.
+//
+// An undated entry is dropped rather than kept: nothing places it against the
+// connection point, and "we cannot tell whether this is new" is not a reason to
+// treat it as new.
+//
+// A null connection point is a member who connected before this rule existed.
+// They keep the whole window, because narrowing it now would strand the rows
+// they already have outside everything that maintains them.
+export function sinceConnected(entries: LetterboxdEntry[], connectedAt: number | null): LetterboxdEntry[] {
+  if (connectedAt == null) return entries
+
+  return entries.filter((entry) => entry.publishedAt != null && entry.publishedAt > connectedAt)
+}
+
+// Where the delete pass may reach, once the connection point is in play.
+//
+// While the feed still carries something from before the member connected, it
+// reaches back past everything they can own here — so every row the feed could
+// have written is in view, and any absence is a deletion. The connection point
+// is the floor, and the feed's own truncation cannot reach above it.
+//
+// Once every entry in the window is one of theirs, the feed has filled up with
+// their own diary and can truncate again, so the ordinary rule takes over.
+export function coverageFrom(
+  all: LetterboxdEntry[],
+  mine: LetterboxdEntry[],
+  connectedAt: number | null,
+  previous: PreviousFeed,
+): FeedCoverage | null {
+  if (connectedAt == null) return feedCoverage(mine, previous)
+  if (mine.length === 0) return null
+
+  const reachesPastConnection = all.some((entry) => entry.publishedAt != null && entry.publishedAt <= connectedAt)
+
+  return reachesPastConnection ? { at: connectedAt, inclusive: false } : feedCoverage(mine, previous)
 }
 
 // The floor this fetch alone can vouch for. Kept apart from feedCoverage
