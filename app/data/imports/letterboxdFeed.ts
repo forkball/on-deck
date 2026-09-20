@@ -115,6 +115,19 @@ export async function fetchLetterboxdFeed(username: string): Promise<LetterboxdF
   return { ok: true, entries: parseLetterboxdFeed(await response.text()) }
 }
 
+// Measured against real feeds rather than assumed, because the delete rule
+// leans on all of it:
+//
+//   davidehrlich  100 items = 50 diary + 50 lists
+//   jayhalsey      30 items = 30 diary +  0 lists
+//   schrader        1 item  =  1 diary +  0 lists
+//
+// The two kinds are separate blocks — every diary entry, then every list —
+// each capped at 50, so a list can never push a diary entry out of view. The
+// diary block is ordered by pubDate descending, and pubDate is when the entry
+// was written rather than when the film was watched: three entries seconds
+// apart carrying one backdated watchedDate is someone logging a batch in one
+// sitting. That is what makes pubDate the axis the window can be measured on.
 const ITEM_PATTERN = /<item>([\s\S]*?)<\/item>/g
 
 // The feed is not all diary entries: it carries the member's lists too, at

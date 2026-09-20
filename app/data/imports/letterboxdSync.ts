@@ -1,4 +1,4 @@
-import { and, eq, gt, inList } from 'remix/data-table'
+import { and, eq, gt, gte, inList } from 'remix/data-table'
 
 import { getCatalogProvider, upsertCatalogItem } from '../catalog/provider.ts'
 import { runBounded } from './csv.ts'
@@ -30,6 +30,12 @@ const COOLDOWN_MS = 15 * 60 * 1000
 const WAIT_MS = 3_000
 
 export interface LetterboxdSyncResult {
+  // Diary entries the feed held, before the connection point narrowed them.
+  // The difference between the two is what separates "your diary is empty"
+  // from "nothing new since you connected" — which read identically once
+  // connecting stopped backfilling, and only one of them is worth worrying
+  // about.
+  carried: number
   logged: number
   // Entries whose TMDB id no longer resolves — a deleted or merged record.
   unresolved: number
@@ -57,10 +63,19 @@ export async function syncLetterboxdDiary(
   const outcome = await fetchLetterboxdFeed(username)
   if (!outcome.ok) throw new Error(outcome.message)
 
+  // Read before the writes below touch anything: this is what the *last* fetch
+  // saw, and comparing the two is the only way to know why the window moved.
+  const user = await db.find(users, userId)
+  const previous: PreviousFeed = {
+    floor: user?.letterboxd_feed_floor ?? null,
+    items: user?.letterboxd_feed_items ?? null,
+  }
+
   let logged = 0
   let unresolved = 0
 
-  const entries = foldRewatches(outcome.entries)
+  const connectedAt = user?.letterboxd_connected_at ?? null
+  const entries = foldRewatches(sinceConnected(outcome.entries, connectedAt))
 
   await runBounded(entries, CONCURRENCY, async (entry) => {
     const item = await resolveMovie(db, entry.tmdbId)
@@ -93,8 +108,8 @@ export async function syncLetterboxdDiary(
   // Composed here rather than inside a loader, so the rule that decides what
   // gets destroyed is visible at the point it runs. A feed that can't place
   // its own window answers for nothing and never reaches the database.
-  const watermark = coverageWatermark(entries)
-  const removable = watermark == null ? [] : selectRemovable(entries, await loadSyncedRows(db, userId, watermark))
+  const coverage = coverageFrom(outcome.entries, entries, connectedAt, previous)
+  const removable = coverage == null ? [] : selectRemovable(entries, await loadSyncedRows(db, userId, coverage), coverage)
 
   const removed: string[] = []
 
@@ -116,16 +131,152 @@ export async function syncLetterboxdDiary(
     )
   }
 
-  return { logged, unresolved, deleted: removed.length }
+  // Recorded last, and always — including when the feed answered for nothing,
+  // since a diary emptied to lists is exactly what the next sync needs to know
+  // about. What is stored is this fetch's own floor, never the widened one
+  // above: the widening is a claim about an interval, and reusing it would let
+  // the window creep further back on every sync.
+  await db.update(users, userId, {
+    letterboxd_feed_floor: oldestPublished(entries) ?? undefined,
+    letterboxd_feed_items: entries.length,
+  })
+
+  return { carried: outcome.entries.length, logged, unresolved, deleted: removed.length }
 }
 
-// A row the feed created, as the rule below needs to see it: what it points at
-// in the catalog, and when the entry behind it was published.
-export interface SyncedRow {
-  interactionId: number
-  tmdbId: string | null
-  title: string
-  sourceEntryAt: number | null
+// Everything the feed carries that was written after the member connected.
+//
+// The feed is a window on a diary, not the diary: the fifty entries it happens
+// to hold are the last few weeks for one member and the last few years for
+// another. Taking them at connection time brought an arbitrary slice of a
+// library across as though it were the library, and — because recommendations
+// exclude what the log knows about — made everything it missed look unwatched.
+// So connecting follows what comes next, and the CSV import is what brings the
+// past.
+//
+// An undated entry is dropped rather than kept: nothing places it against the
+// connection point, and "we cannot tell whether this is new" is not a reason to
+// treat it as new.
+//
+// A null connection point is a member who connected before this rule existed.
+// They keep the whole window, because narrowing it now would strand the rows
+// they already have outside everything that maintains them.
+export function sinceConnected(entries: LetterboxdEntry[], connectedAt: number | null): LetterboxdEntry[] {
+  if (connectedAt == null) return entries
+
+  return entries.filter((entry) => entry.publishedAt != null && entry.publishedAt > connectedAt)
+}
+
+// Where the delete pass may reach, once the connection point is in play.
+//
+// While the feed still carries something from before the member connected, it
+// reaches back past everything they can own here — so every row the feed could
+// have written is in view, and any absence is a deletion. The connection point
+// is the floor, and the feed's own truncation cannot reach above it.
+//
+// Once every entry in the window is one of theirs, the feed has filled up with
+// their own diary and can truncate again, so the ordinary rule takes over.
+export function coverageFrom(
+  all: LetterboxdEntry[],
+  mine: LetterboxdEntry[],
+  connectedAt: number | null,
+  previous: PreviousFeed,
+): FeedCoverage | null {
+  if (connectedAt == null) return feedCoverage(mine, previous)
+  if (mine.length === 0) return null
+
+  const reachesPastConnection = all.some((entry) => entry.publishedAt != null && entry.publishedAt <= connectedAt)
+
+  return reachesPastConnection ? { at: connectedAt, inclusive: false } : feedCoverage(mine, previous)
+}
+
+// The floor this fetch alone can vouch for. Kept apart from feedCoverage
+// because that answers "what may be deleted" and this answers "what did we
+// see" — the same number only when the feed did not shrink.
+function oldestPublished(entries: LetterboxdEntry[]): number | null {
+  const published = entries.map((entry) => entry.publishedAt).filter((at) => at != null)
+  return published.length === 0 ? null : Math.min(...published)
+}
+
+// How far back the feed can currently answer for, and whether the entry
+// sitting exactly on that line is included.
+export interface FeedCoverage {
+  at: number
+  // True only when `at` came from the previous fetch rather than this one. The
+  // entry on the line is then the one that went missing, not the one the line
+  // was read from — see feedCoverage.
+  inclusive: boolean
+}
+
+// What the last fetch saw, as stored on the member's row.
+export interface PreviousFeed {
+  floor: number | null
+  items: number | null
+}
+
+// A feed that lost more items than this in one interval is not someone tidying
+// their diary. It is a short response, a partial render, or Letterboxd changing
+// what it publishes — and trusting it would delete rows that are still there.
+// Beyond it the pass falls back to what the current fetch alone can prove.
+const MAX_SHRINK = 10
+
+// The line the delete pass measures against.
+//
+// Normally it is the oldest entry the feed still shows: everything published
+// after that would still be carried if it existed, so its absence is a
+// deletion, and everything before it is out of view, which is not the same as
+// gone. Exclusive, because the entry on the line is the one the line was read
+// from.
+//
+// That rule cannot see the bottom of its own window. Delete the oldest entry
+// the feed shows and, with nothing older to backfill, the line rises to the
+// next one — so the row that just went now sits below it and is refused, by the
+// guard written to protect the back catalogue. In a diary that fits inside the
+// feed the line only ever climbs, so the orphan is out of reach for good.
+//
+// Telling that from truncation needs the previous fetch, because the current
+// one cannot say why its floor moved. Truncation happens when a full feed takes
+// something new, and a full feed that truncates keeps its item count — so a
+// count that *fell* is a feed that lost items with nothing refilling it.
+// Nothing was pushed out, and the window still reaches where it reached last
+// time. Inclusive there, because the entry that defined the old floor is
+// exactly the one that may have been deleted.
+//
+// Null when the feed carries no dated diary entry at all: a member who cleared
+// their diary, or a feed that is all lists. That is the case a naive diff reads
+// as "everything was deleted", so it has to be a refusal rather than a floor of
+// zero.
+export function feedCoverage(
+  entries: LetterboxdEntry[],
+  previous: PreviousFeed = { floor: null, items: null },
+): FeedCoverage | null {
+  const published = entries.map((entry) => entry.publishedAt).filter((at) => at != null)
+  if (published.length === 0) return null
+
+  const floor = Math.min(...published)
+
+  // Diary entries, not raw <item>s. The feed is two separate blocks with
+  // separate caps — see the note on ITEM_PATTERN — so a list cannot push an
+  // entry out of view, and counting lists would be worse than useless here:
+  // deleting one would read as a diary that shrank and widen the window onto
+  // rows that were only truncated.
+  const count = entries.length
+
+  const shrank =
+    previous.items != null &&
+    previous.floor != null &&
+    count < previous.items &&
+    previous.items - count <= MAX_SHRINK
+
+  // min() rather than the previous floor outright: a feed can shrink and
+  // backfill in the same interval, and the lower of the two is the one both
+  // fetches can vouch for.
+  return shrank ? { at: Math.min(floor, previous.floor!), inclusive: true } : { at: floor, inclusive: false }
+}
+
+export function withinCoverage(at: number | null, coverage: FeedCoverage): boolean {
+  if (at == null) return false
+  return coverage.inclusive ? at >= coverage.at : at > coverage.at
 }
 
 // Which of a member's feed-written rows the current feed says are gone.
@@ -134,9 +285,12 @@ export interface SyncedRow {
 // decision, and it is the part worth being able to check: everything that makes
 // deletion safe is one of the refusals below, and none of them needs a database
 // to demonstrate.
-export function selectRemovable(entries: LetterboxdEntry[], rows: SyncedRow[]): SyncedRow[] {
-  const watermark = coverageWatermark(entries)
-  if (watermark == null) return []
+export function selectRemovable(
+  entries: LetterboxdEntry[],
+  rows: SyncedRow[],
+  coverage: FeedCoverage | null,
+): SyncedRow[] {
+  if (coverage == null) return []
 
   const present = new Set(entries.map((entry) => entry.tmdbId))
 
@@ -145,30 +299,36 @@ export function selectRemovable(entries: LetterboxdEntry[], rows: SyncedRow[]): 
     // way is not grounds for removing anything.
     if (row.tmdbId == null) return false
     if (present.has(row.tmdbId)) return false
-    // Strictly newer, so the entry sitting exactly on the watermark is left
-    // alone: it is the one the watermark was read from, and a tie there means
-    // two entries published in the same instant — too thin a basis for deleting
-    // someone's log. An undated row is anything written before the column
-    // existed; it cannot be placed against the window at all.
-    return row.sourceEntryAt != null && row.sourceEntryAt > watermark
+    // An undated row is anything written before the column existed; it cannot
+    // be placed against the window at all.
+    return withinCoverage(row.sourceEntryAt, coverage)
   })
 }
 
-// Everything the feed sync has written for this member that the feed's current
-// window can speak for. Two queries rather than a join because the table API
-// can't express one.
+// A row the feed created, as the rule above needs to see it: what it points at
+// in the catalog, and when the entry behind it was published.
+export interface SyncedRow {
+  interactionId: number
+  tmdbId: string | null
+  title: string
+  sourceEntryAt: number | null
+}
+
+// Everything the feed sync has written for this member that the coverage line
+// can speak for. Two queries rather than a join because the table API can't
+// express one.
 //
-// The watermark is applied in SQL as well as in selectRemovable, which is not
+// The line is applied in SQL as well as in selectRemovable, which is not
 // redundant so much as differently motivated: there it is the rule, here it is
 // what keeps the read proportional to the feed rather than to a member's whole
-// history. `source_entry_at > watermark` also excludes NULLs in SQL exactly as
-// the rule does in JS, so the narrower read cannot change the answer.
-async function loadSyncedRows(db: Db, userId: number, watermark: number): Promise<SyncedRow[]> {
+// history. Both comparisons also exclude NULLs exactly as the rule does, so the
+// narrower read cannot change the answer.
+async function loadSyncedRows(db: Db, userId: number, coverage: FeedCoverage): Promise<SyncedRow[]> {
   const rows = await db.findMany(userMediaInteractions, {
     where: and(
       eq('user_id', userId),
       eq('source', INTERACTION_SOURCES.letterboxdFeed),
-      gt('source_entry_at', watermark),
+      coverage.inclusive ? gte('source_entry_at', coverage.at) : gt('source_entry_at', coverage.at),
     ),
   })
   if (rows.length === 0) return []
@@ -190,21 +350,6 @@ async function loadSyncedRows(db: Db, userId: number, watermark: number): Promis
       sourceEntryAt: row.source_entry_at,
     }
   })
-}
-
-// The oldest entry the feed is currently showing. Everything published after
-// this point is something the feed would still be carrying if it existed, so
-// its absence is a deletion rather than a truncation — and everything before it
-// is simply out of view, which is not the same as gone.
-//
-// Null when the feed carries no dated diary entry at all: a member who cleared
-// their diary, or a feed that is all lists. That is exactly the case where a
-// naive diff decides everything was deleted, so it has to be a refusal to act
-// rather than a watermark of zero.
-export function coverageWatermark(entries: LetterboxdEntry[]): number | null {
-  const published = entries.map((entry) => entry.publishedAt).filter((at) => at != null)
-
-  return published.length === 0 ? null : Math.min(...published)
 }
 
 // A rewatch is a second diary entry for a film already in the feed, and an

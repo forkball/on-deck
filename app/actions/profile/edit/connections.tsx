@@ -22,6 +22,13 @@ export interface LetterboxdConnection {
   error?: string
   // What the last Sync now found, when that is what brought us back here.
   notice?: string
+  // When the diary was connected, so the panel can name the line it draws.
+  // Null for anyone connected before that was recorded.
+  connectedAt: number | null
+  // False until a Letterboxd export has been imported. The feed cannot bring a
+  // back catalogue across, so this is the difference between a log that is
+  // current and a log that is complete.
+  historyImported: boolean
 }
 
 export interface SteamConnection {
@@ -52,9 +59,15 @@ const NOTE = css({ fontSize: '13px', color: '#888' })
 
 const ERROR = css({ color: '#b91c1c' })
 
+// Matches how dates read elsewhere (run-list, the import review): the viewer's
+// own locale, since this is a day they chose rather than a timestamp.
+function formatDay(at: number): string {
+  return new Date(at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
 function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
   return () => {
-    const { username, error, notice } = handle.props.connection
+    const { username, error, notice, historyImported, connectedAt } = handle.props.connection
 
     return (
       <section mix={PANEL}>
@@ -84,17 +97,57 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
             people expect to arrive. */}
         {username ? (
           <>
+            {/* The date is the whole point: "what's new" is only meaningful
+                if the panel says new since when. Members connected before that
+                was recorded fall back to naming the diary alone. */}
             <p mix={css({ margin: '0 0 12px', color: '#555' })}>
-              Reading the public diary of <code>{username}</code>.
+              {connectedAt == null ? (
+                <>
+                  Following <code>{username}</code>.
+                </>
+              ) : (
+                <>
+                  Following <code>{username}</code> since {formatDay(connectedAt)}.
+                </>
+              )}
             </p>
+            {/* "since <date>" above states the boundary, so nothing below
+                repeats it. It was being said three times — there, here, and
+                again in the import prompt — which is most of what made this
+                panel long.
+
+                "Diary entries" carries the exclusions on its own: a list or a
+                watchlist add is not one, so naming them separately earns
+                nothing once someone is connected. The disconnected copy still
+                names them, which is where that expectation gets set. */}
             <p mix={NOTE}>
-              Diary entries only — logged films, with their rating and review. Lists and your
-              watchlist aren't read.
+              New diary entries only, with their rating and review. Edits and deletions follow —
+              Letterboxd wins, and films you logged here are never touched. Re-read every 15
+              minutes.
             </p>
-            <p mix={NOTE}>
-              Edits and deletions follow too, and Letterboxd wins. Films you logged here are never
-              touched. Re-read every 15 minutes, or press <strong>Sync now</strong>.
-            </p>
+
+            {/* The boundary this feature would otherwise hide. Connecting
+                subscribes to what gets logged next; it cannot reach a back
+                catalogue, because the feed does not carry one.
+
+                Left unsaid, that gap is invisible in the one place it does
+                damage. Recommendations exclude what the log knows about, so a
+                member with years of Letterboxd history and an empty log here
+                gets films suggested back that they watched and rated — while
+                everything on screen says the connection is working. Saying it
+                is most of the fix; the link is the rest.
+
+                Shown on provenance rather than on a count of films: somebody
+                who logged two hundred by hand has a full log and no imported
+                history, and somebody whose export held four has the opposite.
+                It goes away for good once a batch is saved. */}
+            {!historyImported && (
+              <p mix={css({ margin: '12px 0 0', fontSize: '13px', color: '#555' })}>
+                <strong>Your earlier films aren't here yet.</strong>{' '}
+                <a href={routes.profile.importMovies.index.href()}>Import your Letterboxd export</a>{' '}
+                to bring them across.
+              </p>
+            )}
 
             {/* Sync is the form's own action and Disconnect overrides it,
                 rather than two forms: nesting is not allowed, and `formaction`
@@ -114,8 +167,9 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
         ) : (
           <>
             <p mix={NOTE}>
-              Reads your public diary, no sign-in needed — diary entries only, with their rating
-              and review. Lists and your watchlist aren't read. For older films, use the{' '}
+              Follows what you log from the moment you connect — new diary entries, with their
+              rating and review. Nothing from before, and no lists or watchlist. Your existing
+              films come from the{' '}
               <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
             </p>
             <form
