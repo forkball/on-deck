@@ -59,7 +59,9 @@ export function Field(handle: Handle<FieldProps>) {
     const { label, children, hint, error } = handle.props
 
     return (
-      <label mix={fieldStyle}>
+      // `field` is for app.css, which zeroes the vertical padding DoodleCSS
+      // gives every <label> — see the note there.
+      <label class="field" mix={fieldStyle}>
         <span class="field-label" mix={labelTextStyle}>
           {label}
         </span>
