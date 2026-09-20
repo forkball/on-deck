@@ -3,6 +3,7 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
+import { letterboxdSyncAvailableTo } from '../../data/imports/letterboxdFeed.ts'
 import { syncLetterboxdInBackground } from '../../data/imports/letterboxdSync.ts'
 import {
   getProfileRebuildAllowance,
@@ -71,6 +72,11 @@ export default createController(routes.profile, {
           followersCount={followersCount}
           saved={context.url.searchParams.get('saved') === '1'}
           settings={profileSettingsFor(auth.identity)}
+          sources={{
+            letterboxdAvailable: letterboxdSyncAvailableTo(auth.identity),
+            letterboxdConnected: auth.identity.letterboxd_username != null,
+            steamConnected: auth.identity.steam_id != null,
+          }}
           rebuildsLeft={rebuildAllowance.unlimited ? null : rebuildAllowance.remaining}
           rebuilt={context.url.searchParams.get('rebuilt') === '1'}
           rebuildError={context.url.searchParams.get('rebuildError') ?? undefined}
@@ -91,7 +97,7 @@ export default createController(routes.profile, {
         useNotes: formData.get('use_notes') != null,
       })
 
-      return redirect(`${routes.profile.edit.index.href()}?saved=1`, 303)
+      return redirect(`${routes.profile.edit.index.href()}?tab=taste&saved=1`, 303)
     },
 
     async rebuild(context) {

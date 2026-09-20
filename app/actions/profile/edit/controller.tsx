@@ -22,7 +22,7 @@ import { routes } from '../../../routes.ts'
 import { verifyPassword } from '../../auth/password.ts'
 import { profileSettingsFor } from '../../../data/recommendations/tasteProfile.ts'
 import type { ConnectionsProps } from './connections.tsx'
-import { ProfileEditPage } from './page.tsx'
+import { PROFILE_TABS, ProfileEditPage, type ProfileTab } from './page.tsx'
 
 const profileSchema = f.object({
   email: f.field(emailSchema),
@@ -70,6 +70,14 @@ function connectionsFor(identity: User, url: URL): ConnectionsProps {
   }
 }
 
+// Which pane to open on. Read off the query string the other actions redirect
+// with, so a save or a failed connect comes back to the thing it was about
+// rather than to the profile form.
+function activeTab(url: URL): ProfileTab | undefined {
+  const tab = url.searchParams.get('tab')
+  return tab != null && tab in PROFILE_TABS ? (tab as ProfileTab) : undefined
+}
+
 // Whatever was typed, so a rejected submit comes back with the person's own
 // text (and checkbox state) in the inputs rather than the stored row.
 function submittedValues(formData: FormData) {
@@ -99,6 +107,7 @@ export default createController(routes.profile.edit, {
           saved={context.url.searchParams.get('saved') === '1'}
           displayName={displayLabel(auth.identity)}
           connections={connectionsFor(auth.identity, context.url)}
+          activeTab={activeTab(context.url)}
         />,
       )
     },
@@ -119,6 +128,9 @@ export default createController(routes.profile.edit, {
             settings={profileSettingsFor(auth.identity)}
             displayName={displayLabel(auth.identity)}
             connections={connectionsFor(auth.identity, context.url)}
+            // This form is the profile pane, and it is the one that failed —
+            // so the errors are rendered where the fields carrying them are.
+            activeTab={PROFILE_TABS.profile}
           />,
           { status },
         )

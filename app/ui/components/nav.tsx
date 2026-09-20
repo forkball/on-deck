@@ -37,6 +37,11 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
                   { href: routes.users.search.href(), label: 'People' },
                   { href: routes.recommendations.index.href(), label: 'Recommendations' },
                   { href: routes.profile.index.href(), label: 'Profile' },
+                  // Its own entry rather than something to find behind the
+                  // profile: it holds the connected accounts now, and nobody
+                  // hunting for those thinks to look under a pencil beside
+                  // their own name.
+                  { href: routes.profile.edit.index.href(), label: 'Settings' },
                 ]}
                 logoutHref={routes.auth.logout.href()}
               />

@@ -63,27 +63,29 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
         {error && <p mix={ERROR}>{error}</p>}
         {notice && <p mix={css({ margin: '0 0 12px', color: '#555' })}>{notice}</p>}
 
-        {/* Kept to the part with consequences, and no longer than it takes
-            to say: what is read, that Letterboxd wins, and how to make it
-            happen now. What is read comes first in both states, because it is
-            the question each is being asked — "will this bring my films
-            across" before, "why isn't this one here" after — and the answer is
+        {/* Connected and disconnected are two states, not one form with a
+            different button on it: the field is for naming a diary that isn't
+            named yet, so once one is, it goes away and what's left is acting
+            on the connection. Same shape as Steam below.
+
+            The cost is that correcting a typo means disconnecting and
+            connecting again — the connect action would take a new name
+            perfectly well, there is just nowhere to type one. */}
+        {/* Kept to the part with consequences, and no longer than it takes to
+            say: what is read, that Letterboxd wins, and how to make it happen
+            now. What is read comes first in both states, because it is the
+            question each is being asked — "will this bring my films across"
+            before, "why isn't this one here" after — and the answer is
             narrower than "reads your Letterboxd" sounds.
 
             Stated as what is carried rather than as a list of what isn't; the
             exclusions are open-ended and only the diary is a promise the sync
             can keep. Lists and the watchlist are named anyway, being the two
             people expect to arrive. */}
-        {/* Each state offers only what belongs to it: a name to give before,
-            something to do about the connection after. The field used to stay
-            on afterwards, which cost a third button and an easily missed Save
-            — correcting a typo is Disconnect and reconnect now, which clears
-            the username and nothing else. Same shape as the Steam block
-            below. */}
         {username ? (
           <>
-            <p mix={css({ margin: '0 0 8px', color: '#555' })}>
-              Reading the public diary of <strong>{username}</strong>.
+            <p mix={css({ margin: '0 0 12px', color: '#555' })}>
+              Reading the public diary of <code>{username}</code>.
             </p>
             <p mix={NOTE}>
               Diary entries only — logged films, with their rating and review. Lists and your
@@ -116,7 +118,6 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
               and review. Lists and your watchlist aren't read. For older films, use the{' '}
               <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
             </p>
-
             <form
               method="post"
               action={routes.profile.letterboxd.connect.href()}
@@ -145,7 +146,6 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
             </form>
           </>
         )}
-
       </section>
     )
   }
@@ -229,9 +229,11 @@ export function Connections(handle: Handle<ConnectionsProps>) {
   return () => {
     const { letterboxd, steam } = handle.props
 
+    // Inside a tab panel the bar above is the separator, so this carries no
+    // top margin of its own.
     return (
-      <section mix={css({ marginTop: '40px', maxWidth: '480px' })}>
-        <h2>Connected accounts</h2>
+      <section mix={css({ maxWidth: '480px' })}>
+        <h2 mix={css({ marginTop: 0 })}>Connected accounts</h2>
         <p mix={css({ margin: '0 0 16px', color: '#555' })}>
           Libraries On Deck reads from. Disconnecting one stops the reading — it leaves everything
           already in your log exactly where it is.
