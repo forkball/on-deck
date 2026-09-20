@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
-  coverageWatermark,
+  feedCoverage,
   foldRewatches,
   selectRemovable,
   type SyncedRow,
@@ -103,24 +103,74 @@ describe('foldRewatches', () => {
   })
 })
 
-describe('coverageWatermark', () => {
-  it('is the oldest entry the feed is still showing', () => {
-    const watermark = coverageWatermark([
-      entry({ tmdbId: '1', publishedAt: 500 }),
-      entry({ tmdbId: '2', publishedAt: 200 }),
-      entry({ tmdbId: '3', publishedAt: 900 }),
-    ])
+// A fetch on its own can say how far back it reaches. It takes the one before
+// it to say why that line moved.
+describe('feedCoverage', () => {
+  const feed = [
+    entry({ tmdbId: '1', publishedAt: 500 }),
+    entry({ tmdbId: '2', publishedAt: 200 }),
+    entry({ tmdbId: '3', publishedAt: 900 }),
+  ]
 
-    assert.equal(watermark, 200)
+  it('is the oldest entry the feed is still showing', () => {
+    assert.deepEqual(feedCoverage(feed), { at: 200, inclusive: false })
   })
 
   // An empty feed is the case a naive diff reads as "everything was deleted".
   it('refuses to answer for an empty feed', () => {
-    assert.equal(coverageWatermark([]), null)
+    assert.equal(feedCoverage([]), null)
   })
 
   it('refuses to answer when nothing in the feed carries a date', () => {
-    assert.equal(coverageWatermark([entry({ tmdbId: '1' }), entry({ tmdbId: '2' })]), null)
+    assert.equal(feedCoverage([entry({ tmdbId: '1' }), entry({ tmdbId: '2' })]), null)
+  })
+
+  // The bug this exists for. A feed that lost items with nothing refilling it
+  // was not truncated, so it still answers for where it reached last time —
+  // including for the entry that *was* that floor, hence inclusive.
+  it('reaches back to the old floor when the feed shrank', () => {
+    const coverage = feedCoverage(feed, { floor: 100, items: 4 })
+
+    assert.deepEqual(coverage, { at: 100, inclusive: true })
+  })
+
+  // A full feed that truncates keeps its entry count, so a count that held —
+  // or grew — is the case the widening must not touch. Three entries here,
+  // against three and two seen last time.
+  it('stays where it is when the feed did not shrink', () => {
+    assert.deepEqual(feedCoverage(feed, { floor: 100, items: 3 }), { at: 200, inclusive: false })
+    assert.deepEqual(feedCoverage(feed, { floor: 100, items: 2 }), { at: 200, inclusive: false })
+  })
+
+  // Lists share the feed but live in their own block with their own cap, so
+  // they can neither push a diary entry out nor stand in for one. Counting raw
+  // <item>s read a deleted list as a diary that had shrunk, and widened the
+  // window onto rows that were only truncated — deleting films still sitting on
+  // Letterboxd. Only the entries are counted, so the lists cannot reach this.
+  it('counts diary entries rather than everything in the feed', () => {
+    const withLists = [...feed]
+
+    assert.deepEqual(feedCoverage(withLists, { floor: 100, items: 3 }), { at: 200, inclusive: false })
+  })
+
+  // A feed can lose an entry and backfill in the same interval. The lower of
+  // the two floors is the one both fetches can vouch for.
+  it('takes the lower floor when the feed both shrank and backfilled', () => {
+    assert.deepEqual(feedCoverage(feed, { floor: 300, items: 4 }), { at: 200, inclusive: true })
+  })
+
+  // Nothing to compare against on a first sync, or on a row written before the
+  // columns existed.
+  it('has only this fetch to go on the first time', () => {
+    assert.deepEqual(feedCoverage(feed, { floor: null, items: null }), { at: 200, inclusive: false })
+    assert.deepEqual(feedCoverage(feed, { floor: 100, items: null }), { at: 200, inclusive: false })
+  })
+
+  // A feed missing most of its items is a short response or a change at
+  // Letterboxd, not someone tidying a diary — and trusting it would delete rows
+  // that are still there.
+  it('refuses to widen for a collapse rather than a shrink', () => {
+    assert.deepEqual(feedCoverage(feed, { floor: 100, items: 40 }), { at: 200, inclusive: false })
   })
 })
 
@@ -129,9 +179,11 @@ describe('coverageWatermark', () => {
 // something it shouldn't.
 describe('selectRemovable', () => {
   const feed = [entry({ tmdbId: 'kept', publishedAt: 1_000 }), entry({ tmdbId: 'also-kept', publishedAt: 2_000 })]
+  // What this feed says for itself, with no previous fetch to widen it.
+  const window = feedCoverage(feed)
 
   it('takes a row the feed stopped carrying from inside its window', () => {
-    const removable = selectRemovable(feed, [row({ tmdbId: 'gone', sourceEntryAt: 1_500, interactionId: 42 })])
+    const removable = selectRemovable(feed, [row({ tmdbId: 'gone', sourceEntryAt: 1_500, interactionId: 42 })], window)
 
     assert.deepEqual(
       removable.map((r) => r.interactionId),
@@ -140,34 +192,34 @@ describe('selectRemovable', () => {
   })
 
   it('leaves a row the feed is still carrying', () => {
-    assert.deepEqual(selectRemovable(feed, [row({ tmdbId: 'kept', sourceEntryAt: 1_000 })]), [])
+    assert.deepEqual(selectRemovable(feed, [row({ tmdbId: 'kept', sourceEntryAt: 1_000 })], window), [])
   })
 
   // The truncation guard. The feed holds a bounded number of recent entries, so
   // a film published before the oldest one shown is out of view rather than
   // gone — this is the whole back catalogue, and the reason a watermark exists.
   it('leaves a row published before the window opens', () => {
-    assert.deepEqual(selectRemovable(feed, [row({ tmdbId: 'ancient', sourceEntryAt: 400 })]), [])
+    assert.deepEqual(selectRemovable(feed, [row({ tmdbId: 'ancient', sourceEntryAt: 400 })], window), [])
   })
 
   // Rows written before source_entry_at existed. They cannot be placed against
   // the window at all, so they are never eligible.
   it('leaves a row with no entry date', () => {
-    assert.deepEqual(selectRemovable(feed, [row({ tmdbId: 'undated', sourceEntryAt: null })]), [])
+    assert.deepEqual(selectRemovable(feed, [row({ tmdbId: 'undated', sourceEntryAt: null })], window), [])
   })
 
   it('leaves the row sitting exactly on the watermark', () => {
-    assert.deepEqual(selectRemovable(feed, [row({ tmdbId: 'boundary', sourceEntryAt: 1_000 })]), [])
+    assert.deepEqual(selectRemovable(feed, [row({ tmdbId: 'boundary', sourceEntryAt: 1_000 })], window), [])
   })
 
   it('leaves a row whose catalog entry has no external id to compare', () => {
-    assert.deepEqual(selectRemovable(feed, [row({ tmdbId: null, sourceEntryAt: 1_500 })]), [])
+    assert.deepEqual(selectRemovable(feed, [row({ tmdbId: null, sourceEntryAt: 1_500 })], window), [])
   })
 
   // Belt and braces with coverageWatermark: an empty feed must not be read as
   // "the member deleted their entire diary".
   it('takes nothing at all when the feed is empty', () => {
-    assert.deepEqual(selectRemovable([], [row({ tmdbId: 'gone', sourceEntryAt: 1_500 })]), [])
+    assert.deepEqual(selectRemovable([], [row({ tmdbId: 'gone', sourceEntryAt: 1_500 })], feedCoverage([])), [])
   })
 
   it('separates the gone from the kept in one pass', () => {
@@ -176,11 +228,45 @@ describe('selectRemovable', () => {
       row({ tmdbId: 'gone', sourceEntryAt: 1_500, interactionId: 2 }),
       row({ tmdbId: 'ancient', sourceEntryAt: 10, interactionId: 3 }),
       row({ tmdbId: 'also-gone', sourceEntryAt: 3_000, interactionId: 4 }),
-    ])
+    ], window)
 
     assert.deepEqual(
       removable.map((r) => r.interactionId),
       [2, 4],
     )
+  })
+})
+
+// The gap the coverage line closes, at the level of the rule: with the feed
+// known to have shrunk, the row sitting exactly on the old floor is the one
+// that went.
+describe('selectRemovable at the bottom of the window', () => {
+  const before = [
+    entry({ tmdbId: 'newest', publishedAt: 3_000 }),
+    entry({ tmdbId: 'middle', publishedAt: 2_000 }),
+    entry({ tmdbId: 'oldest', publishedAt: 1_000 }),
+  ]
+  const after = before.slice(0, 2)
+  const rows = [row({ tmdbId: 'oldest', sourceEntryAt: 1_000, interactionId: 7 })]
+
+  it('was refused when only the new feed could be consulted', () => {
+    assert.deepEqual(selectRemovable(after, rows, feedCoverage(after)), [])
+  })
+
+  it('is taken once the previous fetch says the feed shrank', () => {
+    const coverage = feedCoverage(after, { floor: 1_000, items: 3 })
+
+    assert.deepEqual(
+      selectRemovable(after, rows, coverage).map((r) => r.interactionId),
+      [7],
+    )
+  })
+
+  // The back catalogue is still out of reach: shrinking says where the window
+  // reached, not that it reached further than it ever did.
+  it('still leaves what was never in view', () => {
+    const coverage = feedCoverage(after, { floor: 1_000, items: 3 })
+
+    assert.deepEqual(selectRemovable(after, [row({ tmdbId: 'ancient', sourceEntryAt: 400 })], coverage), [])
   })
 })
