@@ -63,51 +63,35 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
         {error && <p mix={ERROR}>{error}</p>}
         {notice && <p mix={css({ margin: '0 0 12px', color: '#555' })}>{notice}</p>}
 
-        {/* Ahead of whatever the state offers, so the block reads as a
-            state with a way to change it rather than a form with a footnote. */}
-        {/* Kept to the part with consequences. That Letterboxd overwrites, and
-            that it can now delete, is the thing someone would be annoyed not to
-            have been told; how often it polls is not.
+        {/* Kept to the part with consequences, and no longer than it takes
+            to say: what is read, that Letterboxd wins, and how to make it
+            happen now. What is read comes first in both states, because it is
+            the question each is being asked — "will this bring my films
+            across" before, "why isn't this one here" after — and the answer is
+            narrower than "reads your Letterboxd" sounds.
 
-            What is read comes first, and it is stated before connecting as well
-            as after, because it is the question both states are actually being
-            asked: "will this bring my films across" before, and "why isn't this
-            one here" after. Both have the same answer, and it is narrower than
-            "reads your Letterboxd" sounds — the feed is the diary and nothing
-            else, so a film that never got a diary entry is invisible to this no
-            matter what else was done to it on Letterboxd.
-
-            Named as what *is* carried rather than as a list of what isn't: the
-            exclusions are open-ended (lists, watchlist, likes, follows, a bare
-            rating), and only the diary is a promise we can keep. Lists and the
-            watchlist are called out anyway — they are the two people expect to
-            arrive, and the watchlist is the one that would otherwise read as a
-            bug. */}
-        {/* Two states, and each offers only what belongs to it: a name to give
-            before connecting, and something to do about the connection after.
-
-            The connected half used to keep the field, on the reading that
-            naming a diary and renaming it are one act — which cost a third
-            button and left an input whose Save was easy to miss. Correcting a
-            typo is Disconnect and reconnect instead: it clears the username and
-            nothing else, so the log survives it and retyping the name is the
-            whole of the work. Same shape the Steam block below already has,
-            which is the better argument — one panel per connection, reading the
-            same way. */}
+            Stated as what is carried rather than as a list of what isn't; the
+            exclusions are open-ended and only the diary is a promise the sync
+            can keep. Lists and the watchlist are named anyway, being the two
+            people expect to arrive. */}
+        {/* Each state offers only what belongs to it: a name to give before,
+            something to do about the connection after. The field used to stay
+            on afterwards, which cost a third button and an easily missed Save
+            — correcting a typo is Disconnect and reconnect now, which clears
+            the username and nothing else. Same shape as the Steam block
+            below. */}
         {username ? (
           <>
-            <p mix={css({ margin: '0 0 12px', color: '#555' })}>
+            <p mix={css({ margin: '0 0 8px', color: '#555' })}>
               Reading the public diary of <strong>{username}</strong>.
             </p>
             <p mix={NOTE}>
-              Only diary entries come across — the films you've logged there, with the rating and
-              review on each. Lists and your watchlist aren't read.
+              Diary entries only — logged films, with their rating and review. Lists and your
+              watchlist aren't read.
             </p>
             <p mix={NOTE}>
-              New entries follow on their own, and so do changes and recent deletions — Letterboxd
-              wins. Films you logged here yourself are never touched. The feed is re-read every
-              quarter of an hour; <strong>Sync now</strong> reads it immediately and says what it
-              found. To read a different diary, disconnect and connect again.
+              Edits and deletions follow too, and Letterboxd wins. Films you logged here are never
+              touched. Re-read every 15 minutes, or press <strong>Sync now</strong>.
             </p>
 
             {/* Sync is the form's own action and Disconnect overrides it,
@@ -128,9 +112,9 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
         ) : (
           <>
             <p mix={NOTE}>
-              Reads your public diary, no sign-in needed — only the films you've logged there, with
-              the rating and review on each. Lists and your watchlist aren't read. For older films,
-              use the <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
+              Reads your public diary, no sign-in needed — diary entries only, with their rating
+              and review. Lists and your watchlist aren't read. For older films, use the{' '}
+              <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
             </p>
 
             <form
