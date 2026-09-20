@@ -138,7 +138,13 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
               first, and `formaction` is what HTML offers instead; the
               username field rides along in the body, which the disconnect
               action doesn't read. */}
-          <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px' })}>
+          {/* Wrapping, because three buttons is one more than this row was
+              sized for: at phone width they don't fit, and without this they
+              shrink until their labels break over two lines and Disconnect
+              still runs off the panel — taking the whole page into horizontal
+              scroll with it. Wrapped, each keeps its natural width and the
+              third drops to a line of its own. */}
+          <div mix={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px' })}>
             <button type="submit">{username ? 'Save username' : 'Connect'}</button>
             {/* Rides the same form as the other two — see the note above — and
                 like Disconnect it ignores the username field it carries. It
