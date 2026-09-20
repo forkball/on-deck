@@ -63,10 +63,8 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
         {error && <p mix={ERROR}>{error}</p>}
         {notice && <p mix={css({ margin: '0 0 12px', color: '#555' })}>{notice}</p>}
 
-        {/* Ahead of the form, so the block reads as a state with a way to
-            change it rather than a form with a footnote — and so the two
-            buttons end up together at the bottom instead of with a paragraph
-            wedged between them. */}
+        {/* Ahead of whatever the state offers, so the block reads as a
+            state with a way to change it rather than a form with a footnote. */}
         {/* Kept to the part with consequences. That Letterboxd overwrites, and
             that it can now delete, is the thing someone would be annoyed not to
             have been told; how often it polls is not.
@@ -85,8 +83,22 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
             watchlist are called out anyway — they are the two people expect to
             arrive, and the watchlist is the one that would otherwise read as a
             bug. */}
+        {/* Two states, and each offers only what belongs to it: a name to give
+            before connecting, and something to do about the connection after.
+
+            The connected half used to keep the field, on the reading that
+            naming a diary and renaming it are one act — which cost a third
+            button and left an input whose Save was easy to miss. Correcting a
+            typo is Disconnect and reconnect instead: it clears the username and
+            nothing else, so the log survives it and retyping the name is the
+            whole of the work. Same shape the Steam block below already has,
+            which is the better argument — one panel per connection, reading the
+            same way. */}
         {username ? (
           <>
+            <p mix={css({ margin: '0 0 12px', color: '#555' })}>
+              Reading the public diary of <strong>{username}</strong>.
+            </p>
             <p mix={NOTE}>
               Only diary entries come across — the films you've logged there, with the rating and
               review on each. Lists and your watchlist aren't read.
@@ -95,74 +107,61 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
               New entries follow on their own, and so do changes and recent deletions — Letterboxd
               wins. Films you logged here yourself are never touched. The feed is re-read every
               quarter of an hour; <strong>Sync now</strong> reads it immediately and says what it
-              found.
+              found. To read a different diary, disconnect and connect again.
             </p>
-          </>
-        ) : (
-          <p mix={NOTE}>
-            Reads your public diary, no sign-in needed — only the films you've logged there, with
-            the rating and review on each. Lists and your watchlist aren't read. For older films,
-            use the <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
-          </p>
-        )}
 
-        {/* One form either way, and the same action behind it. Connecting and
-            changing the name are the same act — naming the diary to read — so
-            the connected state is this field with a value in it rather than a
-            separate display that has to be dismantled before it can be
-            corrected. */}
-        <form
-          method="post"
-          action={routes.profile.letterboxd.connect.href()}
-          mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
-        >
-          {/* The warnings the hint used to carry — that nothing proves the
-              account is yours, that a private one publishes no feed — are both
-              in the error the connect action returns when they bite, so they
-              were being read by everyone to help the few who need them. */}
-          <Field
-            label="Letterboxd username"
-            hint="The last part of your profile URL — letterboxd.com/yourname/"
-          >
-            <input
-              type="text"
-              name="username"
-              placeholder="yourname"
-              autocomplete="off"
-              spellcheck={false}
-              defaultValue={username ?? ''}
-            />
-          </Field>
-          {/* Both buttons submit this one form — Disconnect only overrides
-              where to. A second <form> can't be nested to sit beside the
-              first, and `formaction` is what HTML offers instead; the
-              username field rides along in the body, which the disconnect
-              action doesn't read. */}
-          {/* Wrapping, because three buttons is one more than this row was
-              sized for: at phone width they don't fit, and without this they
-              shrink until their labels break over two lines and Disconnect
-              still runs off the panel — taking the whole page into horizontal
-              scroll with it. Wrapped, each keeps its natural width and the
-              third drops to a line of its own. */}
-          <div mix={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px' })}>
-            <button type="submit">{username ? 'Save username' : 'Connect'}</button>
-            {/* Rides the same form as the other two — see the note above — and
-                like Disconnect it ignores the username field it carries. It
-                syncs the name already stored, not whatever is half-typed in
-                the box, so pressing it after an unsaved edit reads the diary
-                you are actually connected to. */}
-            {username && (
-              <button type="submit" formaction={routes.profile.letterboxd.sync.href()}>
-                Sync now
-              </button>
-            )}
-            {username && (
+            {/* Sync is the form's own action and Disconnect overrides it,
+                rather than two forms: nesting is not allowed, and `formaction`
+                is what HTML offers instead. Nothing is submitted with either —
+                both act on the username already stored. */}
+            <form
+              method="post"
+              action={routes.profile.letterboxd.sync.href()}
+              mix={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px', marginTop: '12px' })}
+            >
+              <button type="submit">Sync now</button>
               <button type="submit" formaction={routes.profile.letterboxd.disconnect.href()}>
                 Disconnect
               </button>
-            )}
-          </div>
-        </form>
+            </form>
+          </>
+        ) : (
+          <>
+            <p mix={NOTE}>
+              Reads your public diary, no sign-in needed — only the films you've logged there, with
+              the rating and review on each. Lists and your watchlist aren't read. For older films,
+              use the <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
+            </p>
+
+            <form
+              method="post"
+              action={routes.profile.letterboxd.connect.href()}
+              mix={css({ display: 'flex', flexDirection: 'column', gap: '12px' })}
+            >
+              {/* The warnings the hint used to carry — that nothing proves the
+                  account is yours, that a private one publishes no feed — are
+                  both in the error the connect action returns when they bite,
+                  so they were being read by everyone to help the few who need
+                  them. */}
+              <Field
+                label="Letterboxd username"
+                hint="The last part of your profile URL — letterboxd.com/yourname/"
+              >
+                <input
+                  type="text"
+                  name="username"
+                  placeholder="yourname"
+                  autocomplete="off"
+                  spellcheck={false}
+                />
+              </Field>
+              <div>
+                <button type="submit">Connect</button>
+              </div>
+            </form>
+          </>
+        )}
+
       </section>
     )
   }
