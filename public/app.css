@@ -105,17 +105,19 @@
   padding-block: 4px;
 }
 
-/* Padding alone still left the select a pixel short of the button: with
-   `line-height: normal` the browser sizes a select's own text box from the
-   font's metrics and a button's line box from something fractionally taller,
-   so the two only agree once a number is stated. 1.125 is 18px at the app's
-   16px — the height a button's line box already had — so the buttons don't
-   move and the fields come up to meet them. */
+/* Padding gets them to the same height while Short Stack is rendering, but the
+   font arrives over the network and `line-height: normal` is read off whatever
+   is rendering at the time: with the fallback the select comes out a pixel
+   short of the button, because a select's text box and a button's line box
+   round a font's metrics differently. Stating the number makes the shared box
+   the same whichever font renders. 1.25 is 20px at the app's 16px, which is
+   exactly Short Stack's own normal line box — so nothing moves when it loads,
+   and nothing drifts when it doesn't. */
 .doodle button,
 .doodle .doodle-border,
 .doodle select,
 .doodle input:not([type='checkbox']):not([type='radio']) {
-  line-height: 1.125;
+  line-height: 1.25;
 }
 
 /* Labels that are a click target and nothing more: they must contribute no box
