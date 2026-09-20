@@ -99,8 +99,16 @@
    status dropdown stood 9px taller than it. Only the block padding is stated
    here: a select's inline padding is DoodleCSS's caret allowance
    (`padding-right: 1.5em`) and an input's is the browser's, and neither has
-   anything to do with the height. */
+   anything to do with the height.
+
+   A <textarea> takes the same block padding — it stacks with these inputs in
+   the same forms (notes, bio), and on 2px its first line sat tighter to the
+   border than theirs. It is deliberately left out of the line-height rule
+   below: that number exists to make one-line controls agree on a height a
+   textarea doesn't share, and a textarea holds prose, which reads better on
+   the font's own roomier line spacing. */
 .doodle select,
+.doodle textarea,
 .doodle input:not([type='checkbox']):not([type='radio']) {
   padding-block: 4px;
 }
