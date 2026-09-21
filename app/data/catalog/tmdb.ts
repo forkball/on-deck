@@ -1,4 +1,3 @@
-
 const TMDB_API_BASE = 'https://api.themoviedb.org/3'
 
 const GENRE_ID_TO_NAME: Record<number, string> = {

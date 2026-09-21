@@ -22,9 +22,7 @@ function encodedHashAt(password: string, N: number): Promise<string> {
   const salt = randomBytes(16)
   return new Promise((resolve, reject) => {
     scrypt(password, salt, 64, { N, r: 8, p: 1, maxmem: 256 * N * 8 }, (error, key) =>
-      error
-        ? reject(error)
-        : resolve(`scrypt$N=${N},r=8,p=1$${salt.toString('hex')}$${key.toString('hex')}`),
+      error ? reject(error) : resolve(`scrypt$N=${N},r=8,p=1$${salt.toString('hex')}$${key.toString('hex')}`),
     )
   })
 }

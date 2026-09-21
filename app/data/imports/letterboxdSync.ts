@@ -109,7 +109,8 @@ export async function syncLetterboxdDiary(
   // gets destroyed is visible at the point it runs. A feed that can't place
   // its own window answers for nothing and never reaches the database.
   const coverage = coverageFrom(outcome.entries, entries, connectedAt, previous)
-  const removable = coverage == null ? [] : selectRemovable(entries, await loadSyncedRows(db, userId, coverage), coverage)
+  const removable =
+    coverage == null ? [] : selectRemovable(entries, await loadSyncedRows(db, userId, coverage), coverage)
 
   const removed: string[] = []
 
@@ -185,7 +186,9 @@ export function coverageFrom(
   if (connectedAt == null) return feedCoverage(mine, previous)
   if (mine.length === 0) return null
 
-  const reachesPastConnection = all.some((entry) => entry.publishedAt != null && entry.publishedAt <= connectedAt)
+  const reachesPastConnection = all.some(
+    (entry) => entry.publishedAt != null && entry.publishedAt <= connectedAt,
+  )
 
   return reachesPastConnection ? { at: connectedAt, inclusive: false } : feedCoverage(mine, previous)
 }

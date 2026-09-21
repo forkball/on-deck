@@ -27,7 +27,10 @@ const SOURCE_LABELS: Record<MediaType, string> = {
   game: 'Game taste',
 }
 
-const PLAYER_TYPE_LABELS: Record<string, string> = { singleplayer: 'Singleplayer', multiplayer: 'Multiplayer' }
+const PLAYER_TYPE_LABELS: Record<string, string> = {
+  singleplayer: 'Singleplayer',
+  multiplayer: 'Multiplayer',
+}
 const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus: 'Versus' }
 const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series', standalone: 'Standalone' }
 
@@ -44,12 +47,17 @@ function describeParams(params: GenerationParams, mediaType: MediaType): string[
     lines.push(`Decade: ${label}`)
   }
   if (params.length) {
-    const label = getCatalogProvider(mediaType).lengthOptions.find((option) => option.value === params.length)?.label
+    const label = getCatalogProvider(mediaType).lengthOptions.find(
+      (option) => option.value === params.length,
+    )?.label
     if (label) lines.push(`Length: ${label}`)
   }
-  if (params.playerType) lines.push(`Player type: ${PLAYER_TYPE_LABELS[params.playerType] ?? params.playerType}`)
+  if (params.playerType)
+    lines.push(`Player type: ${PLAYER_TYPE_LABELS[params.playerType] ?? params.playerType}`)
   if (params.multiplayerType) {
-    lines.push(`Multiplayer type: ${MULTIPLAYER_TYPE_LABELS[params.multiplayerType] ?? params.multiplayerType}`)
+    lines.push(
+      `Multiplayer type: ${MULTIPLAYER_TYPE_LABELS[params.multiplayerType] ?? params.multiplayerType}`,
+    )
   }
   if (params.platform) lines.push(`Platform: ${params.platform}`)
   if (params.series) lines.push(`Series: ${SERIES_TYPE_LABELS[params.series] ?? params.series}`)

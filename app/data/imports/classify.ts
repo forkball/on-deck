@@ -9,14 +9,7 @@ export type MatchReason = 'exact' | 'year_drift' | 'no_year' | 'title_differs'
 // what review writes over them. `kept` is a conflict decided in favour of the
 // log — nothing is written, but nothing is lost either, which is why it is not
 // the same as `skipped`.
-export type RowState =
-  | 'pending'
-  | 'confident'
-  | 'uncertain'
-  | 'not_found'
-  | 'confirmed'
-  | 'skipped'
-  | 'kept'
+export type RowState = 'pending' | 'confident' | 'uncertain' | 'not_found' | 'confirmed' | 'skipped' | 'kept'
 
 export interface CandidateLike {
   externalId: string

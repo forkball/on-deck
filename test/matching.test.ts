@@ -68,9 +68,11 @@ describe('matchesDecade', () => {
 // unambiguously has to be refused rather than filtered on a best guess.
 const pickOf = (title: string): Pick => ({ title, year: 2000, reason: '' })
 
-const hit = (title: string) => ({ title, externalId: title }) as unknown as Awaited<ReturnType<CatalogSearch>>[number]
+const hit = (title: string) =>
+  ({ title, externalId: title }) as unknown as Awaited<ReturnType<CatalogSearch>>[number]
 
-const candidate = (title: string): Candidate => ({ pick: pickOf(title), match: { title } }) as unknown as Candidate
+const candidate = (title: string): Candidate =>
+  ({ pick: pickOf(title), match: { title } }) as unknown as Candidate
 
 describe('applyVerdicts', () => {
   const three = [candidate('a'), candidate('b'), candidate('c')]
@@ -81,7 +83,10 @@ describe('applyVerdicts', () => {
       { index: 1, matches: false },
       { index: 2, matches: true },
     ])
-    assert.deepEqual(kept.map((c) => c.pick.title), ['a', 'c'])
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['a', 'c'],
+    )
   })
 
   it('pairs by index, not by arrival order', () => {
@@ -90,30 +95,39 @@ describe('applyVerdicts', () => {
       { index: 0, matches: true },
       { index: 1, matches: true },
     ])
-    assert.deepEqual(kept.map((c) => c.pick.title), ['a', 'b'])
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['a', 'b'],
+    )
   })
 
   it('refuses a short verdict list rather than sliding answers onto the wrong entry', () => {
-    assert.throws(() => applyVerdicts(three, [
-      { index: 0, matches: true },
-      { index: 1, matches: true },
-    ]))
+    assert.throws(() =>
+      applyVerdicts(three, [
+        { index: 0, matches: true },
+        { index: 1, matches: true },
+      ]),
+    )
   })
 
   it('refuses an out-of-range index', () => {
-    assert.throws(() => applyVerdicts(three, [
-      { index: 0, matches: true },
-      { index: 1, matches: true },
-      { index: 9, matches: true },
-    ]))
+    assert.throws(() =>
+      applyVerdicts(three, [
+        { index: 0, matches: true },
+        { index: 1, matches: true },
+        { index: 9, matches: true },
+      ]),
+    )
   })
 
   it('refuses a duplicate verdict', () => {
-    assert.throws(() => applyVerdicts(three, [
-      { index: 0, matches: true },
-      { index: 0, matches: false },
-      { index: 1, matches: true },
-    ]))
+    assert.throws(() =>
+      applyVerdicts(three, [
+        { index: 0, matches: true },
+        { index: 0, matches: false },
+        { index: 1, matches: true },
+      ]),
+    )
   })
 
   it('refuses a non-array', () => {
@@ -146,7 +160,10 @@ describe('filterByLength', () => {
       },
     )
 
-    assert.deepEqual(kept.map((c) => c.pick.title), ['short one'])
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['short one'],
+    )
     assert.deepEqual(asked, [])
   })
 
@@ -163,7 +180,10 @@ describe('filterByLength', () => {
     )
 
     assert.deepEqual(asked, ['B'])
-    assert.deepEqual(kept.map((c) => c.pick.title), ['known', 'unknown'])
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['known', 'unknown'],
+    )
   })
 
   // The bug this exists for: Google Books answers 429 once the day's quota is
@@ -181,7 +201,10 @@ describe('filterByLength', () => {
       },
     )
 
-    assert.deepEqual(kept.map((c) => c.pick.title), ['known'])
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['known'],
+    )
   })
 
   it('says the catalog is down rather than saving an empty run', async () => {
@@ -204,7 +227,10 @@ describe('filterByLength', () => {
       },
     )
 
-    assert.deepEqual(kept.map((c) => c.pick.title), ['answered'])
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['answered'],
+    )
   })
 })
 
@@ -221,13 +247,15 @@ describe('withOverviews', () => {
 
   it('fills in the overview the lookup did return', async () => {
     const candidates = [book('no overview', 'A', 100)]
-    const returned = await withOverviews(candidates, 'book', async () =>
-      ({ overview: 'a plot' }) as unknown as Awaited<ReturnType<CatalogLookup>>)
+    const returned = await withOverviews(
+      candidates,
+      'book',
+      async () => ({ overview: 'a plot' }) as unknown as Awaited<ReturnType<CatalogLookup>>,
+    )
 
     assert.equal(returned[0].match.overview, 'a plot')
   })
 })
-
 
 describe('searchForPicks', () => {
   const three = [pickOf('a'), pickOf('b'), pickOf('c')]
@@ -242,16 +270,23 @@ describe('searchForPicks', () => {
     })
 
     assert.deepEqual(asked, ['a', 'c'])
-    assert.deepEqual(matches.map((m) => m.map((r) => r.title)), [['a'], ['b from catalog'], ['c']])
+    assert.deepEqual(
+      matches.map((m) => m.map((r) => r.title)),
+      [['a'], ['b from catalog'], ['c']],
+    )
   })
 
   it('leaves a pick unfound when its search throws, rather than failing the run', async () => {
     const matches = await searchForPicks('book', three, new Map(), async (_type, query) => {
-      if (query === 'b') throw Object.assign(new TypeError('fetch failed'), { cause: new Error('read ECONNRESET') })
+      if (query === 'b')
+        throw Object.assign(new TypeError('fetch failed'), { cause: new Error('read ECONNRESET') })
       return [hit(query)]
     })
 
-    assert.deepEqual(matches.map((m) => m.length), [1, 0, 1])
+    assert.deepEqual(
+      matches.map((m) => m.length),
+      [1, 0, 1],
+    )
   })
 
   it('says the catalog is unreachable when every search failed', async () => {
@@ -271,7 +306,10 @@ describe('searchForPicks', () => {
       throw new TypeError('fetch failed')
     })
 
-    assert.deepEqual(matches.map((m) => m.length), [1, 0, 0])
+    assert.deepEqual(
+      matches.map((m) => m.length),
+      [1, 0, 0],
+    )
   })
 
   it('holds the fan-out to the pool rather than putting every pick on the wire', async () => {

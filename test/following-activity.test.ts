@@ -17,7 +17,9 @@ describe('following log activity', { skip: skipWithoutDatabase }, () => {
   const itemIds: number[] = []
 
   const newItem = async (title: string) => {
-    const { rows: [item] } = await pool.query<{ id: number }>(
+    const {
+      rows: [item],
+    } = await pool.query<{ id: number }>(
       `insert into media_items (type, external_source, external_id, title, metadata, created_at)
        values ('movie','test',$1,$2,'{}'::jsonb,$3) returning id`,
       [`feed-${title}-${Date.now()}-${Math.random()}`, title, Date.now()],

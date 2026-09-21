@@ -13,7 +13,8 @@ import {
   repointRow,
   saveBatch,
   setConflictChoice,
-  skipRow,} from '../../../data/imports/batches.ts'
+  skipRow,
+} from '../../../data/imports/batches.ts'
 import { isBulkAcceptable } from '../../../data/imports/classify.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
 import type { ImportBatch, User } from '../../../data/schema.ts'
@@ -192,7 +193,9 @@ export default createController(routes.profile.imports, {
       const { model } = await loadReview(db, batch)
 
       const rowIds = model.uncertain
-        .filter(({ row }) => isBulkAcceptable({ state: 'uncertain', reason: row.reason, yearDelta: row.yearDelta }))
+        .filter(({ row }) =>
+          isBulkAcceptable({ state: 'uncertain', reason: row.reason, yearDelta: row.yearDelta }),
+        )
         .map(({ row }) => row.id)
 
       await acceptBulk(db, batch, rowIds)

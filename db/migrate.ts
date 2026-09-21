@@ -49,10 +49,9 @@ async function acquireLock(): Promise<() => Promise<void>> {
   const deadline = Date.now() + LOCK_WAIT_MS
 
   for (;;) {
-    const { rows } = await client.query<{ locked: boolean }>(
-      'select pg_try_advisory_lock($1) as locked',
-      [LOCK_KEY],
-    )
+    const { rows } = await client.query<{ locked: boolean }>('select pg_try_advisory_lock($1) as locked', [
+      LOCK_KEY,
+    ])
     if (rows[0].locked) break
 
     if (Date.now() >= deadline) {

@@ -22,9 +22,21 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
           <h1>Notifications</h1>
 
           {notifications.length === 0 ? (
-            <p>Nothing yet — you'll hear about it here when someone you follow (and who follows you back) runs a group recommendation with you in it.</p>
+            <p>
+              Nothing yet — you'll hear about it here when someone you follow (and who follows you back) runs
+              a group recommendation with you in it.
+            </p>
           ) : (
-            <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' })}>
+            <ul
+              mix={css({
+                listStyle: 'none',
+                margin: 0,
+                padding: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              })}
+            >
               {notifications.map((notification) => {
                 const date = new Date(notification.createdAt).toLocaleDateString(undefined, {
                   year: 'numeric',

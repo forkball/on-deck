@@ -19,7 +19,11 @@ export type MediaType = MediaItem['type']
 // credits, runtime or description, so re-importing over an enriched row would
 // null out what a by-id lookup filled in. Rematch passes none — it repoints the
 // row at a different work.
-function buildMetadata(result: TmdbSearchResult, previous?: unknown, fromDetailLookup = false): MediaMetadata {
+function buildMetadata(
+  result: TmdbSearchResult,
+  previous?: unknown,
+  fromDetailLookup = false,
+): MediaMetadata {
   const prev = previous != null ? parseMediaMetadata(previous) : null
 
   return {
@@ -79,7 +83,9 @@ export async function markMediaItemEnriched(db: Db, item: MediaItem): Promise<vo
   await db.update(mediaItems, item.id, { metadata: { ...metadata, enrichedAt: Date.now() } })
 }
 
-export type RematchMediaItemResult = { ok: true; item: MediaItem; merged: boolean } | { ok: false; error: string }
+export type RematchMediaItemResult =
+  | { ok: true; item: MediaItem; merged: boolean }
+  | { ok: false; error: string }
 
 // The unique (user_id, media_item_id) constraint won't allow keeping both logs,
 // so the more recently updated wins.
@@ -313,7 +319,8 @@ export async function updateInteraction(
     ...(input.rating !== undefined ? { rating: input.rating } : {}),
     ...(input.disliked !== undefined ? { disliked: input.disliked } : {}),
     ...(input.notes !== undefined ? { notes: input.notes } : {}),
-    consumed_at: input.status === 'consumed' ? (existing.consumed_at ?? now) : (existing.consumed_at ?? undefined),
+    consumed_at:
+      input.status === 'consumed' ? (existing.consumed_at ?? now) : (existing.consumed_at ?? undefined),
     updated_at: now,
   })
 }

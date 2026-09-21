@@ -9,7 +9,8 @@ const STAR_SIZE = 24
 function StarIcon(handle: Handle<{ variant: 'outline' | 'filled' }>) {
   return () => {
     const { variant } = handle.props
-    const d = 'M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279L12 19.771l-7.416 3.642 1.48-8.279L.001 9.306l8.332-1.151z'
+    const d =
+      'M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279L12 19.771l-7.416 3.642 1.48-8.279L.001 9.306l8.332-1.151z'
     return (
       <svg viewBox="0 0 24 24" width={STAR_SIZE} height={STAR_SIZE} mix={css({ display: 'block' })}>
         <path
@@ -39,7 +40,12 @@ export function StarRatingDisplay(handle: Handle<{ value: number }>) {
           return (
             <span
               key={i}
-              mix={css({ position: 'relative', display: 'inline-block', width: `${STAR_SIZE}px`, height: `${STAR_SIZE}px` })}
+              mix={css({
+                position: 'relative',
+                display: 'inline-block',
+                width: `${STAR_SIZE}px`,
+                height: `${STAR_SIZE}px`,
+              })}
             >
               <span mix={css({ position: 'absolute', inset: 0 })}>
                 <StarIcon variant="outline" />

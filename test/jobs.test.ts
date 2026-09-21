@@ -15,11 +15,14 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
   let otherId: number
 
   const params = { mediaType: 'movie', filters: {}, sourceTypes: ['movie'] }
-  const enqueue = (id: number) => enqueueJob(db, id, { ...params, memberIds: [id] }, { withLengthCheck: false })
+  const enqueue = (id: number) =>
+    enqueueJob(db, id, { ...params, memberIds: [id] }, { withLengthCheck: false })
 
   const newUser = async (tag: string) => {
     const s = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const { rows: [u] } = await pool.query<{ id: number }>(
+    const {
+      rows: [u],
+    } = await pool.query<{ id: number }>(
       `insert into users (email, password_hash, display_name, created_at)
        values ($1,'x',$2,$3) returning id`,
       [`jobs-${tag}-${s}@example.test`, `jobs-${tag}-${s}`, Date.now()],
@@ -41,7 +44,8 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
     await pool.end()
   })
 
-  const clear = () => pool.query('delete from recommendation_jobs where user_id = any($1)', [[userId, otherId]])
+  const clear = () =>
+    pool.query('delete from recommendation_jobs where user_id = any($1)', [[userId, otherId]])
 
   it('accepts the first job', async () => {
     await clear()
@@ -94,7 +98,9 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
     assert.ok(first.ok)
 
     // completeJob points the row at a real run, so one has to exist.
-    const { rows: [run] } = await pool.query<{ id: number }>(
+    const {
+      rows: [run],
+    } = await pool.query<{ id: number }>(
       `insert into recommendation_runs (user_id, media_type, created_at, params)
        values ($1, 'movie', $2, '{}') returning id`,
       [userId, Date.now()],

@@ -6,7 +6,11 @@ import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { timeUntil, type DailyRunAllowance } from '../../data/recommendations/dailyLimit.ts'
 import { TARGET_COUNT } from '../../data/recommendations/generate.ts'
 import type { LuckyState } from '../../data/recommendations/lucky.ts'
-import { MAX_LUCKY_RUNS_PER_USER, MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations/runs.ts'
+import {
+  MAX_LUCKY_RUNS_PER_USER,
+  MAX_RUNS_PER_USER,
+  type RecommendationRunSummary,
+} from '../../data/recommendations/runs.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
@@ -95,10 +99,9 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
           <strong>You already have a recommendation like this.</strong>
         </p>
         <p mix={css({ margin: '0 0 12px', color: '#555' })}>
-          Those exact settings produced{' '}
-          <a href={href}>{duplicate.name || 'an earlier run'}</a> on{' '}
-          {new Date(duplicate.createdAt).toLocaleDateString()}, and you haven't logged anything from it
-          yet. Generating again will replace it with a different set of picks.
+          Those exact settings produced <a href={href}>{duplicate.name || 'an earlier run'}</a> on{' '}
+          {new Date(duplicate.createdAt).toLocaleDateString()}, and you haven't logged anything from it yet.
+          Generating again will replace it with a different set of picks.
         </p>
         <div mix={css({ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' })}>
           <a href={href}>Show me that one →</a>
@@ -162,16 +165,13 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
           <h1>Recommendations</h1>
           <p mix={css({ margin: 0, color: '#555' })}>
-            Rewrites your {ui.attributive} taste profile from what you've logged, then finds
-            picks to try next.
+            Rewrites your {ui.attributive} taste profile from what you've logged, then finds picks to try
+            next.
           </p>
           <p mix={css({ margin: '4px 0 0', color: '#888', fontSize: '13px' })}>
             Only your last {MAX_RUNS_PER_USER} runs are kept — generating a new one deletes the oldest.
           </p>
-          <MediaTabLinks
-            current={mediaType}
-            hrefFor={(type) => `${recsHref}?mediaType=${type}`}
-          />
+          <MediaTabLinks current={mediaType} hrefFor={(type) => `${recsHref}?mediaType=${type}`} />
 
           {duplicate && <DuplicateNotice duplicate={duplicate} />}
 

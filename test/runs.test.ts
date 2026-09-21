@@ -24,7 +24,9 @@ describe('recommendation run listings', { skip: skipWithoutDatabase }, () => {
 
   const newUser = async (tag: string) => {
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const { rows: [u] } = await pool.query<{ id: number }>(
+    const {
+      rows: [u],
+    } = await pool.query<{ id: number }>(
       `insert into users (email, password_hash, display_name, created_at)
        values ($1,'x',$2,$3) returning id`,
       [`runs-${tag}-${stamp}@example.test`, `runs-${tag}-${stamp}`, Date.now()],
@@ -54,7 +56,9 @@ describe('recommendation run listings', { skip: skipWithoutDatabase }, () => {
     await followUser(db, viewer, friend)
     await followUser(db, friend, viewer)
 
-    const { rows: [item] } = await pool.query<{ id: number }>(
+    const {
+      rows: [item],
+    } = await pool.query<{ id: number }>(
       `insert into media_items (type, external_source, external_id, title, metadata, created_at)
        values ('movie','test',$1,'Fixture','{}'::jsonb,$2) returning id`,
       [`runs-item-${Date.now()}`, Date.now()],

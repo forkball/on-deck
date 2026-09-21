@@ -113,7 +113,9 @@ function Card(handle: Handle<{ children?: RemixNode; attention?: boolean }>) {
   }
 }
 
-function ResolveForm(handle: Handle<{ batchId: string; rowId: number; action: string; label: string; primary?: boolean }>) {
+function ResolveForm(
+  handle: Handle<{ batchId: string; rowId: number; action: string; label: string; primary?: boolean }>,
+) {
   return () => {
     const { batchId, rowId, action, label, primary } = handle.props
 
@@ -218,7 +220,13 @@ function ConflictCard(handle: Handle<{ batchId: string; entry: ConflictEntry; pa
 }
 
 function DuplicateCard(
-  handle: Handle<{ batchId: string; entry: DuplicateEntry; singular: string; plural: string; pastParticiple: string }>,
+  handle: Handle<{
+    batchId: string
+    entry: DuplicateEntry
+    singular: string
+    plural: string
+    pastParticiple: string
+  }>,
 ) {
   return () => {
     const { batchId, entry, singular, plural, pastParticiple } = handle.props
@@ -265,7 +273,11 @@ function DuplicateCard(
               {verdict.anchor.index} matches its own year, so row {verdict.move.index} is the one to move.
             </p>
             <Actions>
-              <PickerButton rowId={verdict.move.id} label={`Find the right ${singular} for row ${verdict.move.index}`} primary />
+              <PickerButton
+                rowId={verdict.move.id}
+                label={`Find the right ${singular} for row ${verdict.move.index}`}
+                primary
+              />
             </Actions>
             <div mix={css({ margin: '16px 0 0' })}>
               <form
@@ -281,8 +293,18 @@ function DuplicateCard(
           </>
         ) : (
           <>
-            {pair(`Row ${verdict.keep.index}`, verdict.keep.title, verdict.keep.year, formatDate(verdict.keep.consumedAt))}
-            {pair(`Row ${verdict.drop.index}`, verdict.drop.title, verdict.drop.year, formatDate(verdict.drop.consumedAt))}
+            {pair(
+              `Row ${verdict.keep.index}`,
+              verdict.keep.title,
+              verdict.keep.year,
+              formatDate(verdict.keep.consumedAt),
+            )}
+            {pair(
+              `Row ${verdict.drop.index}`,
+              verdict.drop.title,
+              verdict.drop.year,
+              formatDate(verdict.drop.consumedAt),
+            )}
             <p mix={css({ fontSize: '13.5px', color: ACCENT, margin: '10px 0 8px' })}>
               Same title and year in both rows, so this looks like one {singular} logged twice — a rewatch,
               most likely.
@@ -318,7 +340,14 @@ function UncertainCard(handle: Handle<{ batchId: string; entry: ReviewRow; pastP
       <Card attention>
         <div mix={css({ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-start' })}>
           <div mix={css({ flex: '1 1 210px', minWidth: 0 })}>
-            <div mix={css({ fontSize: '11px', letterSpacing: '.08em', textTransform: 'uppercase', color: '#8d8579' })}>
+            <div
+              mix={css({
+                fontSize: '11px',
+                letterSpacing: '.08em',
+                textTransform: 'uppercase',
+                color: '#8d8579',
+              })}
+            >
               Your CSV row
             </div>
             <div>
@@ -330,7 +359,14 @@ function UncertainCard(handle: Handle<{ batchId: string; entry: ReviewRow; pastP
           </div>
           <div mix={css({ alignSelf: 'center', color: '#b3aa9c' })}>→</div>
           <div mix={css({ flex: '1 1 210px', minWidth: 0 })}>
-            <div mix={css({ fontSize: '11px', letterSpacing: '.08em', textTransform: 'uppercase', color: '#8d8579' })}>
+            <div
+              mix={css({
+                fontSize: '11px',
+                letterSpacing: '.08em',
+                textTransform: 'uppercase',
+                color: '#8d8579',
+              })}
+            >
               We matched
             </div>
             <div mix={css({ display: 'flex', gap: '10px' })}>
@@ -409,7 +445,8 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
               <h1>Review before saving</h1>
               {error ? <p mix={css({ color: '#b91c1c' })}>{error}</p> : null}
               <p mix={css({ fontSize: '15px', margin: '0 0 4px' })}>
-                {counts.total} rows. <b mix={css({ fontWeight: 400 })}>{model.confidentCount} matched cleanly</b>,{' '}
+                {counts.total} rows.{' '}
+                <b mix={css({ fontWeight: 400 })}>{model.confidentCount} matched cleanly</b>,{' '}
                 {model.uncertain.length} worth a look, and {model.notFound.length} we couldn't find.
               </p>
               {reviewsOnly && (
@@ -425,27 +462,35 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   })}
                 >
                   This is only the films you reviewed — <b mix={css({ fontWeight: 600 })}>reviews.csv</b>{' '}
-                  carries nothing about the rest of what you've watched. Upload the whole export zip
-                  instead if you want your full history.
+                  carries nothing about the rest of what you've watched. Upload the whole export zip instead
+                  if you want your full history.
                 </p>
               )}
               <p mix={css({ fontSize: '13px', color: ACCENT, marginBottom: '20px' })}>
-                Everything saves unless you say otherwise — except the decisions below, which would
-                change or drop something you already have.
+                Everything saves unless you say otherwise — except the decisions below, which would change or
+                drop something you already have.
               </p>
 
               {model.conflicts.length > 0 && (
                 <Flag title="Already in your log" count={model.conflicts.length}>
                   <p mix={css({ fontSize: '14px', color: '#555', margin: '0 0 12px' })}>
-                    You've logged these before, and the import disagrees. Rows matching what you
-                    already have aren't listed — there's nothing to decide.
+                    You've logged these before, and the import disagrees. Rows matching what you already have
+                    aren't listed — there's nothing to decide.
                   </p>
                   <form
                     method="post"
                     action={routes.profile.imports.conflicts.href({ batchId })}
-                    mix={css({ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '14px' })}
+                    mix={css({
+                      display: 'flex',
+                      gap: '8px',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      marginBottom: '14px',
+                    })}
                   >
-                    <span mix={css({ fontSize: '13px', color: '#8d8579' })}>For all {model.conflicts.length}</span>
+                    <span mix={css({ fontSize: '13px', color: '#8d8579' })}>
+                      For all {model.conflicts.length}
+                    </span>
                     <button
                       type="submit"
                       name="choice"
@@ -485,9 +530,9 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
               {model.duplicates.length > 0 && (
                 <Flag title={`Two rows, one ${singular}`} count={model.duplicates.length}>
                   <p mix={css({ fontSize: '14px', color: '#555', margin: '0 0 12px' })}>
-                    Two rows landed on the same {singular}, and your log keeps one entry per
-                    {' '}{singular}. Usually that means they're two different {plural} sharing a name and
-                    one row matched wrong.
+                    Two rows landed on the same {singular}, and your log keeps one entry per {singular}.
+                    Usually that means they're two different {plural} sharing a name and one row matched
+                    wrong.
                   </p>
                   {model.duplicates.map((entry, i) => (
                     <DuplicateCard
@@ -500,8 +545,8 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     />
                   ))}
                   <p mix={css({ fontSize: '13px', color: '#888', margin: '10px 0 0' })}>
-                    Until you decide, the weaker match of each pair is held back rather than
-                    overwriting the other.
+                    Until you decide, the weaker match of each pair is held back rather than overwriting the
+                    other.
                   </p>
                 </Flag>
               )}
@@ -509,11 +554,12 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
               {model.uncertain.length > 0 && (
                 <>
                   <h2>
-                    Worth a look <span mix={css({ color: '#888', fontSize: '14px' })}>({model.uncertain.length})</span>
+                    Worth a look{' '}
+                    <span mix={css({ color: '#888', fontSize: '14px' })}>({model.uncertain.length})</span>
                   </h2>
                   <p mix={css({ fontSize: '13px', color: '#888', marginBottom: '10px' })}>
-                    Least certain first. These will be saved either way; the chip says what we're
-                    unsure about.
+                    Least certain first. These will be saved either way; the chip says what we're unsure
+                    about.
                   </p>
                   <div id="import-uncertain">
                     {model.uncertain.map((entry) => (
@@ -543,8 +589,8 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       })}
                     >
                       <span mix={css({ flex: '1 1 220px', fontSize: '14px' })}>
-                        {model.bulkAcceptable} of these are within a year of your CSV — usually a
-                        festival or re-release date.
+                        {model.bulkAcceptable} of these are within a year of your CSV — usually a festival or
+                        re-release date.
                       </span>
                       <button type="submit" mix={css({ fontSize: '13px' })}>
                         Accept all {model.bulkAcceptable}
@@ -558,11 +604,11 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 <>
                   <hr />
                   <h2>
-                    Couldn't find <span mix={css({ color: '#888', fontSize: '14px' })}>({model.notFound.length})</span>
+                    Couldn't find{' '}
+                    <span mix={css({ color: '#888', fontSize: '14px' })}>({model.notFound.length})</span>
                   </h2>
                   <p mix={css({ fontSize: '13px', color: '#888', marginBottom: '10px' })}>
-                    No catalog result under that name. <b>These won't be saved</b> unless you track
-                    them down.
+                    No catalog result under that name. <b>These won't be saved</b> unless you track them down.
                   </p>
                   <div id="import-not-found">
                     {model.notFound.map(({ row }) => (

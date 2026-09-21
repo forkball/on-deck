@@ -83,7 +83,11 @@ export async function findUserByEmail(db: Db, value: string, excludeUserId?: num
   })
 }
 
-export async function findUserByUsername(db: Db, value: string, excludeUserId?: number): Promise<User | null> {
+export async function findUserByUsername(
+  db: Db,
+  value: string,
+  excludeUserId?: number,
+): Promise<User | null> {
   const match = eq('display_name', value)
   return db.findOne(users, {
     where: excludeUserId === undefined ? match : and(match, ne('id', excludeUserId)),

@@ -179,7 +179,11 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
       const users = await listFollowedUsers(db, auth.identity.id)
-      const followingIds = await listFollowingIds(db, auth.identity.id, users.map((u) => u.id))
+      const followingIds = await listFollowingIds(
+        db,
+        auth.identity.id,
+        users.map((u) => u.id),
+      )
 
       return context.render(
         <FollowListPage
@@ -200,7 +204,11 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
       const users = await listFollowers(db, auth.identity.id)
-      const followingIds = await listFollowingIds(db, auth.identity.id, users.map((u) => u.id))
+      const followingIds = await listFollowingIds(
+        db,
+        auth.identity.id,
+        users.map((u) => u.id),
+      )
 
       return context.render(
         <FollowListPage

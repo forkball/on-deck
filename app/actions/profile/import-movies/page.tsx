@@ -46,30 +46,29 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
                 fontSize: '14px',
               })}
             >
-              You have an import waiting. <a href={pendingHref}>Pick it back up</a> — uploading again
-              starts over.
+              You have an import waiting. <a href={pendingHref}>Pick it back up</a> — uploading again starts
+              over.
             </div>
           )}
 
           {syncAvailable && (
             <p mix={css({ fontSize: '13px', color: '#888' })}>
               Keeping up with new films is a separate thing, and it's already handled elsewhere:{' '}
-              <a href={routes.profile.edit.index.href()}>connect your Letterboxd account in settings</a>{' '}
-              and new entries arrive on their own. This page is for the history that predates it.
+              <a href={routes.profile.edit.index.href()}>connect your Letterboxd account in settings</a> and
+              new entries arrive on their own. This page is for the history that predates it.
             </p>
           )}
 
           <p mix={css({ color: '#555' })}>
             {syncAvailable && BACKFILL_LEAD}
             Export your data from Letterboxd (Settings → Data → Export) and upload the resulting{' '}
-            <code>.zip</code>, unopened — ratings and reviews live in separate files inside, and
-            both come across in one import.
+            <code>.zip</code>, unopened — ratings and reviews live in separate files inside, and both come
+            across in one import.
           </p>
 
           <p mix={css({ color: '#555' })}>
-            Exporting from Letterboxd's app is unreliable — if the export doesn't come through,
-            open letterboxd.com in a mobile browser or on a desktop computer instead and export
-            from there.
+            Exporting from Letterboxd's app is unreliable — if the export doesn't come through, open
+            letterboxd.com in a mobile browser or on a desktop computer instead and export from there.
           </p>
 
           <LetterboxdImportForm

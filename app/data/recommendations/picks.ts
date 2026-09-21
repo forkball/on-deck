@@ -105,13 +105,13 @@ export function describeSeen(seen: string[], noun: string, subject: string | nul
   // whole of what they've watched and pitches at someone barely started.
   return subject
     ? `\n\n${subject} has logged ${seen.length} ${noun} as seen — here are the ${shown.length} most recent, none ` +
-      `of which you should suggest: ${JSON.stringify(shown)}. Take it as read that there are many more you ` +
-      `haven't been shown: ${subject} is well past the obvious picks, so favour things ${subject} is unlikely to ` +
-      `have already worked through.`
+        `of which you should suggest: ${JSON.stringify(shown)}. Take it as read that there are many more you ` +
+        `haven't been shown: ${subject} is well past the obvious picks, so favour things ${subject} is unlikely to ` +
+        `have already worked through.`
     : `\n\nThey've logged ${seen.length} ${noun} as seen — here are the ${shown.length} most recent, none of ` +
-      `which you should suggest: ${JSON.stringify(shown)}. Take it as read that there are many more you ` +
-      `haven't been shown: this is someone well past the obvious picks, so favour things they're unlikely to ` +
-      `have already worked through.`
+        `which you should suggest: ${JSON.stringify(shown)}. Take it as read that there are many more you ` +
+        `haven't been shown: this is someone well past the obvious picks, so favour things they're unlikely to ` +
+        `have already worked through.`
 }
 
 function buildFilterInstructions(filters: RecommendationFilters, noun: string, mediaType: MediaType): string {
@@ -188,7 +188,7 @@ export async function requestPicks(
       `this taste profile.${filterInstructions} For each, give your best-guess release year (used only to ` +
       `disambiguate remakes/same-titled entries) and a one-sentence reason tied to ${subject}'s profile.`
 
-// Scales per person because the reasoning does — a run that exhausts its budget
+  // Scales per person because the reasoning does — a run that exhausts its budget
   // thinking comes back with no picks at all.
   //
   // Capped where a non-streaming request stops being comfortable: past this a

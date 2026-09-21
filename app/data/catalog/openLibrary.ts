@@ -109,7 +109,8 @@ function coverUrl(coverId: number | undefined): string | null {
 // Self-published study aids that shadow popular books. Readership can't
 // separate them (students give them more readers than most novels), so they're
 // matched on the one consistent thing: title shape.
-const STUDY_AID_TITLE = /^\s*(summary|study guide|workbook|analysis|conversation starters|key takeaways|sparknotes)\b|\bstudy guide\b/i
+const STUDY_AID_TITLE =
+  /^\s*(summary|study guide|workbook|analysis|conversation starters|key takeaways|sparknotes)\b|\bstudy guide\b/i
 
 // Neither filter alone is enough: missing cover art marks index junk (real
 // books have ~94% coverage), the title pattern catches study aids that do

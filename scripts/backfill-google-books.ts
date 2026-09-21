@@ -58,7 +58,9 @@ async function throttleGoogleBooks(): Promise<void> {
       googleBooksCallTimes.push(now)
       return
     }
-    await new Promise((resolve) => setTimeout(resolve, GOOGLE_BOOKS_RATE_WINDOW_MS - (now - googleBooksCallTimes[0])))
+    await new Promise((resolve) =>
+      setTimeout(resolve, GOOGLE_BOOKS_RATE_WINDOW_MS - (now - googleBooksCallTimes[0])),
+    )
   }
 }
 
@@ -79,7 +81,8 @@ function levenshteinDistance(a: string, b: string): number {
   for (let j = 0; j <= b.length; j++) dp[0][j] = j
   for (let i = 1; i <= a.length; i++) {
     for (let j = 1; j <= b.length; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+      dp[i][j] =
+        a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
     }
   }
   return dp[a.length][b.length]
@@ -244,7 +247,11 @@ async function main() {
         return
       }
 
-      lines.push({ row, outcome: 'matched', detail: `ISBN ${isbn} -> ${candidate.externalId} "${candidate.title}"` })
+      lines.push({
+        row,
+        outcome: 'matched',
+        detail: `ISBN ${isbn} -> ${candidate.externalId} "${candidate.title}"`,
+      })
 
       if (APPLY) {
         const result = await rematchMediaItem(

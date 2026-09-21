@@ -46,7 +46,10 @@ export function platformFamilies(platforms: string[]): string[] {
     else if (!unmatched.includes(platform)) unmatched.push(platform)
   }
 
-  return [...PLATFORM_FAMILIES.filter((family) => found.has(family.label)).map((family) => family.label), ...unmatched]
+  return [
+    ...PLATFORM_FAMILIES.filter((family) => found.has(family.label)).map((family) => family.label),
+    ...unmatched,
+  ]
 }
 
 export const GAME_GENRES: string[] = [
@@ -228,7 +231,10 @@ function toResult(game: IgdbGame, hoursToBeat: number | null): CatalogSearchResu
     externalId: String(game.id),
     title: game.name ?? 'Untitled',
     releaseYear: game.first_release_date ? new Date(game.first_release_date * 1000).getUTCFullYear() : null,
-    tags: [...(game.genres ?? []).map((genre) => genre.name.toLowerCase()), ...derivePlayerTags(game.game_modes)],
+    tags: [
+      ...(game.genres ?? []).map((genre) => genre.name.toLowerCase()),
+      ...derivePlayerTags(game.game_modes),
+    ],
     posterUrl: image(game.cover?.url, 't_cover_big'),
     popularity: game.total_rating_count ?? 0,
     overview: game.summary?.trim() || null,
@@ -312,7 +318,10 @@ export async function getGameById(externalId: string): Promise<CatalogSearchResu
 }
 
 function normalize(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
 }
 
 export function slugifyTitle(title: string): string {

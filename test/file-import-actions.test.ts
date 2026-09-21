@@ -39,10 +39,10 @@ interface Rendered {
 // database, and render. `render` keeps the node instead of turning it into
 // HTML — the element carries the props, which is what these assertions are
 // about.
-function fakeContext(options: {
-  formData?: FormData
-  findOne?: () => Promise<ImportBatch | null>
-}): { context: AuthedControllerContext; rendered: Rendered[] } {
+function fakeContext(options: { formData?: FormData; findOne?: () => Promise<ImportBatch | null> }): {
+  context: AuthedControllerContext
+  rendered: Rendered[]
+} {
   const rendered: Rendered[] = []
   const db = { findOne: options.findOne ?? (async () => null) }
 
@@ -164,10 +164,7 @@ describe('file import upload', () => {
     }).upload(context)
 
     assert.equal(response.status, 400)
-    assert.equal(
-      rendered[0]!.props.error,
-      'That looks like a single file rather than the export archive.',
-    )
+    assert.equal(rendered[0]!.props.error, 'That looks like a single file rather than the export archive.')
   })
 
   it('falls back to a general message when a parser throws a non-Error', async () => {

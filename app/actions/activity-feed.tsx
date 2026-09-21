@@ -36,7 +36,9 @@ export function FeedRows(handle: Handle<{ items: FeedItem[] }>) {
             key={`log-${item.id}`}
             interaction={item.entry.interaction}
             item={item.entry.item}
-            detailHref={item.entry.item ? mediaTypeUiFor(item.entry.item.type).hrefs.show(item.entry.item.id) : '#'}
+            detailHref={
+              item.entry.item ? mediaTypeUiFor(item.entry.item.type).hrefs.show(item.entry.item.id) : '#'
+            }
             actor={item.entry.actor}
           />
         ),
