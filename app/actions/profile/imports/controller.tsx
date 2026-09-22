@@ -15,6 +15,7 @@ import {
   setConflictChoice,
   skipRow,} from '../../../data/imports/batches.ts'
 import { isBulkAcceptable } from '../../../data/imports/classify.ts'
+import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
 import type { ImportBatch, User } from '../../../data/schema.ts'
 import { displayLabel } from '../../../data/users.ts'
@@ -35,6 +36,22 @@ async function findBatch(context: ImportBatchContext | ImportRowContext): Promis
   if (!batch) return { ok: false, response: new Response('Not found', { status: 404 }) }
 
   return { ok: true, batch, displayName: displayLabel(auth.identity) }
+}
+
+// Whether a saved import should offer to follow the diary it came from.
+//
+// Only after a Letterboxd import, and only to someone not already following:
+// the CSV has no username in it, so this is the first moment we could ask, and
+// the last moment it is obviously about the films they just brought across.
+// Books and games have their own importers and no feed behind them.
+export function offersFeed(batch: ImportBatch, identity: User): boolean {
+  return (
+    batch.status === 'done' &&
+    batch.source === 'letterboxd' &&
+    batch.media_type === 'movie' &&
+    identity.letterboxd_username == null &&
+    letterboxdSyncAvailableTo(identity)
+  )
 }
 
 function backToReview(batch: ImportBatch, error?: string): Response {
@@ -103,6 +120,7 @@ export default createController(routes.profile.imports, {
           batch={batch}
           model={model}
           saved={batch.status === 'done'}
+          offerFeed={offersFeed(batch, context.get(Auth).identity)}
           reviewsOnly={context.url.searchParams.get('partial') === 'reviews'}
           error={context.url.searchParams.get('error') ?? undefined}
         />,
