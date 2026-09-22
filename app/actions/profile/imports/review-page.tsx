@@ -11,6 +11,7 @@ import type { MediaType } from '../../../data/mediaItems.ts'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
+import { Field } from '../../../ui/shared/field.tsx'
 import { StarRatingDisplay } from '../../../ui/components/star-rating.tsx'
 
 export interface ImportReviewPageProps {
@@ -18,6 +19,10 @@ export interface ImportReviewPageProps {
   batch: ImportBatch
   model: ReviewModel
   saved?: boolean
+  // Shown once a Letterboxd import is saved, to a member whose diary isn't
+  // connected yet. Null when there is nothing to offer — wrong media type,
+  // gate closed, or already following.
+  offerFeed?: boolean
   reviewsOnly?: boolean
   error?: string
 }
@@ -414,7 +419,7 @@ function UncertainCard(handle: Handle<{ batchId: string; entry: ReviewRow; pastP
 
 export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
   return () => {
-    const { displayName, batch, model, saved, reviewsOnly, error } = handle.props
+    const { displayName, batch, model, saved, offerFeed, reviewsOnly, error } = handle.props
     const { counts } = model
     const { singular, plural, pastParticiple } = mediaTypeUiFor(batch.media_type as MediaType)
     const batchId = batch.id
@@ -439,6 +444,54 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 {' · '}
                 <a href={routes.profile.importMovies.index.href()}>Import another file</a>
               </p>
+
+              {/* The other half of the pair, offered where it is obviously
+                  relevant rather than left to be found in settings. An export
+                  is a snapshot: it is right the moment it is uploaded and
+                  stale by the next film they log. The feed is the only thing
+                  that keeps it current, and this is the one moment someone has
+                  demonstrably decided they want their Letterboxd films here.
+
+                  Offered, not done for them. Importing is a single act; a
+                  connection is a standing arrangement that reads a feed and
+                  can remove rows, so it stays something they choose. The field
+                  is here because the alternative is sending them to settings
+                  to type the same thing. */}
+              {offerFeed && (
+                <section
+                  mix={css({
+                    border: '1px solid #d9cfbe',
+                    borderRadius: '8px',
+                    padding: '16px 18px',
+                    marginTop: '24px',
+                  })}
+                >
+                  <h2 mix={css({ marginTop: 0, fontSize: '15px' })}>Keep it up to date?</h2>
+                  <p mix={css({ fontSize: '13px', color: '#555', marginTop: 0 })}>
+                    This file is a snapshot. Connect your diary and what you log on Letterboxd from
+                    here on follows on its own.
+                  </p>
+                  <form
+                    method="post"
+                    action={routes.profile.letterboxd.connect.href()}
+                    mix={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '12px' })}
+                  >
+                    <Field
+                      label="Letterboxd username"
+                      hint="The last part of your profile URL — letterboxd.com/yourname/"
+                    >
+                      <input
+                        type="text"
+                        name="username"
+                        placeholder="yourname"
+                        autocomplete="off"
+                        spellcheck={false}
+                      />
+                    </Field>
+                    <button type="submit">Connect</button>
+                  </form>
+                </section>
+              )}
             </>
           ) : (
             <>
