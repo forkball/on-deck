@@ -1,0 +1,51 @@
+# Checks and deploy share a file because `needs:` cannot reach across
+# workflows, and a deploy that does not wait for its checks is not a gate.
+
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      # Without DATABASE_URL, 12 of 28 test files skip themselves and the run
+      # reports 254 passing instead of 322. Pinned to 17, as docker-compose is.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ondeck
+          POSTGRES_PASSWORD: ondeck
+          POSTGRES_DB: ondeck
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ondeck -d ondeck"
+          --health-interval 2s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://ondeck:ondeck@localhost:5432/ondeck
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run db:migrate
+      - run: npm test
+
+  deploy:
+    needs: checks
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency: deploy-group
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
