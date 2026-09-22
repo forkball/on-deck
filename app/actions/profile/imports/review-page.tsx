@@ -468,8 +468,8 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 >
                   <h2 mix={css({ marginTop: 0, fontSize: '15px' })}>Keep it up to date?</h2>
                   <p mix={css({ fontSize: '13px', color: '#555', marginTop: 0 })}>
-                    This file is a snapshot. Connect your diary and what you log on Letterboxd from
-                    here on follows on its own.
+                    This file is a snapshot. Connect your diary and what you log on Letterboxd from here on
+                    follows on its own.
                   </p>
                   <form
                     method="post"
