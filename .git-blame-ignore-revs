@@ -1,5 +1,5 @@
 # Commits to skip in `git blame`. Enable with:
 #   git config blame.ignoreRevsFile .git-blame-ignore-revs
 
-# Run oxfmt over the tree (#128)
-84f98db1b47f9037d5cf24316ad1be2c9e7b13e7
+# Let oxfmt hold the code style, rather than consistency (#133)
+ae86426f509ea281d984af92d1e8660dbe6b9f96
