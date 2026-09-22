@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { buildReview, type CatalogEntry, type ExistingEntry, type StagedRow } from '../app/data/imports/review.ts'
+import {
+  buildReview,
+  type CatalogEntry,
+  type ExistingEntry,
+  type StagedRow,
+} from '../app/data/imports/review.ts'
 
 let nextId = 1
 
@@ -79,7 +84,10 @@ describe('buildReview bucketing', () => {
       'keep',
     )
 
-    assert.deepEqual(model.uncertain.map(({ row }) => row.id), [2, 3, 1])
+    assert.deepEqual(
+      model.uncertain.map(({ row }) => row.id),
+      [2, 3, 1],
+    )
   })
 
   it('counts only the off-by-one tail as bulk acceptable', () => {
@@ -87,7 +95,12 @@ describe('buildReview bucketing', () => {
       row({ id: 1, state: 'uncertain', reason: 'year_drift', yearDelta: 1, mediaItemId: 1 }),
       row({ id: 2, state: 'uncertain', reason: 'year_drift', yearDelta: 29, mediaItemId: 2 }),
     ]
-    const model = buildReview(rows, catalog(entry(1, 'Kwaidan', 1965), entry(2, 'The Thing', 2011)), logged(), 'keep')
+    const model = buildReview(
+      rows,
+      catalog(entry(1, 'Kwaidan', 1965), entry(2, 'The Thing', 2011)),
+      logged(),
+      'keep',
+    )
 
     assert.equal(model.bulkAcceptable, 1)
   })
@@ -103,7 +116,12 @@ describe('buildReview conflicts', () => {
   }
 
   it('raises a row that would overwrite a different rating', () => {
-    const model = buildReview([row({ rating: 4, notes: 'still the best shootout' })], catalog(entry(1, 'Heat', 1995)), logged(existing), 'keep')
+    const model = buildReview(
+      [row({ rating: 4, notes: 'still the best shootout' })],
+      catalog(entry(1, 'Heat', 1995)),
+      logged(existing),
+      'keep',
+    )
 
     assert.equal(model.conflicts.length, 1)
     assert.deepEqual(model.conflicts[0].fields.includes('rating'), true)
@@ -125,7 +143,12 @@ describe('buildReview conflicts', () => {
   })
 
   it('turns kept conflicts into updates when the import is taken', () => {
-    const model = buildReview([row({ rating: 4, notes: existing.notes })], catalog(entry(1, 'Heat', 1995)), logged(existing), 'take')
+    const model = buildReview(
+      [row({ rating: 4, notes: existing.notes })],
+      catalog(entry(1, 'Heat', 1995)),
+      logged(existing),
+      'take',
+    )
 
     assert.deepEqual(model.counts, { total: 1, save: 1, unchanged: 0, leftOut: 0 })
   })
@@ -150,7 +173,9 @@ describe('buildReview conflicts', () => {
   })
 
   it('reports a conflict ahead of the match being uncertain', () => {
-    const rows = [row({ state: 'uncertain', reason: 'year_drift', yearDelta: 1, rating: 4, notes: existing.notes })]
+    const rows = [
+      row({ state: 'uncertain', reason: 'year_drift', yearDelta: 1, rating: 4, notes: existing.notes }),
+    ]
     const model = buildReview(rows, catalog(entry(1, 'Heat', 1995)), logged(existing), 'keep')
 
     assert.equal(model.conflicts.length, 1)
@@ -161,8 +186,24 @@ describe('buildReview conflicts', () => {
 describe('buildReview duplicates', () => {
   it('reads two years apart as two different films and holds the mover back', () => {
     const rows = [
-      row({ id: 41, title: 'Solaris', year: 1972, state: 'confident', reason: 'exact', yearDelta: 0, mediaItemId: 7 }),
-      row({ id: 288, title: 'Solaris', year: 2002, state: 'uncertain', reason: 'year_drift', yearDelta: -30, mediaItemId: 7 }),
+      row({
+        id: 41,
+        title: 'Solaris',
+        year: 1972,
+        state: 'confident',
+        reason: 'exact',
+        yearDelta: 0,
+        mediaItemId: 7,
+      }),
+      row({
+        id: 288,
+        title: 'Solaris',
+        year: 2002,
+        state: 'uncertain',
+        reason: 'year_drift',
+        yearDelta: -30,
+        mediaItemId: 7,
+      }),
     ]
     const model = buildReview(rows, catalog(entry(7, 'Solaris', 1972)), logged(), 'keep')
 
@@ -208,10 +249,7 @@ describe('buildReview duplicates', () => {
   })
 
   it('ignores a row already skipped', () => {
-    const rows = [
-      row({ id: 1, mediaItemId: 3 }),
-      row({ id: 2, mediaItemId: 3, state: 'skipped' }),
-    ]
+    const rows = [row({ id: 1, mediaItemId: 3 }), row({ id: 2, mediaItemId: 3, state: 'skipped' })]
     const model = buildReview(rows, catalog(entry(3, 'Heat', 1995)), logged(), 'keep')
 
     assert.equal(model.duplicates.length, 0)

@@ -70,9 +70,7 @@ function parseFeedCursor(raw: string | null): FeedCursor | undefined {
 export default createController(routes, {
   actions: {
     async assets(context) {
-      return (
-        (await assetServer.fetch(context.request)) ?? new Response('Not Found', { status: 404 })
-      )
+      return (await assetServer.fetch(context.request)) ?? new Response('Not Found', { status: 404 })
     },
     async home(context) {
       const auth = context.get(Auth)

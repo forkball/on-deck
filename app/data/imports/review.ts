@@ -87,7 +87,8 @@ export interface ReviewModel {
 }
 
 function verdictOf(row: StagedRow): Verdict {
-  const state = row.state === 'not_found' ? 'not_found' : row.state === 'confident' ? 'confident' : 'uncertain'
+  const state =
+    row.state === 'not_found' ? 'not_found' : row.state === 'confident' ? 'confident' : 'uncertain'
   return { state, reason: row.reason, yearDelta: row.yearDelta }
 }
 

@@ -106,7 +106,7 @@ interface OwnedGamesResponse {
 export async function fetchSteamLibrary(steamId: string): Promise<SteamLibraryOutcome> {
   const key = process.env.STEAM_API_KEY
   if (!key) {
-    return { ok: false, reason: 'unavailable', message: 'Steam importing isn\'t configured on this server.' }
+    return { ok: false, reason: 'unavailable', message: "Steam importing isn't configured on this server." }
   }
 
   const url = new URL(`${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/`)
@@ -117,7 +117,11 @@ export async function fetchSteamLibrary(steamId: string): Promise<SteamLibraryOu
 
   const response = await fetch(url)
   if (!response.ok) {
-    return { ok: false, reason: 'unavailable', message: `Steam returned ${response.status}. Try again shortly.` }
+    return {
+      ok: false,
+      reason: 'unavailable',
+      message: `Steam returned ${response.status}. Try again shortly.`,
+    }
   }
 
   const data = (await response.json()) as OwnedGamesResponse

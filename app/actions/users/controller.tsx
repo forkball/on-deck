@@ -58,7 +58,11 @@ export default createController(routes.users, {
       const db = context.get(Database)
       const query = context.url.searchParams.get('q')?.trim() ?? ''
       const results = query ? await searchUsers(db, query, auth.identity.id) : []
-      const followingIds = await listFollowingIds(db, auth.identity.id, results.map((r) => r.id))
+      const followingIds = await listFollowingIds(
+        db,
+        auth.identity.id,
+        results.map((r) => r.id),
+      )
       const followingByUserId = new Map(results.map((r) => [r.id, followingIds.has(r.id)]))
 
       return context.render(
@@ -178,7 +182,11 @@ export default createController(routes.users, {
 
       const label = displayLabel(target)
       const targetUsers = await listFollowedUsers(db, userId)
-      const followingIds = await listFollowingIds(db, auth.identity.id, targetUsers.map((u) => u.id))
+      const followingIds = await listFollowingIds(
+        db,
+        auth.identity.id,
+        targetUsers.map((u) => u.id),
+      )
 
       return context.render(
         <FollowListPage
@@ -204,7 +212,11 @@ export default createController(routes.users, {
 
       const label = displayLabel(target)
       const targetUsers = await listFollowers(db, userId)
-      const followingIds = await listFollowingIds(db, auth.identity.id, targetUsers.map((u) => u.id))
+      const followingIds = await listFollowingIds(
+        db,
+        auth.identity.id,
+        targetUsers.map((u) => u.id),
+      )
 
       return context.render(
         <FollowListPage

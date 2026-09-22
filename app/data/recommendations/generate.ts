@@ -90,7 +90,9 @@ export async function findMembersMissingSourceLogs(
         // Rejections don't count — a log of nothing but "not interested" gives
         // the profile nothing to work from.
         Promise.all(
-          sourceTypes.map((type) => countUserMediaLog(db, memberId, { type, statuses: CONSUMPTION_STATUSES })),
+          sourceTypes.map((type) =>
+            countUserMediaLog(db, memberId, { type, statuses: CONSUMPTION_STATUSES }),
+          ),
         ),
       ])
       return {
@@ -157,7 +159,10 @@ export async function generateRecommendations(
       : members.map(({ regenerated, label }) => ({
           label,
           ...Object.fromEntries(
-            profileTypes.map((type, i) => [`${mediaTypeUiFor(type).plural}_taste`, toTasteSummary(regenerated[i])]),
+            profileTypes.map((type, i) => [
+              `${mediaTypeUiFor(type).plural}_taste`,
+              toTasteSummary(regenerated[i]),
+            ]),
           ),
         }))
 
@@ -325,7 +330,9 @@ export async function generateRecommendations(
   const [, , prunedOldestRun] = await Promise.all([
     lucky
       ? Promise.resolve()
-      : track('run.usage', () => recordRunAgainstDailyLimit(db, requestingUserId, runCostFor(memberUserIds.length))),
+      : track('run.usage', () =>
+          recordRunAgainstDailyLimit(db, requestingUserId, runCostFor(memberUserIds.length)),
+        ),
     track('run.notify', () => notifyMutualFollowers(db, requestingUserId, memberUserIds, runId)),
     track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType, { lucky })),
   ])
@@ -351,7 +358,12 @@ async function notifyMutualFollowers(
       ])
       if (!requesterFollowsMember || !memberFollowsRequester) return
 
-      await createNotification(db, { userId: memberId, actorUserId: requestingUserId, type: 'recommendation', runId })
+      await createNotification(db, {
+        userId: memberId,
+        actorUserId: requestingUserId,
+        type: 'recommendation',
+        runId,
+      })
     }),
   )
 }

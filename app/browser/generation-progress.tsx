@@ -88,7 +88,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
           })
 
           if (response.status === 404) {
-            failed = "This run is no longer available. It may have finished a while ago."
+            failed = 'This run is no longer available. It may have finished a while ago.'
             render()
             return
           }

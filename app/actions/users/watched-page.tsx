@@ -42,7 +42,11 @@ export function UserWatchedPage(handle: Handle<UserWatchedPageProps>) {
           <WatchedList log={movieLog} mediaType={mediaType} returnTo={returnTo} />
 
           {totalPages > 1 && (
-            <Pagination page={page} totalPages={totalPages} pageHref={(p) => `${watchedHref}?page=${p}${typeQuery}`} />
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              pageHref={(p) => `${watchedHref}?page=${p}${typeQuery}`}
+            />
           )}
         </main>
       </Document>

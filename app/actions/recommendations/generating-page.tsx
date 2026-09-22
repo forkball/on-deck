@@ -53,8 +53,8 @@ export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
                 key={jobId}
               />
               <p mix={css({ fontSize: '13px', color: '#888' })}>
-                This takes a little while — two of these steps are the model thinking. You can leave this
-                page open; it'll go to your picks on its own.
+                This takes a little while — two of these steps are the model thinking. You can leave this page
+                open; it'll go to your picks on its own.
               </p>
             </>
           )}

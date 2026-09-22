@@ -98,7 +98,7 @@ export default createController(routes.profile.letterboxd, {
       if (!username) {
         return back(
           `letterboxdError=${encodeURIComponent(
-            'That doesn\'t look like a Letterboxd username. They\'re letters, numbers and underscores — the last part of your profile URL.',
+            "That doesn't look like a Letterboxd username. They're letters, numbers and underscores — the last part of your profile URL.",
           )}`,
         )
       }

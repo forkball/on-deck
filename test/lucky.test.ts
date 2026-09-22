@@ -188,7 +188,7 @@ describe("I'm feeling lucky", { skip: skipWithoutDatabase }, () => {
     assert.equal(state.pick, null)
   })
 
-  it("does not spend the draw on a run that came back with nothing", async () => {
+  it('does not spend the draw on a run that came back with nothing', async () => {
     const empty = await newUser('empty')
     await saveRun(db, {
       requestingUserId: empty.id,

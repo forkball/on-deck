@@ -40,7 +40,8 @@ function capitalize(tag: string): string {
 // MEDIA_TYPE_UI.
 export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
   return () => {
-    const { mediaType, query, results, initialVisible, interactionsByItemId, message, displayName } = handle.props
+    const { mediaType, query, results, initialVisible, interactionsByItemId, message, displayName } =
+      handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
     const returnTo = `${ui.hrefs.search()}?q=${encodeURIComponent(query)}`
 
@@ -65,16 +66,24 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
             placeholder={ui.searchPlaceholder}
           />
 
-
           {results.length > 0 && (
             <section>
               <h2>
                 Results{' '}
-                <span mix={css({ fontSize: '14px', fontWeight: 400, color: '#888' })}>({results.length})</span>
+                <span mix={css({ fontSize: '14px', fontWeight: 400, color: '#888' })}>
+                  ({results.length})
+                </span>
               </h2>
               <ul
                 id="search-results"
-                mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}
+                mix={css({
+                  listStyle: 'none',
+                  margin: 0,
+                  padding: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                })}
               >
                 {results.map((item) => {
                   const { releaseYear, posterUrl, platforms, tags } = parseMediaMetadata(item.metadata)
@@ -171,7 +180,10 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                                   defaultValue={interaction?.status ?? 'want_to_consume'}
                                 />
                               </Field>
-                              <div class="watched-only-fields" mix={css({ flexDirection: 'column', gap: '10px' })}>
+                              <div
+                                class="watched-only-fields"
+                                mix={css({ flexDirection: 'column', gap: '10px' })}
+                              >
                                 <div>
                                   <p mix={css({ margin: '0 0 4px' })}>Rating</p>
                                   <StarRatingInput

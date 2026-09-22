@@ -101,7 +101,8 @@ function parseParams(run: RecommendationRun): GenerationParams {
       multiplayerType: parsed.multiplayerType,
       platform: parsed.platform,
       series: parsed.series,
-      sourceTypes: parsed.sourceTypes && parsed.sourceTypes.length > 0 ? parsed.sourceTypes : [run.media_type],
+      sourceTypes:
+        parsed.sourceTypes && parsed.sourceTypes.length > 0 ? parsed.sourceTypes : [run.media_type],
     }
   } catch {
     return { sourceTypes: [run.media_type] }
@@ -150,7 +151,12 @@ export async function findUnusedDuplicateRun(
   const memberRows =
     runs.length === 0
       ? []
-      : await db.findMany(recommendationRunMembers, { where: inList('run_id', runs.map((run) => run.id)) })
+      : await db.findMany(recommendationRunMembers, {
+          where: inList(
+            'run_id',
+            runs.map((run) => run.id),
+          ),
+        })
   const memberIdsByRun = new Map<number, number[]>(runs.map((run) => [run.id, []]))
   for (const row of memberRows) memberIdsByRun.get(row.run_id)?.push(row.user_id)
 
@@ -206,7 +212,10 @@ async function loadOtherMemberLabels(
   if (runs.length === 0) return byRun
 
   const memberRows = await db.findMany(recommendationRunMembers, {
-    where: inList('run_id', runs.map((run) => run.id)),
+    where: inList(
+      'run_id',
+      runs.map((run) => run.id),
+    ),
   })
   const otherMemberIds = [...new Set(memberRows.map((row) => row.user_id))].filter((id) => id !== viewerId)
   if (otherMemberIds.length === 0) return byRun
@@ -295,7 +304,12 @@ export async function pruneOldRuns(
   if (runs.length <= keep) return false
 
   const excess = runs.slice(0, runs.length - keep)
-  await db.deleteMany(recommendationRuns, { where: inList('id', excess.map((run) => run.id)) })
+  await db.deleteMany(recommendationRuns, {
+    where: inList(
+      'id',
+      excess.map((run) => run.id),
+    ),
+  })
   return true
 }
 
@@ -361,7 +375,12 @@ export async function listRecommendationRunsFromOthers(
   const memberships = await db.findMany(recommendationRunMembers, { where: { user_id: userId } })
   if (memberships.length === 0) return []
 
-  const runs = await db.findMany(recommendationRuns, { where: inList('id', memberships.map((m) => m.run_id)) })
+  const runs = await db.findMany(recommendationRuns, {
+    where: inList(
+      'id',
+      memberships.map((m) => m.run_id),
+    ),
+  })
   const runsFromOthers = runs.filter(
     (run) => run.user_id !== userId && (mediaType === undefined || run.media_type === mediaType),
   )
@@ -422,7 +441,9 @@ export async function getRecommendationRun(
   if (!run) return null
 
   if (run.user_id !== userId) {
-    const membership = await db.findOne(recommendationRunMembers, { where: { run_id: runId, user_id: userId } })
+    const membership = await db.findOne(recommendationRunMembers, {
+      where: { run_id: runId, user_id: userId },
+    })
     if (!membership) return null
   }
 

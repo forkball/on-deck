@@ -43,7 +43,12 @@ export async function listNotifications(db: Db, userId: number): Promise<Notific
   })
   if (rows.length === 0) return []
 
-  const actors = await db.findMany(users, { where: inList('id', rows.map((row) => row.actor_user_id)) })
+  const actors = await db.findMany(users, {
+    where: inList(
+      'id',
+      rows.map((row) => row.actor_user_id),
+    ),
+  })
   const actorLabelById = new Map(actors.map((actor) => [actor.id, displayLabel(actor)]))
 
   return rows.map((row) => ({

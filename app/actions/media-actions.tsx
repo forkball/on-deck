@@ -33,7 +33,6 @@ const SUGGESTION_LIMIT = 6
 
 const SEARCH_INITIAL_VISIBLE = 10
 
-
 const logSchema = f.object({
   status: f.field(s.enum_(INTERACTION_STATUSES)),
   rating: f.field(s.defaulted(s.string(), '')),

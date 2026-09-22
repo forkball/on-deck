@@ -44,7 +44,8 @@ export const ImportProgress = clientEntry<ImportProgressProps>(
 
                   const bar = document.getElementById(barId)
                   const label = document.getElementById(labelId)
-                  const percent = data.total === 0 ? 0 : Math.min(100, Math.round((data.matched / data.total) * 100))
+                  const percent =
+                    data.total === 0 ? 0 : Math.min(100, Math.round((data.matched / data.total) * 100))
 
                   if (bar) bar.style.width = `${percent}%`
                   if (label) label.textContent = `${data.matched} of ${data.total} rows`

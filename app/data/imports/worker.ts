@@ -46,7 +46,9 @@ export function startImportWorker(): ImportWorker {
     } catch (error) {
       // Recorded on the batch rather than thrown away, so the page can say what
       // went wrong instead of spinning on "matching" forever.
-      await failBatch(db, batch.id, error instanceof Error ? error.message : 'Matching failed.').catch(() => {})
+      await failBatch(db, batch.id, error instanceof Error ? error.message : 'Matching failed.').catch(
+        () => {},
+      )
     } finally {
       clearInterval(heartbeat)
     }

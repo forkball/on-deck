@@ -23,7 +23,9 @@ describe('activity feed', { skip: skipWithoutDatabase }, () => {
   const stamp = Date.now() - 1_000_000
 
   const newItem = async (title: string) => {
-    const { rows: [item] } = await pool.query<{ id: number }>(
+    const {
+      rows: [item],
+    } = await pool.query<{ id: number }>(
       `insert into media_items (type, external_source, external_id, title, metadata, created_at)
        values ('movie','test',$1,$2,'{}'::jsonb,$3) returning id`,
       [`feedpage-${title}-${Date.now()}-${Math.random()}`, title, Date.now()],
@@ -107,7 +109,11 @@ describe('activity feed', { skip: skipWithoutDatabase }, () => {
     )
 
     const times = items.map((item) => item.at)
-    assert.deepEqual(times, [...times].sort((a, b) => b - a), 'feed is not newest-first')
+    assert.deepEqual(
+      times,
+      [...times].sort((a, b) => b - a),
+      'feed is not newest-first',
+    )
   })
 
   it('says who generated a run, and says nothing for your own', async () => {

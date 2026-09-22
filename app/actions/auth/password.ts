@@ -84,7 +84,12 @@ function decode(stored: string): DecodedHash | null {
     // the absence of one is the marker.
     const [saltHex, keyHex, ...rest] = stored.split(':')
     if (!saltHex || !keyHex || rest.length > 0) return null
-    return { params: LEGACY_PARAMS, salt: Buffer.from(saltHex, 'hex'), key: Buffer.from(keyHex, 'hex'), legacy: true }
+    return {
+      params: LEGACY_PARAMS,
+      salt: Buffer.from(saltHex, 'hex'),
+      key: Buffer.from(keyHex, 'hex'),
+      legacy: true,
+    }
   }
 
   const [, settings, saltHex, keyHex, ...rest] = stored.split('$')

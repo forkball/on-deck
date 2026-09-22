@@ -27,7 +27,11 @@ const EDITION_SUFFIX =
 
 const TRAILING_PARENTHETICAL = /\s*\([^)]*\)\s*$/
 
-export async function importSteamLibrary(db: Db, userId: number, steamId: string): Promise<SteamImportResult> {
+export async function importSteamLibrary(
+  db: Db,
+  userId: number,
+  steamId: string,
+): Promise<SteamImportResult> {
   const outcome = await fetchSteamLibrary(steamId)
   if (!outcome.ok) throw new Error(outcome.message)
 

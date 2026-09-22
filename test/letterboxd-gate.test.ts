@@ -114,7 +114,10 @@ describe('what a manual sync reports', () => {
   // A diary of nothing but lists, or a name that isn't publishing yet. Saying
   // "0 entries" invites the reading that something broke on our side.
   it('explains an empty feed instead of counting it', () => {
-    assert.match(describeSync({ carried: 0, logged: 0, unresolved: 0, deleted: 0 }), /isn't publishing any diary entries/)
+    assert.match(
+      describeSync({ carried: 0, logged: 0, unresolved: 0, deleted: 0 }),
+      /isn't publishing any diary entries/,
+    )
   })
 
   // The ordinary state of a fresh connection to a busy diary: fifty entries in

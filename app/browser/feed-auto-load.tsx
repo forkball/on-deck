@@ -59,92 +59,89 @@ function absorb(html: string, list: Element, seenStyles: Set<string>): void {
 // With JS off nothing observes anything and the feed is simply the first page,
 // which is why the server renders a real page of rows rather than an empty list
 // for this to fill.
-export const FeedAutoLoad = clientEntry<FeedAutoLoadProps>(
-  import.meta.url,
-  function FeedAutoLoad(handle) {
-    return () => {
-      const { feedHref, listId, cursor, statusId, endText } = handle.props
+export const FeedAutoLoad = clientEntry<FeedAutoLoadProps>(import.meta.url, function FeedAutoLoad(handle) {
+  return () => {
+    const { feedHref, listId, cursor, statusId, endText } = handle.props
 
-      return (
-        <div
-          mix={[
-            // Needs a little height so it can actually intersect the viewport.
-            css({ height: '1px' }),
-            ref((node, signal) => {
-              const list = document.getElementById(listId)
-              if (!list) return
+    return (
+      <div
+        mix={[
+          // Needs a little height so it can actually intersect the viewport.
+          css({ height: '1px' }),
+          ref((node, signal) => {
+            const list = document.getElementById(listId)
+            if (!list) return
 
-              const status = document.getElementById(statusId)
+            const status = document.getElementById(statusId)
 
-              let next: string | null = cursor
-              let loading = false
+            let next: string | null = cursor
+            let loading = false
 
-              // What the first render already put in the document, so a page's
-              // styles are only added when they are genuinely new.
-              const seenStyles = new Set<string>()
-              for (const style of document.querySelectorAll('style[data-rmx]')) {
-                const key = style.getAttribute('data-rmx')
-                if (key) seenStyles.add(key)
-              }
+            // What the first render already put in the document, so a page's
+            // styles are only added when they are genuinely new.
+            const seenStyles = new Set<string>()
+            for (const style of document.querySelectorAll('style[data-rmx]')) {
+              const key = style.getAttribute('data-rmx')
+              if (key) seenStyles.add(key)
+            }
 
-              const say = (text: string) => {
-                if (status) status.textContent = text
-              }
+            const say = (text: string) => {
+              if (status) status.textContent = text
+            }
 
-              // Nothing more to fetch: the server said so by sending no cursor.
-              if (!next) return
-              say('')
+            // Nothing more to fetch: the server said so by sending no cursor.
+            if (!next) return
+            say('')
 
-              const observer = new IntersectionObserver(
-                (entries) => {
-                  if (loading || !next) return
-                  if (!entries.some((entry) => entry.isIntersecting)) return
+            const observer = new IntersectionObserver(
+              (entries) => {
+                if (loading || !next) return
+                if (!entries.some((entry) => entry.isIntersecting)) return
 
-                  loading = true
-                  say('Loading…')
+                loading = true
+                say('Loading…')
 
-                  void (async () => {
-                    try {
-                      const url = new URL(feedHref, window.location.href)
-                      url.searchParams.set('cursor', next!)
+                void (async () => {
+                  try {
+                    const url = new URL(feedHref, window.location.href)
+                    url.searchParams.set('cursor', next!)
 
-                      const response = await fetch(url, {
-                        signal,
-                        headers: { Accept: 'application/json' },
-                      })
-                      if (!response.ok) throw new Error(String(response.status))
+                    const response = await fetch(url, {
+                      signal,
+                      headers: { Accept: 'application/json' },
+                    })
+                    if (!response.ok) throw new Error(String(response.status))
 
-                      const page = (await response.json()) as { html: string; cursor: string | null }
-                      if (signal.aborted) return
+                    const page = (await response.json()) as { html: string; cursor: string | null }
+                    if (signal.aborted) return
 
-                      absorb(page.html, list, seenStyles)
-                      next = page.cursor
+                    absorb(page.html, list, seenStyles)
+                    next = page.cursor
 
-                      if (!next) {
-                        say(endText)
-                        observer.disconnect()
-                        return
-                      }
-                      say('')
-                    } catch (error) {
-                      if (error instanceof DOMException && error.name === 'AbortError') return
-                      // A dropped page is not the end of the feed. The cursor is
-                      // untouched, so scrolling past the sentinel tries again.
-                      say('Could not load more — scroll to try again.')
-                    } finally {
-                      loading = false
+                    if (!next) {
+                      say(endText)
+                      observer.disconnect()
+                      return
                     }
-                  })()
-                },
-                { rootMargin: ROOT_MARGIN },
-              )
+                    say('')
+                  } catch (error) {
+                    if (error instanceof DOMException && error.name === 'AbortError') return
+                    // A dropped page is not the end of the feed. The cursor is
+                    // untouched, so scrolling past the sentinel tries again.
+                    say('Could not load more — scroll to try again.')
+                  } finally {
+                    loading = false
+                  }
+                })()
+              },
+              { rootMargin: ROOT_MARGIN },
+            )
 
-              observer.observe(node)
-              signal.addEventListener('abort', () => observer.disconnect())
-            }),
-          ]}
-        />
-      )
-    }
-  },
-)
+            observer.observe(node)
+            signal.addEventListener('abort', () => observer.disconnect())
+          }),
+        ]}
+      />
+    )
+  }
+})

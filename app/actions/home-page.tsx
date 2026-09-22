@@ -143,7 +143,13 @@ function Pitch() {
         that knows what you actually like.
       </p>
       <div
-        mix={css({ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', marginTop: '32px' })}
+        mix={css({
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          alignItems: 'center',
+          marginTop: '32px',
+        })}
       >
         <a
           href={routes.auth.login.index.href()}

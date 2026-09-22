@@ -31,8 +31,7 @@ function ImportSummary(handle: Handle<{ result: SteamImportResult }>) {
         </p>
         {result.skipped > 0 && (
           <p mix={css({ fontSize: '13px', color: '#888' })}>
-            Skipped {result.skipped} non-game items in your library, like soundtracks, demos and server
-            tools.
+            Skipped {result.skipped} non-game items in your library, like soundtracks, demos and server tools.
           </p>
         )}
         {result.notFound.length > 0 && (
@@ -89,12 +88,12 @@ export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
             <>
               <p mix={css({ color: '#555' })}>
                 Connected to Steam account <code>{steamId}</code>. Importing brings in the games you own,
-                using your Steam playtime to tell them apart: anything you've played is logged as played,
-                and anything you've never launched goes on your want-to-play list.
+                using your Steam playtime to tell them apart: anything you've played is logged as played, and
+                anything you've never launched goes on your want-to-play list.
               </p>
               <p mix={css({ fontSize: '13px', color: '#888' })}>
-                A large library takes a few minutes — each game is looked up individually. Leave the tab
-                open until it finishes.
+                A large library takes a few minutes — each game is looked up individually. Leave the tab open
+                until it finishes.
               </p>
               <div mix={css({ marginTop: '16px' })}>
                 <form method="post" action={routes.profile.importGames.upload.href()}>
@@ -105,8 +104,8 @@ export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
           ) : (
             <>
               <p mix={css({ color: '#555' })}>
-                No Steam account connected yet. Importing your library needs one, since the library is
-                read from Steam rather than uploaded.
+                No Steam account connected yet. Importing your library needs one, since the library is read
+                from Steam rather than uploaded.
               </p>
               <p>
                 <a href={routes.profile.edit.index.href()}>Connect Steam in settings →</a>

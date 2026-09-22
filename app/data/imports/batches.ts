@@ -8,7 +8,14 @@ import { pool, type Db } from '../db.ts'
 import { getCatalogProvider, upsertCatalogItem } from '../catalog/provider.ts'
 import { logInteraction, type LogInteractionInput, type MediaType } from '../mediaItems.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
-import { importBatches, importRows, mediaItems, userMediaInteractions, type ImportBatch, type ImportRow } from '../schema.ts'
+import {
+  importBatches,
+  importRows,
+  mediaItems,
+  userMediaInteractions,
+  type ImportBatch,
+  type ImportRow,
+} from '../schema.ts'
 import type { ConflictChoice, RowState } from './classify.ts'
 import {
   buildReview,
@@ -125,7 +132,13 @@ export async function touchClaim(db: Db, batchId: string): Promise<void> {
 export async function recordMatch(
   db: Db,
   rowId: number,
-  result: { state: RowState; reason: string | null; yearDelta: number | null; externalId: string | null; mediaItemId: number | null },
+  result: {
+    state: RowState
+    reason: string | null
+    yearDelta: number | null
+    externalId: string | null
+    mediaItemId: number | null
+  },
 ): Promise<void> {
   await db.update(importRows, rowId, {
     state: result.state,
@@ -138,7 +151,11 @@ export async function recordMatch(
 }
 
 export async function setMatchedCount(db: Db, batchId: string, matched: number): Promise<void> {
-  await db.update(importBatches, batchId, { matched_rows: matched, claimed_at: Date.now(), updated_at: Date.now() })
+  await db.update(importBatches, batchId, {
+    matched_rows: matched,
+    claimed_at: Date.now(),
+    updated_at: Date.now(),
+  })
 }
 
 export async function finishMatching(db: Db, batchId: string): Promise<void> {
@@ -186,10 +203,19 @@ function toStagedRow(row: ImportRow): StagedRow {
 
 function toCatalogEntry(item: { id: number; title: string; metadata: unknown }): CatalogEntry {
   const { releaseYear, creator, posterUrl } = parseMediaMetadata(item.metadata)
-  return { id: item.id, title: item.title, releaseYear: releaseYear ?? null, creator: creator ?? null, posterUrl: posterUrl ?? null }
+  return {
+    id: item.id,
+    title: item.title,
+    releaseYear: releaseYear ?? null,
+    creator: creator ?? null,
+    posterUrl: posterUrl ?? null,
+  }
 }
 
-export async function loadReview(db: Db, batch: ImportBatch): Promise<{ rows: ImportRow[]; model: ReviewModel }> {
+export async function loadReview(
+  db: Db,
+  batch: ImportBatch,
+): Promise<{ rows: ImportRow[]; model: ReviewModel }> {
   const rows = await loadRows(db, batch.id)
   const staged = rows.map(toStagedRow)
 
@@ -334,7 +360,13 @@ export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult>
   const writable: ImportRow[] = []
 
   for (const row of rows) {
-    if (row.state === 'skipped' || row.state === 'kept' || row.state === 'not_found' || row.state === 'pending') continue
+    if (
+      row.state === 'skipped' ||
+      row.state === 'kept' ||
+      row.state === 'not_found' ||
+      row.state === 'pending'
+    )
+      continue
     if (row.media_item_id == null) continue
     if (held.has(row.id)) continue
     // A conflict is only written when the batch says take it, or this row was

@@ -128,8 +128,7 @@ export function startGenerationWorker(): GenerationWorker {
       await requeueStaleJobs(db)
       const jobs = await claimJobs(db, slots - running)
       for (const job of jobs) void run(job)
-    } catch {
-    }
+    } catch {}
   }
 
   function schedule(): void {

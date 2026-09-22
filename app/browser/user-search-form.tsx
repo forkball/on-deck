@@ -1,7 +1,12 @@
 import { clientEntry, css, on, ref } from 'remix/ui'
 
 import { SuggestionDropdown } from './shared/suggestion-dropdown.tsx'
-import { createSuggestionFetcher, EMPTY_SUGGEST_STATE, type SuggestState, type Suggestion } from './shared/suggestions.ts'
+import {
+  createSuggestionFetcher,
+  EMPTY_SUGGEST_STATE,
+  type SuggestState,
+  type Suggestion,
+} from './shared/suggestions.ts'
 
 export type UserSearchFormProps = {
   query: string

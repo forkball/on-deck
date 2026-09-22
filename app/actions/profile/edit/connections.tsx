@@ -121,9 +121,8 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
                 nothing once someone is connected. The disconnected copy still
                 names them, which is where that expectation gets set. */}
             <p mix={NOTE}>
-              New diary entries only, with their rating and review. Edits and deletions follow —
-              Letterboxd wins, and films you logged here are never touched. Re-read every 15
-              minutes.
+              New diary entries only, with their rating and review. Edits and deletions follow — Letterboxd
+              wins, and films you logged here are never touched. Re-read every 15 minutes.
             </p>
 
             {/* The boundary this feature would otherwise hide. Connecting
@@ -144,8 +143,8 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
             {!historyImported && (
               <p mix={css({ margin: '12px 0 0', fontSize: '13px', color: '#555' })}>
                 <strong>Your earlier films aren't here yet.</strong>{' '}
-                <a href={routes.profile.importMovies.index.href()}>Import your Letterboxd export</a>{' '}
-                to bring them across.
+                <a href={routes.profile.importMovies.index.href()}>Import your Letterboxd export</a> to bring
+                them across.
               </p>
             )}
 
@@ -156,7 +155,13 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
             <form
               method="post"
               action={routes.profile.letterboxd.sync.href()}
-              mix={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px', marginTop: '12px' })}
+              mix={css({
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: '16px',
+                marginTop: '12px',
+              })}
             >
               <button type="submit">Sync now</button>
               <button type="submit" formaction={routes.profile.letterboxd.disconnect.href()}>
@@ -167,9 +172,8 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
         ) : (
           <>
             <p mix={NOTE}>
-              Follows what you log from the moment you connect — new diary entries, with their
-              rating and review. Nothing from before, and no lists or watchlist. Your existing
-              films come from the{' '}
+              Follows what you log from the moment you connect — new diary entries, with their rating and
+              review. Nothing from before, and no lists or watchlist. Your existing films come from the{' '}
               <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
             </p>
             <form
@@ -238,8 +242,8 @@ function SteamBlock(handle: Handle<{ connection: SteamConnection }>) {
             )}
             <p mix={NOTE}>
               Unlike Letterboxd, nothing is read until you ask for it —{' '}
-              <a href={routes.profile.importGames.index.href()}>import your library</a> to bring your
-              games across.
+              <a href={routes.profile.importGames.index.href()}>import your library</a> to bring your games
+              across.
             </p>
             <form
               method="post"
@@ -252,12 +256,12 @@ function SteamBlock(handle: Handle<{ connection: SteamConnection }>) {
         ) : (
           <>
             <p mix={css({ margin: '0 0 12px', color: '#555' })}>
-              Sign in through Steam to import the games you own. On Deck only reads which games you
-              own and how long you've played them — it can't post or change anything on your account.
+              Sign in through Steam to import the games you own. On Deck only reads which games you own and
+              how long you've played them — it can't post or change anything on your account.
             </p>
             <p mix={NOTE}>
-              Your Steam profile's <strong>Game details</strong> setting needs to be Public, otherwise
-              Steam won't share the list even after you've signed in.
+              Your Steam profile's <strong>Game details</strong> setting needs to be Public, otherwise Steam
+              won't share the list even after you've signed in.
             </p>
             {/*
               `rmx-document` is load-bearing. This href is same-origin, so the
@@ -289,8 +293,8 @@ export function Connections(handle: Handle<ConnectionsProps>) {
       <section mix={css({ maxWidth: '480px' })}>
         <h2 mix={css({ marginTop: 0 })}>Connected accounts</h2>
         <p mix={css({ margin: '0 0 16px', color: '#555' })}>
-          Libraries On Deck reads from. Disconnecting one stops the reading — it leaves everything
-          already in your log exactly where it is.
+          Libraries On Deck reads from. Disconnecting one stops the reading — it leaves everything already in
+          your log exactly where it is.
         </p>
 
         {letterboxd && <LetterboxdBlock connection={letterboxd} />}
