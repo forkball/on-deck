@@ -207,3 +207,19 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 .doodle button.linkish:hover {
   color: #3c3c3c;
 }
+
+/* An icon-only control that sits inside something else — the ✕ that clears a
+   picked file. Same reason as .linkish: the doodle border comes from an
+   unlayered `.doodle button` rule, so css() can't take it off. */
+.doodle button.bare {
+  border: 0;
+  border-image: none;
+  background: none;
+  padding: 4px 8px;
+  color: #888;
+  cursor: pointer;
+}
+
+.doodle button.bare:hover:not(:disabled) {
+  color: #3c3c3c;
+}
