@@ -252,6 +252,9 @@ export const importRows = table({
     year_delta: c.integer().nullable(),
     matched_external_id: c.text(),
     media_item_id: c.integer().nullable(),
+    // Same-titled films a no-year row could have meant. See the migration and
+    // inlineAlternates in app/data/imports/classify.ts.
+    alternates: c.json().nullable(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
   },

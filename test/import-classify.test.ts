@@ -6,6 +6,7 @@ import {
   classifyMatch,
   conflictFields,
   describeReason,
+  inlineAlternates,
   isBulkAcceptable,
   suspicion,
   type CandidateLike,
@@ -193,5 +194,44 @@ describe('conflictFields', () => {
 
   it('ignores whitespace-only note changes', () => {
     assert.deepEqual(conflictFields(logged, { ...logged, notes: '  still the best shootout  ' }), [])
+  })
+})
+
+describe('inlineAlternates', () => {
+  const row = { title: 'Little Women', year: null }
+  const noYear = classifyMatch(row, film('Little Women', 2019, 'lw19'))
+
+  it('offers the namesakes of a no-year row, our pick first', () => {
+    const results = [film('Little Women', 1994, 'lw94'), film('Little Women', 2019, 'lw19')]
+    const alternates = inlineAlternates(row, noYear, film('Little Women', 2019, 'lw19'), results)
+    assert.deepEqual(
+      alternates?.map((a) => a.externalId),
+      ['lw19', 'lw94'],
+    )
+  })
+
+  it('leaves out results that only contain the title', () => {
+    const results = [film('Little Women', 1994, 'lw94'), film('Little Women: LA Story', 2016, 'la')]
+    const alternates = inlineAlternates(row, noYear, film('Little Women', 2019, 'lw19'), results)
+    assert.deepEqual(
+      alternates?.map((a) => a.externalId),
+      ['lw19', 'lw94'],
+    )
+  })
+
+  it('is nothing to choose between when there is only one namesake', () => {
+    const results = [film('Little Women: LA Story', 2016, 'la')]
+    assert.equal(inlineAlternates(row, noYear, film('Little Women', 2019, 'lw19'), results), null)
+  })
+
+  it('hands a long list of namesakes to the picker instead', () => {
+    const results = [1933, 1949, 1994, 2018].map((year) => film('Little Women', year, `lw${year}`))
+    assert.equal(inlineAlternates(row, noYear, film('Little Women', 2019, 'lw19'), results), null)
+  })
+
+  it('only applies to rows flagged for having no year', () => {
+    const drift = classifyMatch({ title: 'Nosferatu', year: 2025 }, film('Nosferatu', 2024, 'n24'))
+    const results = [film('Nosferatu', 2024, 'n24'), film('Nosferatu', 1922, 'n22')]
+    assert.equal(inlineAlternates({ title: 'Nosferatu', year: 2025 }, drift, results[0]!, results), null)
   })
 })

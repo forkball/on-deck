@@ -10,6 +10,7 @@ import {
   describeReason,
   isBulkAcceptable,
   suspicion,
+  type CandidateLike,
   type ConflictChoice,
   type ConflictField,
   type DuplicateRow,
@@ -35,6 +36,10 @@ export interface StagedRow {
   reason: MatchReason | null
   yearDelta: number | null
   mediaItemId: number | null
+  matchedExternalId: string | null
+  // Same-titled films a no-year row could have meant, matching's own pick
+  // first — see inlineAlternates. Null means choose in the picker.
+  alternates: CandidateLike[] | null
 }
 
 export interface CatalogEntry {

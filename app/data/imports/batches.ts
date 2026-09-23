@@ -16,7 +16,7 @@ import {
   type ImportBatch,
   type ImportRow,
 } from '../schema.ts'
-import type { ConflictChoice, RowState } from './classify.ts'
+import type { CandidateLike, ConflictChoice, RowState } from './classify.ts'
 import {
   buildReview,
   type CatalogEntry,
@@ -138,9 +138,14 @@ export async function recordMatch(
     yearDelta: number | null
     externalId: string | null
     mediaItemId: number | null
+    alternates?: CandidateLike[] | null
   },
 ): Promise<void> {
   await db.update(importRows, rowId, {
+    // Serialized here: node-postgres sends a bare JS array as a Postgres array
+    // literal, which a jsonb column rejects. Objects go through as JSON, which
+    // is why metadata never needed this.
+    alternates: result.alternates ? JSON.stringify(result.alternates) : null,
     state: result.state,
     reason: result.reason ?? undefined,
     year_delta: result.yearDelta,
@@ -198,7 +203,25 @@ function toStagedRow(row: ImportRow): StagedRow {
     reason: (row.reason ?? null) as StagedRow['reason'],
     yearDelta: row.year_delta ?? null,
     mediaItemId: row.media_item_id ?? null,
+    matchedExternalId: row.matched_external_id ?? null,
+    alternates: readAlternates(row.alternates),
   }
+}
+
+// Written by matching as an array of candidates. Anything else — null, or a
+// shape from some future change — reads as none, which leaves the card on the
+// picker rather than rendering buttons from something it can't trust.
+function readAlternates(value: unknown): CandidateLike[] | null {
+  if (!Array.isArray(value)) return null
+  const alternates = value.filter(
+    (entry): entry is CandidateLike =>
+      typeof entry === 'object' &&
+      entry !== null &&
+      typeof entry.externalId === 'string' &&
+      typeof entry.title === 'string' &&
+      (entry.releaseYear === null || typeof entry.releaseYear === 'number'),
+  )
+  return alternates.length === value.length && alternates.length >= 2 ? alternates : null
 }
 
 function toCatalogEntry(item: { id: number; title: string; metadata: unknown }): CatalogEntry {

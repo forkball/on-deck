@@ -145,16 +145,19 @@ function ResolveForm(
     // A text button, for the answer that shouldn't compete with the others.
     quiet?: boolean
     anchor?: string
+    // For `repoint`: the catalog entry to point the row at.
+    externalId?: string
   }>,
 ) {
   return () => {
-    const { batchId, rowId, action, label, primary, quiet, anchor } = handle.props
+    const { batchId, rowId, action, label, primary, quiet, anchor, externalId } = handle.props
 
     return (
       <form method="post" action={routes.profile.imports.resolve.href({ batchId, rowId: String(rowId) })}>
         <FrameForm />
         <input type="hidden" name="action" value={action} />
         {anchor && <input type="hidden" name="anchor" value={anchor} />}
+        {externalId && <input type="hidden" name="external_id" value={externalId} />}
         <button
           type="submit"
           class={quiet ? 'linkish' : primary ? 'primary' : undefined}
@@ -174,15 +177,15 @@ function rowAnchor(rowId: number): string {
 // Opens the picker for one row. A plain button rather than a link: the modal is
 // a single client entry for the whole page, and this is how it is told which
 // row to open on.
-function PickerButton(handle: Handle<{ rowId: number; label: string; primary?: boolean }>) {
+function PickerButton(handle: Handle<{ rowId: number; label: string; primary?: boolean; quiet?: boolean }>) {
   return () => {
-    const { rowId, label, primary } = handle.props
+    const { rowId, label, primary, quiet } = handle.props
 
     return (
       <button
         type="button"
         data-import-picker={String(rowId)}
-        class={primary ? 'primary' : undefined}
+        class={quiet ? 'linkish' : primary ? 'primary' : undefined}
         mix={css({ fontSize: '13px' })}
       >
         {label}
@@ -397,11 +400,23 @@ function DuplicateCard(
 // it to, the answers. Side by side it needed two columns on desktop and wrapped
 // into a card half a phone screen tall; stacked, it is short at both.
 function UncertainCard(
-  handle: Handle<{ batchId: string; entry: ReviewRow; pastParticiple: string; next?: string }>,
+  handle: Handle<{
+    batchId: string
+    entry: ReviewRow
+    pastParticiple: string
+    next?: string
+    // Off where the group heading already says it; kept where the chip adds
+    // something, like how many years off a match is.
+    showChip?: boolean
+  }>,
 ) {
   return () => {
-    const { batchId, entry, pastParticiple, next } = handle.props
-    const { row, item, chip } = entry
+    const { batchId, entry, pastParticiple, next, showChip = true } = handle.props
+    const { row, item } = entry
+    const chip = showChip ? entry.chip : null
+    // A no-year row with a couple of namesakes is a "which one?" question, so
+    // the card asks it directly rather than behind the picker.
+    const choices = row.reason === 'no_year' ? row.alternates : null
 
     return (
       <Card attention id={rowAnchor(row.id)}>
@@ -437,6 +452,64 @@ function UncertainCard(
           <Rated values={row} /> · {pastParticiple} {formatDate(row.consumedAt)}
         </div>
 
+        {choices ? (
+          <Actions>
+            <span mix={css({ fontSize: '13px', color: '#8d8579' })}>Which one?</span>
+            {/* None of these is primary: with no year to go on, our pick was
+                a guess, and weighting it would push the guess. */}
+            {choices.map((choice) =>
+              choice.externalId === row.matchedExternalId ? (
+                <ResolveForm
+                  key={choice.externalId}
+                  batchId={batchId}
+                  rowId={row.id}
+                  action="confirm"
+                  label={choiceLabel(choice.releaseYear)}
+                  anchor={next}
+                />
+              ) : (
+                <ResolveForm
+                  key={choice.externalId}
+                  batchId={batchId}
+                  rowId={row.id}
+                  action="repoint"
+                  externalId={choice.externalId}
+                  label={choiceLabel(choice.releaseYear)}
+                  anchor={next}
+                />
+              ),
+            )}
+            <PickerButton rowId={row.id} label="Another…" quiet />
+            <ResolveForm
+              batchId={batchId}
+              rowId={row.id}
+              action="skip"
+              label="Don't save"
+              quiet
+              anchor={next}
+            />
+          </Actions>
+        ) : (
+          <MatchedAnswers batchId={batchId} row={row} item={item} next={next} />
+        )}
+      </Card>
+    )
+  }
+}
+
+// The year is the whole difference between namesakes, so it is the label.
+function choiceLabel(year: number | null): string {
+  return year == null ? 'Undated' : String(year)
+}
+
+function MatchedAnswers(
+  handle: Handle<{ batchId: string; row: ReviewRow['row']; item: ReviewRow['item']; next?: string }>,
+) {
+  return () => {
+    const { batchId, row, item, next } = handle.props
+
+    return (
+      <>
         <div mix={css({ display: 'flex', gap: '10px', alignItems: 'center', margin: '8px 0 0' })}>
           <Poster url={item?.posterUrl ?? null} size={32} />
           <span mix={css({ fontSize: '14px', minWidth: 0 })}>
@@ -465,8 +538,61 @@ function UncertainCard(
             anchor={next}
           />
         </Actions>
-      </Card>
+      </>
     )
+  }
+}
+
+// "Worth a look" split by what we're unsure about, in the order the cards
+// already sort — least certain first — so each group is one kind of question
+// and can be answered as one.
+interface ReasonGroup {
+  key: string
+  title: string
+  blurb: string
+  entries: ReviewRow[]
+  // Whether the card's chip still says something the heading doesn't.
+  showChip: boolean
+}
+
+function groupByReason(uncertain: ReviewRow[], singular: string, plural: string): ReasonGroup[] {
+  const groups = new Map<string, ReasonGroup>()
+
+  for (const entry of uncertain) {
+    const key = entry.row.reason ?? 'other'
+    let group = groups.get(key)
+    if (!group) {
+      group = { key, entries: [], ...reasonCopy(key, singular, plural) }
+      groups.set(key, group)
+    }
+    group.entries.push(entry)
+  }
+
+  return [...groups.values()]
+}
+
+function reasonCopy(reason: string, singular: string, plural: string) {
+  switch (reason) {
+    case 'title_differs':
+      return {
+        title: 'Different title',
+        blurb: `The catalog's title isn't the one in your file — often a subtitle, or a different ${singular}.`,
+        showChip: false,
+      }
+    case 'no_year':
+      return {
+        title: 'No year in your file',
+        blurb: `Several ${plural} share these names. Pick the one you meant.`,
+        showChip: false,
+      }
+    case 'year_drift':
+      return {
+        title: "Year doesn't match",
+        blurb: 'A year or so out is usually a festival or re-release date; further out may be a remake.',
+        showChip: true,
+      }
+    default:
+      return { title: 'Worth checking', blurb: '', showChip: true }
   }
 }
 
@@ -477,6 +603,12 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
     const { singular, plural, pastParticiple } = mediaTypeUiFor(batch.media_type as MediaType)
     const batchId = batch.id
     const notFoundFirst = model.notFound[0] ? rowAnchor(model.notFound[0].row.id) : SAVE_ANCHOR
+    const uncertainGroups = groupByReason(model.uncertain, singular, plural)
+    // The order the cards appear in, which the no-JS "next card" anchors follow.
+    const orderedUncertain = uncertainGroups.flatMap((group) => group.entries)
+    // Cards still asking something. Conflicts aren't counted: the switch above
+    // them is already an answer for all of them.
+    const toCheck = model.uncertain.length + model.notFound.length + model.duplicates.length
 
     return (
       <Document title="Review your import | On Deck">
@@ -666,47 +798,69 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     <span mix={css({ color: '#888', fontSize: '14px' })}>({model.uncertain.length})</span>
                   </h2>
                   <p mix={css({ fontSize: '13px', color: '#888', marginBottom: '10px' })}>
-                    Least certain first. These will be saved either way; the chip says what we're unsure
-                    about.
+                    Least certain first. These save as matched unless you say otherwise.
                   </p>
-                  <div id="import-uncertain">
-                    {model.uncertain.map((entry, i) => (
-                      <UncertainCard
-                        key={entry.row.id}
-                        batchId={batchId}
-                        entry={entry}
-                        pastParticiple={pastParticiple}
-                        next={nextAnchor(model.uncertain, i, notFoundFirst)}
+                  {uncertainGroups.map((group) => (
+                    <section key={group.key} mix={css({ marginBottom: '18px' })}>
+                      <h3 mix={css({ margin: '14px 0 2px', fontSize: '16px' })}>
+                        {group.title}{' '}
+                        <span mix={css({ color: '#888', fontSize: '13px', fontWeight: 400 })}>
+                          ({group.entries.length})
+                        </span>
+                      </h3>
+                      {group.blurb && (
+                        <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 8px' })}>{group.blurb}</p>
+                      )}
+                      <div id={`import-uncertain-${group.key}`}>
+                        {group.entries.map((entry) => (
+                          <UncertainCard
+                            key={entry.row.id}
+                            batchId={batchId}
+                            entry={entry}
+                            pastParticiple={pastParticiple}
+                            showChip={group.showChip}
+                            next={nextAnchor(
+                              orderedUncertain,
+                              orderedUncertain.indexOf(entry),
+                              notFoundFirst,
+                            )}
+                          />
+                        ))}
+                      </div>
+                      <LazyList
+                        listId={`import-uncertain-${group.key}`}
+                        initial={ROWS_VISIBLE}
+                        step={ROWS_VISIBLE}
                       />
-                    ))}
-                  </div>
-                  <LazyList listId="import-uncertain" initial={ROWS_VISIBLE} step={ROWS_VISIBLE} />
-                  {model.bulkAcceptable > 0 && (
-                    <form
-                      method="post"
-                      action={routes.profile.imports.bulk.href({ batchId })}
-                      mix={css({
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        flexWrap: 'wrap',
-                        border: '1px dashed #cfc5b6',
-                        borderRadius: '8px',
-                        padding: '11px 14px',
-                        background: '#fbf6ee',
-                        marginTop: '10px',
-                      })}
-                    >
-                      <FrameForm />
-                      <span mix={css({ flex: '1 1 220px', fontSize: '14px' })}>
-                        {model.bulkAcceptable} of these are within a year of your CSV — usually a festival or
-                        re-release date.
-                      </span>
-                      <button type="submit" mix={css({ fontSize: '13px' })}>
-                        Accept all {model.bulkAcceptable}
-                      </button>
-                    </form>
-                  )}
+                      {group.key === 'year_drift' && model.bulkAcceptable > 0 && (
+                        <form
+                          method="post"
+                          action={routes.profile.imports.bulk.href({ batchId })}
+                          mix={css({
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            flexWrap: 'wrap',
+                            border: '1px dashed #cfc5b6',
+                            borderRadius: '8px',
+                            padding: '11px 14px',
+                            background: '#fbf6ee',
+                            marginTop: '10px',
+                          })}
+                        >
+                          <FrameForm />
+                          <span mix={css({ flex: '1 1 220px', fontSize: '14px' })}>
+                            {model.bulkAcceptable === group.entries.length
+                              ? `All ${model.bulkAcceptable} are within a year of your file.`
+                              : `${model.bulkAcceptable} of these are within a year of your file.`}
+                          </span>
+                          <button type="submit" mix={css({ fontSize: '13px' })}>
+                            Accept all {model.bulkAcceptable}
+                          </button>
+                        </form>
+                      )}
+                    </section>
+                  ))}
                 </>
               )}
 
@@ -744,30 +898,40 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 </>
               )}
 
+              {/* Pinned to the bottom of the screen: everything saves by
+                  default, so saving shouldn't wait on scrolling past every
+                  card to find the button. It sits in the flow at the end of
+                  the page, so it stops there rather than covering the last
+                  card. */}
               <div
                 id={SAVE_ANCHOR}
                 mix={css({
+                  position: 'sticky',
+                  bottom: 0,
+                  zIndex: 10,
+                  background: '#FDF7F1',
                   borderTop: '1px solid #ddd',
+                  boxShadow: '0 -6px 12px -10px rgba(0, 0, 0, 0.35)',
                   marginTop: '24px',
-                  paddingTop: '16px',
+                  padding: '10px 0',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '14px',
+                  gap: '6px 14px',
                   flexWrap: 'wrap',
                 })}
               >
-                <span mix={css({ fontSize: '13px', color: '#888' })}>
+                <span mix={css({ fontSize: '13px', color: '#888', flex: '1 1 100%' })}>
+                  {toCheck > 0 ? `${toCheck} left to look at · ` : 'Nothing left to look at · '}
                   {counts.save} saved · {counts.unchanged} unchanged · {counts.leftOut} left out
                 </span>
-                <span mix={css({ flex: '1 1 auto' })} />
-                <a href={routes.profile.index.href()} mix={css({ fontSize: '14px' })}>
-                  Decide later
-                </a>
                 <form method="post" action={routes.profile.imports.save.href({ batchId })}>
                   <button type="submit" class="primary">
                     Save {counts.save} {plural} to my log
                   </button>
                 </form>
+                <a href={routes.profile.index.href()} mix={css({ fontSize: '14px' })}>
+                  Decide later
+                </a>
               </div>
 
               <ImportPicker

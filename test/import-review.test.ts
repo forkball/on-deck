@@ -27,6 +27,8 @@ function row(partial: Partial<StagedRow> = {}): StagedRow {
     reason: 'exact',
     yearDelta: 0,
     mediaItemId: 1,
+    matchedExternalId: null,
+    alternates: null,
     ...partial,
   }
 }

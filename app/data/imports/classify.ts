@@ -200,3 +200,31 @@ function normalizeNote(note: string | null): string {
 // What a conflicting row does when the person hasn't said otherwise. `keep` is
 // the default because it is the only direction that destroys nothing.
 export type ConflictChoice = 'keep' | 'take'
+
+// The same-titled films a no-year row could have meant, when there are few
+// enough to offer as buttons on the card. Two is the least that makes it a
+// choice; past three it is a list, and the picker — with posters and a search
+// box — is the better place to choose from one. Matching's own pick leads, so
+// the card reads "ours, or one of these".
+export const MAX_INLINE_ALTERNATES = 3
+
+export function inlineAlternates(
+  row: RowLike,
+  verdict: Verdict,
+  chosen: CandidateLike | null,
+  results: CandidateLike[],
+): CandidateLike[] | null {
+  if (verdict.reason !== 'no_year' || !chosen) return null
+
+  const wanted = normalizeTitle(row.title)
+  const seen = new Set<string>()
+  const namesakes: CandidateLike[] = []
+
+  for (const result of [chosen, ...results]) {
+    if (seen.has(result.externalId) || normalizeTitle(result.title) !== wanted) continue
+    seen.add(result.externalId)
+    namesakes.push({ externalId: result.externalId, title: result.title, releaseYear: result.releaseYear })
+  }
+
+  return namesakes.length >= 2 && namesakes.length <= MAX_INLINE_ALTERNATES ? namesakes : null
+}
