@@ -268,7 +268,12 @@ export async function loadReview(
     ]),
   )
 
-  return { rows, model: buildReview(staged, itemMap, existing, batch.conflict_choice as ConflictChoice) }
+  return {
+    rows,
+    model: buildReview(staged, itemMap, existing, batch.conflict_choice as ConflictChoice, {
+      saved: batch.status === 'done',
+    }),
+  }
 }
 
 async function ownedRow(db: Db, batch: ImportBatch, rowId: number): Promise<ImportRow | null> {
@@ -380,6 +385,19 @@ export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult>
     held.add(verdict.kind === 'different_films' ? verdict.move.id : verdict.drop.id)
   }
 
+  // Already in the log exactly as this file has them: nothing to write. Marked
+  // kept — the state for "decided in favour of the log" — so the saved page,
+  // which reads the batch back once the log agrees with every row, still
+  // counts them as unchanged rather than as saved.
+  const alreadyLogged = new Set(model.alreadyLoggedIds)
+  if (alreadyLogged.size > 0) {
+    await db.updateMany(
+      importRows,
+      { state: 'kept', updated_at: Date.now() },
+      { where: and(eq('batch_id', batch.id), inList('id', model.alreadyLoggedIds)) },
+    )
+  }
+
   const writable: ImportRow[] = []
 
   for (const row of rows) {
@@ -391,7 +409,7 @@ export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult>
     )
       continue
     if (row.media_item_id == null) continue
-    if (held.has(row.id)) continue
+    if (held.has(row.id) || alreadyLogged.has(row.id)) continue
     // A conflict is only written when the batch says take it, or this row was
     // confirmed by hand — which beats the batch default.
     if (conflicted.has(row.id) && batch.conflict_choice === 'keep' && row.state !== 'confirmed') continue

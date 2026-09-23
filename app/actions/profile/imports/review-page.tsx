@@ -546,6 +546,31 @@ function MatchedAnswers(
   }
 }
 
+// A collapsed list on the saved page. <details>, so it opens without JS and a
+// 370-row list costs nothing until someone asks for it.
+function SavedList(handle: Handle<{ summary: string; children?: RemixNode }>) {
+  return () => (
+    <details
+      mix={css({
+        border: '1px solid #e2d8c8',
+        borderRadius: '8px',
+        padding: '10px 14px',
+        margin: '0 0 10px',
+        background: '#fffcf8',
+      })}
+    >
+      <summary mix={css({ cursor: 'pointer', fontSize: '14px' })}>{handle.props.summary}</summary>
+      <div mix={css({ marginTop: '10px' })}>{handle.props.children}</div>
+    </details>
+  )
+}
+
+function leftOutReason(state: string): string {
+  if (state === 'not_found') return 'not found in the catalog'
+  if (state === 'skipped') return 'you left it out'
+  return 'held back as a duplicate'
+}
+
 // "Worth a look" split by what we're unsure about, in the order the cards
 // already sort — least certain first — so each group is one kind of question
 // and can be answered as one.
@@ -603,15 +628,24 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
   return () => {
     const { displayName, batch, model, saved, offerFeed, reviewsOnly, error } = handle.props
     const { counts } = model
-    const { singular, plural, pastParticiple } = mediaTypeUiFor(batch.media_type as MediaType)
+    const ui = mediaTypeUiFor(batch.media_type as MediaType)
+    const { singular, plural, pastParticiple } = ui
     const batchId = batch.id
     const notFoundFirst = model.notFound[0] ? rowAnchor(model.notFound[0].row.id) : SAVE_ANCHOR
     const uncertainGroups = groupByReason(model.uncertain, singular, plural)
     // The order the cards appear in, which the no-JS "next card" anchors follow.
     const orderedUncertain = uncertainGroups.flatMap((group) => group.entries)
-    // Cards still asking something. Conflicts aren't counted: the switch above
-    // them is already an answer for all of them.
-    const toCheck = model.uncertain.length + model.notFound.length + model.duplicates.length
+    // What pressing Save does right now, rather than how much is left to do:
+    // everything saves by default, so the open cards aren't homework, they are
+    // what goes in unchecked.
+    const saveLine =
+      [
+        model.uncertain.length > 0 && `${model.uncertain.length} unchecked will save as we matched them`,
+        counts.leftOut > 0 && `${counts.leftOut} left out`,
+        counts.unchanged > 0 && `${counts.unchanged} already in your log`,
+      ]
+        .filter(Boolean)
+        .join(' · ') || `All ${counts.save} checked and ready`
 
     return (
       <Document title="Review your import | On Deck">
@@ -620,14 +654,61 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
           {saved ? (
             <>
               <h1>
-                Saved {counts.save} {plural} to your log
+                Saved {counts.save} {counts.save === 1 ? singular : plural} to your log
               </h1>
               <p mix={css({ color: '#15803d' })}>They're in your log now.</p>
               <ul mix={css({ color: '#555' })}>
                 <li>{model.confidentCount} matched without help</li>
-                <li>{counts.unchanged} already logged and left as they were</li>
-                <li>{counts.leftOut} left out</li>
+                {model.confirmedCount > 0 && <li>{model.confirmedCount} you checked or picked</li>}
+                {model.uncertain.length > 0 && (
+                  <li>{model.uncertain.length} saved as we matched them, unchecked</li>
+                )}
+                {counts.unchanged > 0 && (
+                  <li>{counts.unchanged} already in your log and left as they were</li>
+                )}
+                {counts.leftOut > 0 && <li>{counts.leftOut} left out</li>}
               </ul>
+
+              {/* Saving is allowed with cards still open, and those rows go in
+                  as matched. Saying so only as a count left no way to find
+                  them again, and a wrong one can't be re-matched by a member
+                  after the fact — so they are named, with a way to each. */}
+              {model.uncertain.length > 0 && (
+                <SavedList summary={`The ${model.uncertain.length} saved as we matched them`}>
+                  <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 8px' })}>
+                    We weren't sure about these. If one is the wrong {singular}, open it, remove it from your
+                    log, and log the right one.
+                  </p>
+                  <ul mix={css({ margin: 0, paddingLeft: '18px', fontSize: '14px' })}>
+                    {model.uncertain.map(({ row, item }) => (
+                      <li key={row.id} mix={css({ marginBottom: '4px' })}>
+                        {item ? (
+                          <a href={ui.hrefs.show(item.id)}>
+                            {item.title} {item.releaseYear ?? ''}
+                          </a>
+                        ) : (
+                          row.title
+                        )}{' '}
+                        <span mix={css({ color: '#888' })}>
+                          · your file: {row.title} {row.year ?? 'no year'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </SavedList>
+              )}
+              {model.leftOutRows.length > 0 && (
+                <SavedList summary={`The ${model.leftOutRows.length} left out`}>
+                  <ul mix={css({ margin: 0, paddingLeft: '18px', fontSize: '14px' })}>
+                    {model.leftOutRows.map((row) => (
+                      <li key={row.id} mix={css({ marginBottom: '4px' })}>
+                        {row.title} {row.year ?? ''}{' '}
+                        <span mix={css({ color: '#888' })}>· {leftOutReason(row.state)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </SavedList>
+              )}
               <p>
                 <a href={routes.profile.watched.href()}>See my log</a>
                 {' · '}
@@ -688,8 +769,12 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
               {error ? <p mix={css({ color: '#b91c1c' })}>{error}</p> : null}
               <p mix={css({ fontSize: '15px', margin: '0 0 4px' })}>
                 {counts.total} rows.{' '}
-                <b mix={css({ fontWeight: 400 })}>{model.confidentCount} matched cleanly</b>,{' '}
-                {model.uncertain.length} worth a look, and {model.notFound.length} we couldn't find.
+                {model.alreadyLoggedIds.length > 0 &&
+                  `${model.alreadyLoggedIds.length} already in your log, `}
+                <b mix={css({ fontWeight: 400 })}>
+                  {model.confidentCount + model.confirmedCount} matched cleanly
+                </b>
+                , {model.uncertain.length} worth a look, and {model.notFound.length} we couldn't find.
               </p>
               {reviewsOnly && (
                 <p
@@ -923,13 +1008,12 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   flexWrap: 'wrap',
                 })}
               >
-                <span mix={css({ fontSize: '13px', color: '#888', flex: '1 1 100%' })}>
-                  {toCheck > 0 ? `${toCheck} left to look at · ` : 'Nothing left to look at · '}
-                  {counts.save} saved · {counts.unchanged} unchanged · {counts.leftOut} left out
-                </span>
+                <span mix={css({ fontSize: '13px', color: '#888', flex: '1 1 100%' })}>{saveLine}</span>
                 <form method="post" action={routes.profile.imports.save.href({ batchId })}>
                   <button type="submit" class="primary">
-                    Save {counts.save} {plural} to my log
+                    {counts.save > 0
+                      ? `Save ${counts.save} ${counts.save === 1 ? singular : plural} to my log`
+                      : 'Nothing new — finish'}
                   </button>
                 </form>
                 <a href={routes.profile.index.href()} mix={css({ fontSize: '14px' })}>

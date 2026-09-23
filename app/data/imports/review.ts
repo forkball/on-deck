@@ -78,16 +78,28 @@ export interface ReviewModel {
   duplicates: DuplicateEntry[]
   uncertain: ReviewRow[]
   notFound: ReviewRow[]
+  // Matched and not questioned. Rows someone settled by hand are counted apart
+  // (`confirmedCount`), so the saved page doesn't credit the matcher with them.
   confidentCount: number
+  confirmedCount: number
+  // Rows whose film is already in the log with exactly these details. Writing
+  // them would change nothing, so they are counted as unchanged, not listed,
+  // and not written — see saveBatch. Only worked out while the batch is still
+  // in review: once saved, the log holds what this batch wrote.
+  alreadyLoggedIds: number[]
+  // Everything that won't reach the log, by row, so the saved page can say
+  // which films rather than only how many.
+  leftOutRows: StagedRow[]
   // How many of `uncertain` the one bulk accept would clear.
   bulkAcceptable: number
-  // The footer's arithmetic. `unchanged` only moves when conflicts are kept;
-  // taking the import turns them into updates instead.
+  // The footer's arithmetic. `unchanged` is kept conflicts, rows kept by hand,
+  // and rows already logged exactly as the file has them — the last is what
+  // makes a second upload of the same export say "870 already in your log"
+  // rather than offer to save 870 again.
   //
-  // `save` is how many rows get written, which is not how much the log grows:
-  // a row for a film already logged with the same rating is still written, and
-  // writing it changes nothing. An 834-row import that wrote 712 rows grew the
-  // log by 587, so the page says "saved" rather than "new" or "added".
+  // `save` is how many rows get written, which is still not quite how much the
+  // log grows: two rows can land on one film. So the page says "saved" rather
+  // than "new" or "added".
   counts: { total: number; save: number; unchanged: number; leftOut: number }
 }
 
@@ -117,6 +129,9 @@ export function buildReview(
   items: Map<number, CatalogEntry>,
   existing: Map<number, ExistingEntry>,
   conflictChoice: ConflictChoice,
+  // Whether this batch has been written. After saving, the log agrees with
+  // every row by construction, so "already logged" would swallow the lot.
+  { saved = false }: { saved?: boolean } = {},
 ): ReviewModel {
   const duplicates = findDuplicates(rows, items)
   const held = heldBack(duplicates)
@@ -125,6 +140,8 @@ export function buildReview(
   const uncertain: ReviewRow[] = []
   const notFound: ReviewRow[] = []
   let confidentCount = 0
+  let confirmedCount = 0
+  const alreadyLoggedIds: number[] = []
 
   let keptCount = 0
 
@@ -160,11 +177,17 @@ export function buildReview(
           conflicts.push({ row, item, existing: already, incoming: valuesOf(row), fields })
           continue
         }
+        if (!saved) {
+          alreadyLoggedIds.push(row.id)
+          continue
+        }
       }
     }
 
     if (row.state === 'uncertain') {
       uncertain.push({ row, item, chip: describeReason(verdictOf(row)) })
+    } else if (row.state === 'confirmed') {
+      confirmedCount++
     } else {
       confidentCount++
     }
@@ -179,9 +202,12 @@ export function buildReview(
   // A row confirmed by hand beats the batch default: someone pressing Take on
   // one conflict means that row, whatever the switch above it says.
   const taken = conflicts.filter(({ row }) => conflictChoice === 'take' || row.state === 'confirmed').length
-  const unchanged = conflicts.length - taken + keptCount
-  const save = confidentCount + uncertain.length + taken
-  const leftOut = notFound.length + rows.filter((row) => row.state === 'skipped').length + held.size
+  const unchanged = conflicts.length - taken + keptCount + alreadyLoggedIds.length
+  const save = confidentCount + confirmedCount + uncertain.length + taken
+  const leftOutRows = rows.filter(
+    (row) => row.state === 'not_found' || row.state === 'skipped' || held.has(row.id),
+  )
+  const leftOut = leftOutRows.length
 
   return {
     conflicts,
@@ -189,6 +215,9 @@ export function buildReview(
     uncertain,
     notFound,
     confidentCount,
+    confirmedCount,
+    alreadyLoggedIds,
+    leftOutRows,
     bulkAcceptable,
     counts: { total: rows.length, save, unchanged, leftOut },
   }

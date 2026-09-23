@@ -141,7 +141,36 @@ describe('buildReview conflicts', () => {
 
     // The whole reason a re-import of an unchanged export is not 400 decisions.
     assert.equal(model.conflicts.length, 0)
+    // And not 400 saves either: it is already there, so it is unchanged.
+    assert.deepEqual(model.alreadyLoggedIds, [same.id])
+    assert.deepEqual(model.counts, { total: 1, save: 0, unchanged: 1, leftOut: 0 })
+  })
+
+  it('does not ask again about a guess the log already holds', () => {
+    const guess = row({
+      state: 'uncertain',
+      reason: 'no_year',
+      year: null,
+      rating: existing.rating,
+      notes: existing.notes,
+      consumedAt: existing.consumedAt,
+    })
+    const model = buildReview([guess], catalog(entry(1, 'Heat', 1995)), logged(existing), 'keep')
+
+    assert.equal(model.uncertain.length, 0)
+    assert.deepEqual(model.counts, { total: 1, save: 0, unchanged: 1, leftOut: 0 })
+  })
+
+  it('counts what it wrote once the batch is saved, not what the log now agrees with', () => {
+    // After saving, the log matches every written row by construction.
+    const same = row({ rating: existing.rating, notes: existing.notes, consumedAt: existing.consumedAt })
+    const model = buildReview([same], catalog(entry(1, 'Heat', 1995)), logged(existing), 'keep', {
+      saved: true,
+    })
+
+    assert.deepEqual(model.alreadyLoggedIds, [])
     assert.equal(model.confidentCount, 1)
+    assert.deepEqual(model.counts, { total: 1, save: 1, unchanged: 0, leftOut: 0 })
   })
 
   it('turns kept conflicts into updates when the import is taken', () => {
@@ -256,5 +285,32 @@ describe('buildReview duplicates', () => {
 
     assert.equal(model.duplicates.length, 0)
     assert.equal(model.counts.leftOut, 1)
+  })
+})
+
+describe('buildReview what the saved page reports', () => {
+  it('counts rows settled by hand apart from clean matches', () => {
+    const model = buildReview(
+      [row({ mediaItemId: 1 }), row({ state: 'confirmed', reason: 'no_year', mediaItemId: 2 })],
+      catalog(entry(1, 'Heat', 1995), entry(2, 'Dune', 2021)),
+      new Map(),
+      'keep',
+    )
+
+    assert.equal(model.confidentCount, 1)
+    assert.equal(model.confirmedCount, 1)
+    assert.equal(model.counts.save, 2)
+  })
+
+  it('names every row that stays out of the log', () => {
+    const missing = row({ state: 'not_found', mediaItemId: null })
+    const skipped = row({ state: 'skipped' })
+    const model = buildReview([row(), missing, skipped], catalog(entry(1, 'Heat', 1995)), new Map(), 'keep')
+
+    assert.deepEqual(
+      model.leftOutRows.map((r) => r.id),
+      [missing.id, skipped.id],
+    )
+    assert.equal(model.counts.leftOut, 2)
   })
 })
