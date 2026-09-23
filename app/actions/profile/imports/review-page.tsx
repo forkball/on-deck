@@ -1,8 +1,8 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { FrameForm } from '../../../browser/frame-form.tsx'
 import { ImportPicker } from '../../../browser/import-picker.tsx'
+import { InPlaceForms } from '../../../browser/in-place-forms.tsx'
 import { LazyList } from '../../../browser/lazy-list.tsx'
 import type { ConflictEntry, DuplicateEntry, ReviewModel, ReviewRow } from '../../../data/imports/review.ts'
 import type { LogValues } from '../../../data/imports/classify.ts'
@@ -132,7 +132,7 @@ function Card(handle: Handle<{ children?: RemixNode; attention?: boolean; id?: s
 }
 
 // Each decision saves in the background and the page updates in place
-// (FrameForm), so working down a long list doesn't send you back to the top
+// (InPlaceForms), so working down a long list doesn't send you back to the top
 // after every answer. Without JS it is a plain post, and `anchor` — the id of
 // the card to land on afterwards — does the same job through the redirect.
 function ResolveForm(
@@ -153,8 +153,11 @@ function ResolveForm(
     const { batchId, rowId, action, label, primary, quiet, anchor, externalId } = handle.props
 
     return (
-      <form method="post" action={routes.profile.imports.resolve.href({ batchId, rowId: String(rowId) })}>
-        <FrameForm />
+      <form
+        method="post"
+        action={routes.profile.imports.resolve.href({ batchId, rowId: String(rowId) })}
+        data-in-place
+      >
         <input type="hidden" name="action" value={action} />
         {anchor && <input type="hidden" name="anchor" value={anchor} />}
         {externalId && <input type="hidden" name="external_id" value={externalId} />}
@@ -347,8 +350,8 @@ function DuplicateCard(
               <form
                 method="post"
                 action={routes.profile.imports.resolve.href({ batchId, rowId: String(verdict.move.id) })}
+                data-in-place
               >
-                <FrameForm />
                 <input type="hidden" name="action" value="skip" />
                 <button type="submit" class="linkish">
                   Actually the same {singular} — leave row {verdict.move.index} out
@@ -479,7 +482,7 @@ function UncertainCard(
                 />
               ),
             )}
-            <PickerButton rowId={row.id} label="Another…" quiet />
+            <PickerButton rowId={row.id} label="Something else…" quiet />
             <ResolveForm
               batchId={batchId}
               rowId={row.id}
@@ -719,6 +722,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   <form
                     method="post"
                     action={routes.profile.imports.conflicts.href({ batchId })}
+                    data-in-place
                     mix={css({
                       display: 'flex',
                       gap: '8px',
@@ -727,7 +731,6 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       marginBottom: '14px',
                     })}
                   >
-                    <FrameForm />
                     <span mix={css({ fontSize: '13px', color: '#8d8579' })}>
                       For all {model.conflicts.length}
                     </span>
@@ -836,6 +839,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                         <form
                           method="post"
                           action={routes.profile.imports.bulk.href({ batchId })}
+                          data-in-place
                           mix={css({
                             display: 'flex',
                             alignItems: 'center',
@@ -848,7 +852,6 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                             marginTop: '10px',
                           })}
                         >
-                          <FrameForm />
                           <span mix={css({ flex: '1 1 220px', fontSize: '14px' })}>
                             {model.bulkAcceptable === group.entries.length
                               ? `All ${model.bulkAcceptable} are within a year of your file.`
@@ -934,6 +937,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 </a>
               </div>
 
+              <InPlaceForms />
               <ImportPicker
                 candidatesTemplate={routes.profile.imports.candidates.href({ batchId, rowId: ROW_TOKEN })}
                 resolveTemplate={routes.profile.imports.resolve.href({ batchId, rowId: ROW_TOKEN })}
