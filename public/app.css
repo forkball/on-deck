@@ -209,8 +209,9 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 }
 
 /* An icon-only control that sits inside something else — the ✕ that clears a
-   picked file. Same reason as .linkish: the doodle border comes from an
-   unlayered `.doodle button` rule, so css() can't take it off. */
+   picked file, or closes the import picker. Same reason as .linkish: the
+   doodle border comes from an unlayered `.doodle button` rule, so css() can't
+   take it off. */
 .doodle button.bare {
   border: 0;
   border-image: none;

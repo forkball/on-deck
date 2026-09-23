@@ -220,11 +220,9 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                 </h3>
                 <button
                   type="button"
+                  class="bare"
                   aria-label="Close"
-                  mix={[
-                    css({ background: 'none', border: 0, fontSize: '20px', cursor: 'pointer' }),
-                    on('click', close),
-                  ]}
+                  mix={[css({ fontSize: '20px' }), on('click', close)]}
                 >
                   ✕
                 </button>
