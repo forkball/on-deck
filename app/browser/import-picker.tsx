@@ -32,6 +32,11 @@ type PickerData = {
 const DEBOUNCE_MS = 250
 const MIN_QUERY = 2
 
+function resultsLine(data: PickerData, typed: boolean): string {
+  const count = `${data.candidates.length} ${data.candidates.length === 1 ? 'result' : 'results'}`
+  return !typed && data.year != null ? `${count} · searched with your row's year` : count
+}
+
 // One picker for the whole page rather than one modal per row: a 400-row import
 // would otherwise render hundreds of dialogs to open at most a handful.
 export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, function ImportPicker(handle) {
@@ -39,6 +44,10 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
   let data: PickerData | null = null
   let loading = false
   let query = ''
+  // Whether the results on screen came from the row's own title and year or
+  // from something typed — only the first may say it used the row's year.
+  let typed = false
+  let choosing = false
 
   let debounce: ReturnType<typeof setTimeout> | undefined
   let inflight: AbortController | undefined
@@ -73,6 +82,7 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
       if (!response.ok) throw new Error(String(response.status))
 
       data = (await response.json()) as PickerData
+      typed = search !== undefined
       if (search === undefined) query = data.query
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
@@ -98,28 +108,28 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
 
   // Picking is the answer: it submits straight away rather than asking for a
   // second confirmation, which is what made the first draft of this feel like
-  // two steps for one decision.
-  function choose(candidate: Candidate) {
-    if (openRowId == null) return
+  // two steps for one decision. It posts in the background and the page
+  // updates in place, so a long review keeps its scroll position; an error the
+  // server sends back (?error=) is a real navigation, so it gets shown.
+  async function choose(candidate: Candidate) {
+    if (openRowId == null || choosing) return
+    choosing = true
 
-    const form = document.createElement('form')
-    form.method = 'post'
-    form.action = hrefFor(handle.props.resolveTemplate, openRowId)
+    const body = new FormData()
+    body.set('action', 'repoint')
+    body.set('external_id', candidate.externalId)
 
-    const action = document.createElement('input')
-    action.type = 'hidden'
-    action.name = 'action'
-    action.value = 'repoint'
-    form.appendChild(action)
-
-    const external = document.createElement('input')
-    external.type = 'hidden'
-    external.name = 'external_id'
-    external.value = candidate.externalId
-    form.appendChild(external)
-
-    document.body.appendChild(form)
-    form.submit()
+    try {
+      const response = await fetch(hrefFor(handle.props.resolveTemplate, openRowId), { method: 'POST', body })
+      if (!response.ok || new URL(response.url).searchParams.has('error')) {
+        window.location.href = response.url
+        return
+      }
+      close()
+      await handle.frames.top.reload()
+    } finally {
+      choosing = false
+    }
   }
 
   return () => {
@@ -170,7 +180,7 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                 if (document.activeElement instanceof HTMLInputElement) return
 
                 event.preventDefault()
-                choose(candidate)
+                void choose(candidate)
               },
               { signal },
             )
@@ -246,14 +256,18 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                 ]}
               />
               <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 14px' })}>
-                {loading
-                  ? 'Searching…'
-                  : data
-                    ? `${data.candidates.length} results · searched with your row's year`
-                    : 'No results'}
+                {loading ? 'Searching…' : data ? resultsLine(data, typed) : 'No results'}
               </p>
 
-              <div mix={css({ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' })}>
+              {/* As many columns as fit: four in the desktop dialog, three
+                  on a phone, where four left each title about 65px wide. */}
+              <div
+                mix={css({
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))',
+                  gap: '14px',
+                })}
+              >
                 {(data?.candidates ?? []).map((candidate, i) => (
                   <button
                     key={candidate.externalId}
@@ -270,7 +284,7 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                         textAlign: 'left',
                         position: 'relative',
                       }),
-                      on('click', () => choose(candidate)),
+                      on('click', () => void choose(candidate)),
                     ]}
                   >
                     <span mix={css({ position: 'relative', display: 'block' })}>
@@ -310,27 +324,6 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                       >
                         {i + 1}
                       </span>
-                      {candidate.externalId === data?.suggestedExternalId && (
-                        <span
-                          mix={css({
-                            // Along the bottom rather than beside the number:
-                            // at four to a row there is not width for both at
-                            // the top, and they overlapped.
-                            position: 'absolute',
-                            bottom: '4px',
-                            left: '4px',
-                            right: '4px',
-                            background: '#3E5C76',
-                            color: '#fff',
-                            borderRadius: '4px',
-                            fontSize: '10px',
-                            padding: '1px 6px',
-                            textAlign: 'center',
-                          })}
-                        >
-                          suggested
-                        </span>
-                      )}
                       {/* Says which other row already holds this film, so
                             picking it can't silently recreate the duplicate
                             this was opened to fix. */}
@@ -356,6 +349,13 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                     <span mix={css({ fontSize: '13.5px', lineHeight: 1.25 })}>
                       {candidate.title} <span mix={css({ color: '#888' })}>{candidate.year ?? ''}</span>
                     </span>
+                    {/* Under the title rather than across the poster, where
+                        it didn't fit once the columns got narrow. */}
+                    {candidate.externalId === data?.suggestedExternalId && (
+                      <span mix={css({ fontSize: '12px', color: '#3E5C76', lineHeight: 1.25 })}>
+                        Our match
+                      </span>
+                    )}
                     {candidate.creator && (
                       <span mix={css({ fontSize: '12px', color: '#888', lineHeight: 1.25 })}>
                         {candidate.creator}
@@ -365,7 +365,17 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                 ))}
               </div>
 
-              <p mix={css({ fontSize: '12px', color: '#8d8579', margin: '18px 0 0', textAlign: 'right' })}>
+              {/* Keys only mean something with a keyboard; on a touch screen
+                  this was a line of instructions for nothing. */}
+              <p
+                mix={css({
+                  fontSize: '12px',
+                  color: '#8d8579',
+                  margin: '18px 0 0',
+                  textAlign: 'right',
+                  '@media (hover: none)': { display: 'none' },
+                })}
+              >
                 1–{Math.min(9, data?.candidates.length ?? 0)} to pick · Esc to close
               </p>
             </div>

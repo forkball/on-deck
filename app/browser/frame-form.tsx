@@ -17,11 +17,15 @@ export const FrameForm = clientEntry(import.meta.url, function FrameForm(handle)
             event.preventDefault()
 
             void (async () => {
+              // The attribute, not `form.action`: a field named "action" (the
+              // import review's forms have one) shadows that property with
+              // the input element itself.
+              const action = form.getAttribute('action') ?? window.location.href
               const buttons = Array.from(form.querySelectorAll<HTMLButtonElement>('button[type="submit"]'))
               for (const button of buttons) button.disabled = true
 
               try {
-                const response = await fetch(form.action, {
+                const response = await fetch(action, {
                   method: 'POST',
                   body: new FormData(form),
                   signal,
@@ -29,7 +33,7 @@ export const FrameForm = clientEntry(import.meta.url, function FrameForm(handle)
                 if (signal.aborted) return
 
                 if (!response.ok) {
-                  window.location.href = response.url || form.action
+                  window.location.href = response.url || action
                   return
                 }
 

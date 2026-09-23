@@ -55,9 +55,17 @@ export function offersFeed(batch: ImportBatch, identity: User): boolean {
   )
 }
 
-function backToReview(batch: ImportBatch, error?: string): Response {
+// `anchor` is where on the page to land. With JS a decision updates the page in
+// place and this never shows; without it, every decision was a full page load
+// back at the top, so a long review meant scrolling back down after each one.
+// Only ids the page itself hands out are followed.
+const ANCHOR = /^(row-\d+|import-[a-z-]+)$/
+
+function backToReview(batch: ImportBatch, error?: string, anchor?: string): Response {
   const href = routes.profile.imports.review.href({ batchId: batch.id })
-  return redirect(error ? `${href}?error=${encodeURIComponent(error)}` : href, 303)
+  const query = error ? `?error=${encodeURIComponent(error)}` : ''
+  const fragment = anchor && ANCHOR.test(anchor) ? `#${anchor}` : ''
+  return redirect(`${href}${query}${fragment}`, 303)
 }
 
 export default createController(routes.profile.imports, {
@@ -181,6 +189,7 @@ export default createController(routes.profile.imports, {
       const formData = context.get(FormData)
       const rowId = Number(context.params.rowId)
       const action = String(formData.get('action') ?? '')
+      const anchor = String(formData.get('anchor') ?? '')
 
       if (action === 'confirm' || action === 'take') {
         await confirmRow(db, batch, rowId)
@@ -193,10 +202,10 @@ export default createController(routes.profile.imports, {
         if (!externalId) return backToReview(batch, 'Choose a film first.')
 
         const outcome = await repointRow(db, batch, rowId, externalId)
-        if (!outcome.ok) return backToReview(batch, outcome.error)
+        if (!outcome.ok) return backToReview(batch, outcome.error, anchor)
       }
 
-      return backToReview(batch)
+      return backToReview(batch, undefined, anchor)
     },
 
     // The one bulk accept the page offers. Which rows qualify is recomputed

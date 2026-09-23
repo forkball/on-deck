@@ -1,6 +1,7 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import { FrameForm } from '../../../browser/frame-form.tsx'
 import { ImportPicker } from '../../../browser/import-picker.tsx'
 import { LazyList } from '../../../browser/lazy-list.tsx'
 import type { ConflictEntry, DuplicateEntry, ReviewModel, ReviewRow } from '../../../data/imports/review.ts'
@@ -40,6 +41,15 @@ const ROW_TOKEN = '__row__'
 // request, and with JS off nothing is hidden at all.
 const CONFLICTS_VISIBLE = 10
 const ROWS_VISIBLE = 25
+
+// The card after the one just decided — it takes the decided card's place, so
+// that is where a no-JS redirect should land. Past the end of a list, `after`.
+function nextAnchor(list: { row: { id: number } }[], index: number, after: string): string {
+  const following = list[index + 1]
+  return following ? rowAnchor(following.row.id) : after
+}
+
+const SAVE_ANCHOR = 'import-save'
 
 function formatDate(at: number | null): string {
   if (at == null) return 'no date'
@@ -98,13 +108,16 @@ function Flag(handle: Handle<{ title: string; count: number; children?: RemixNod
   }
 }
 
-function Card(handle: Handle<{ children?: RemixNode; attention?: boolean }>) {
+function Card(handle: Handle<{ children?: RemixNode; attention?: boolean; id?: string }>) {
   return () => {
-    const { children, attention } = handle.props
+    const { children, attention, id } = handle.props
 
     return (
       <div
+        id={id}
         mix={css({
+          // Lands a little below the top edge when a redirect jumps to it.
+          scrollMarginTop: '12px',
           border: `1px solid ${attention ? '#e3c9a3' : '#e2d8c8'}`,
           borderRadius: '8px',
           background: attention ? '#fdf6ec' : '#fffcf8',
@@ -118,21 +131,44 @@ function Card(handle: Handle<{ children?: RemixNode; attention?: boolean }>) {
   }
 }
 
+// Each decision saves in the background and the page updates in place
+// (FrameForm), so working down a long list doesn't send you back to the top
+// after every answer. Without JS it is a plain post, and `anchor` — the id of
+// the card to land on afterwards — does the same job through the redirect.
 function ResolveForm(
-  handle: Handle<{ batchId: string; rowId: number; action: string; label: string; primary?: boolean }>,
+  handle: Handle<{
+    batchId: string
+    rowId: number
+    action: string
+    label: string
+    primary?: boolean
+    // A text button, for the answer that shouldn't compete with the others.
+    quiet?: boolean
+    anchor?: string
+  }>,
 ) {
   return () => {
-    const { batchId, rowId, action, label, primary } = handle.props
+    const { batchId, rowId, action, label, primary, quiet, anchor } = handle.props
 
     return (
       <form method="post" action={routes.profile.imports.resolve.href({ batchId, rowId: String(rowId) })}>
+        <FrameForm />
         <input type="hidden" name="action" value={action} />
-        <button type="submit" class={primary ? 'primary' : undefined} mix={css({ fontSize: '13px' })}>
+        {anchor && <input type="hidden" name="anchor" value={anchor} />}
+        <button
+          type="submit"
+          class={quiet ? 'linkish' : primary ? 'primary' : undefined}
+          mix={css({ fontSize: '13px' })}
+        >
           {label}
         </button>
       </form>
     )
   }
+}
+
+function rowAnchor(rowId: number): string {
+  return `row-${rowId}`
 }
 
 // Opens the picker for one row. A plain button rather than a link: the modal is
@@ -157,7 +193,15 @@ function PickerButton(handle: Handle<{ rowId: number; label: string; primary?: b
 
 function Actions(handle: Handle<{ children?: RemixNode }>) {
   return () => (
-    <div mix={css({ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginTop: '8px' })}>
+    <div
+      mix={css({
+        display: 'flex',
+        gap: '8px 12px',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        marginTop: '8px',
+      })}
+    >
       {handle.props.children}
     </div>
   )
@@ -200,7 +244,7 @@ function ConflictCard(handle: Handle<{ batchId: string; entry: ConflictEntry; pa
     )
 
     return (
-      <Card>
+      <Card id={rowAnchor(entry.row.id)}>
         <div mix={css({ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' })}>
           <Poster url={entry.item.posterUrl} size={32} />
           <span>
@@ -216,8 +260,20 @@ function ConflictCard(handle: Handle<{ batchId: string; entry: ConflictEntry; pa
           {/* Neither is primary. The switch above states the batch default, and
               taking the import is the only direction that overwrites something,
               so weighting it would push toward the destructive answer. */}
-          <ResolveForm batchId={batchId} rowId={entry.row.id} action="keep" label="Keep" />
-          <ResolveForm batchId={batchId} rowId={entry.row.id} action="take" label="Take" />
+          <ResolveForm
+            batchId={batchId}
+            rowId={entry.row.id}
+            action="keep"
+            label="Keep"
+            anchor={rowAnchor(entry.row.id)}
+          />
+          <ResolveForm
+            batchId={batchId}
+            rowId={entry.row.id}
+            action="take"
+            label="Take"
+            anchor={rowAnchor(entry.row.id)}
+          />
         </Actions>
       </Card>
     )
@@ -289,6 +345,7 @@ function DuplicateCard(
                 method="post"
                 action={routes.profile.imports.resolve.href({ batchId, rowId: String(verdict.move.id) })}
               >
+                <FrameForm />
                 <input type="hidden" name="action" value="skip" />
                 <button type="submit" class="linkish">
                   Actually the same {singular} — leave row {verdict.move.index} out
@@ -336,81 +393,77 @@ function DuplicateCard(
   }
 }
 
-function UncertainCard(handle: Handle<{ batchId: string; entry: ReviewRow; pastParticiple: string }>) {
+// Stacked the same way at every width: what your export said, what we matched
+// it to, the answers. Side by side it needed two columns on desktop and wrapped
+// into a card half a phone screen tall; stacked, it is short at both.
+function UncertainCard(
+  handle: Handle<{ batchId: string; entry: ReviewRow; pastParticiple: string; next?: string }>,
+) {
   return () => {
-    const { batchId, entry, pastParticiple } = handle.props
+    const { batchId, entry, pastParticiple, next } = handle.props
     const { row, item, chip } = entry
 
     return (
-      <Card attention>
-        <div mix={css({ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-start' })}>
-          <div mix={css({ flex: '1 1 210px', minWidth: 0 })}>
-            <div
-              mix={css({
-                fontSize: '11px',
-                letterSpacing: '.08em',
-                textTransform: 'uppercase',
-                color: '#8d8579',
-              })}
-            >
-              Your CSV row
-            </div>
-            <div>
-              {row.title} <span mix={css({ color: '#888' })}>{row.year ?? 'no year'}</span>
-            </div>
-            <div mix={css({ color: '#888', fontSize: '13px' })}>
-              <Rated values={row} /> · {pastParticiple} {formatDate(row.consumedAt)}
-            </div>
-          </div>
-          <div mix={css({ alignSelf: 'center', color: '#b3aa9c' })}>→</div>
-          <div mix={css({ flex: '1 1 210px', minWidth: 0 })}>
-            <div
-              mix={css({
-                fontSize: '11px',
-                letterSpacing: '.08em',
-                textTransform: 'uppercase',
-                color: '#8d8579',
-              })}
-            >
-              We matched
-            </div>
-            <div mix={css({ display: 'flex', gap: '10px' })}>
-              <Poster url={item?.posterUrl ?? null} />
-              <span>
-                {item?.title ?? 'nothing'} <span mix={css({ color: '#888' })}>{item?.releaseYear ?? ''}</span>
-                {item?.creator ? (
-                  <>
-                    <br />
-                    <span mix={css({ color: '#888' })}>{item.creator}</span>
-                  </>
-                ) : null}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {chip ? (
-          <div mix={css({ marginTop: '10px' })}>
+      <Card attention id={rowAnchor(row.id)}>
+        <div
+          mix={css({
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'baseline',
+            columnGap: '10px',
+            rowGap: '2px',
+          })}
+        >
+          <span mix={css({ flex: '1 1 auto', minWidth: 0 })}>
+            {row.title} <span mix={css({ color: '#888' })}>{row.year ?? 'no year'}</span>
+          </span>
+          {chip ? (
             <span
               mix={css({
-                display: 'inline-block',
                 fontSize: '11.5px',
                 padding: '1px 8px',
                 borderRadius: '999px',
                 border: '1px solid #d9cfbe',
                 color: '#7a6f5d',
                 background: '#f6efe3',
+                whiteSpace: 'nowrap',
               })}
             >
               {chip}
             </span>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
+        <div mix={css({ color: '#888', fontSize: '13px' })}>
+          <Rated values={row} /> · {pastParticiple} {formatDate(row.consumedAt)}
+        </div>
+
+        <div mix={css({ display: 'flex', gap: '10px', alignItems: 'center', margin: '8px 0 0' })}>
+          <Poster url={item?.posterUrl ?? null} size={32} />
+          <span mix={css({ fontSize: '14px', minWidth: 0 })}>
+            <span mix={css({ color: '#8d8579', fontSize: '12px' })}>Matched to </span>
+            {item?.title ?? 'nothing'} <span mix={css({ color: '#888' })}>{item?.releaseYear ?? ''}</span>
+            {item?.creator ? <span mix={css({ color: '#888' })}> · {item.creator}</span> : null}
+          </span>
+        </div>
 
         <Actions>
-          <ResolveForm batchId={batchId} rowId={row.id} action="confirm" label="Looks right" primary />
+          <ResolveForm
+            batchId={batchId}
+            rowId={row.id}
+            action="confirm"
+            label="Looks right"
+            primary
+            anchor={next}
+          />
           <PickerButton rowId={row.id} label="Change" />
-          <ResolveForm batchId={batchId} rowId={row.id} action="skip" label="Don't save" />
+          <ResolveForm
+            batchId={batchId}
+            rowId={row.id}
+            action="skip"
+            label="Don't save"
+            quiet
+            anchor={next}
+          />
         </Actions>
       </Card>
     )
@@ -423,6 +476,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
     const { counts } = model
     const { singular, plural, pastParticiple } = mediaTypeUiFor(batch.media_type as MediaType)
     const batchId = batch.id
+    const notFoundFirst = model.notFound[0] ? rowAnchor(model.notFound[0].row.id) : SAVE_ANCHOR
 
     return (
       <Document title="Review your import | On Deck">
@@ -541,6 +595,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       marginBottom: '14px',
                     })}
                   >
+                    <FrameForm />
                     <span mix={css({ fontSize: '13px', color: '#8d8579' })}>
                       For all {model.conflicts.length}
                     </span>
@@ -615,12 +670,13 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     about.
                   </p>
                   <div id="import-uncertain">
-                    {model.uncertain.map((entry) => (
+                    {model.uncertain.map((entry, i) => (
                       <UncertainCard
                         key={entry.row.id}
                         batchId={batchId}
                         entry={entry}
                         pastParticiple={pastParticiple}
+                        next={nextAnchor(model.uncertain, i, notFoundFirst)}
                       />
                     ))}
                   </div>
@@ -641,6 +697,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                         marginTop: '10px',
                       })}
                     >
+                      <FrameForm />
                       <span mix={css({ flex: '1 1 220px', fontSize: '14px' })}>
                         {model.bulkAcceptable} of these are within a year of your CSV — usually a festival or
                         re-release date.
@@ -664,14 +721,21 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     No catalog result under that name. <b>These won't be saved</b> unless you track them down.
                   </p>
                   <div id="import-not-found">
-                    {model.notFound.map(({ row }) => (
-                      <Card key={row.id}>
+                    {model.notFound.map(({ row }, i) => (
+                      <Card key={row.id} id={rowAnchor(row.id)}>
                         <div>
                           {row.title} <span mix={css({ color: '#888' })}>{row.year ?? 'no year'}</span>
                         </div>
                         <Actions>
                           <PickerButton rowId={row.id} label="Find it" primary />
-                          <ResolveForm batchId={batchId} rowId={row.id} action="skip" label="Leave out" />
+                          <ResolveForm
+                            batchId={batchId}
+                            rowId={row.id}
+                            action="skip"
+                            label="Leave out"
+                            quiet
+                            anchor={nextAnchor(model.notFound, i, SAVE_ANCHOR)}
+                          />
                         </Actions>
                       </Card>
                     ))}
@@ -681,6 +745,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
               )}
 
               <div
+                id={SAVE_ANCHOR}
                 mix={css({
                   borderTop: '1px solid #ddd',
                   marginTop: '24px',
