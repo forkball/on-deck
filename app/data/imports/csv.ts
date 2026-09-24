@@ -1,4 +1,3 @@
-
 // Minimal RFC 4180 parser. Quoted fields matter: both exports use them for any
 // title containing a comma ("Synecdoche, New York").
 export function parseCsv(text: string): string[][] {
@@ -63,7 +62,11 @@ export function cleanCell(value: string | undefined): string {
 
 // Imports run inside the request with no job queue behind them, so this keeps a
 // few hundred rows from opening a few hundred simultaneous catalog connections.
-export async function runBounded<T>(items: T[], concurrency: number, work: (item: T) => Promise<void>): Promise<void> {
+export async function runBounded<T>(
+  items: T[],
+  concurrency: number,
+  work: (item: T) => Promise<void>,
+): Promise<void> {
   let next = 0
 
   async function worker() {

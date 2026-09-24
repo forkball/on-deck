@@ -7,7 +7,13 @@ import {
   type RematchMediaItemResult,
 } from '../mediaItems.ts'
 import type { MediaItem } from '../schema.ts'
-import { BOOK_GENRES, BOOK_SERIES_TYPES, getBookById, parseGoogleBooksId, searchBooks } from './googleBooks.ts'
+import {
+  BOOK_GENRES,
+  BOOK_SERIES_TYPES,
+  getBookById,
+  parseGoogleBooksId,
+  searchBooks,
+} from './googleBooks.ts'
 import {
   GAME_GENRES,
   GAME_MULTIPLAYER_TYPES,
@@ -307,7 +313,10 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
     // handler as a bare stack with no query and no media type on it. Rethrown
     // immediately — the 500 is still the right answer, this only makes it
     // possible to tell which search caused it.
-    console.error(`[search] ${type} ${JSON.stringify(query)} failed after ${duration(Date.now() - startedAt)}:`, error)
+    console.error(
+      `[search] ${type} ${JSON.stringify(query)} failed after ${duration(Date.now() - startedAt)}:`,
+      error,
+    )
     throw error
   }
 

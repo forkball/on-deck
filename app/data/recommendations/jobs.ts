@@ -8,7 +8,14 @@ import type { RunTimings } from './timings.ts'
 
 // In the database, not process memory: the POST and the poll that follows it can
 // land on different machines.
-export type GenerationPhase = 'profiles' | 'picks' | 'matching' | 'genres' | 'lengths' | 'verifying' | 'saving'
+export type GenerationPhase =
+  | 'profiles'
+  | 'picks'
+  | 'matching'
+  | 'genres'
+  | 'lengths'
+  | 'verifying'
+  | 'saving'
 
 // One per real await in generateRecommendations — adding a stage there means
 // adding it here too.
@@ -103,7 +110,8 @@ export function phasesFor(params: {
   filters: { genre?: unknown; length?: unknown }
 }): GenerationPhase[] {
   const skipped = new Set<GenerationPhase>()
-  if (params.filters.genre == null || !genreMissNeedsLookup(params.mediaType as MediaType)) skipped.add('genres')
+  if (params.filters.genre == null || !genreMissNeedsLookup(params.mediaType as MediaType))
+    skipped.add('genres')
   if (params.filters.length == null) skipped.add('lengths')
   return PHASE_ORDER.filter((phase) => !skipped.has(phase))
 }

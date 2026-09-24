@@ -41,7 +41,16 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
           {users.length === 0 ? (
             <p>{emptyMessage}</p>
           ) : (
-            <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' })}>
+            <ul
+              mix={css({
+                listStyle: 'none',
+                margin: 0,
+                padding: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              })}
+            >
               {users.map((user) => {
                 const following = followingByUserId.get(user.id) ?? false
                 const isViewer = user.id === viewerId

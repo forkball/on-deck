@@ -17,47 +17,43 @@ function valueOf(form: HTMLFormElement, name: string): string {
 // Not a security control: the server runs the same check on a request that need
 // not come from this form. This only moves the prompt in front of you before
 // anything is sent.
-export const PasswordGate = clientEntry<PasswordGateProps>(
-  import.meta.url,
-  function PasswordGate(handle) {
-    return () => {
-      const { modalId, passwordField, guardedFields } = handle.props
+export const PasswordGate = clientEntry<PasswordGateProps>(import.meta.url, function PasswordGate(handle) {
+  return () => {
+    const { modalId, passwordField, guardedFields } = handle.props
 
-      return (
-        <span
-          hidden
-          mix={ref((node, signal) => {
-            const form = node.closest('form')
-            if (!form) return
+    return (
+      <span
+        hidden
+        mix={ref((node, signal) => {
+          const form = node.closest('form')
+          if (!form) return
 
-            // Read after the server's values are in the DOM but before anyone
-            // has typed, so this is what the account currently holds.
-            const original = new Map((guardedFields ?? []).map((name) => [name, valueOf(form, name)]))
+          // Read after the server's values are in the DOM but before anyone
+          // has typed, so this is what the account currently holds.
+          const original = new Map((guardedFields ?? []).map((name) => [name, valueOf(form, name)]))
 
-            form.addEventListener(
-              'submit',
-              (event) => {
-                if (valueOf(form, passwordField) !== '') return
+          form.addEventListener(
+            'submit',
+            (event) => {
+              if (valueOf(form, passwordField) !== '') return
 
-                // No guarded fields named means every submit needs one.
-                const needsPassword =
-                  original.size === 0 ||
-                  [...original].some(([name, was]) => valueOf(form, name) !== was)
-                if (!needsPassword) return
+              // No guarded fields named means every submit needs one.
+              const needsPassword =
+                original.size === 0 || [...original].some(([name, was]) => valueOf(form, name) !== was)
+              if (!needsPassword) return
 
-                event.preventDefault()
+              event.preventDefault()
 
-                const toggle = document.getElementById(modalId)
-                if (toggle instanceof HTMLInputElement) toggle.checked = true
+              const toggle = document.getElementById(modalId)
+              if (toggle instanceof HTMLInputElement) toggle.checked = true
 
-                const input = form.elements.namedItem(passwordField)
-                if (input instanceof HTMLInputElement) input.focus()
-              },
-              { signal },
-            )
-          })}
-        />
-      )
-    }
-  },
-)
+              const input = form.elements.namedItem(passwordField)
+              if (input instanceof HTMLInputElement) input.focus()
+            },
+            { signal },
+          )
+        })}
+      />
+    )
+  }
+})

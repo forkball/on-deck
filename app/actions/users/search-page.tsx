@@ -18,7 +18,9 @@ export interface UserSearchPageProps {
 export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
   return () => {
     const { query, results, followingByUserId, displayName } = handle.props
-    const returnTo = query ? `${routes.users.search.href()}?q=${encodeURIComponent(query)}` : routes.users.search.href()
+    const returnTo = query
+      ? `${routes.users.search.href()}?q=${encodeURIComponent(query)}`
+      : routes.users.search.href()
 
     return (
       <Document title="Find people | On Deck">
@@ -34,7 +36,16 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
 
           {query && results.length === 0 && <p>No one found for "{query}".</p>}
 
-          <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' })}>
+          <ul
+            mix={css({
+              listStyle: 'none',
+              margin: 0,
+              padding: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            })}
+          >
             {results.map((user) => {
               const following = followingByUserId.get(user.id) ?? false
               // Public profiles are viewable by anyone; private ones still

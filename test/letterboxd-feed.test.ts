@@ -164,15 +164,27 @@ describe('letterboxdSyncAvailableTo', () => {
   const admin = { is_admin: true }
 
   it('is closed to an ordinary member while the flag is unset', () => {
-    assert.equal(withFlag(undefined, () => letterboxdSyncAvailableTo(member)), false)
+    assert.equal(
+      withFlag(undefined, () => letterboxdSyncAvailableTo(member)),
+      false,
+    )
   })
 
   it('is open to an admin even then, which is what makes a production beta possible', () => {
-    assert.equal(withFlag(undefined, () => letterboxdSyncAvailableTo(admin)), true)
+    assert.equal(
+      withFlag(undefined, () => letterboxdSyncAvailableTo(admin)),
+      true,
+    )
   })
 
   it('is open to everyone once the flag is set', () => {
-    assert.equal(withFlag('1', () => letterboxdSyncAvailableTo(member)), true)
-    assert.equal(withFlag('1', () => letterboxdSyncAvailableTo(admin)), true)
+    assert.equal(
+      withFlag('1', () => letterboxdSyncAvailableTo(member)),
+      true,
+    )
+    assert.equal(
+      withFlag('1', () => letterboxdSyncAvailableTo(admin)),
+      true,
+    )
   })
 })

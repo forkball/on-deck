@@ -44,10 +44,7 @@ export type MediaControllerContext = MiddlewareContext<
 >
 
 // The same, for the routes carrying a media item id.
-export type MediaItemControllerContext = ContextWithParams<
-  MediaControllerContext,
-  { mediaItemId: string }
->
+export type MediaItemControllerContext = ContextWithParams<MediaControllerContext, { mediaItemId: string }>
 
 // The router's stack plus requireAuth, for controllers that gate on sign-in but
 // add no middleware of their own.
@@ -64,7 +61,4 @@ export type AuthedControllerContext = MiddlewareContext<
 
 // A staged import, and the routes that address one of its rows.
 export type ImportBatchContext = ContextWithParams<AuthedControllerContext, { batchId: string }>
-export type ImportRowContext = ContextWithParams<
-  AuthedControllerContext,
-  { batchId: string; rowId: string }
->
+export type ImportRowContext = ContextWithParams<AuthedControllerContext, { batchId: string; rowId: string }>

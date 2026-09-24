@@ -29,12 +29,7 @@ import {
 } from '../../data/recommendations/runs.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import {
-  DEFAULT_MEDIA_TYPE,
-  mediaTypeUiFor,
-  parseMediaType,
-  type ActiveMediaType,
-} from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType, type ActiveMediaType } from '../../mediaTypes.ts'
 import { RETURN_TO_PARAM } from '../../ui/backLink.ts'
 import { LUCKY_PAGE_ORIGIN } from '../../browser/draw-lucky-form.tsx'
 import { GeneratingPage } from './generating-page.tsx'
@@ -149,7 +144,9 @@ async function luckyDrawPage(
   extras: Pick<LuckyPickPageProps, 'error'> = {},
 ) {
   const data = await loadLuckyPageData(db, user, mediaType)
-  return <LuckyPickPage {...data} mediaType={mediaType} findPeopleHref={routes.users.search.href()} {...extras} />
+  return (
+    <LuckyPickPage {...data} mediaType={mediaType} findPeopleHref={routes.users.search.href()} {...extras} />
+  )
 }
 
 export default createController(routes.recommendations, {
@@ -158,8 +155,7 @@ export default createController(routes.recommendations, {
     async index(context) {
       const auth = context.get(Auth)
 
-      const mediaType =
-        parseMediaType(context.url.searchParams.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
+      const mediaType = parseMediaType(context.url.searchParams.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
 
       const db = context.get(Database)
 
@@ -169,8 +165,7 @@ export default createController(routes.recommendations, {
     async luckyPage(context) {
       const auth = context.get(Auth)
 
-      const mediaType =
-        parseMediaType(context.url.searchParams.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
+      const mediaType = parseMediaType(context.url.searchParams.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
 
       const db = context.get(Database)
 
@@ -310,17 +305,13 @@ export default createController(routes.recommendations, {
 
       // No pre-check: the insert refuses a second active run for this user, so
       // two requests arriving together can't both get through.
-      const enqueued = await enqueueJob(
-        db,
-        auth.identity.id,
-        {
-          memberIds,
-          mediaType,
-          filters: filters as Record<string, unknown>,
-          sourceTypes,
-          name: parsed.value.name || undefined,
-        },
-      )
+      const enqueued = await enqueueJob(db, auth.identity.id, {
+        memberIds,
+        mediaType,
+        filters: filters as Record<string, unknown>,
+        sourceTypes,
+        name: parsed.value.name || undefined,
+      })
 
       if (!enqueued.ok) {
         return context.render(
@@ -406,18 +397,14 @@ export default createController(routes.recommendations, {
 
       // No duplicate check: a lucky run carries no levers to match on, and its
       // once-a-day cap already rules out drawing the same thing twice in a day.
-      const enqueued = await enqueueJob(
-        db,
-        auth.identity.id,
-        {
-          memberIds,
-          mediaType,
-          filters: {},
-          sourceTypes: [mediaType],
-          name: LUCKY_RUN_NAME,
-          lucky: true,
-        },
-      )
+      const enqueued = await enqueueJob(db, auth.identity.id, {
+        memberIds,
+        mediaType,
+        filters: {},
+        sourceTypes: [mediaType],
+        name: LUCKY_RUN_NAME,
+        lucky: true,
+      })
 
       if (!enqueued.ok) {
         return context.render(

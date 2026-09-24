@@ -3,7 +3,11 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { countUnreadNotifications, listNotifications, markNotificationRead } from '../../data/notifications.ts'
+import {
+  countUnreadNotifications,
+  listNotifications,
+  markNotificationRead,
+} from '../../data/notifications.ts'
 import { notifications } from '../../data/schema.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'

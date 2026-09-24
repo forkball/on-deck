@@ -21,15 +21,25 @@ describe('user media log queries', { skip: skipWithoutDatabase }, () => {
   const itemIds: number[] = []
 
   const FIXTURES = [
-    ['movie', 'consumed'], ['movie', 'consumed'], ['movie', 'want_to_consume'],
-    ['movie', 'not_interested'], ['book', 'consumed'], ['book', 'consumed'],
-    ['book', 'want_to_consume'], ['book', 'not_interested'], ['tv', 'consumed'],
-    ['tv', 'in_progress'], ['game', 'consumed'], ['game', 'not_interested'],
+    ['movie', 'consumed'],
+    ['movie', 'consumed'],
+    ['movie', 'want_to_consume'],
+    ['movie', 'not_interested'],
+    ['book', 'consumed'],
+    ['book', 'consumed'],
+    ['book', 'want_to_consume'],
+    ['book', 'not_interested'],
+    ['tv', 'consumed'],
+    ['tv', 'in_progress'],
+    ['game', 'consumed'],
+    ['game', 'not_interested'],
   ] as const
 
   before(async () => {
     const stamp = Date.now()
-    const { rows: [user] } = await pool.query<{ id: number }>(
+    const {
+      rows: [user],
+    } = await pool.query<{ id: number }>(
       `insert into users (email, password_hash, display_name, created_at)
        values ($1, 'x', $2, $3) returning id`,
       [`log-test-${stamp}@example.test`, `log-test-${stamp}`, stamp],
@@ -37,7 +47,9 @@ describe('user media log queries', { skip: skipWithoutDatabase }, () => {
     userId = user.id
 
     for (const [index, [type, status]] of FIXTURES.entries()) {
-      const { rows: [item] } = await pool.query<{ id: number }>(
+      const {
+        rows: [item],
+      } = await pool.query<{ id: number }>(
         `insert into media_items (type, external_source, external_id, title, metadata, created_at)
          values ($1, 'test', $2, $3, '{}'::jsonb, $4) returning id`,
         [type, `log-test-${stamp}-${index}`, `Title ${index}`, stamp],
@@ -104,7 +116,10 @@ describe('user media log queries', { skip: skipWithoutDatabase }, () => {
 
   it('orders most recently updated first', async () => {
     const stamps = (await listUserMediaLog(db, userId)).map((e) => Number(e.interaction.updated_at))
-    assert.deepEqual(stamps, [...stamps].sort((a, b) => b - a))
+    assert.deepEqual(
+      stamps,
+      [...stamps].sort((a, b) => b - a),
+    )
   })
 
   it('pages without repeating or skipping a row, even across tied timestamps', async () => {
@@ -114,7 +129,10 @@ describe('user media log queries', { skip: skipWithoutDatabase }, () => {
       const page = await listUserMediaLog(db, userId, { limit: 5, offset })
       seen.push(...page.map((e) => e.interaction.id))
     }
-    assert.deepEqual(seen, all.map((e) => e.interaction.id))
+    assert.deepEqual(
+      seen,
+      all.map((e) => e.interaction.id),
+    )
     assert.equal(new Set(seen).size, all.length, 'a row was repeated across pages')
   })
 

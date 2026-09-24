@@ -180,12 +180,19 @@ describe('feedCoverage', () => {
 // of this — "logged here, absent from the feed, so delete it" — destroys
 // something it shouldn't.
 describe('selectRemovable', () => {
-  const feed = [entry({ tmdbId: 'kept', publishedAt: 1_000 }), entry({ tmdbId: 'also-kept', publishedAt: 2_000 })]
+  const feed = [
+    entry({ tmdbId: 'kept', publishedAt: 1_000 }),
+    entry({ tmdbId: 'also-kept', publishedAt: 2_000 }),
+  ]
   // What this feed says for itself, with no previous fetch to widen it.
   const window = feedCoverage(feed)
 
   it('takes a row the feed stopped carrying from inside its window', () => {
-    const removable = selectRemovable(feed, [row({ tmdbId: 'gone', sourceEntryAt: 1_500, interactionId: 42 })], window)
+    const removable = selectRemovable(
+      feed,
+      [row({ tmdbId: 'gone', sourceEntryAt: 1_500, interactionId: 42 })],
+      window,
+    )
 
     assert.deepEqual(
       removable.map((r) => r.interactionId),
@@ -221,16 +228,23 @@ describe('selectRemovable', () => {
   // Belt and braces with coverageWatermark: an empty feed must not be read as
   // "the member deleted their entire diary".
   it('takes nothing at all when the feed is empty', () => {
-    assert.deepEqual(selectRemovable([], [row({ tmdbId: 'gone', sourceEntryAt: 1_500 })], feedCoverage([])), [])
+    assert.deepEqual(
+      selectRemovable([], [row({ tmdbId: 'gone', sourceEntryAt: 1_500 })], feedCoverage([])),
+      [],
+    )
   })
 
   it('separates the gone from the kept in one pass', () => {
-    const removable = selectRemovable(feed, [
-      row({ tmdbId: 'kept', sourceEntryAt: 1_000, interactionId: 1 }),
-      row({ tmdbId: 'gone', sourceEntryAt: 1_500, interactionId: 2 }),
-      row({ tmdbId: 'ancient', sourceEntryAt: 10, interactionId: 3 }),
-      row({ tmdbId: 'also-gone', sourceEntryAt: 3_000, interactionId: 4 }),
-    ], window)
+    const removable = selectRemovable(
+      feed,
+      [
+        row({ tmdbId: 'kept', sourceEntryAt: 1_000, interactionId: 1 }),
+        row({ tmdbId: 'gone', sourceEntryAt: 1_500, interactionId: 2 }),
+        row({ tmdbId: 'ancient', sourceEntryAt: 10, interactionId: 3 }),
+        row({ tmdbId: 'also-gone', sourceEntryAt: 3_000, interactionId: 4 }),
+      ],
+      window,
+    )
 
     assert.deepEqual(
       removable.map((r) => r.interactionId),

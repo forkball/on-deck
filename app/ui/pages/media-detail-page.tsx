@@ -106,7 +106,9 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 </p>
               )}
               {tags.length > 0 && (
-                <p mix={css({ color: '#555' })}>{tags.map((t) => t.replace(/^./, (c) => c.toUpperCase())).join(', ')}</p>
+                <p mix={css({ color: '#555' })}>
+                  {tags.map((t) => t.replace(/^./, (c) => c.toUpperCase())).join(', ')}
+                </p>
               )}
               <PlatformList platforms={platforms} />
               {overview ? (
@@ -124,30 +126,40 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                       both the error and the field it refers to, leaving the page
                       looking like nothing happened. */}
                   <Collapsible summary={`Wrong ${ui.itemNoun}?`} open={Boolean(rematchError)}>
-                  <form
-                    method="post"
-                    action={ui.hrefs.rematch(item.id)}
-                    mix={css({ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap', alignItems: 'center' })}
-                  >
-                    <input type="hidden" name="return_to" value={returnTo} />
-                    <input
-                      type="text"
-                      name="catalog_link"
-                      placeholder={ui.rematchPlaceholder}
-                      mix={css({ flex: '1 1 240px' })}
-                    />
-                    <button type="submit">Fix match</button>
-                  </form>
-                  <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
-                    <a href={ui.catalogSearchUrl(item.title, releaseYear)} target="_blank" rel="noopener noreferrer">
-                      Look up "{item.title}" on {ui.catalogName}
-                    </a>
-                  </p>
-                  <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
-                    This entry is shared: fixing the match repoints it for everyone who logged this{' '}
-                    {ui.itemNoun}.
-                  </p>
-                  {rematchError && <p mix={css({ color: '#c33', margin: '8px 0 0' })}>{rematchError}</p>}
+                    <form
+                      method="post"
+                      action={ui.hrefs.rematch(item.id)}
+                      mix={css({
+                        display: 'flex',
+                        gap: '8px',
+                        marginTop: '8px',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                      })}
+                    >
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <input
+                        type="text"
+                        name="catalog_link"
+                        placeholder={ui.rematchPlaceholder}
+                        mix={css({ flex: '1 1 240px' })}
+                      />
+                      <button type="submit">Fix match</button>
+                    </form>
+                    <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
+                      <a
+                        href={ui.catalogSearchUrl(item.title, releaseYear)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Look up "{item.title}" on {ui.catalogName}
+                      </a>
+                    </p>
+                    <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
+                      This entry is shared: fixing the match repoints it for everyone who logged this{' '}
+                      {ui.itemNoun}.
+                    </p>
+                    {rematchError && <p mix={css({ color: '#c33', margin: '8px 0 0' })}>{rematchError}</p>}
                   </Collapsible>
                 </div>
               )}
@@ -168,10 +180,14 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                   {interaction ? (
                     <>
                       <p mix={css({ margin: 0 })}>
-                        <strong>{statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}</strong>
+                        <strong>
+                          {statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}
+                        </strong>
                       </p>
                       {interaction.rating != null && (
-                        <p mix={css({ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0 0' })}>
+                        <p
+                          mix={css({ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0 0' })}
+                        >
                           <StarRatingDisplay value={interaction.rating} /> ({interaction.rating})
                         </p>
                       )}
@@ -180,7 +196,9 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                           <DislikedDisplay />
                         </p>
                       )}
-                      {interaction.notes && <p mix={css({ margin: '8px 0 0', fontStyle: 'italic' })}>"{interaction.notes}"</p>}
+                      {interaction.notes && (
+                        <p mix={css({ margin: '8px 0 0', fontStyle: 'italic' })}>"{interaction.notes}"</p>
+                      )}
                     </>
                   ) : (
                     <p mix={css({ margin: 0, color: '#555' })}>You haven't logged this one yet.</p>
@@ -209,7 +227,11 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                     {interaction && <input type="hidden" name="_method" value="PUT" />}
                     <input type="hidden" name="return_to" value={returnTo} />
                     <Field label="Status">
-                      <StatusSelect mediaType={mediaType} name="status" defaultValue={interaction?.status ?? 'want_to_consume'} />
+                      <StatusSelect
+                        mediaType={mediaType}
+                        name="status"
+                        defaultValue={interaction?.status ?? 'want_to_consume'}
+                      />
                     </Field>
                     <div class="watched-only-fields" mix={css({ flexDirection: 'column', gap: '12px' })}>
                       <div>

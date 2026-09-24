@@ -2,7 +2,14 @@ import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
 
 import { db, pool } from '../app/data/db.ts'
-import { completeJob, enqueueJob, failJob, getJob, phasesFor, requeueJob } from '../app/data/recommendations/jobs.ts'
+import {
+  completeJob,
+  enqueueJob,
+  failJob,
+  getJob,
+  phasesFor,
+  requeueJob,
+} from '../app/data/recommendations/jobs.ts'
 import { skipWithoutDatabase } from './support/db.ts'
 
 // What the progress list holds has to be what the run enters. The genre stage is a
@@ -46,7 +53,9 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
 
   const newUser = async (tag: string) => {
     const s = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const { rows: [u] } = await pool.query<{ id: number }>(
+    const {
+      rows: [u],
+    } = await pool.query<{ id: number }>(
       `insert into users (email, password_hash, display_name, created_at)
        values ($1,'x',$2,$3) returning id`,
       [`jobs-${tag}-${s}@example.test`, `jobs-${tag}-${s}`, Date.now()],
@@ -68,7 +77,8 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
     await pool.end()
   })
 
-  const clear = () => pool.query('delete from recommendation_jobs where user_id = any($1)', [[userId, otherId]])
+  const clear = () =>
+    pool.query('delete from recommendation_jobs where user_id = any($1)', [[userId, otherId]])
 
   it('accepts the first job', async () => {
     await clear()
@@ -121,7 +131,9 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
     assert.ok(first.ok)
 
     // completeJob points the row at a real run, so one has to exist.
-    const { rows: [run] } = await pool.query<{ id: number }>(
+    const {
+      rows: [run],
+    } = await pool.query<{ id: number }>(
       `insert into recommendation_runs (user_id, media_type, created_at, params)
        values ($1, 'movie', $2, '{}') returning id`,
       [userId, Date.now()],

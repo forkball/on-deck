@@ -50,6 +50,8 @@ npm run dev             # watch mode
 npm start               # serve (does not migrate — see Deployment)
 npm test
 npm run typecheck       # tsc, then the browser-bundle check
+npm run format          # oxfmt, writes in place
+npm run format:check    # oxfmt, reports instead of writing
 npm run db:up           # start local Postgres
 npm run db:down
 npm run db:migrate
@@ -59,12 +61,34 @@ npm run prod:query      # read-only SELECT against production
 
 `npm test` runs the suite under `test/`. Database-backed tests skip themselves
 unless `DATABASE_URL` is set, so the suite is runnable with no Postgres — it
-just covers less. Run `npm run db:up && npm run db:migrate` first to include
-them.
+just covers less: 254 tests rather than 322. Run `npm run db:up && npm run
+db:migrate` first to include them. CI always does.
 
 `npm run typecheck` is two checks: `tsc`, then `scripts/check-browser-bundle.ts`,
 which compiles every client entry through the real asset server and fails if one
 has picked up an import that can't reach the browser.
+
+## Formatting
+
+`oxfmt` owns code style — `npm run format` writes, `format:check` reports, and
+`.oxfmtrc.json` is the whole configuration. CI runs `format:check`, so a branch
+that skipped `npm run format` fails before it can merge.
+
+`ignorePatterns` is the part that isn't self-explanatory. Each entry is there
+because oxfmt does something wrong to that file:
+
+- `**/*.md` — rewrites fenced code blocks, including in the `.agents/` Remix
+  references this repo only vendors
+- `public/vendor/**` — third-party CSS and SVG, kept as shipped
+- `package.json`, `package-lock.json` — reorders top-level keys; npm owns these
+- `fly.toml` — strips the indentation `fly launch` writes
+
+`.git-blame-ignore-revs` lists the commit that reformatted the tree, so those
+94 files don't answer for lines it only rewrapped:
+
+```sh
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
 
 ## Layout
 
@@ -93,8 +117,10 @@ runs `npm run db:migrate` once per deploy. Booting deliberately doesn't migrate
 — the app runs on more than one machine, so migrating from there meant every
 machine racing to apply the same migration on every boot.
 
-Pushing to `main` deploys: `.github/workflows/fly-deploy.yml` runs
-`flyctl deploy` on every push. There is no test gate on that workflow.
+Pushing to `main` deploys: `.github/workflows/ci.yml` runs `flyctl deploy`
+once its `checks` job passes. Checks and deploy share a file because `needs:`
+cannot reach across workflows — a deploy that did not wait for its own checks
+would not be a gate.
 
 First-time setup:
 

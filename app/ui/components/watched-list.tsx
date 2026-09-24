@@ -48,9 +48,7 @@ export function WatchedList(handle: Handle<WatchedListProps>) {
         {log.map((entry) => {
           const { interaction, item } = entry
           // A row whose match was never settled has no detail page to open.
-          const detailHref = item
-            ? withReturnTo(ui.hrefs.show(item.id), returnTo)
-            : '#'
+          const detailHref = item ? withReturnTo(ui.hrefs.show(item.id), returnTo) : '#'
 
           return (
             <WatchedListItem

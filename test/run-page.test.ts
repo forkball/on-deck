@@ -14,7 +14,7 @@ const lineFor = (label: string, given: Partial<GenerationParams>, mediaType: 'bo
 // the catalog confirmed. Which levers those are is a property worth pinning: it is
 // invisible on the page when it's wrong, which is how it went unnoticed before.
 describe('describeParams', () => {
-  it('marks a book decade as the model\'s answer', () => {
+  it("marks a book decade as the model's answer", () => {
     const line = lineFor('Decade', { decade: 1960 }, 'book')
     assert.equal(line?.text, 'Decade: 1960s')
     assert.match(line?.modelNote ?? '', /Google Books dates editions/)

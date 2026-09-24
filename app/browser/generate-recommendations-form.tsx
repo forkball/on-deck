@@ -41,7 +41,10 @@ export type GenerateRecommendationsFormProps = {
 
 const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
 
-const PLAYER_TYPE_LABELS: Record<string, string> = { singleplayer: 'Singleplayer', multiplayer: 'Multiplayer' }
+const PLAYER_TYPE_LABELS: Record<string, string> = {
+  singleplayer: 'Singleplayer',
+  multiplayer: 'Multiplayer',
+}
 const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus: 'Versus' }
 const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series', standalone: 'Standalone' }
 
@@ -111,7 +114,8 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       // go anywhere".
       const isLucky = runKind === 'lucky'
       const luckyBlockedBy = membersInRun.filter((member) => !member.loggedTypes.includes(mediaType))
-      const disabled = submitting || (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
+      const disabled =
+        submitting || (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
 
       const caption = css({ margin: '10px 0 0', fontSize: '12px', color: '#888', lineHeight: 1.4 })
 
@@ -186,9 +190,13 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   },
                   children: "Today's lucky pick",
                 })}
-                <p mix={[caption, css({ paddingLeft: '1.6em' })]}>{`One ${itemNoun} nobody in the run has logged.`}</p>
+                <p
+                  mix={[caption, css({ paddingLeft: '1.6em' })]}
+                >{`One ${itemNoun} nobody in the run has logged.`}</p>
                 {!luckyAvailable && (
-                  <p mix={[caption, css({ paddingLeft: '1.6em' })]}>Already drawn — another in {luckyWaitLabel}.</p>
+                  <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
+                    Already drawn — another in {luckyWaitLabel}.
+                  </p>
                 )}
               </div>
             </div>
@@ -278,7 +286,8 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 </div>
                 {hasSource && (
                   <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
-                    You'll still get {mediaTypeLabel} picks — this only changes which taste they're drawn from.
+                    You'll still get {mediaTypeLabel} picks — this only changes which taste they're drawn
+                    from.
                   </p>
                 )}
               </div>
@@ -397,8 +406,8 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             ? luckyBlockedBy.length > 0 && (
                 <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
                   {luckyBlockedBy.map((member) => member.label).join(', ')}{' '}
-                  {luckyBlockedBy.length === 1 && luckyBlockedBy[0].label === 'You' ? 'have' : 'has'}{' '}
-                  nothing {mediaTypeLabel} logged to draw from.
+                  {luckyBlockedBy.length === 1 && luckyBlockedBy[0].label === 'You' ? 'have' : 'has'} nothing{' '}
+                  {mediaTypeLabel} logged to draw from.
                 </p>
               )
             : (!hasSource || blockedBy.length > 0) && (

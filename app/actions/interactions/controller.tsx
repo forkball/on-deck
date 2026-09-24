@@ -5,11 +5,7 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import {
-  deleteInteraction,
-  parseRatingSubmission,
-  updateInteraction,
-} from '../../data/mediaItems.ts'
+import { deleteInteraction, parseRatingSubmission, updateInteraction } from '../../data/mediaItems.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { INTERACTION_STATUSES, type User } from '../../data/schema.ts'
 import { routes } from '../../routes.ts'

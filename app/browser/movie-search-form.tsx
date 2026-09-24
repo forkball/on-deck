@@ -1,7 +1,12 @@
 import { clientEntry, css, on, ref } from 'remix/ui'
 
 import { SuggestionDropdown } from './shared/suggestion-dropdown.tsx'
-import { createSuggestionFetcher, EMPTY_SUGGEST_STATE, type SuggestState, type Suggestion } from './shared/suggestions.ts'
+import {
+  createSuggestionFetcher,
+  EMPTY_SUGGEST_STATE,
+  type SuggestState,
+  type Suggestion,
+} from './shared/suggestions.ts'
 
 export type MovieSearchFormProps = {
   query: string
@@ -37,8 +42,7 @@ export const MovieSearchForm = clientEntry<MovieSearchFormProps>(
     function selectSuggestion(suggestion: Suggestion) {
       const { importHref, searchHref, query: initialQuery } = handle.props
       const from = `${searchHref}?q=${encodeURIComponent(query || initialQuery)}`
-      window.location.href =
-        `${importHref}?externalId=${encodeURIComponent(suggestion.key)}&from=${encodeURIComponent(from)}`
+      window.location.href = `${importHref}?externalId=${encodeURIComponent(suggestion.key)}&from=${encodeURIComponent(from)}`
     }
 
     return () => {
@@ -94,7 +98,6 @@ export const MovieSearchForm = clientEntry<MovieSearchFormProps>(
             />
             {suggestState.open && <SuggestionDropdown state={suggestState} onSelect={selectSuggestion} />}
           </div>
-
 
           <button
             type="submit"

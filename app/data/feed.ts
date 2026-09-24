@@ -88,12 +88,18 @@ export async function loadFeedPage(
   }
 
   const candidates: FeedItem[] = [
-    ...logEntries.map(
-      (entry): FeedItem => ({ kind: 'log', at: entry.interaction.updated_at, id: entry.interaction.id, entry }),
-    ),
-    ...[...runs, ...runsFromOthers].map(
-      (run): FeedItem => ({ kind: 'run', at: run.createdAt, id: run.id, run }),
-    ),
+    ...logEntries.map((entry): FeedItem => ({
+      kind: 'log',
+      at: entry.interaction.updated_at,
+      id: entry.interaction.id,
+      entry,
+    })),
+    ...[...runs, ...runsFromOthers].map((run): FeedItem => ({
+      kind: 'run',
+      at: run.createdAt,
+      id: run.id,
+      run,
+    })),
   ]
 
   // Descending by time; id breaks ties within a source, and `kind` settles what

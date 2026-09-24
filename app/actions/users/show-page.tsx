@@ -71,7 +71,16 @@ function LoggedList(
 
     return (
       <>
-        <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
+        <ul
+          mix={css({
+            listStyle: 'none',
+            margin: 0,
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          })}
+        >
           {log.map(({ interaction, item }) => (
             <WatchedListItem
               key={interaction.id}
@@ -116,8 +125,17 @@ function FollowButton(handle: Handle<{ userId: number; following: boolean; retur
 
 export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
   return () => {
-    const { user, locked, viewerFollows, media, activeTab, bio, followingCount, followersCount, displayName } =
-      handle.props
+    const {
+      user,
+      locked,
+      viewerFollows,
+      media,
+      activeTab,
+      bio,
+      followingCount,
+      followersCount,
+      displayName,
+    } = handle.props
     const label = displayLabel(user)
     const returnTo = routes.users.show.href({ userId: String(user.id) })
 
@@ -133,7 +151,10 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
               </>
             ) : (
               <>
-                <a href={routes.users.following.href({ userId: String(user.id) })}>{followingCount} following</a> ·{' '}
+                <a href={routes.users.following.href({ userId: String(user.id) })}>
+                  {followingCount} following
+                </a>{' '}
+                ·{' '}
                 <a href={routes.users.followers.href({ userId: String(user.id) })}>
                   {followersCount} follower{followersCount === 1 ? '' : 's'}
                 </a>
@@ -160,16 +181,17 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
                     return [
                       type,
                       <>
-                        <TasteProfileSummary label={`${label}'s ${ui.attributive} taste profile`} summary={summary} />
+                        <TasteProfileSummary
+                          label={`${label}'s ${ui.attributive} taste profile`}
+                          summary={summary}
+                        />
                         <h2>
                           What {label} has {ui.pastParticiple}
                         </h2>
                         <LoggedList
                           log={log}
                           total={total}
-                          detailHref={(id) =>
-                            withReturnTo(ui.hrefs.show(id), `${returnTo}?tab=${type}`)
-                          }
+                          detailHref={(id) => withReturnTo(ui.hrefs.show(id), `${returnTo}?tab=${type}`)}
                           seeAllHref={
                             type === DEFAULT_MEDIA_TYPE ? watchedHref : `${watchedHref}?type=${type}`
                           }

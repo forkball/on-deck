@@ -24,16 +24,15 @@ export function GoodreadsImportPage(handle: Handle<GoodreadsImportPageProps>) {
 
           {pendingHref && (
             <div mix={css({ fontSize: '14px', marginBottom: '12px' })}>
-              You have an import waiting. <a href={pendingHref}>Pick it back up</a> — uploading again
-              starts over.
+              You have an import waiting. <a href={pendingHref}>Pick it back up</a> — uploading again starts
+              over.
             </div>
           )}
 
           <p mix={css({ color: '#555' })}>
-            Export your library from Goodreads (My Books → Import and export → Export Library) and
-            upload the <code>goodreads_library_export.csv</code> it emails you. Your read,
-            currently-reading and want-to-read shelves all come across, and so does anything you
-            wrote in a review.
+            Export your library from Goodreads (My Books → Import and export → Export Library) and upload the{' '}
+            <code>goodreads_library_export.csv</code> it emails you. Your read, currently-reading and
+            want-to-read shelves all come across, and so does anything you wrote in a review.
           </p>
 
           <LetterboxdImportForm

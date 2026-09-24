@@ -42,7 +42,8 @@ try {
   // Emails are stored lowercased (see users.ts), so a typed-in address only
   // matches once it's folded the same way.
   const user =
-    (await findUserByEmail(db, identifier.trim().toLowerCase())) ?? (await findUserByUsername(db, identifier.trim()))
+    (await findUserByEmail(db, identifier.trim().toLowerCase())) ??
+    (await findUserByUsername(db, identifier.trim()))
 
   if (!user) {
     console.error(`No account matches ${identifier}.`)
@@ -53,7 +54,9 @@ try {
     console.log(`${displayLabel(user)} is already ${REVOKE ? 'not an admin' : 'an admin'} — nothing to do.`)
   } else {
     await db.update(users, user.id, { is_admin: !REVOKE })
-    console.log(`${REVOKE ? 'Revoked admin from' : 'Granted admin to'} ${displayLabel(user)} (id ${user.id}).`)
+    console.log(
+      `${REVOKE ? 'Revoked admin from' : 'Granted admin to'} ${displayLabel(user)} (id ${user.id}).`,
+    )
   }
 } finally {
   await pool.end()

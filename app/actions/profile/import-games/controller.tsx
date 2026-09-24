@@ -57,7 +57,9 @@ export default createController(routes.profile.importGames, {
           <SteamImportPage
             displayName={displayLabel(auth.identity)}
             steamId={steamId}
-            error={error instanceof Error ? error.message : 'Something went wrong reading your Steam library.'}
+            error={
+              error instanceof Error ? error.message : 'Something went wrong reading your Steam library.'
+            }
           />,
           { status: 400 },
         )

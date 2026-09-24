@@ -64,7 +64,11 @@ export async function upsertTasteProfile(
     return (await getTasteProfile(db, userId, mediaType))!
   }
 
-  return db.create(userTasteProfiles, { user_id: userId, media_type: mediaType, ...payload }, { returnRow: true })
+  return db.create(
+    userTasteProfiles,
+    { user_id: userId, media_type: mediaType, ...payload },
+    { returnRow: true },
+  )
 }
 
 const PROFILE_SCHEMA = {

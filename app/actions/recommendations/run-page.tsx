@@ -29,7 +29,10 @@ const SOURCE_LABELS: Record<MediaType, string> = {
   game: 'Game taste',
 }
 
-const PLAYER_TYPE_LABELS: Record<string, string> = { singleplayer: 'Singleplayer', multiplayer: 'Multiplayer' }
+const PLAYER_TYPE_LABELS: Record<string, string> = {
+  singleplayer: 'Singleplayer',
+  multiplayer: 'Multiplayer',
+}
 const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus: 'Versus' }
 const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series', standalone: 'Standalone' }
 
@@ -63,10 +66,15 @@ export function describeParams(params: GenerationParams, mediaType: MediaType): 
           : `${params.decade}s`
     // Asked, not restated: the note claims what the filter did, so it reads the
     // same predicate the filter read.
-    lines.push({ text: `Decade: ${label}`, modelNote: decadeComesFromPick(mediaType) ? BOOK_YEAR_NOTE : undefined })
+    lines.push({
+      text: `Decade: ${label}`,
+      modelNote: decadeComesFromPick(mediaType) ? BOOK_YEAR_NOTE : undefined,
+    })
   }
   if (params.length) {
-    const label = getCatalogProvider(mediaType).lengthOptions.find((option) => option.value === params.length)?.label
+    const label = getCatalogProvider(mediaType).lengthOptions.find(
+      (option) => option.value === params.length,
+    )?.label
     if (label) lines.push({ text: `Length: ${label}` })
   }
   if (params.playerType) {
@@ -79,7 +87,10 @@ export function describeParams(params: GenerationParams, mediaType: MediaType): 
   }
   if (params.platform) lines.push({ text: `Platform: ${params.platform}` })
   if (params.series) {
-    lines.push({ text: `Series: ${SERIES_TYPE_LABELS[params.series] ?? params.series}`, modelNote: SERIES_NOTE })
+    lines.push({
+      text: `Series: ${SERIES_TYPE_LABELS[params.series] ?? params.series}`,
+      modelNote: SERIES_NOTE,
+    })
   }
   return lines
 }
@@ -126,7 +137,11 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
             {paramLines.map((line, index) => (
               <span key={line.text}>
                 {index > 0 && ' · '}
-                {line.modelNote ? <ModelProvided note={line.modelNote}>{line.text}</ModelProvided> : line.text}
+                {line.modelNote ? (
+                  <ModelProvided note={line.modelNote}>{line.text}</ModelProvided>
+                ) : (
+                  line.text
+                )}
               </span>
             ))}
           </p>

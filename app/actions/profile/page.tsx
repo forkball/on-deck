@@ -95,9 +95,7 @@ function describeProfileSource(settings: TasteProfileSettings, mediaType: Active
       ? `your whole ${ui.attributive} log`
       : `your last ${settings.logLimit} logged ${ui.plural}`
 
-  return settings.useNotes
-    ? `${scope}, including the notes you've written`
-    : `${scope}, without your notes`
+  return settings.useNotes ? `${scope}, including the notes you've written` : `${scope}, without your notes`
 }
 
 function TasteProfileSummary(
@@ -130,9 +128,8 @@ function TasteProfileSummary(
               <p mix={css({ margin: 0 })}>{summary}</p>
               {updatedAt && (
                 <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
-                  Written from {source}, as your log stood on{' '}
-                  {new Date(updatedAt).toLocaleDateString()}. It's rewritten next time you generate, if
-                  you've logged anything since.
+                  Written from {source}, as your log stood on {new Date(updatedAt).toLocaleDateString()}. It's
+                  rewritten next time you generate, if you've logged anything since.
                 </p>
               )}
             </>
@@ -205,7 +202,16 @@ function LoggedList(
 
     return (
       <>
-        <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
+        <ul
+          mix={css({
+            listStyle: 'none',
+            margin: 0,
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          })}
+        >
           {log.map(({ interaction, item }) => (
             <WatchedListItem
               key={interaction.id}
@@ -290,8 +296,8 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>
           ) : (
             <p mix={css({ color: '#555' })}>
-              No bio yet — <a href={routes.profile.edit.index.href()}>add one</a> for other people to read.
-              It has no effect on your recommendations.
+              No bio yet — <a href={routes.profile.edit.index.href()}>add one</a> for other people to read. It
+              has no effect on your recommendations.
             </p>
           )}
 
@@ -357,9 +363,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                       log={log}
                       total={total}
                       // Carries the tab, so "back" returns to the one you left.
-                      detailHref={(id) =>
-                        withReturnTo(ui.hrefs.show(id), `${profileHref}?tab=${type}`)
-                      }
+                      detailHref={(id) => withReturnTo(ui.hrefs.show(id), `${profileHref}?tab=${type}`)}
                       seeAllHref={seeAllHref}
                       emptyHref={ui.hrefs.search()}
                       emptyLabel={`search for a ${ui.itemNoun}`}

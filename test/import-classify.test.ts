@@ -97,7 +97,13 @@ describe('isBulkAcceptable', () => {
   })
 })
 
-function dupe(id: number, title: string, year: number | null, consumedAt: number | null, match: CandidateLike): DuplicateRow {
+function dupe(
+  id: number,
+  title: string,
+  year: number | null,
+  consumedAt: number | null,
+  match: CandidateLike,
+): DuplicateRow {
   return { id, index: id, title, year, consumedAt, verdict: classifyMatch({ title, year }, match) }
 }
 
@@ -142,8 +148,14 @@ describe('classifyDuplicate', () => {
 
 describe('describeReason', () => {
   it('names the gap without a stray plural', () => {
-    assert.equal(describeReason(classifyMatch({ title: 'Kwaidan', year: 1964 }, film('Kwaidan', 1965))), 'Year off by 1')
-    assert.equal(describeReason(classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011))), 'Year off by 29')
+    assert.equal(
+      describeReason(classifyMatch({ title: 'Kwaidan', year: 1964 }, film('Kwaidan', 1965))),
+      'Year off by 1',
+    )
+    assert.equal(
+      describeReason(classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011))),
+      'Year off by 29',
+    )
   })
 
   it('says nothing about a confident match', () => {
@@ -170,7 +182,9 @@ describe('conflictFields', () => {
 
   it('names only the field that differs', () => {
     assert.deepEqual(conflictFields(logged, { ...logged, rating: 4 }), ['rating'])
-    assert.deepEqual(conflictFields(logged, { ...logged, consumedAt: Date.parse('2024-09-19T00:00:00Z') }), ['watched'])
+    assert.deepEqual(conflictFields(logged, { ...logged, consumedAt: Date.parse('2024-09-19T00:00:00Z') }), [
+      'watched',
+    ])
   })
 
   it('counts a dislike as a rating disagreement', () => {
