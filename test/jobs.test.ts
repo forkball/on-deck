@@ -15,7 +15,7 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
   let otherId: number
 
   const params = { mediaType: 'movie', filters: {}, sourceTypes: ['movie'] }
-  const enqueue = (id: number) => enqueueJob(db, id, { ...params, memberIds: [id] }, { withLengthCheck: false })
+  const enqueue = (id: number) => enqueueJob(db, id, { ...params, memberIds: [id] }, { withGenreCheck: false, withLengthCheck: false })
 
   const newUser = async (tag: string) => {
     const s = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`

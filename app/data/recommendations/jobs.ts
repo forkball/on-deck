@@ -6,7 +6,7 @@ import type { RunTimings } from './timings.ts'
 
 // In the database, not process memory: the POST and the poll that follows it can
 // land on different machines.
-export type GenerationPhase = 'profiles' | 'picks' | 'matching' | 'lengths' | 'verifying' | 'saving'
+export type GenerationPhase = 'profiles' | 'picks' | 'matching' | 'genres' | 'lengths' | 'verifying' | 'saving'
 
 // One per real await in generateRecommendations — adding a stage there means
 // adding it here too.
@@ -14,6 +14,7 @@ export const PHASE_LABELS: Record<GenerationPhase, string> = {
   profiles: 'Reading what everyone has logged…',
   picks: 'Choosing picks…',
   matching: 'Looking each one up…',
+  genres: 'Checking genres…',
   lengths: 'Checking lengths…',
   verifying: 'Making sure they match…',
   saving: 'Saving your picks…',
@@ -23,6 +24,7 @@ export const PHASE_ORDER: GenerationPhase[] = [
   'profiles',
   'picks',
   'matching',
+  'genres',
   'lengths',
   'verifying',
   'saving',
@@ -34,8 +36,8 @@ export interface GenerationJob {
   userId: number
   status: JobStatus
   queuedAhead?: number
-  // Only the stages this run will hit — the length check runs only when that
-  // lever is set.
+  // Only the stages this run will hit — the genre and length checks each run
+  // only when their lever is set, and the genre one only when it costs lookups.
   phases: GenerationPhase[]
   phase: GenerationPhase
   runId?: number
@@ -94,13 +96,16 @@ export async function enqueueJob(
   db: Db,
   userId: number,
   params: JobParams,
-  options: { withLengthCheck: boolean },
+  options: { withGenreCheck: boolean; withLengthCheck: boolean },
 ): Promise<EnqueueJobResult> {
   await sweep(db)
 
   const id = crypto.randomUUID()
   const now = Date.now()
-  const phases = options.withLengthCheck ? PHASE_ORDER : PHASE_ORDER.filter((phase) => phase !== 'lengths')
+  const skipped = new Set<GenerationPhase>()
+  if (!options.withGenreCheck) skipped.add('genres')
+  if (!options.withLengthCheck) skipped.add('lengths')
+  const phases = PHASE_ORDER.filter((phase) => !skipped.has(phase))
 
   const { rows } = await pool.query<{ id: string }>(
     `insert into recommendation_jobs

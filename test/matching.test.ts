@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 
 import {
   applyVerdicts,
+  filterByGenre,
   filterByLength,
   matchesDecade,
   searchForPicks,
@@ -201,6 +202,114 @@ describe('filterByLength', () => {
       async (_type, externalId) => {
         if (externalId === 'B') throw new Error('Google Books lookup failed: 429')
         return detail(externalId, 100)
+      },
+    )
+
+    assert.deepEqual(kept.map((c) => c.pick.title), ['answered'])
+  })
+})
+
+// A book candidate the way a Google Books search hit arrives: tags derived from
+// the top-level category alone, which for fiction means no genre at all.
+const tagged = (title: string, externalId: string, tags: string[], pageCount: number | null = null): Candidate =>
+  ({ pick: pickOf(title), match: { title, externalId, tags, pageCount } }) as unknown as Candidate
+
+const taggedDetail = (externalId: string, tags: string[], pageCount: number | null = null) =>
+  ({ title: externalId, externalId, tags, pageCount }) as unknown as Awaited<ReturnType<CatalogLookup>>
+
+describe('filterByGenre', () => {
+  it('trusts a tag the search hit carries without paying for a lookup', async () => {
+    const asked: string[] = []
+    const kept = await filterByGenre(
+      [tagged('tagged', 'A', ['science fiction']), tagged('other genre', 'B', ['romance'])],
+      'book',
+      'science fiction',
+      async (_type, externalId) => {
+        asked.push(externalId)
+        return null
+      },
+    )
+
+    assert.deepEqual(kept.map((c) => c.pick.title), ['tagged'])
+    assert.deepEqual(asked, ['B'])
+  })
+
+  // The bug this exists for: Google Books' search payload carries "Fiction" and
+  // nothing under it, so every fiction genre was dropping the whole shortlist.
+  it('keeps a book whose by-id record carries the genre its hit did not', async () => {
+    const kept = await filterByGenre(
+      [tagged('untagged', 'A', [])],
+      'book',
+      'science fiction',
+      async (_type, externalId) => taggedDetail(externalId, ['science fiction', 'classics']),
+    )
+
+    assert.deepEqual(kept.map((c) => c.pick.title), ['untagged'])
+  })
+
+  it('carries the detail record forward, so the length check reuses the lookup', async () => {
+    const kept = await filterByGenre([tagged('untagged', 'A', [])], 'book', 'romance', async (_type, externalId) =>
+      taggedDetail(externalId, ['romance'], 320),
+    )
+
+    assert.equal(kept[0].match.pageCount, 320)
+  })
+
+  it('drops a book the by-id record says is a different genre', async () => {
+    const kept = await filterByGenre([tagged('untagged', 'A', [])], 'book', 'horror', async (_type, externalId) =>
+      taggedDetail(externalId, ['romance']),
+    )
+
+    assert.deepEqual(kept, [])
+  })
+
+  it('reads a miss on a hit that does answer genres as the answer', async () => {
+    const asked: string[] = []
+    const kept = await filterByGenre(
+      [tagged('sci-fi film', 'A', ['science fiction']), tagged('romance film', 'B', ['romance'])],
+      'movie',
+      'science fiction',
+      async (_type, externalId) => {
+        asked.push(externalId)
+        return taggedDetail(externalId, ['science fiction'])
+      },
+    )
+
+    assert.deepEqual(kept.map((c) => c.pick.title), ['sci-fi film'])
+    assert.deepEqual(asked, [])
+  })
+
+  it('drops a candidate the provider throws on instead of failing the run', async () => {
+    const kept = await filterByGenre(
+      [tagged('tagged', 'A', ['horror']), tagged('unlookupable', 'B', [])],
+      'book',
+      'horror',
+      async (_type, externalId) => {
+        if (externalId === 'B') throw new Error('Google Books lookup failed: 429')
+        return null
+      },
+    )
+
+    assert.deepEqual(kept.map((c) => c.pick.title), ['tagged'])
+  })
+
+  it('says the catalog is down rather than saving an empty run', async () => {
+    await assert.rejects(
+      filterByGenre([tagged('unlookupable', 'B', [])], 'book', 'horror', async () => {
+        throw new Error('Google Books lookup failed: 429')
+      }),
+      /catalog isn't answering/,
+    )
+  })
+
+  it('keeps an answered candidate even when a sibling lookup threw', async () => {
+    const kept = await filterByGenre(
+      [tagged('answered', 'A', []), tagged('threw', 'B', [])],
+      'book',
+      'horror',
+      async (_type, externalId) => {
+        if (externalId === 'B') throw new Error('Google Books lookup failed: 429')
+        return taggedDetail(externalId, ['horror'])
       },
     )
 

@@ -13,7 +13,9 @@ import { recordRunAgainstDailyLimit, runCostFor } from './dailyLimit.ts'
 import { buildExclusions } from './exclusions.ts'
 import type { GenerationPhase } from './jobs.ts'
 import {
+  filterByGenre,
   filterByLength,
+  genreMissNeedsLookup,
   matchesDecade,
   resolveFromCatalog,
   searchForPicks,
@@ -222,14 +224,15 @@ export async function generateRecommendations(
       drops.titleMismatch++
       continue
     }
+    // Genre is checked after this loop, not in it: for books the search hit
+    // can't answer it. `series` is checked nowhere — the pick prompt is the only
+    // thing that can ask for it, see BOOK_SERIES_TYPES.
     if (
-      (filters.genre && !match.tags.includes(filters.genre)) ||
       (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade, filters.decadeRelation)) ||
       (filters.playerType && !match.tags.includes(filters.playerType)) ||
       (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) ||
       // Platforms are their own field, not tags, and compare by family.
-      (filters.platform && !platformFamilies(match.platforms ?? []).includes(filters.platform)) ||
-      (filters.series && !match.tags.includes(filters.series))
+      (filters.platform && !platformFamilies(match.platforms ?? []).includes(filters.platform))
     ) {
       drops.filtered++
       continue
@@ -240,10 +243,20 @@ export async function generateRecommendations(
   }
 
   let candidates: Candidate[] = shortlist
+  if (filters.genre) {
+    // A stage only when it costs a round of lookups, which is how the job's phase
+    // list is gated too — a phase missing from that list leaves the progress bar
+    // reading as stalled while this runs.
+    if (genreMissNeedsLookup(mediaType)) enterPhase('genres')
+    const inGenre = await filterByGenre(candidates, mediaType, filters.genre)
+    drops.genre = candidates.length - inGenre.length
+    candidates = inGenre
+  }
   if (filters.length) {
     enterPhase('lengths')
-    candidates = await filterByLength(shortlist, mediaType, filters.length)
-    drops.length = shortlist.length - candidates.length
+    const atLength = await filterByLength(candidates, mediaType, filters.length)
+    drops.length = candidates.length - atLength.length
+    candidates = atLength
   }
 
   let results: RecommendationResult[]

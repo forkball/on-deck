@@ -288,6 +288,65 @@ export async function withOverviews(
   return candidates
 }
 
+// Whether a genre a search hit doesn't carry counts as an answer.
+//
+// For books it doesn't: Google Books returns only the top-level BISAC category
+// on search ("Fiction"), and the hierarchical ones the genres are derived from
+// ("Fiction / Science Fiction / Space Opera") on the by-id record alone, so a
+// science fiction novel arrives with no genre tag at all. A tag a hit does carry
+// is real either way, which is what keeps this to one request per miss rather
+// than one per candidate. One media type rather than a provider flag because it
+// is the provider's search payload that is thin, not the medium.
+export function genreMissNeedsLookup(mediaType: MediaType): boolean {
+  return mediaType === 'book'
+}
+
+// Keeps only the candidates carrying the requested genre, fetching the by-id
+// record for the ones whose search hit couldn't answer.
+//
+// Runs before filterByLength on purpose: the detail record it leaves on the
+// candidate carries the length dimension too, so the two levers set together
+// cost one round of lookups rather than two.
+export async function filterByGenre(
+  candidates: Candidate[],
+  mediaType: MediaType,
+  genre: string,
+  lookup: CatalogLookup = lookupForType,
+): Promise<Candidate[]> {
+  const needLookup = new Set(candidates.filter(({ match }) => !match.tags.includes(genre)))
+  if (!genreMissNeedsLookup(mediaType)) return candidates.filter((entry) => !needLookup.has(entry))
+
+  // Null marks a lookup that answered nothing: no categories, no verdict, so it
+  // can't be kept. Held beside the entry so the filter below stays a pure read.
+  const resolved = new Map<Candidate, CatalogSearchResult | null>()
+  await forEachWithConcurrency([...needLookup], LOOKUP_CONCURRENCY, async (entry) => {
+    resolved.set(entry, await lookupQuietly(lookup, mediaType, entry.match.externalId))
+  })
+
+  const kept: Candidate[] = []
+  for (const entry of candidates) {
+    if (!needLookup.has(entry)) {
+      kept.push(entry)
+      continue
+    }
+
+    const detail = resolved.get(entry) ?? null
+    if (!detail || !detail.tags.includes(genre)) continue
+    // The detail record, not the search one: it carries the tags just paid for.
+    kept.push({ pick: entry.pick, match: detail })
+  }
+
+  // Same reading as filterByLength's: one candidate the provider wouldn't answer
+  // for is the rule working, every one of them with nothing else surviving is the
+  // provider being down, and an empty page saying "nothing in that genre" would
+  // be a different and untrue thing.
+  if (kept.length === 0 && needLookup.size > 0 && [...resolved.values()].every((detail) => detail == null)) {
+    throw catalogDown(`Couldn't check the genre of any of the ${mediaTypeUiFor(mediaType).plural}`)
+  }
+
+  return kept
+}
+
 // Whether the by-id lookup can be skipped.
 export function hasLengthDimension(mediaType: MediaType, result: CatalogSearchResult): boolean {
   if (mediaType === 'book') return result.pageCount != null

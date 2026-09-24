@@ -13,6 +13,7 @@ import { loadLoggedTypesByUser } from '../../data/mediaItems.ts'
 import { getDailyRunAllowance, runCostFor, timeUntil } from '../../data/recommendations/dailyLimit.ts'
 import { enqueueJob, getJob, PHASE_LABELS } from '../../data/recommendations/jobs.ts'
 import { getLuckyState, LUCKY_RUN_NAME } from '../../data/recommendations/lucky.ts'
+import { genreMissNeedsLookup } from '../../data/recommendations/matching.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import {
@@ -320,7 +321,12 @@ export default createController(routes.recommendations, {
           sourceTypes,
           name: parsed.value.name || undefined,
         },
-        { withLengthCheck: filters.length != null },
+        {
+          // Only when it costs a round of lookups — for every other medium the
+          // genre is read off the search hit inside the matching stage.
+          withGenreCheck: filters.genre != null && genreMissNeedsLookup(mediaType),
+          withLengthCheck: filters.length != null,
+        },
       )
 
       if (!enqueued.ok) {
@@ -418,7 +424,7 @@ export default createController(routes.recommendations, {
           name: LUCKY_RUN_NAME,
           lucky: true,
         },
-        { withLengthCheck: false },
+        { withGenreCheck: false, withLengthCheck: false },
       )
 
       if (!enqueued.ok) {
