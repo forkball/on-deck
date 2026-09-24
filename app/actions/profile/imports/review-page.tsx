@@ -688,10 +688,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                           </a>
                         ) : (
                           row.title
-                        )}{' '}
-                        <span mix={css({ color: '#888' })}>
-                          · your file: {row.title} {row.year ?? 'no year'}
-                        </span>
+                        )}
                       </li>
                     ))}
                   </ul>
