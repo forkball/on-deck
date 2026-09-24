@@ -85,14 +85,19 @@ const GROUP_STYLE = css({
   // The rules either side of the label that make it read as a divider.
   '& > details > summary::before, & > details > summary::after': {
     content: '""',
-    flex: '1 1 24px',
+    flex: '1 1 12px',
+    minWidth: '12px',
     borderTop: '1px dashed #bbb',
   },
+  // On a narrow screen the label wraps; centred, and with the date range and
+  // the count each kept whole, it breaks between phrases rather than mid-date.
+  '& > details > summary > span': { textAlign: 'center' },
   '& .chevron': { display: 'inline-block', transition: 'transform 120ms ease' },
   '& > details[open] > summary .chevron': { transform: 'rotate(90deg)' },
-  '& .when': { color: '#888', fontSize: '12px' },
+  '& .when': { color: '#888', fontSize: '12px', whiteSpace: 'nowrap' },
   // Only while folded: open, the rows are right there to count.
   '& .count': {
+    display: 'inline-block',
     marginLeft: '6px',
     padding: '1px 8px',
     border: '1px solid #ccc',
