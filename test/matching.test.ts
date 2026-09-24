@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 
 import {
   applyVerdicts,
+  chooseMatch,
   decadeYear,
   matchesSeries,
   filterByGenre,
@@ -63,6 +64,47 @@ describe('matchesDecade', () => {
     for (const relation of ['before', 'within', 'after'] as const) {
       assert.ok(!matchesDecade(null, 1990, relation))
     }
+  })
+})
+
+describe('chooseMatch', () => {
+  const hit = (title: string, releaseYear: number | null) =>
+    ({ title, releaseYear, externalId: title, tags: [] }) as unknown as Parameters<
+      typeof chooseMatch
+    >[1][number]
+
+  const pick = (title: string, year: number) => ({ title, year, reason: '' })
+
+  // The real one: searching "Bitten" returns "No Biting: Policy and Practice for
+  // Toddlers" near the pick's year, and the book itself further down. Choosing by
+  // year first picked the toddlers book and then dropped the pick for not being it.
+  it('picks the right book before the right year', () => {
+    const chosen = chooseMatch(pick('Bitten', 2001), [
+      hit('No Biting: Policy and Practice', 2001),
+      hit('Bitten', 2010),
+    ])
+
+    assert.equal(chosen?.title, 'Bitten')
+  })
+
+  it('picks the edition matching the year, among hits that are the book', () => {
+    const chosen = chooseMatch(pick('Outlander', 1991), [hit('Outlander', 2004), hit('Outlander', 1991)])
+
+    assert.equal(chosen?.releaseYear, 1991)
+  })
+
+  it('falls to the nearest year when no edition matches exactly', () => {
+    const chosen = chooseMatch(pick('Outlander', 1991), [hit('Outlander', 2015), hit('Outlander', 1994)])
+
+    assert.equal(chosen?.releaseYear, 1994)
+  })
+
+  it('answers null when no hit is the book at all', () => {
+    assert.equal(chooseMatch(pick('Written in Red', 2013), [hit('Writing Red: An Anthology', 2013)]), null)
+  })
+
+  it('answers null for no hits', () => {
+    assert.equal(chooseMatch(pick('Bitten', 2001), []), null)
   })
 })
 
