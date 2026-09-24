@@ -401,46 +401,71 @@ describe('filterByGenre', () => {
     assert.deepEqual(asked, [])
   })
 
-  it('drops a candidate the provider throws on instead of failing the run', async () => {
+  // The lookup is the only thing that can answer a book's genre, so when it doesn't
+  // answer, the hit it was asked about is what's left — and an empty tag list is
+  // the catalog never having said, not a verdict. This is the case that emptied a
+  // real run: Open Library ids asked of Google Books, during a Google outage.
+  it('keeps a candidate the provider threw on, having nothing against it', async () => {
     const kept = await filterByGenre(
       [book('tagged', 'A', null, ['horror']), book('unlookupable', 'B', null, [])],
       'book',
       'horror',
       async (_type, externalId) => {
-        if (externalId === 'B') throw new Error('Google Books lookup failed: 429')
+        if (externalId === 'B') throw new Error('Google Books lookup failed: 503')
         return null
       },
     )
 
     assert.deepEqual(
       kept.map((c) => c.pick.title),
-      ['tagged'],
+      ['tagged', 'unlookupable'],
+    )
+  })
+
+  // The hit is still evidence when it carried any: a book the search says is a
+  // biography is not the romance that was asked for, whether or not the lookup
+  // that would have confirmed it landed.
+  it('drops a candidate whose own hit names another genre, lookup or no lookup', async () => {
+    const kept = await filterByGenre(
+      [book('a biography', 'A', null, ['biography']), book('unsaid', 'B', null, [])],
+      'book',
+      'romance',
+      async () => {
+        throw new Error('Google Books lookup failed: 503')
+      },
+    )
+
+    // A survivor alongside it, so this asserts the drop rather than the
+    // catalog-down guard the next test covers.
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['unsaid'],
     )
   })
 
   it('says the catalog is down rather than saving an empty run', async () => {
     await assert.rejects(
-      filterByGenre([book('unlookupable', 'B', null, [])], 'book', 'horror', async () => {
-        throw new Error('Google Books lookup failed: 429')
+      filterByGenre([book('a biography', 'A', null, ['biography'])], 'book', 'romance', async () => {
+        throw new Error('Google Books lookup failed: 503')
       }),
       /catalog isn't answering/,
     )
   })
 
-  it('keeps an answered candidate even when a sibling lookup threw', async () => {
+  it('keeps an answered candidate alongside one whose lookup threw', async () => {
     const kept = await filterByGenre(
       [book('answered', 'A', null, []), book('threw', 'B', null, [])],
       'book',
       'horror',
       async (_type, externalId) => {
-        if (externalId === 'B') throw new Error('Google Books lookup failed: 429')
+        if (externalId === 'B') throw new Error('Google Books lookup failed: 503')
         return detail(externalId, null, ['horror'])
       },
     )
 
     assert.deepEqual(
       kept.map((c) => c.pick.title),
-      ['answered'],
+      ['answered', 'threw'],
     )
   })
 })

@@ -14,6 +14,7 @@ import {
   parseGoogleBooksId,
   searchBooks,
 } from './googleBooks.ts'
+import { getWorkById, parseOpenLibraryWorkId } from './openLibrary.ts'
 import {
   GAME_GENRES,
   GAME_MULTIPLAYER_TYPES,
@@ -105,7 +106,13 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
   book: {
     sourceName: 'google-books',
     search: searchBooks,
-    getById: getBookById,
+    // Routed by the id itself, because books are the one medium whose rows come
+    // from two catalogs: 549 of 744 rows still carry an Open Library work key,
+    // from before the switch and from the fallback in searchBooks. Asking Google
+    // about one of those can only fail — it did, eleven times in one run, and a
+    // failed lookup was read as "not the genre you asked for".
+    getById: (externalId) =>
+      parseOpenLibraryWorkId(externalId) ? getWorkById(externalId) : getBookById(externalId),
     genres: BOOK_GENRES,
     seriesTypes: BOOK_SERIES_TYPES,
     parseExternalId: parseGoogleBooksId,
