@@ -36,7 +36,10 @@ export function matchesDecade(releaseYear: number | null, decade: number, relati
 // Dune's search hits say 2005 and Neuromancer's 2000, and of 20 hits each, none
 // carried the year the book was written. A decade read off that drops the very
 // books it was asked for, and no lookup rescues it — the volume *is* an edition,
-// so the by-id record says 2005 too.
+// so the by-id record says 2005 too. Nor is the earliest edition an answer: there
+// is no editions-of-this-work endpoint to take a minimum over, only relevance
+// search, which answers 2002 for Piranesi off a Year's Best anthology and 1980
+// for Dune off Dune Messiah.
 //
 // So the pick's own year, which is the model answering the question the prompt
 // asked ("originally released in the 1960s"). Unverified, and the only
