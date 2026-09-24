@@ -105,10 +105,11 @@ const GROUP_BODY_STYLE = css({
 })
 
 // A run of one person's rows folded behind a divider — see feedGroups.ts for
-// when that happens. Closed at first: the point is that a burst from one person
-// takes one line of the feed rather than all of it.
+// when that happens. Open at first, so nothing is hidden until the reader
+// chooses to fold a burst they've seen away; the divider still marks where one
+// person's run of activity starts and how far it reaches.
 //
-// A native <details>, as Collapsible is, so opening it needs no script — which
+// A native <details>, as Collapsible is, so toggling it needs no script — which
 // matters here, since appended pages arrive as markup and nothing hydrates them.
 function FeedGroup(handle: Handle<{ items: FeedItem[] }>) {
   return () => {
@@ -117,7 +118,7 @@ function FeedGroup(handle: Handle<{ items: FeedItem[] }>) {
 
     return (
       <li mix={GROUP_STYLE}>
-        <details>
+        <details open>
           <summary>
             <span>
               <span class="chevron" aria-hidden="true">
