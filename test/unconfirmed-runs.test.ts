@@ -8,7 +8,7 @@ import {
   MAX_UNCONFIRMED_PER_USER,
   saveUnconfirmedRun,
 } from '../app/data/recommendations/unconfirmed.ts'
-import { skipWithoutDatabase } from './support/db.ts'
+import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 
 // What the model answered when the catalog wouldn't. These rows hold the picks as
 // JSON rather than pointing at catalog entries, which is the whole reason they are
@@ -18,18 +18,6 @@ import { skipWithoutDatabase } from './support/db.ts'
 describe('unconfirmed runs', { skip: skipWithoutDatabase }, () => {
   let userId: number
   let otherId: number
-
-  const newUser = async (tag: string) => {
-    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const {
-      rows: [user],
-    } = await pool.query<{ id: number }>(
-      `insert into users (email, password_hash, display_name, created_at)
-       values ($1, 'x', $2, $3) returning id`,
-      [`unconfirmed-${tag}-${stamp}@example.com`, `unconfirmed ${tag} ${stamp}`, Date.now()],
-    )
-    return user.id
-  }
 
   const pick = (title: string) => ({ title, year: 1999, reason: `because ${title}` })
 
@@ -42,12 +30,23 @@ describe('unconfirmed runs', { skip: skipWithoutDatabase }, () => {
       reason: "the catalog isn't answering right now",
     })
 
+  // Every user this file makes, so `after` can take them back out — these rows
+  // share a database with the rest of the suite.
+  const created: number[] = []
+  const newUser = async (tag: string) => {
+    const id = await insertUser(`unconfirmed-${tag}`)
+    created.push(id)
+    return id
+  }
+
   before(async () => {
     userId = await newUser('owner')
     otherId = await newUser('other')
   })
 
   after(async () => {
+    await pool.query('delete from unconfirmed_runs where user_id = any($1)', [created])
+    await deleteUsers(created)
     await pool.end()
   })
 

@@ -1,10 +1,13 @@
+import { inList } from 'remix/data-table'
+
 import type { Db } from '../db.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { unconfirmedRuns, type UnconfirmedRun } from '../schema.ts'
 import type { Pick, RecommendationFilters } from './picks.ts'
 
-// The same ceiling recommendation_runs keeps, for the same reason: these are a
-// record of one attempt, not a library.
+// Its own ceiling rather than the runs one. It happens to be the same number, but
+// these answer a different question — how many failed attempts are worth keeping
+// around to read — and moving one shouldn't move the other.
 export const MAX_UNCONFIRMED_PER_USER = 3
 
 export interface UnconfirmedRunDetail {
@@ -16,23 +19,23 @@ export interface UnconfirmedRunDetail {
   createdAt: number
 }
 
-// The columns are text holding the model's own JSON. Parsed here so a malformed
-// row reads as an empty list rather than throwing on a page someone is already
+// A malformed row reads as empty rather than throwing on a page someone is already
 // having a bad time on.
-function parse(row: UnconfirmedRun): UnconfirmedRunDetail {
-  const safely = <T>(raw: string, fallback: T): T => {
-    try {
-      return JSON.parse(raw) as T
-    } catch {
-      return fallback
-    }
+function parseJson<T>(raw: string, fallback: T): T {
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
   }
+}
 
+// The columns are text holding the model's own JSON.
+function parse(row: UnconfirmedRun): UnconfirmedRunDetail {
   return {
     id: row.id,
     mediaType: row.media_type as MediaType,
-    filters: safely<RecommendationFilters>(row.params, {}),
-    picks: safely<Pick[]>(row.picks, []),
+    filters: parseJson<RecommendationFilters>(row.params, {}),
+    picks: parseJson<Pick[]>(row.picks, []),
     reason: row.reason,
     createdAt: Number(row.created_at),
   }
@@ -66,21 +69,27 @@ export async function saveUnconfirmedRun(
 }
 
 // Oldest first out the door, newest kept — the opposite order to how they're read.
-export async function pruneOldUnconfirmedRuns(db: Db, userId: number): Promise<void> {
+async function pruneOldUnconfirmedRuns(db: Db, userId: number): Promise<void> {
   const rows = await db.findMany(unconfirmedRuns, {
     where: { user_id: userId },
     orderBy: ['created_at', 'desc'],
   })
+  if (rows.length <= MAX_UNCONFIRMED_PER_USER) return
 
-  for (const row of rows.slice(MAX_UNCONFIRMED_PER_USER)) {
-    await db.delete(unconfirmedRuns, row.id)
-  }
+  const excess = rows.slice(MAX_UNCONFIRMED_PER_USER)
+  await db.deleteMany(unconfirmedRuns, {
+    where: inList(
+      'id',
+      excess.map((row) => row.id),
+    ),
+  })
 }
 
 export async function listUnconfirmedRuns(db: Db, userId: number): Promise<UnconfirmedRunDetail[]> {
   const rows = await db.findMany(unconfirmedRuns, {
     where: { user_id: userId },
     orderBy: ['created_at', 'desc'],
+    limit: MAX_UNCONFIRMED_PER_USER,
   })
 
   return rows.map(parse)

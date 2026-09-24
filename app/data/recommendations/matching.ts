@@ -433,6 +433,8 @@ export function filterByGenre(
   genre: string,
   lookup: CatalogLookup = lookupForType,
 ): Promise<Candidate[]> {
+  // Constant for the call, not per candidate.
+  const needsLookup = genreMissNeedsLookup(mediaType)
   const carriesGenre = (match: CatalogSearchResult) => match.tags.includes(genre)
 
   // A Google Books record with no categories at all is not a book of some other
@@ -446,17 +448,14 @@ export function filterByGenre(
   // record that *does* carry categories is still held to them: that is real
   // evidence, and a book tagged only [horror] is not the romance that was asked
   // for.
-  const uncatalogued = (match: CatalogSearchResult) =>
-    genreMissNeedsLookup(mediaType) && match.tags.length === 0
-
   return filterByDetail(
     candidates,
     mediaType,
     {
       // Every provider but Google Books answers genres on search, so for them a miss
       // is the answer and nothing is looked up.
-      answered: (match) => carriesGenre(match) || !genreMissNeedsLookup(mediaType),
-      matches: (match) => carriesGenre(match) || uncatalogued(match),
+      answered: (match) => carriesGenre(match) || !needsLookup,
+      matches: (match) => carriesGenre(match) || (needsLookup && match.tags.length === 0),
       what: 'genre',
     },
     lookup,

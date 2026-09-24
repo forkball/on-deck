@@ -1,6 +1,8 @@
 import type { Handle } from 'remix/ui'
 import { clientEntry, css, ref } from 'remix/ui'
 
+import { GenerationFailure } from '../ui/shared/generation-failure.tsx'
+
 // Polls for the stage a run is actually in. Every label comes from the server
 // having entered that stage, so progress can't run backwards or be invented.
 //
@@ -144,16 +146,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       const { phases, labels } = handle.props
 
       function panel() {
-        if (failed) {
-          return (
-            <>
-              <p mix={css({ color: '#b91c1c' })}>{failed}</p>
-              <p>
-                <a href={handle.props.formHref}>Change the filters and try again</a>
-              </p>
-            </>
-          )
-        }
+        if (failed) return <GenerationFailure message={failed} backHref={handle.props.formHref} />
 
         if (lostContact) {
           return (

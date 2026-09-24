@@ -4,6 +4,8 @@ import {
   claimJobs,
   completeJob,
   failJob,
+  MAX_ATTEMPTS,
+  requeueJob,
   requeueStaleJobs,
   saveCheckpoint,
   saveJobTimings,
@@ -105,6 +107,15 @@ export function startGenerationWorker(): GenerationWorker {
       // filters they were made under, and the line explaining what couldn't be
       // checked. Nothing is upserted into the catalog and nothing can be logged
       // from it, because nothing here has been confirmed to exist.
+      // A catalog that won't answer is usually a catalog that won't answer *yet* —
+      // Google Books' own circuit reopens after a minute. Resuming costs no model
+      // calls, the checkpoint already holding the picks, so the attempts this job
+      // has are worth spending before settling for titles nothing confirmed.
+      if (error instanceof CatalogUnavailableError && job.attempt < MAX_ATTEMPTS) {
+        await requeueJob(db, job.id).catch(() => {})
+        return
+      }
+
       if (error instanceof CatalogUnavailableError && latest.picks?.length) {
         try {
           const unconfirmedRunId = await saveUnconfirmedRun(db, {

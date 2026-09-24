@@ -102,8 +102,6 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
   }
 }
 
-// Both actions refuse for the same reason in the same words — an empty log
-// gives the profile nothing to work from, whichever kind of run asked for it.
 // Where a finished job sends someone: a real run, or the unconfirmed picks kept
 // when the catalog wouldn't answer. Spelled once, because the redirect and the poll
 // the generating page runs both need it and must not be able to disagree.
@@ -118,6 +116,8 @@ function finishedHref(job: GenerationJob): string | null {
   return null
 }
 
+// Both actions refuse for the same reason in the same words — an empty log gives
+// the profile nothing to work from, whichever kind of run asked for it.
 function describeMissingLogs(missing: MissingSourceLogs[], viewerId: number): string {
   return missing
     .map(({ userId, label, missing: types }) => {
@@ -470,13 +470,15 @@ export default createController(routes.recommendations, {
       const job = await getJob(context.get(Database), context.params.jobId, auth.identity.id)
       if (!job) return Response.json({ error: 'not_found' }, { status: 404 })
 
+      const finished = finishedHref(job)
+
       return Response.json({
         status: job.status,
         queuedAhead: job.queuedAhead ?? null,
         phase: job.phase,
         label: PHASE_LABELS[job.phase],
-        done: finishedHref(job) != null,
-        href: finishedHref(job),
+        done: finished != null,
+        href: finished,
         error: job.error ?? null,
       })
     },

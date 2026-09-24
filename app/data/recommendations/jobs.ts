@@ -232,7 +232,9 @@ export async function getJob(db: Db, jobId: string, userId: number): Promise<Gen
 // bound on how long a stage may legitimately take.
 export const CLAIM_STALE_MS = 3 * 60 * 1000
 
-const MAX_ATTEMPTS = 3
+// Shared with the worker, which spends them on a catalog that won't answer before
+// it gives up and keeps what the model said.
+export const MAX_ATTEMPTS = 3
 
 // A null claim is deliberately not stale — `claimed_at is not null`, never
 // coalesce(claimed_at, 0). During a rolling deploy that would let a new-release

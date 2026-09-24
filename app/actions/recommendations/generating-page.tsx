@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import { PHASE_LABELS, type GenerationPhase } from '../../data/recommendations/jobs.ts'
 import { GenerationProgress } from '../../browser/generation-progress.tsx'
 import { Document } from '../../ui/components/document.tsx'
+import { GenerationFailure } from '../../ui/shared/generation-failure.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 
 export interface GeneratingPageProps {
@@ -41,12 +42,7 @@ export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
           <h1>Putting your picks together</h1>
 
           {error ? (
-            <>
-              <p mix={css({ color: '#b91c1c' })}>{error}</p>
-              <p>
-                <a href={formHref}>Change the filters and try again</a>
-              </p>
-            </>
+            <GenerationFailure message={error} backHref={formHref} />
           ) : (
             <>
               <GenerationProgress
