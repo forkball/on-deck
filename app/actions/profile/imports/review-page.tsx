@@ -5,7 +5,7 @@ import { ImportPicker } from '../../../browser/import-picker.tsx'
 import { InPlaceForms } from '../../../browser/in-place-forms.tsx'
 import { LazyList } from '../../../browser/lazy-list.tsx'
 import type { ConflictEntry, DuplicateEntry, ReviewModel, ReviewRow } from '../../../data/imports/review.ts'
-import { reasonGroup, type LogValues } from '../../../data/imports/classify.ts'
+import { reasonGroup, type BulkKind, type LogValues } from '../../../data/imports/classify.ts'
 import type { ImportBatch } from '../../../data/schema.ts'
 import { mediaTypeUiFor } from '../../../mediaTypes.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
@@ -557,6 +557,82 @@ const savedListStyle = css({ margin: 0, paddingLeft: '18px', fontSize: '14px' })
 // "Worth a look" split by what we're unsure about, in the order the cards
 // already sort — least certain first — so each group is one kind of question
 // and can be answered as one.
+function groupAnchor(key: string): string {
+  return `group-${key}`
+}
+
+const sectionStyle = css({ marginBottom: '18px', scrollMarginTop: '12px' })
+
+// One tap to every group, so reaching the third doesn't mean scrolling
+// through all of the first two — at a few hundred rows that was dozens of
+// screens on a phone. Plain fragment links: nothing to hydrate, and they work
+// with JS off. Only worth showing when there is more than one place to go.
+function JumpLinks(handle: Handle<{ links: { href: string; label: string }[] }>) {
+  return () => {
+    const { links } = handle.props
+    if (links.length < 2) return null
+
+    return (
+      <nav
+        mix={css({
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '4px 14px',
+          fontSize: '13px',
+          margin: '6px 0 14px',
+        })}
+      >
+        {links.map((link) => (
+          <a key={link.href} href={link.href}>
+            {link.label}
+          </a>
+        ))}
+      </nav>
+    )
+  }
+}
+
+// A one-tap accept, at the top of the group it clears rather than after it:
+// under a hundred cards it was the last thing anyone would reach, and it's the
+// fastest answer on the page. Which rows it covers is decided by bulkKind and
+// recomputed by the action, so the count here is what it does.
+function BulkAccept(handle: Handle<{ batchId: string; kind: BulkKind; count: number; of: number }>) {
+  return () => {
+    const { batchId, kind, count: n, of } = handle.props
+    if (n === 0) return null
+
+    const what =
+      kind === 'year' ? 'within a year of your file' : 'your title with a subtitle added, same year'
+
+    return (
+      <form
+        method="post"
+        action={routes.profile.imports.bulk.href({ batchId })}
+        data-in-place
+        mix={css({
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap',
+          border: '1px dashed #cfc5b6',
+          borderRadius: '8px',
+          padding: '11px 14px',
+          background: '#fbf6ee',
+          margin: '0 0 10px',
+        })}
+      >
+        <input type="hidden" name="kind" value={kind} />
+        <span mix={css({ flex: '1 1 220px', fontSize: '14px' })}>
+          {n === of ? `All ${n} are ${what}.` : `${n} of these are ${what}.`}
+        </span>
+        <button type="submit" mix={css({ fontSize: '13px' })}>
+          Accept all {n}
+        </button>
+      </form>
+    )
+  }
+}
+
 interface ReasonGroup {
   key: string
   title: string
@@ -724,6 +800,22 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 </b>
                 , {model.uncertain.length} worth a look, and {model.notFound.length} we couldn't find.
               </p>
+              <JumpLinks
+                links={[
+                  ...uncertainGroups.map((group) => ({
+                    href: `#${groupAnchor(group.key)}`,
+                    label: `${group.title} (${group.entries.length})`,
+                  })),
+                  ...(model.notFound.length > 0
+                    ? [
+                        {
+                          href: `#${groupAnchor('not-found')}`,
+                          label: `Couldn't find (${model.notFound.length})`,
+                        },
+                      ]
+                    : []),
+                ]}
+              />
               {reviewsOnly && (
                 <p
                   mix={css({
@@ -837,7 +929,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     Least certain first. These save as matched unless you say otherwise.
                   </p>
                   {uncertainGroups.map((group) => (
-                    <section key={group.key} mix={css({ marginBottom: '18px' })}>
+                    <section key={group.key} id={groupAnchor(group.key)} mix={sectionStyle}>
                       <h3 mix={css({ margin: '14px 0 2px', fontSize: '16px' })}>
                         {group.title}{' '}
                         <span mix={css({ color: '#888', fontSize: '13px', fontWeight: 400 })}>
@@ -846,6 +938,22 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       </h3>
                       {group.blurb && (
                         <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 8px' })}>{group.blurb}</p>
+                      )}
+                      {group.key === 'year_drift' && (
+                        <BulkAccept
+                          batchId={batchId}
+                          kind="year"
+                          count={model.bulk.year.length}
+                          of={group.entries.length}
+                        />
+                      )}
+                      {group.key === 'title_differs' && (
+                        <BulkAccept
+                          batchId={batchId}
+                          kind="subtitle"
+                          count={model.bulk.subtitle.length}
+                          of={group.entries.length}
+                        />
                       )}
                       <div id={`import-uncertain-${group.key}`}>
                         {group.entries.map((entry) => (
@@ -863,33 +971,6 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                         initial={ROWS_VISIBLE}
                         step={ROWS_VISIBLE}
                       />
-                      {group.key === 'year_drift' && model.bulkAcceptable > 0 && (
-                        <form
-                          method="post"
-                          action={routes.profile.imports.bulk.href({ batchId })}
-                          data-in-place
-                          mix={css({
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                            flexWrap: 'wrap',
-                            border: '1px dashed #cfc5b6',
-                            borderRadius: '8px',
-                            padding: '11px 14px',
-                            background: '#fbf6ee',
-                            marginTop: '10px',
-                          })}
-                        >
-                          <span mix={css({ flex: '1 1 220px', fontSize: '14px' })}>
-                            {model.bulkAcceptable === group.entries.length
-                              ? `All ${model.bulkAcceptable} are within a year of your file.`
-                              : `${model.bulkAcceptable} of these are within a year of your file.`}
-                          </span>
-                          <button type="submit" mix={css({ fontSize: '13px' })}>
-                            Accept all {model.bulkAcceptable}
-                          </button>
-                        </form>
-                      )}
                     </section>
                   ))}
                 </>
@@ -898,7 +979,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
               {model.notFound.length > 0 && (
                 <>
                   <hr />
-                  <h2>
+                  <h2 id={groupAnchor('not-found')} mix={css({ scrollMarginTop: '12px' })}>
                     Couldn't find{' '}
                     <span mix={css({ color: '#888', fontSize: '14px' })}>({model.notFound.length})</span>
                   </h2>

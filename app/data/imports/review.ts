@@ -8,8 +8,9 @@ import {
   classifyDuplicate,
   conflictFields,
   describeReason,
-  isBulkAcceptable,
+  bulkKind,
   suspicion,
+  type BulkKind,
   type CandidateLike,
   type ConflictChoice,
   type ConflictField,
@@ -90,8 +91,8 @@ export interface ReviewModel {
   // Everything that won't reach the log, by row, so the saved page can say
   // which films rather than only how many.
   leftOutRows: StagedRow[]
-  // How many of `uncertain` the one bulk accept would clear.
-  bulkAcceptable: number
+  // Which rows of `uncertain` each one-tap accept would clear — see bulkKind.
+  bulk: Record<BulkKind, number[]>
   // The footer's arithmetic. `unchanged` is kept conflicts, rows kept by hand,
   // and rows already logged exactly as the file has them — the last is what
   // makes a second upload of the same export say "870 already in your log"
@@ -197,7 +198,12 @@ export function buildReview(
   // legitimate way to finish a 400-row import.
   uncertain.sort((a, b) => suspicion(verdictOf(b.row)) - suspicion(verdictOf(a.row)))
 
-  const bulkAcceptable = uncertain.filter(({ row }) => isBulkAcceptable(verdictOf(row))).length
+  const bulk: Record<BulkKind, number[]> = { year: [], subtitle: [] }
+  for (const { row, item } of uncertain) {
+    const match = item ? { externalId: '', title: item.title, releaseYear: item.releaseYear } : null
+    const kind = bulkKind(verdictOf(row), row.title, match)
+    if (kind) bulk[kind].push(row.id)
+  }
 
   // A row confirmed by hand beats the batch default: someone pressing Take on
   // one conflict means that row, whatever the switch above it says.
@@ -218,7 +224,7 @@ export function buildReview(
     confirmedCount,
     alreadyLoggedIds,
     leftOutRows,
-    bulkAcceptable,
+    bulk,
     counts: { total: rows.length, save, unchanged, leftOut },
   }
 }

@@ -104,7 +104,52 @@ describe('buildReview bucketing', () => {
       'keep',
     )
 
-    assert.equal(model.bulkAcceptable, 1)
+    assert.deepEqual(model.bulk, { year: [1], subtitle: [] })
+  })
+
+  it('offers a subtitle added in the same year as a one-tap accept', () => {
+    const rows = [
+      row({
+        id: 1,
+        title: 'Birdman',
+        year: 2014,
+        state: 'uncertain',
+        reason: 'title_differs',
+        yearDelta: 0,
+        mediaItemId: 1,
+      }),
+      row({
+        id: 2,
+        title: 'Dune',
+        year: 2021,
+        state: 'uncertain',
+        reason: 'title_differs',
+        yearDelta: 3,
+        mediaItemId: 2,
+      }),
+      row({
+        id: 3,
+        title: 'Solyaris',
+        year: 1972,
+        state: 'uncertain',
+        reason: 'title_differs',
+        yearDelta: 0,
+        mediaItemId: 3,
+      }),
+    ]
+    const model = buildReview(
+      rows,
+      catalog(
+        entry(1, 'Birdman: A Love Story', 2014),
+        entry(2, 'Dune: Part Two', 2024),
+        entry(3, 'Solaris', 1972),
+      ),
+      logged(),
+      'keep',
+    )
+
+    // Not the one years out, and not a title that is simply different.
+    assert.deepEqual(model.bulk, { year: [], subtitle: [1] })
   })
 })
 

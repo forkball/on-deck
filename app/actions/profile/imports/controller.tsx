@@ -15,7 +15,6 @@ import {
   setConflictChoice,
   skipRow,
 } from '../../../data/imports/batches.ts'
-import { isBulkAcceptable } from '../../../data/imports/classify.ts'
 import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
 import type { ImportBatch, User } from '../../../data/schema.ts'
@@ -208,9 +207,12 @@ export default createController(routes.profile.imports, {
       return backToReview(batch, undefined, anchor)
     },
 
-    // The one bulk accept the page offers. Which rows qualify is recomputed
-    // here rather than taken from the form: the button says "the remaining N
-    // off-by-one matches", and that has to be what it does.
+    // The page's one-tap accepts. Which rows qualify is recomputed here rather
+    // than taken from the form: the button says "the remaining N off-by-one
+    // matches", and that has to be what it does. The form only names which.
+    //
+    // No anchor: with JS the page updates in place; without it, a bulk accept
+    // is one reload for dozens of rows.
     async bulk(context: ImportBatchContext) {
       const found = await findBatch(context)
       if (!found.ok) return found.response
@@ -219,13 +221,9 @@ export default createController(routes.profile.imports, {
       const db = context.get(Database)
       const { model } = await loadReview(db, batch)
 
-      const rowIds = model.uncertain
-        .filter(({ row }) =>
-          isBulkAcceptable({ state: 'uncertain', reason: row.reason, yearDelta: row.yearDelta }),
-        )
-        .map(({ row }) => row.id)
+      const kind = context.get(FormData).get('kind') === 'subtitle' ? 'subtitle' : 'year'
 
-      await acceptBulk(db, batch, rowIds)
+      await acceptBulk(db, batch, model.bulk[kind])
       return backToReview(batch)
     },
 

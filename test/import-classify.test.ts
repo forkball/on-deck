@@ -8,6 +8,7 @@ import {
   describeReason,
   inlineAlternates,
   isBulkAcceptable,
+  isSubtitleOnly,
   reasonGroup,
   suspicion,
   type CandidateLike,
@@ -96,6 +97,31 @@ describe('isBulkAcceptable', () => {
 
   it('does not sweep up a different-looking title', () => {
     assert.ok(!isBulkAcceptable(classifyMatch({ title: 'Solyaris', year: 1972 }, film('Solaris', 1972))))
+  })
+})
+
+describe('isSubtitleOnly', () => {
+  it('takes a subtitle after a colon or a spaced dash', () => {
+    assert.ok(isSubtitleOnly('Birdman', 'Birdman: A Love Story'))
+    assert.ok(isSubtitleOnly('Paris, Texas', 'Paris, Texas – Restored'))
+  })
+
+  it('finds the separator after a colon inside the title itself', () => {
+    assert.ok(isSubtitleOnly('Mission: Impossible', 'Mission: Impossible – Fallout'))
+  })
+
+  it('ignores case and punctuation in the part that has to agree', () => {
+    assert.ok(isSubtitleOnly('wall-e', 'WALL·E: The Director’s Cut'))
+  })
+
+  // Could as easily be a different film that starts the same way.
+  it('does not count words run on without a separator', () => {
+    assert.ok(!isSubtitleOnly('Birdman', 'Birdman or (The Unexpected Virtue of Ignorance)'))
+    assert.ok(!isSubtitleOnly('Alien', 'Aliens'))
+  })
+
+  it('needs something after the separator', () => {
+    assert.ok(!isSubtitleOnly('Heat', 'Heat:'))
   })
 })
 

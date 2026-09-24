@@ -144,6 +144,43 @@ export function isBulkAcceptable(verdict: Verdict): boolean {
   return verdict.reason === 'year_drift' && Math.abs(verdict.yearDelta ?? 0) <= BULK_ACCEPT_MAX_DRIFT
 }
 
+// Whether the catalog's title is the row's title with a subtitle added —
+// "Mission: Impossible" matched to "Mission: Impossible – Fallout", or a
+// Letterboxd "Birdman" matched to "Birdman: A Love Story". The subtitle has to
+// follow a real separator (a colon or a spaced dash), so "Birdman or (The
+// Unexpected Virtue of Ignorance)" doesn't count: that could as easily be a
+// different film that happens to start the same way.
+export function isSubtitleOnly(rowTitle: string, matchTitle: string): boolean {
+  const wanted = normalizeTitle(rowTitle)
+  if (!wanted) return false
+
+  for (const separator of matchTitle.matchAll(/\s*(?::|\s[-–—])\s+/g)) {
+    const before = matchTitle.slice(0, separator.index)
+    const after = matchTitle.slice(separator.index + separator[0].length)
+    if (normalizeTitle(before) === wanted && after.trim()) return true
+  }
+  return false
+}
+
+// The review's two one-tap accepts, and which one (if either) covers a row.
+// Year drift within a year is the festival/re-release tail; a subtitle added
+// in the same year is the other long tail of a real export. Both leave anything
+// that could plausibly be a different film to be looked at one by one.
+export type BulkKind = 'year' | 'subtitle'
+
+export function bulkKind(verdict: Verdict, rowTitle: string, match: CandidateLike | null): BulkKind | null {
+  if (isBulkAcceptable(verdict)) return 'year'
+  if (
+    verdict.reason === 'title_differs' &&
+    verdict.yearDelta === 0 &&
+    match &&
+    isSubtitleOnly(rowTitle, match.title)
+  ) {
+    return 'subtitle'
+  }
+  return null
+}
+
 export interface DuplicateRow {
   id: number
   // The line in the uploaded file. What the page calls the row, since "row 288"
