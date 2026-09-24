@@ -403,7 +403,21 @@ async function filterByDetail(
     }
 
     const detail = resolved.get(entry) ?? null
-    if (!detail || !rule.matches(detail)) continue
+    // A lookup that answered nothing leaves the search hit as the only thing that
+    // has spoken, so it is asked instead — under the same rule, which is what keeps
+    // this from being a second, looser policy. For a length that settles it: a hit
+    // with no page count can't match a length. For a genre it depends on what the
+    // hit carried: tags that name another genre are evidence, an empty list is the
+    // catalog never having said.
+    //
+    // Eleven of one run's eighteen picks were dropped as "not romance" by lookups
+    // that never landed — Open Library ids asked of Google Books, during a Google
+    // outage. Neither the id nor the outage was a fact about the book.
+    if (!rule.matches(detail ?? entry.match)) continue
+    if (!detail) {
+      kept.push(entry)
+      continue
+    }
     // The detail record, not the search one: it carries the dimension that was just
     // paid for, and whatever else the search payload omitted.
     kept.push({ pick: entry.pick, match: detail })
