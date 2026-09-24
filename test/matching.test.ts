@@ -167,13 +167,14 @@ describe('applyVerdicts', () => {
   })
 })
 
-// A book candidate as the pipeline holds one: a search hit that may or may not
-// have carried its page count, plus the id a by-id lookup would be asked about.
-const book = (title: string, externalId: string, pageCount: number | null): Candidate =>
-  ({ pick: pickOf(title), match: { title, externalId, pageCount } }) as unknown as Candidate
+// A book candidate as the pipeline holds one: a search hit that may or may not have
+// carried its page count or its genres, plus the id a by-id lookup would be asked
+// about.
+const book = (title: string, externalId: string, pageCount: number | null, tags: string[] = []): Candidate =>
+  ({ pick: pickOf(title), match: { title, externalId, pageCount, tags } }) as unknown as Candidate
 
-const detail = (externalId: string, pageCount: number) =>
-  ({ title: externalId, externalId, pageCount }) as unknown as Awaited<ReturnType<CatalogLookup>>
+const detail = (externalId: string, pageCount: number | null, tags: string[] = []) =>
+  ({ title: externalId, externalId, pageCount, tags }) as unknown as Awaited<ReturnType<CatalogLookup>>
 
 describe('filterByLength', () => {
   it('reads the dimension off the search hit without paying for a lookup', async () => {
@@ -250,19 +251,11 @@ describe('filterByLength', () => {
   })
 })
 
-// A book candidate the way a Google Books search hit arrives: tags derived from
-// the top-level category alone, which for fiction means no genre at all.
-const tagged = (title: string, externalId: string, tags: string[], pageCount: number | null = null): Candidate =>
-  ({ pick: pickOf(title), match: { title, externalId, tags, pageCount } }) as unknown as Candidate
-
-const taggedDetail = (externalId: string, tags: string[], pageCount: number | null = null) =>
-  ({ title: externalId, externalId, tags, pageCount }) as unknown as Awaited<ReturnType<CatalogLookup>>
-
 describe('filterByGenre', () => {
   it('trusts a tag the search hit carries without paying for a lookup', async () => {
     const asked: string[] = []
     const kept = await filterByGenre(
-      [tagged('tagged', 'A', ['science fiction']), tagged('other genre', 'B', ['romance'])],
+      [book('tagged', 'A', null, ['science fiction']), book('other genre', 'B', null, ['romance'])],
       'book',
       'science fiction',
       async (_type, externalId) => {
@@ -279,26 +272,26 @@ describe('filterByGenre', () => {
   // nothing under it, so every fiction genre was dropping the whole shortlist.
   it('keeps a book whose by-id record carries the genre its hit did not', async () => {
     const kept = await filterByGenre(
-      [tagged('untagged', 'A', [])],
+      [book('untagged', 'A', null, [])],
       'book',
       'science fiction',
-      async (_type, externalId) => taggedDetail(externalId, ['science fiction', 'classics']),
+      async (_type, externalId) => detail(externalId, null, ['science fiction', 'classics']),
     )
 
     assert.deepEqual(kept.map((c) => c.pick.title), ['untagged'])
   })
 
   it('carries the detail record forward, so the length check reuses the lookup', async () => {
-    const kept = await filterByGenre([tagged('untagged', 'A', [])], 'book', 'romance', async (_type, externalId) =>
-      taggedDetail(externalId, ['romance'], 320),
+    const kept = await filterByGenre([book('untagged', 'A', null, [])], 'book', 'romance', async (_type, externalId) =>
+      detail(externalId, 320, ['romance']),
     )
 
     assert.equal(kept[0].match.pageCount, 320)
   })
 
   it('drops a book the by-id record says is a different genre', async () => {
-    const kept = await filterByGenre([tagged('untagged', 'A', [])], 'book', 'horror', async (_type, externalId) =>
-      taggedDetail(externalId, ['romance']),
+    const kept = await filterByGenre([book('untagged', 'A', null, [])], 'book', 'horror', async (_type, externalId) =>
+      detail(externalId, null, ['romance']),
     )
 
     assert.deepEqual(kept, [])
@@ -307,12 +300,12 @@ describe('filterByGenre', () => {
   it('reads a miss on a hit that does answer genres as the answer', async () => {
     const asked: string[] = []
     const kept = await filterByGenre(
-      [tagged('sci-fi film', 'A', ['science fiction']), tagged('romance film', 'B', ['romance'])],
+      [book('sci-fi film', 'A', null, ['science fiction']), book('romance film', 'B', null, ['romance'])],
       'movie',
       'science fiction',
       async (_type, externalId) => {
         asked.push(externalId)
-        return taggedDetail(externalId, ['science fiction'])
+        return detail(externalId, null, ['science fiction'])
       },
     )
 
@@ -322,7 +315,7 @@ describe('filterByGenre', () => {
 
   it('drops a candidate the provider throws on instead of failing the run', async () => {
     const kept = await filterByGenre(
-      [tagged('tagged', 'A', ['horror']), tagged('unlookupable', 'B', [])],
+      [book('tagged', 'A', null, ['horror']), book('unlookupable', 'B', null, [])],
       'book',
       'horror',
       async (_type, externalId) => {
@@ -336,7 +329,7 @@ describe('filterByGenre', () => {
 
   it('says the catalog is down rather than saving an empty run', async () => {
     await assert.rejects(
-      filterByGenre([tagged('unlookupable', 'B', [])], 'book', 'horror', async () => {
+      filterByGenre([book('unlookupable', 'B', null, [])], 'book', 'horror', async () => {
         throw new Error('Google Books lookup failed: 429')
       }),
       /catalog isn't answering/,
@@ -345,12 +338,12 @@ describe('filterByGenre', () => {
 
   it('keeps an answered candidate even when a sibling lookup threw', async () => {
     const kept = await filterByGenre(
-      [tagged('answered', 'A', []), tagged('threw', 'B', [])],
+      [book('answered', 'A', null, []), book('threw', 'B', null, [])],
       'book',
       'horror',
       async (_type, externalId) => {
         if (externalId === 'B') throw new Error('Google Books lookup failed: 429')
-        return taggedDetail(externalId, ['horror'])
+        return detail(externalId, null, ['horror'])
       },
     )
 

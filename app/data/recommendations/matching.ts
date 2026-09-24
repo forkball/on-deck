@@ -72,8 +72,12 @@ export function matchesSeries(pick: Pick, series: string): boolean {
 // wrong where it isn't ("June 1953" for Rendezvous with Rama, published 1973),
 // for a second request. A check wrong by a decade on a tenth of the shortlist
 // drops more good picks than the model's year does.
+export function decadeComesFromPick(mediaType: MediaType): boolean {
+  return mediaType === 'book'
+}
+
 export function decadeYear(mediaType: MediaType, pick: Pick, match: CatalogSearchResult): number | null {
-  return mediaType === 'book' ? pick.year : match.releaseYear
+  return decadeComesFromPick(mediaType) ? pick.year : match.releaseYear
 }
 
 function normalizeTitle(title: string): string {
@@ -347,24 +351,36 @@ export function genreMissNeedsLookup(mediaType: MediaType): boolean {
   return mediaType === 'book'
 }
 
-// Keeps only the candidates carrying the requested genre, fetching the by-id
-// record for the ones whose search hit couldn't answer.
+// The shape both detail filters below share: a dimension a search hit may not
+// carry, a by-id record that does, and the reading that every lookup coming back
+// empty is the provider being down rather than a lever nothing matched.
 //
-// Runs before filterByLength on purpose: the detail record it leaves on the
-// candidate carries the length dimension too, so the two levers set together
-// cost one round of lookups rather than two.
-export async function filterByGenre(
+// One function rather than two of the same, because that last rule is the subtle
+// part. "Kept nothing, asked about some, got only nulls" is not something a reader
+// checks by eye, and a second copy would have to be kept in agreement by whoever
+// next changes either lever.
+//
+// `answered` is whether the search hit can decide the candidate on its own; only
+// the ones it can't are looked up. That keeps this to one request per undecidable
+// candidate rather than one per candidate.
+interface DetailRule {
+  answered: (match: CatalogSearchResult) => boolean
+  matches: (match: CatalogSearchResult) => boolean
+  // Names the dimension in the line someone waiting on the run reads.
+  what: string
+}
+
+async function filterByDetail(
   candidates: Candidate[],
   mediaType: MediaType,
-  genre: string,
-  lookup: CatalogLookup = lookupForType,
+  rule: DetailRule,
+  lookup: CatalogLookup,
 ): Promise<Candidate[]> {
-  const needLookup = new Set(candidates.filter(({ match }) => !match.tags.includes(genre)))
-  if (!genreMissNeedsLookup(mediaType)) return candidates.filter((entry) => !needLookup.has(entry))
-
-  // Null marks a lookup that answered nothing: no categories, no verdict, so it
-  // can't be kept. Held beside the entry so the filter below stays a pure read.
+  const needLookup = new Set(candidates.filter(({ match }) => !rule.answered(match)))
+  // Null marks a lookup that answered nothing: no record, no verdict, so it can't
+  // be kept. Held beside the entry so the loop below stays a pure read.
   const resolved = new Map<Candidate, CatalogSearchResult | null>()
+
   await forEachWithConcurrency([...needLookup], LOOKUP_CONCURRENCY, async (entry) => {
     resolved.set(entry, await lookupQuietly(lookup, mediaType, entry.match.externalId))
   })
@@ -372,25 +388,55 @@ export async function filterByGenre(
   const kept: Candidate[] = []
   for (const entry of candidates) {
     if (!needLookup.has(entry)) {
-      kept.push(entry)
+      if (rule.matches(entry.match)) kept.push(entry)
       continue
     }
 
     const detail = resolved.get(entry) ?? null
-    if (!detail || !detail.tags.includes(genre)) continue
-    // The detail record, not the search one: it carries the tags just paid for.
+    if (!detail || !rule.matches(detail)) continue
+    // The detail record, not the search one: it carries the dimension that was just
+    // paid for, and whatever else the search payload omitted.
     kept.push({ pick: entry.pick, match: detail })
   }
 
-  // Same reading as filterByLength's: one candidate the provider wouldn't answer
-  // for is the rule working, every one of them with nothing else surviving is the
-  // provider being down, and an empty page saying "nothing in that genre" would
-  // be a different and untrue thing.
+  // Dropping one candidate the provider wouldn't answer for is the rule working.
+  // Dropping every one of them, with nothing left that the search hit could decide,
+  // is the provider being down — and a run saved from that is an empty page reading
+  // as "nothing matched", which is a different and untrue thing. Say so instead.
   if (kept.length === 0 && needLookup.size > 0 && [...resolved.values()].every((detail) => detail == null)) {
-    throw catalogDown(`Couldn't check the genre of any of the ${mediaTypeUiFor(mediaType).plural}`)
+    throw catalogDown(`Couldn't check the ${rule.what} of any of the ${mediaTypeUiFor(mediaType).plural}`)
   }
 
   return kept
+}
+
+// Keeps only the candidates carrying the requested genre, fetching the by-id record
+// for the ones whose search hit couldn't answer.
+//
+// Runs before filterByLength, so a candidate looked up here arrives there carrying
+// a detail record that already holds the page count — one lookup serving both
+// levers. Only for the candidates this one did look up, though: a hit that carried
+// the genre is passed through as it came, and still owes filterByLength a request.
+export function filterByGenre(
+  candidates: Candidate[],
+  mediaType: MediaType,
+  genre: string,
+  lookup: CatalogLookup = lookupForType,
+): Promise<Candidate[]> {
+  const carriesGenre = (match: CatalogSearchResult) => match.tags.includes(genre)
+
+  return filterByDetail(
+    candidates,
+    mediaType,
+    {
+      // Every provider but Google Books answers genres on search, so for them a miss
+      // is the answer and nothing is looked up.
+      answered: (match) => carriesGenre(match) || !genreMissNeedsLookup(mediaType),
+      matches: carriesGenre,
+      what: 'genre',
+    },
+    lookup,
+  )
 }
 
 // Whether the by-id lookup can be skipped.
@@ -401,13 +447,13 @@ export function hasLengthDimension(mediaType: MediaType, result: CatalogSearchRe
   return result.runtimeMinutes != null
 }
 
-// Keeps only the candidates matching the requested length, fetching the
-// dimension for the ones whose search result didn't carry it.
+// Keeps only the candidates matching the requested length, fetching the dimension
+// for the ones whose search result didn't carry it.
 //
-// No provider returns length on search, only on by-id, so this is a second
-// round of requests — but only for the candidates that need it, and only when
-// the lever is set at all. The fan-out is bounded, not serial.
-export async function filterByLength(
+// No provider returns length on search, only on by-id, so this is a second round of
+// requests — but only for the candidates that need it, and only when the lever is
+// set. The fan-out is bounded, not serial.
+export function filterByLength(
   candidates: Candidate[],
   mediaType: MediaType,
   length: LengthBucket,
@@ -415,40 +461,16 @@ export async function filterByLength(
 ): Promise<Candidate[]> {
   const provider = getCatalogProvider(mediaType)
 
-  // The stored row often already carries the dimension.
-  const needLookup = new Set(candidates.filter(({ match }) => !hasLengthDimension(mediaType, match)))
-  // Null marks a lookup that answered nothing: no dimension, no verdict, so it
-  // can't be kept. Held beside the entry so the filter below stays a pure read.
-  const resolved = new Map<Candidate, CatalogSearchResult | null>()
-
-  await forEachWithConcurrency([...needLookup], LOOKUP_CONCURRENCY, async (entry) => {
-    resolved.set(entry, await lookupQuietly(lookup, mediaType, entry.match.externalId))
-  })
-
-  const kept: Candidate[] = []
-  for (const entry of candidates) {
-    if (!needLookup.has(entry)) {
-      if (provider.matchesLength(entry.match, length)) kept.push(entry)
-      continue
-    }
-
-    const detail = resolved.get(entry) ?? null
-    if (!detail || !provider.matchesLength(detail, length)) continue
-    // The detail result, not the search one: it carries the dimension that was
-    // just paid for, which search omits.
-    kept.push({ pick: entry.pick, match: detail })
-  }
-
-  // Dropping one candidate the provider wouldn't answer for is the rule working.
-  // Dropping every one of them, with nothing left that carried the dimension
-  // already, is the provider being down — and a run saved from that is an empty
-  // page reading as "nothing matched your length", which is a different and
-  // untrue thing. Say so instead.
-  if (kept.length === 0 && needLookup.size > 0 && [...resolved.values()].every((detail) => detail == null)) {
-    throw catalogDown(`Couldn't check the length of any of the ${mediaTypeUiFor(mediaType).plural}`)
-  }
-
-  return kept
+  return filterByDetail(
+    candidates,
+    mediaType,
+    {
+      answered: (match) => hasLengthDimension(mediaType, match),
+      matches: (match) => provider.matchesLength(match, length),
+      what: 'length',
+    },
+    lookup,
+  )
 }
 
 const YEAR_TOLERANCE = 1

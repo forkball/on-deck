@@ -12,6 +12,7 @@ import { Document } from '../../ui/components/document.tsx'
 import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
 import { StarRatingInput } from '../../ui/components/star-rating.tsx'
 import { StatusSelect } from '../../ui/components/status-select.tsx'
+import { decadeComesFromPick } from '../../data/recommendations/matching.ts'
 import { ModelProvided } from './model-provided.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { PlatformList } from '../../ui/components/platform-list.tsx'
@@ -44,9 +45,9 @@ const BOOK_YEAR_NOTE =
   'Applied from the year the model gave for each book. Google Books dates editions, ' +
   'not works — its record for Dune says 2005 — so there is no catalogue year to check this against.'
 
-const BOOK_SERIES_NOTE =
-  "Applied from the model's own answer for each book. No book catalogue records whether " +
-  'a work belongs to a series.'
+const SERIES_NOTE =
+  "Applied from the model's own answer for each pick. No catalogue the app reads records " +
+  'whether a work belongs to a series.'
 
 export function describeParams(params: GenerationParams, mediaType: MediaType): ParamLine[] {
   const lines: ParamLine[] = [
@@ -60,7 +61,9 @@ export function describeParams(params: GenerationParams, mediaType: MediaType): 
         : params.decadeRelation === 'after'
           ? `After ${params.decade + 9}`
           : `${params.decade}s`
-    lines.push({ text: `Decade: ${label}`, modelNote: mediaType === 'book' ? BOOK_YEAR_NOTE : undefined })
+    // Asked, not restated: the note claims what the filter did, so it reads the
+    // same predicate the filter read.
+    lines.push({ text: `Decade: ${label}`, modelNote: decadeComesFromPick(mediaType) ? BOOK_YEAR_NOTE : undefined })
   }
   if (params.length) {
     const label = getCatalogProvider(mediaType).lengthOptions.find((option) => option.value === params.length)?.label
@@ -76,10 +79,7 @@ export function describeParams(params: GenerationParams, mediaType: MediaType): 
   }
   if (params.platform) lines.push({ text: `Platform: ${params.platform}` })
   if (params.series) {
-    lines.push({
-      text: `Series: ${SERIES_TYPE_LABELS[params.series] ?? params.series}`,
-      modelNote: mediaType === 'book' ? BOOK_SERIES_NOTE : undefined,
-    })
+    lines.push({ text: `Series: ${SERIES_TYPE_LABELS[params.series] ?? params.series}`, modelNote: SERIES_NOTE })
   }
   return lines
 }

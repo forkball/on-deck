@@ -2,8 +2,35 @@ import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
 
 import { db, pool } from '../app/data/db.ts'
-import { completeJob, enqueueJob, failJob, getJob, requeueJob } from '../app/data/recommendations/jobs.ts'
+import { completeJob, enqueueJob, failJob, getJob, phasesFor, requeueJob } from '../app/data/recommendations/jobs.ts'
 import { skipWithoutDatabase } from './support/db.ts'
+
+// What the progress list holds has to be what the run enters. The genre stage is a
+// stage only where it costs a round of lookups, so a movie run with a genre set must
+// not be promised one.
+describe('phasesFor', () => {
+  it('lists the genre stage for a book run that has to look genres up', () => {
+    assert.ok(phasesFor({ mediaType: 'book', filters: { genre: 'horror' } }).includes('genres'))
+  })
+
+  it('leaves it out when the search hit already answers the genre', () => {
+    assert.ok(!phasesFor({ mediaType: 'movie', filters: { genre: 'horror' } }).includes('genres'))
+  })
+
+  it('leaves out both optional stages for a run with no levers', () => {
+    assert.deepEqual(phasesFor({ mediaType: 'book', filters: {} }), [
+      'profiles',
+      'picks',
+      'matching',
+      'verifying',
+      'saving',
+    ])
+  })
+
+  it('lists the length stage whenever that lever is set', () => {
+    assert.ok(phasesFor({ mediaType: 'game', filters: { length: 'short' } }).includes('lengths'))
+  })
+})
 
 // A user may have one queued-or-running job at a time. The rule is enforced by a
 // partial unique index, not by a read before the insert: two requests arriving
@@ -15,7 +42,7 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
   let otherId: number
 
   const params = { mediaType: 'movie', filters: {}, sourceTypes: ['movie'] }
-  const enqueue = (id: number) => enqueueJob(db, id, { ...params, memberIds: [id] }, { withGenreCheck: false, withLengthCheck: false })
+  const enqueue = (id: number) => enqueueJob(db, id, { ...params, memberIds: [id] })
 
   const newUser = async (tag: string) => {
     const s = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`

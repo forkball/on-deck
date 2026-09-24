@@ -27,7 +27,7 @@ describe('describeParams', () => {
   it('marks the series lever, which no catalog can answer', () => {
     const line = lineFor('Series', { series: 'series' }, 'book')
     assert.equal(line?.text, 'Series: Part of a series')
-    assert.match(line?.modelNote ?? '', /No book catalogue records/)
+    assert.match(line?.modelNote ?? '', /No catalogue the app reads records/)
   })
 
   it('leaves the catalog-checked levers unmarked', () => {

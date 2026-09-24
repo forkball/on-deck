@@ -11,12 +11,11 @@ import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
 import { recordRunAgainstDailyLimit, runCostFor } from './dailyLimit.ts'
 import { buildExclusions } from './exclusions.ts'
-import type { GenerationPhase } from './jobs.ts'
+import { phasesFor, type GenerationPhase } from './jobs.ts'
 import {
   decadeYear,
   filterByGenre,
   filterByLength,
-  genreMissNeedsLookup,
   matchesDecade,
   matchesSeries,
   resolveFromCatalog,
@@ -248,10 +247,9 @@ export async function generateRecommendations(
 
   let candidates: Candidate[] = shortlist
   if (filters.genre) {
-    // A stage only when it costs a round of lookups, which is how the job's phase
-    // list is gated too — a phase missing from that list leaves the progress bar
-    // reading as stalled while this runs.
-    if (genreMissNeedsLookup(mediaType)) enterPhase('genres')
+    // The same function the job's phase list was built from, so a stage entered
+    // here is a stage that list holds.
+    if (phasesFor({ mediaType, filters }).includes('genres')) enterPhase('genres')
     const inGenre = await filterByGenre(candidates, mediaType, filters.genre)
     drops.genre = candidates.length - inGenre.length
     candidates = inGenre
