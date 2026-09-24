@@ -1,6 +1,6 @@
-// "1 movie", "3 movies". Here rather than in app/ui/components because the
-// import picker, a client entry, needs it too, and app/ui/shared is the part of
-// app/ui a client entry may import.
+// "1 movie", "3 movies". In app/ui/shared because that is the one place every
+// layer can import from — client entries included, which may import nothing
+// else outside app/browser.
 export function count(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`
 }

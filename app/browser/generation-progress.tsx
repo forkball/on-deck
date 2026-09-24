@@ -1,6 +1,8 @@
 import type { Handle } from 'remix/ui'
 import { clientEntry, css, ref } from 'remix/ui'
 
+import { count } from '../ui/shared/count.ts'
+
 // Polls for the stage a run is actually in. Every label comes from the server
 // having entered that stage, so progress can't run backwards or be invented.
 //
@@ -156,8 +158,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
           return (
             <p mix={css({ color: '#555' })}>
               Waiting to start
-              {ahead != null && ahead > 0 ? ` — ${ahead} ${ahead === 1 ? 'run' : 'runs'} ahead of yours` : ''}
-              …
+              {ahead != null && ahead > 0 ? ` — ${count(ahead, 'run', 'runs')} ahead of yours` : ''}…
             </p>
           )
         }
