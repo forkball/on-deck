@@ -175,8 +175,8 @@ function ResolveForm(
 }
 
 // `quiet` is a text button, for the answer that shouldn't compete with the
-// others.
-type ButtonVariant = 'primary' | 'quiet'
+// others; `compact` is a narrower one, for a row of short alternatives.
+type ButtonVariant = 'primary' | 'quiet' | 'compact'
 
 function buttonClass(variant?: ButtonVariant): string | undefined {
   return variant === 'quiet' ? 'linkish' : variant
@@ -206,12 +206,12 @@ function PickerButton(handle: Handle<{ rowId: number; label: string; variant?: B
   }
 }
 
-function Actions(handle: Handle<{ children?: RemixNode }>) {
+function Actions(handle: Handle<{ children?: RemixNode; gap?: string }>) {
   return () => (
     <div
       mix={css({
         display: 'flex',
-        gap: '8px 12px',
+        gap: handle.props.gap ?? '8px 12px',
         flexWrap: 'wrap',
         alignItems: 'center',
         marginTop: '8px',
@@ -461,34 +461,42 @@ function UncertainCard(
         </div>
 
         {choices ? (
-          <Actions>
-            <span mix={css({ fontSize: '13px', color: '#8d8579' })}>Which one?</span>
-            {/* None of these is primary: with no year to go on, our pick was
-                a guess, and weighting it would push the guess. */}
-            {choices.map((choice) => {
-              const ours = choice.externalId === row.matchedExternalId
-              return (
-                <ResolveForm
-                  key={choice.externalId}
-                  batchId={batchId}
-                  rowId={row.id}
-                  action={ours ? 'confirm' : 'repoint'}
-                  externalId={ours ? undefined : choice.externalId}
-                  label={choiceLabel(choice.releaseYear)}
-                  anchor={next}
-                />
-              )
-            })}
-            <PickerButton rowId={row.id} label="Something else…" variant="quiet" />
-            <ResolveForm
-              batchId={batchId}
-              rowId={row.id}
-              action="skip"
-              label="Don't save"
-              variant="quiet"
-              anchor={next}
-            />
-          </Actions>
+          // Three rows at every width — the question, the years, the way out —
+          // rather than one row left to wrap: on a 320px phone that split the
+          // years across lines and stranded the label beside the first one.
+          <>
+            <div mix={css({ fontSize: '13px', color: '#8d8579', marginTop: '10px' })}>Which one?</div>
+            <Actions gap="6px">
+              {/* None of these is primary: with no year to go on, our pick was
+                  a guess, and weighting it would push the guess. */}
+              {choices.map((choice) => {
+                const ours = choice.externalId === row.matchedExternalId
+                return (
+                  <ResolveForm
+                    key={choice.externalId}
+                    batchId={batchId}
+                    rowId={row.id}
+                    action={ours ? 'confirm' : 'repoint'}
+                    externalId={ours ? undefined : choice.externalId}
+                    label={choiceLabel(choice.releaseYear)}
+                    variant="compact"
+                    anchor={next}
+                  />
+                )
+              })}
+            </Actions>
+            <Actions>
+              <PickerButton rowId={row.id} label="Something else…" variant="quiet" />
+              <ResolveForm
+                batchId={batchId}
+                rowId={row.id}
+                action="skip"
+                label="Don't save"
+                variant="quiet"
+                anchor={next}
+              />
+            </Actions>
+          </>
         ) : (
           <MatchedAnswers batchId={batchId} row={row} item={item} next={next} />
         )}

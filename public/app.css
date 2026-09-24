@@ -224,3 +224,10 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 .doodle button.bare:hover:not(:disabled) {
   color: #3c3c3c;
 }
+
+/* A button in a row of short alternatives — the year choices on an import
+   review card. Three of them at the standard padding ran 12px wider than a
+   card on a 320px phone and split across lines. */
+.doodle button.compact {
+  padding: 4px 10px;
+}
