@@ -40,10 +40,18 @@ export function matchesDecade(releaseYear: number | null, decade: number, relati
 //
 // So the pick's own year, which is the model answering the question the prompt
 // asked ("originally released in the 1960s"). Unverified, and the only
-// work-level year anything here holds. Open Library's first_publish_year is the
-// one other candidate and measured worse: 9 of 10 titles right, with
-// Slaughterhouse-Five coming back 1956 — a check wrong by a decade on a tenth of
-// the shortlist drops more good picks than the model's year does.
+// work-level year anything here holds.
+//
+// Open Library was the one other candidate, and both of its years measured worse.
+// first_publish_year is derived — the minimum over every edition attached to the
+// work — so one mis-dated edition record decides it: Slaughterhouse-Five answers
+// 1956 off a Delta paperback with no ISBN, against 140 other editions starting at
+// 1968. A minimum can only be dragged earlier, so the error is one-directional,
+// never self-correcting, and worse as editions accumulate. The curated
+// first_publish_date on the work record is absent on 5 of 7 titles probed and
+// wrong where it isn't ("June 1953" for Rendezvous with Rama, published 1973),
+// for a second request. A check wrong by a decade on a tenth of the shortlist
+// drops more good picks than the model's year does.
 export function decadeYear(mediaType: MediaType, pick: Pick, match: CatalogSearchResult): number | null {
   return mediaType === 'book' ? pick.year : match.releaseYear
 }
