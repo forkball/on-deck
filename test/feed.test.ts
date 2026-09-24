@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
 
 import { db, pool } from '../app/data/db.ts'
-import { loadFeedPage, type FeedCursor, type FeedItem } from '../app/data/feed.ts'
+import { loadFeedPage, loadGroupedFeedPage, type FeedCursor, type FeedItem } from '../app/data/feed.ts'
+import { groupKeyOf } from '../app/data/feedGroups.ts'
 import { followUser } from '../app/data/follows.ts'
 import { saveRun } from '../app/data/recommendations/runs.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
@@ -163,5 +164,28 @@ describe('activity feed', { skip: skipWithoutDatabase }, () => {
       assert.ok(titles.includes(expected), `${expected} was dropped at a page boundary`)
     }
     assert.equal(new Set(paged.map(key)).size, paged.length, 'a tied row was served twice')
+  })
+
+  it('runs a page on to the end of the group it stops in, and resumes after it', async () => {
+    // A burst of the friend's rows newer than everything above: an import.
+    const burst = Date.now() + 10_000
+    for (let i = 0; i < 7; i++) await log(friend, await newItem(`Burst ${i}`), burst - i)
+
+    // Earlier tests leave more of the friend's rows right behind it, so the run
+    // is measured off the whole feed rather than assumed to be the seven.
+    const whole = await loadFeedPage(db, viewer, 50)
+    const runLength = whole.items.findIndex((item) => groupKeyOf(item) !== `log:${friend}`)
+    assert.ok(runLength >= 7)
+
+    const first = await loadGroupedFeedPage(db, viewer, 3)
+    assert.equal(first.items.length, runLength, 'the page should take the whole run, not stop at its limit')
+    assert.ok(first.cursor)
+
+    // Picks up with what came after the burst, exactly where the plain feed does.
+    const next = await loadGroupedFeedPage(db, viewer, 3, first.cursor)
+    assert.deepEqual(
+      [...first.items, ...next.items].map(key),
+      whole.items.slice(0, first.items.length + next.items.length).map(key),
+    )
   })
 })
