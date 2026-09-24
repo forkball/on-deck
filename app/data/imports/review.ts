@@ -91,6 +91,7 @@ export interface ReviewModel {
   // Everything that won't reach the log, by row, so the saved page can say
   // which films rather than only how many.
   leftOutRows: StagedRow[]
+  sections: SectionProgress[]
   // Which rows of `uncertain` each one-tap accept would clear — see bulkKind.
   bulk: Record<BulkKind, number[]>
   // The footer's arithmetic. `unchanged` is kept conflicts, rows kept by hand,
@@ -105,9 +106,40 @@ export interface ReviewModel {
 }
 
 function verdictOf(row: StagedRow): Verdict {
+  // Settled by a person, so nothing about it is in doubt any more — which is
+  // what puts a hand-picked row first when two rows land on one film. Its
+  // stored reason stays, as the record of which section it was settled in.
+  if (row.state === 'confirmed') return { state: 'confident', reason: 'exact', yearDelta: 0 }
   const state =
     row.state === 'not_found' ? 'not_found' : row.state === 'confident' ? 'confident' : 'uncertain'
   return { state, reason: row.reason, yearDelta: row.yearDelta }
+}
+
+// The review's sections, for the drawer's checklist: how many rows each one
+// started with and how many are still open, so a finished section reads as
+// done rather than vanishing. A row belongs to the section of the reason it
+// was flagged for; a row with no reason that matching couldn't place belongs
+// to "not found", whether it is still open, was found by hand, or left out.
+export type SectionKey = 'title_differs' | 'no_year' | 'year_drift' | 'not_found'
+
+export interface SectionProgress {
+  key: SectionKey
+  total: number
+  open: number
+}
+
+const SECTION_ORDER: SectionKey[] = ['title_differs', 'no_year', 'year_drift', 'not_found']
+
+function sectionOf(row: StagedRow): SectionKey | null {
+  if (row.reason === 'title_differs' || row.reason === 'no_year' || row.reason === 'year_drift')
+    return row.reason
+  if (
+    row.reason == null &&
+    (row.state === 'not_found' || row.state === 'confirmed' || row.state === 'skipped')
+  ) {
+    return 'not_found'
+  }
+  return null
 }
 
 function valuesOf(row: StagedRow): LogValues {
@@ -215,9 +247,23 @@ export function buildReview(
   )
   const leftOut = leftOutRows.length
 
+  const totals = new Map<SectionKey, number>()
+  for (const row of rows) {
+    const key = sectionOf(row)
+    if (key) totals.set(key, (totals.get(key) ?? 0) + 1)
+  }
+  const open = (key: SectionKey) =>
+    key === 'not_found' ? notFound.length : uncertain.filter(({ row }) => row.reason === key).length
+  const sections = SECTION_ORDER.filter((key) => totals.has(key)).map((key) => ({
+    key,
+    total: totals.get(key)!,
+    open: open(key),
+  }))
+
   return {
     conflicts,
     duplicates,
+    sections,
     uncertain,
     notFound,
     confidentCount,

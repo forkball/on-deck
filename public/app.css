@@ -36,7 +36,8 @@
   border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
 }
 
-.doodle button.primary {
+.doodle button.primary,
+.doodle .doodle-border.primary {
   border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
 }
 

@@ -293,6 +293,38 @@ describe('buildReview duplicates', () => {
     assert.equal(model.counts.save, 1)
   })
 
+  // A person settled this one, so it is the one to keep and the other moves —
+  // however far out it was when it was first flagged.
+  it('keeps the row someone settled by hand when two land on one film', () => {
+    const rows = [
+      row({
+        id: 5,
+        title: 'Solaris',
+        year: 1943,
+        state: 'confirmed',
+        reason: 'year_drift',
+        yearDelta: 29,
+        mediaItemId: 7,
+      }),
+      row({
+        id: 6,
+        title: 'Solaris',
+        year: 1971,
+        state: 'uncertain',
+        reason: 'year_drift',
+        yearDelta: 1,
+        mediaItemId: 7,
+      }),
+    ]
+    const model = buildReview(rows, catalog(entry(7, 'Solaris', 1972)), logged(), 'keep')
+
+    const { verdict } = model.duplicates[0]
+    assert.equal(verdict.kind, 'different_films')
+    if (verdict.kind !== 'different_films') return
+    assert.equal(verdict.anchor.id, 5)
+    assert.equal(verdict.move.id, 6)
+  })
+
   it('reads the same title and year as one film logged twice', () => {
     const rows = [
       row({ id: 12, title: 'Drive', year: 2011, consumedAt: 1_700_000_000_000, mediaItemId: 9 }),
@@ -357,5 +389,36 @@ describe('buildReview what the saved page reports', () => {
       [missing.id, skipped.id],
     )
     assert.equal(model.counts.leftOut, 2)
+  })
+})
+
+describe('buildReview sections', () => {
+  it('counts what each section started with and what is still open', () => {
+    const rows = [
+      row({ id: 1, state: 'uncertain', reason: 'no_year', year: null, mediaItemId: 1 }),
+      row({ id: 2, state: 'confirmed', reason: 'no_year', year: null, mediaItemId: 2 }),
+      row({ id: 3, state: 'confirmed', reason: 'year_drift', yearDelta: 1, mediaItemId: 3 }),
+      row({ id: 4, state: 'not_found', reason: null, mediaItemId: null }),
+      row({ id: 5, state: 'skipped', reason: null, mediaItemId: null }),
+      row({ id: 6, mediaItemId: 6 }),
+    ]
+    const model = buildReview(
+      rows,
+      catalog(
+        entry(1, 'Heat', 1995),
+        entry(2, 'Dune', 2021),
+        entry(3, 'Nosferatu', 2024),
+        entry(6, 'Drive', 2011),
+      ),
+      logged(),
+      'keep',
+    )
+
+    // Year drift is finished but still listed, so the checklist can tick it.
+    assert.deepEqual(model.sections, [
+      { key: 'no_year', total: 2, open: 1 },
+      { key: 'year_drift', total: 1, open: 0 },
+      { key: 'not_found', total: 2, open: 1 },
+    ])
   })
 })

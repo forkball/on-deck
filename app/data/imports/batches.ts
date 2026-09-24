@@ -337,8 +337,9 @@ export async function repointRow(
   await db.update(importRows, row.id, {
     // Confirmed rather than re-classified: a person picking a film off the
     // shelf is better evidence than the year arithmetic that flagged it.
+    // The reason stays: it records which review section the row was settled
+    // in. verdictOf treats a confirmed row as settled whatever it says.
     state: 'confirmed',
-    reason: undefined,
     year_delta: null,
     matched_external_id: item.external_id,
     media_item_id: item.id,

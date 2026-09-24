@@ -106,35 +106,32 @@ export function describeReason(verdict: Verdict): string | null {
     : null
 }
 
-// The heading, one-line explanation and short name (for the review's jump
-// links) of the group of rows flagged for `reason`. Beside describeReason so
-// the wording for a reason lives in one place.
+// The heading and one-line explanation for the review's group of rows flagged
+// for `reason`. Beside describeReason so the wording for a reason lives in one
+// place.
 export function reasonGroup(
   reason: MatchReason | null,
   singular: string,
   plural: string,
-): { title: string; short: string; blurb: string } {
+): { title: string; blurb: string } {
   switch (reason) {
     case 'title_differs':
       return {
         title: 'Different title',
-        short: 'Different title',
         blurb: `The catalog's title isn't the one in your file — often a subtitle, or a different ${singular}.`,
       }
     case 'no_year':
       return {
         title: 'No year in your file',
-        short: 'No year',
         blurb: `Your file gives no year for these ${plural}, and some names belong to more than one. Pick the one you meant.`,
       }
     case 'year_drift':
       return {
         title: "Year doesn't match",
-        short: 'Year off',
         blurb: 'A year or so out is usually a festival or re-release date; further out may be a remake.',
       }
     default:
-      return { title: 'Worth checking', short: 'Other', blurb: '' }
+      return { title: 'Worth checking', blurb: '' }
   }
 }
 

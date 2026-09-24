@@ -70,8 +70,8 @@ export function ImportMatchingPage(handle: Handle<ImportMatchingPageProps>) {
                   color: '#555',
                 })}
               >
-                You can close this page. Matching finishes in the background, and the results wait for you
-                under Profile → Imports until you review them.
+                You can close this page. Matching finishes in the background, and the results wait for you on
+                your profile until you review them.
               </div>
 
               <ImportProgress
