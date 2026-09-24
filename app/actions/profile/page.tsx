@@ -20,7 +20,6 @@ import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
-import { count } from '../../ui/shared/count.ts'
 import { PROFILE_TABS } from './edit/page.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
@@ -168,7 +167,7 @@ function TasteProfileSummary(
                   ? `Nothing logged to write one from`
                   : outOfRebuilds
                     ? 'No rebuilds left today'
-                    : `${count(rebuildsLeft ?? 0, 'rebuild', 'rebuilds')} left today`}
+                    : `${rebuildsLeft} rebuild${rebuildsLeft === 1 ? '' : 's'} left today`}
               </span>
             )}
           </form>
@@ -286,7 +285,9 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           </div>
           <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
             <a href={routes.profile.following.href()}>{followingCount} following</a> ·{' '}
-            <a href={routes.profile.followers.href()}>{count(followersCount, 'follower', 'followers')}</a>
+            <a href={routes.profile.followers.href()}>
+              {followersCount} follower{followersCount === 1 ? '' : 's'}
+            </a>
           </p>
 
           {/* Rendered the way other people see it on users/show-page —

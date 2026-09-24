@@ -17,7 +17,6 @@ import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
-import { count } from '../../ui/shared/count.ts'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
@@ -148,7 +147,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
           <p mix={css({ margin: '0 0 12px', color: '#555' })}>
             {locked ? (
               <>
-                {followingCount} following · {count(followersCount, 'follower', 'followers')}
+                {followingCount} following · {followersCount} follower{followersCount === 1 ? '' : 's'}
               </>
             ) : (
               <>
@@ -157,7 +156,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
                 </a>{' '}
                 ·{' '}
                 <a href={routes.users.followers.href({ userId: String(user.id) })}>
-                  {count(followersCount, 'follower', 'followers')}
+                  {followersCount} follower{followersCount === 1 ? '' : 's'}
                 </a>
               </>
             )}
