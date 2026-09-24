@@ -13,6 +13,7 @@ import { recordRunAgainstDailyLimit, runCostFor } from './dailyLimit.ts'
 import { buildExclusions } from './exclusions.ts'
 import type { GenerationPhase } from './jobs.ts'
 import {
+  decadeYear,
   filterByGenre,
   filterByLength,
   genreMissNeedsLookup,
@@ -228,7 +229,8 @@ export async function generateRecommendations(
     // can't answer it. `series` is checked nowhere — the pick prompt is the only
     // thing that can ask for it, see BOOK_SERIES_TYPES.
     if (
-      (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade, filters.decadeRelation)) ||
+      (filters.decade != null &&
+        !matchesDecade(decadeYear(mediaType, pick, match), filters.decade, filters.decadeRelation)) ||
       (filters.playerType && !match.tags.includes(filters.playerType)) ||
       (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) ||
       // Platforms are their own field, not tags, and compare by family.

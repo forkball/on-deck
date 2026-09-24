@@ -30,6 +30,24 @@ export function matchesDecade(releaseYear: number | null, decade: number, relati
   return releaseYear >= decade && releaseYear < decade + 10
 }
 
+// Which year the decade lever is answered with.
+//
+// The catalog's, except for books. Google Books' publishedDate is the *edition*:
+// Dune's search hits say 2005 and Neuromancer's 2000, and of 20 hits each, none
+// carried the year the book was written. A decade read off that drops the very
+// books it was asked for, and no lookup rescues it — the volume *is* an edition,
+// so the by-id record says 2005 too.
+//
+// So the pick's own year, which is the model answering the question the prompt
+// asked ("originally released in the 1960s"). Unverified, and the only
+// work-level year anything here holds. Open Library's first_publish_year is the
+// one other candidate and measured worse: 9 of 10 titles right, with
+// Slaughterhouse-Five coming back 1956 — a check wrong by a decade on a tenth of
+// the shortlist drops more good picks than the model's year does.
+export function decadeYear(mediaType: MediaType, pick: Pick, match: CatalogSearchResult): number | null {
+  return mediaType === 'book' ? pick.year : match.releaseYear
+}
+
 function normalizeTitle(title: string): string {
   return title
     .toLowerCase()

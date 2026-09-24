@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 
 import {
   applyVerdicts,
+  decadeYear,
   filterByGenre,
   filterByLength,
   matchesDecade,
@@ -61,6 +62,27 @@ describe('matchesDecade', () => {
     for (const relation of ['before', 'within', 'after'] as const) {
       assert.ok(!matchesDecade(null, 1990, relation))
     }
+  })
+})
+
+describe('decadeYear', () => {
+  const pick = { title: 'Dune', year: 1965, reason: '' }
+  // What Google Books answers for Dune: a 2005 reprint.
+  const edition = { releaseYear: 2005 } as unknown as Parameters<typeof decadeYear>[2]
+
+  it('reads a book from the pick, since the catalog only holds an edition', () => {
+    assert.equal(decadeYear('book', pick, edition), 1965)
+    assert.ok(matchesDecade(decadeYear('book', pick, edition), 1960))
+  })
+
+  it('reads every other medium from the catalog, which releases once', () => {
+    assert.equal(decadeYear('movie', pick, edition), 2005)
+    assert.ok(!matchesDecade(decadeYear('movie', pick, edition), 1960))
+  })
+
+  it('passes an unknown catalog year through rather than substituting the pick', () => {
+    const undated = { releaseYear: null } as unknown as Parameters<typeof decadeYear>[2]
+    assert.equal(decadeYear('movie', pick, undated), null)
   })
 })
 
