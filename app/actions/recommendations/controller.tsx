@@ -439,6 +439,7 @@ export default createController(routes.recommendations, {
           queuedAhead={job.queuedAhead ?? null}
           error={job.error}
           statusHref={routes.recommendations.status.href({ jobId: context.params.jobId })}
+          formHref={routes.recommendations.index.href()}
           displayName={displayLabel(auth.identity)}
         />,
       )

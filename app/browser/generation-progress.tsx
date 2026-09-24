@@ -48,6 +48,9 @@ const doneStepStyle = css({
 
 export type GenerationProgressProps = {
   statusHref: string
+  // Where a run that came back with nothing sends someone: the form they set the
+  // filters on. Passed in because a client entry can't reach routes.ts.
+  formHref: string
   initialLabel: string
   initialPhase: string
   initialStatus: string
@@ -141,7 +144,16 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       const { phases, labels } = handle.props
 
       function panel() {
-        if (failed) return <p mix={css({ color: '#b91c1c' })}>{failed}</p>
+        if (failed) {
+          return (
+            <>
+              <p mix={css({ color: '#b91c1c' })}>{failed}</p>
+              <p>
+                <a href={handle.props.formHref}>Change the filters and try again</a>
+              </p>
+            </>
+          )
+        }
 
         if (lostContact) {
           return (
