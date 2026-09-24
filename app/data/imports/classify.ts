@@ -94,19 +94,44 @@ export function suspicion(verdict: Verdict): number {
   }
 }
 
-// Fits after the row, as a chip.
+// Fits after the row, as a chip — only where it says more than the group
+// heading the row sits under (reasonGroup). How far out a year is varies by
+// row; "title differs" and "no year" don't.
 export function describeReason(verdict: Verdict): string | null {
   const magnitude = Math.abs(verdict.yearDelta ?? 0)
+  return verdict.reason === 'year_drift'
+    ? magnitude === 1
+      ? 'Year off by 1'
+      : `Year off by ${magnitude}`
+    : null
+}
 
-  switch (verdict.reason) {
+// The heading and one-line explanation for the review's group of rows flagged
+// for `reason`. Beside describeReason so the wording for a reason lives in one
+// place.
+export function reasonGroup(
+  reason: MatchReason | null,
+  singular: string,
+  plural: string,
+): { title: string; blurb: string } {
+  switch (reason) {
     case 'title_differs':
-      return 'Title differs'
+      return {
+        title: 'Different title',
+        blurb: `The catalog's title isn't the one in your file — often a subtitle, or a different ${singular}.`,
+      }
     case 'no_year':
-      return 'No year in your CSV'
+      return {
+        title: 'No year in your file',
+        blurb: `Several ${plural} share these names. Pick the one you meant.`,
+      }
     case 'year_drift':
-      return magnitude === 1 ? 'Year off by 1' : `Year off by ${magnitude}`
+      return {
+        title: "Year doesn't match",
+        blurb: 'A year or so out is usually a festival or re-release date; further out may be a remake.',
+      }
     default:
-      return null
+      return { title: 'Worth checking', blurb: '' }
   }
 }
 

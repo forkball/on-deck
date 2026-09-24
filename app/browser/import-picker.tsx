@@ -1,5 +1,7 @@
 import { clientEntry, css, on, ref } from 'remix/ui'
 
+import { postInPlace } from './shared/submit-in-place.ts'
+
 export type ImportPickerProps = {
   // Hrefs are built on the server so the route contract stays the one source of
   // URL shapes; `rowToken` is the placeholder in them this swaps for a row id.
@@ -120,13 +122,10 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
     body.set('external_id', candidate.externalId)
 
     try {
-      const response = await fetch(hrefFor(handle.props.resolveTemplate, openRowId), { method: 'POST', body })
-      if (!response.ok || new URL(response.url).searchParams.has('error')) {
-        window.location.href = response.url
-        return
-      }
-      close()
-      await handle.frames.top.reload()
+      await postInPlace(hrefFor(handle.props.resolveTemplate, openRowId), body, undefined, async () => {
+        close()
+        await handle.frames.top.reload()
+      })
     } finally {
       choosing = false
     }

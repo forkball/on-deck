@@ -5,13 +5,14 @@ import { ImportPicker } from '../../../browser/import-picker.tsx'
 import { InPlaceForms } from '../../../browser/in-place-forms.tsx'
 import { LazyList } from '../../../browser/lazy-list.tsx'
 import type { ConflictEntry, DuplicateEntry, ReviewModel, ReviewRow } from '../../../data/imports/review.ts'
-import type { LogValues } from '../../../data/imports/classify.ts'
+import { reasonGroup, type LogValues } from '../../../data/imports/classify.ts'
 import type { ImportBatch } from '../../../data/schema.ts'
 import { mediaTypeUiFor } from '../../../mediaTypes.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
+import { Collapsible } from '../../../ui/shared/collapsible.tsx'
 import { Field } from '../../../ui/shared/field.tsx'
 import { StarRatingDisplay } from '../../../ui/components/star-rating.tsx'
 
@@ -42,14 +43,19 @@ const ROW_TOKEN = '__row__'
 const CONFLICTS_VISIBLE = 10
 const ROWS_VISIBLE = 25
 
-// The card after the one just decided — it takes the decided card's place, so
-// that is where a no-JS redirect should land. Past the end of a list, `after`.
-function nextAnchor(list: { row: { id: number } }[], index: number, after: string): string {
-  const following = list[index + 1]
-  return following ? rowAnchor(following.row.id) : after
-}
-
 const SAVE_ANCHOR = 'import-save'
+
+// For each card, in page order, the card after it — which takes a decided
+// card's place, so that is where a no-JS redirect should land. The last one
+// lands on the save bar.
+function nextAnchors(ordered: { row: { id: number } }[]): Map<number, string> {
+  const next = new Map<number, string>()
+  ordered.forEach(({ row }, i) => {
+    const following = ordered[i + 1]
+    next.set(row.id, following ? rowAnchor(following.row.id) : SAVE_ANCHOR)
+  })
+  return next
+}
 
 function formatDate(at: number | null): string {
   if (at == null) return 'no date'
@@ -141,16 +147,14 @@ function ResolveForm(
     rowId: number
     action: string
     label: string
-    primary?: boolean
-    // A text button, for the answer that shouldn't compete with the others.
-    quiet?: boolean
+    variant?: ButtonVariant
     anchor?: string
     // For `repoint`: the catalog entry to point the row at.
     externalId?: string
   }>,
 ) {
   return () => {
-    const { batchId, rowId, action, label, primary, quiet, anchor, externalId } = handle.props
+    const { batchId, rowId, action, label, variant, anchor, externalId } = handle.props
 
     return (
       <form
@@ -161,16 +165,20 @@ function ResolveForm(
         <input type="hidden" name="action" value={action} />
         {anchor && <input type="hidden" name="anchor" value={anchor} />}
         {externalId && <input type="hidden" name="external_id" value={externalId} />}
-        <button
-          type="submit"
-          class={quiet ? 'linkish' : primary ? 'primary' : undefined}
-          mix={css({ fontSize: '13px' })}
-        >
+        <button type="submit" class={buttonClass(variant)} mix={css({ fontSize: '13px' })}>
           {label}
         </button>
       </form>
     )
   }
+}
+
+// `quiet` is a text button, for the answer that shouldn't compete with the
+// others.
+type ButtonVariant = 'primary' | 'quiet'
+
+function buttonClass(variant?: ButtonVariant): string | undefined {
+  return variant === 'quiet' ? 'linkish' : variant
 }
 
 function rowAnchor(rowId: number): string {
@@ -180,15 +188,15 @@ function rowAnchor(rowId: number): string {
 // Opens the picker for one row. A plain button rather than a link: the modal is
 // a single client entry for the whole page, and this is how it is told which
 // row to open on.
-function PickerButton(handle: Handle<{ rowId: number; label: string; primary?: boolean; quiet?: boolean }>) {
+function PickerButton(handle: Handle<{ rowId: number; label: string; variant?: ButtonVariant }>) {
   return () => {
-    const { rowId, label, primary, quiet } = handle.props
+    const { rowId, label, variant } = handle.props
 
     return (
       <button
         type="button"
         data-import-picker={String(rowId)}
-        class={quiet ? 'linkish' : primary ? 'primary' : undefined}
+        class={buttonClass(variant)}
         mix={css({ fontSize: '13px' })}
       >
         {label}
@@ -343,7 +351,7 @@ function DuplicateCard(
               <PickerButton
                 rowId={verdict.move.id}
                 label={`Find the right ${singular} for row ${verdict.move.index}`}
-                primary
+                variant="primary"
               />
             </Actions>
             <div mix={css({ margin: '16px 0 0' })}>
@@ -383,7 +391,7 @@ function DuplicateCard(
                 rowId={verdict.drop.id}
                 action="skip"
                 label={`Keep the ${formatDate(verdict.keep.consumedAt)} watch`}
-                primary
+                variant="primary"
               />
               <ResolveForm
                 batchId={batchId}
@@ -408,15 +416,11 @@ function UncertainCard(
     entry: ReviewRow
     pastParticiple: string
     next?: string
-    // Off where the group heading already says it; kept where the chip adds
-    // something, like how many years off a match is.
-    showChip?: boolean
   }>,
 ) {
   return () => {
-    const { batchId, entry, pastParticiple, next, showChip = true } = handle.props
-    const { row, item } = entry
-    const chip = showChip ? entry.chip : null
+    const { batchId, entry, pastParticiple, next } = handle.props
+    const { row, item, chip } = entry
     // A no-year row with a couple of namesakes is a "which one?" question, so
     // the card asks it directly rather than behind the picker.
     const choices = row.reason === 'no_year' ? row.alternates : null
@@ -460,35 +464,27 @@ function UncertainCard(
             <span mix={css({ fontSize: '13px', color: '#8d8579' })}>Which one?</span>
             {/* None of these is primary: with no year to go on, our pick was
                 a guess, and weighting it would push the guess. */}
-            {choices.map((choice) =>
-              choice.externalId === row.matchedExternalId ? (
+            {choices.map((choice) => {
+              const ours = choice.externalId === row.matchedExternalId
+              return (
                 <ResolveForm
                   key={choice.externalId}
                   batchId={batchId}
                   rowId={row.id}
-                  action="confirm"
+                  action={ours ? 'confirm' : 'repoint'}
+                  externalId={ours ? undefined : choice.externalId}
                   label={choiceLabel(choice.releaseYear)}
                   anchor={next}
                 />
-              ) : (
-                <ResolveForm
-                  key={choice.externalId}
-                  batchId={batchId}
-                  rowId={row.id}
-                  action="repoint"
-                  externalId={choice.externalId}
-                  label={choiceLabel(choice.releaseYear)}
-                  anchor={next}
-                />
-              ),
-            )}
-            <PickerButton rowId={row.id} label="Something else…" quiet />
+              )
+            })}
+            <PickerButton rowId={row.id} label="Something else…" variant="quiet" />
             <ResolveForm
               batchId={batchId}
               rowId={row.id}
               action="skip"
               label="Don't save"
-              quiet
+              variant="quiet"
               anchor={next}
             />
           </Actions>
@@ -528,7 +524,7 @@ function MatchedAnswers(
             rowId={row.id}
             action="confirm"
             label="Looks right"
-            primary
+            variant="primary"
             anchor={next}
           />
           <PickerButton rowId={row.id} label="Change" />
@@ -537,7 +533,7 @@ function MatchedAnswers(
             rowId={row.id}
             action="skip"
             label="Don't save"
-            quiet
+            variant="quiet"
             anchor={next}
           />
         </Actions>
@@ -546,30 +542,16 @@ function MatchedAnswers(
   }
 }
 
-// A collapsed list on the saved page. <details>, so it opens without JS and a
-// 370-row list costs nothing until someone asks for it.
-function SavedList(handle: Handle<{ summary: string; children?: RemixNode }>) {
-  return () => (
-    <details
-      mix={css({
-        border: '1px solid #e2d8c8',
-        borderRadius: '8px',
-        padding: '10px 14px',
-        margin: '0 0 10px',
-        background: '#fffcf8',
-      })}
-    >
-      <summary mix={css({ cursor: 'pointer', fontSize: '14px' })}>{handle.props.summary}</summary>
-      <div mix={css({ marginTop: '10px' })}>{handle.props.children}</div>
-    </details>
-  )
-}
-
 function leftOutReason(state: string): string {
   if (state === 'not_found') return 'not found in the catalog'
   if (state === 'skipped') return 'you left it out'
   return 'held back as a duplicate'
 }
+
+// The saved page's collapsed lists. Every row is rendered, collapsed: the
+// person asked for these films to be named, and a real export is hundreds at
+// most.
+const savedListStyle = css({ margin: 0, paddingLeft: '18px', fontSize: '14px' })
 
 // "Worth a look" split by what we're unsure about, in the order the cards
 // already sort — least certain first — so each group is one kind of question
@@ -579,8 +561,6 @@ interface ReasonGroup {
   title: string
   blurb: string
   entries: ReviewRow[]
-  // Whether the card's chip still says something the heading doesn't.
-  showChip: boolean
 }
 
 function groupByReason(uncertain: ReviewRow[], singular: string, plural: string): ReasonGroup[] {
@@ -590,7 +570,7 @@ function groupByReason(uncertain: ReviewRow[], singular: string, plural: string)
     const key = entry.row.reason ?? 'other'
     let group = groups.get(key)
     if (!group) {
-      group = { key, entries: [], ...reasonCopy(key, singular, plural) }
+      group = { key, entries: [], ...reasonGroup(entry.row.reason, singular, plural) }
       groups.set(key, group)
     }
     group.entries.push(entry)
@@ -599,42 +579,14 @@ function groupByReason(uncertain: ReviewRow[], singular: string, plural: string)
   return [...groups.values()]
 }
 
-function reasonCopy(reason: string, singular: string, plural: string) {
-  switch (reason) {
-    case 'title_differs':
-      return {
-        title: 'Different title',
-        blurb: `The catalog's title isn't the one in your file — often a subtitle, or a different ${singular}.`,
-        showChip: false,
-      }
-    case 'no_year':
-      return {
-        title: 'No year in your file',
-        blurb: `Several ${plural} share these names. Pick the one you meant.`,
-        showChip: false,
-      }
-    case 'year_drift':
-      return {
-        title: "Year doesn't match",
-        blurb: 'A year or so out is usually a festival or re-release date; further out may be a remake.',
-        showChip: true,
-      }
-    default:
-      return { title: 'Worth checking', blurb: '', showChip: true }
-  }
-}
-
 export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
   return () => {
     const { displayName, batch, model, saved, offerFeed, reviewsOnly, error } = handle.props
     const { counts } = model
-    const ui = mediaTypeUiFor(batch.media_type as MediaType)
-    const { singular, plural, pastParticiple } = ui
+    const { singular, plural, pastParticiple, hrefs } = mediaTypeUiFor(batch.media_type as MediaType)
     const batchId = batch.id
-    const notFoundFirst = model.notFound[0] ? rowAnchor(model.notFound[0].row.id) : SAVE_ANCHOR
     const uncertainGroups = groupByReason(model.uncertain, singular, plural)
-    // The order the cards appear in, which the no-JS "next card" anchors follow.
-    const orderedUncertain = uncertainGroups.flatMap((group) => group.entries)
+    const next = nextAnchors([...uncertainGroups.flatMap((group) => group.entries), ...model.notFound])
     // What pressing Save does right now, rather than how much is left to do:
     // everything saves by default, so the open cards aren't homework, they are
     // what goes in unchecked.
@@ -674,16 +626,16 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   them again, and a wrong one can't be re-matched by a member
                   after the fact — so they are named, with a way to each. */}
               {model.uncertain.length > 0 && (
-                <SavedList summary={`The ${model.uncertain.length} saved as we matched them`}>
+                <Collapsible summary={`The ${model.uncertain.length} saved as we matched them`} boxed>
                   <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 8px' })}>
                     We weren't sure about these. If one is the wrong {singular}, open it, remove it from your
                     log, and log the right one.
                   </p>
-                  <ul mix={css({ margin: 0, paddingLeft: '18px', fontSize: '14px' })}>
+                  <ul mix={savedListStyle}>
                     {model.uncertain.map(({ row, item }) => (
                       <li key={row.id} mix={css({ marginBottom: '4px' })}>
                         {item ? (
-                          <a href={ui.hrefs.show(item.id)}>
+                          <a href={hrefs.show(item.id)}>
                             {item.title} {item.releaseYear ?? ''}
                           </a>
                         ) : (
@@ -692,11 +644,11 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       </li>
                     ))}
                   </ul>
-                </SavedList>
+                </Collapsible>
               )}
               {model.leftOutRows.length > 0 && (
-                <SavedList summary={`The ${model.leftOutRows.length} left out`}>
-                  <ul mix={css({ margin: 0, paddingLeft: '18px', fontSize: '14px' })}>
+                <Collapsible summary={`The ${model.leftOutRows.length} left out`} boxed>
+                  <ul mix={savedListStyle}>
                     {model.leftOutRows.map((row) => (
                       <li key={row.id} mix={css({ marginBottom: '4px' })}>
                         {row.title} {row.year ?? ''}{' '}
@@ -704,7 +656,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       </li>
                     ))}
                   </ul>
-                </SavedList>
+                </Collapsible>
               )}
               <p>
                 <a href={routes.profile.watched.href()}>See my log</a>
@@ -903,12 +855,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                             batchId={batchId}
                             entry={entry}
                             pastParticiple={pastParticiple}
-                            showChip={group.showChip}
-                            next={nextAnchor(
-                              orderedUncertain,
-                              orderedUncertain.indexOf(entry),
-                              notFoundFirst,
-                            )}
+                            next={next.get(entry.row.id)}
                           />
                         ))}
                       </div>
@@ -960,20 +907,20 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     No catalog result under that name. <b>These won't be saved</b> unless you track them down.
                   </p>
                   <div id="import-not-found">
-                    {model.notFound.map(({ row }, i) => (
+                    {model.notFound.map(({ row }) => (
                       <Card key={row.id} id={rowAnchor(row.id)}>
                         <div>
                           {row.title} <span mix={css({ color: '#888' })}>{row.year ?? 'no year'}</span>
                         </div>
                         <Actions>
-                          <PickerButton rowId={row.id} label="Find it" primary />
+                          <PickerButton rowId={row.id} label="Find it" variant="primary" />
                           <ResolveForm
                             batchId={batchId}
                             rowId={row.id}
                             action="skip"
                             label="Leave out"
-                            quiet
-                            anchor={nextAnchor(model.notFound, i, SAVE_ANCHOR)}
+                            variant="quiet"
+                            anchor={next.get(row.id)}
                           />
                         </Actions>
                       </Card>

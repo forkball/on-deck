@@ -8,6 +8,7 @@ import {
   describeReason,
   inlineAlternates,
   isBulkAcceptable,
+  reasonGroup,
   suspicion,
   type CandidateLike,
   type DuplicateRow,
@@ -161,6 +162,26 @@ describe('describeReason', () => {
 
   it('says nothing about a confident match', () => {
     assert.equal(describeReason(classifyMatch({ title: 'Heat', year: 1995 }, film('Heat', 1995))), null)
+  })
+
+  // The group heading already says these; a chip repeating it on every card
+  // is noise.
+  it('leaves reasons its group heading names to the heading', () => {
+    assert.equal(describeReason(classifyMatch({ title: 'Heat', year: null }, film('Heat', 1995))), null)
+    assert.equal(
+      describeReason(classifyMatch({ title: 'Birdman', year: 2014 }, film('Birdman or…', 2014))),
+      null,
+    )
+  })
+})
+
+describe('reasonGroup', () => {
+  it('uses the media noun it is given', () => {
+    assert.match(reasonGroup('no_year', 'book', 'books').blurb, /Several books/)
+  })
+
+  it('has a fallback for a reason without its own group', () => {
+    assert.equal(reasonGroup(null, 'movie', 'movies').title, 'Worth checking')
   })
 })
 
