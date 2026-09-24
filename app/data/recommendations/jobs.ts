@@ -50,6 +50,9 @@ export interface GenerationJob {
   phases: GenerationPhase[]
   phase: GenerationPhase
   runId?: number
+  // Set in run_id's place when the catalog wouldn't answer and the model's picks
+  // were kept unconfirmed.
+  unconfirmedRunId?: number
   prunedOldestRun?: boolean
   error?: string
   startedAt: number
@@ -75,6 +78,7 @@ function toJob(row: RecommendationJob): GenerationJob {
     phases: parsePhases(row.phases),
     phase: (row.phase in PHASE_LABELS ? row.phase : 'profiles') as GenerationPhase,
     runId: row.run_id ?? undefined,
+    unconfirmedRunId: row.unconfirmed_run_id ?? undefined,
     prunedOldestRun: row.pruned_oldest_run === 1,
     error: row.error ?? undefined,
     startedAt: Number(row.created_at),
@@ -171,15 +175,21 @@ export async function saveCheckpoint(db: Db, jobId: string, checkpoint: unknown)
   )
 }
 
-export async function completeJob(
-  db: Db,
-  jobId: string,
-  runId: number,
-  prunedOldestRun: boolean,
-): Promise<void> {
+// What a finished job points at. A run, or — when the catalog wouldn't answer and
+// the model's own picks were kept instead — an unconfirmed one.
+export type JobTarget =
+  | { kind: 'run'; runId: number; prunedOldestRun: boolean }
+  | { kind: 'unconfirmed'; unconfirmedRunId: number }
+
+export async function completeJob(db: Db, jobId: string, target: JobTarget): Promise<void> {
+  const columns =
+    target.kind === 'run'
+      ? { run_id: target.runId, pruned_oldest_run: target.prunedOldestRun ? 1 : 0 }
+      : { unconfirmed_run_id: target.unconfirmedRunId }
+
   await db.updateMany(
     recommendationJobs,
-    { status: 'done', run_id: runId, pruned_oldest_run: prunedOldestRun ? 1 : 0, updated_at: Date.now() },
+    { status: 'done', ...columns, updated_at: Date.now() },
     { where: { id: jobId } },
   )
 }
@@ -222,7 +232,9 @@ export async function getJob(db: Db, jobId: string, userId: number): Promise<Gen
 // bound on how long a stage may legitimately take.
 export const CLAIM_STALE_MS = 3 * 60 * 1000
 
-const MAX_ATTEMPTS = 3
+// Shared with the worker, which spends them on a catalog that won't answer before
+// it gives up and keeps what the model said.
+export const MAX_ATTEMPTS = 3
 
 // A null claim is deliberately not stale — `claimed_at is not null`, never
 // coalesce(claimed_at, 0). During a rolling deploy that would let a new-release

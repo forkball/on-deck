@@ -11,7 +11,7 @@ import { listFollowedUsers } from '../../data/follows.ts'
 import { syncLetterboxdBeforeRun } from '../../data/imports/letterboxdSync.ts'
 import { loadLoggedTypesByUser } from '../../data/mediaItems.ts'
 import { getDailyRunAllowance, runCostFor, timeUntil } from '../../data/recommendations/dailyLimit.ts'
-import { enqueueJob, getJob, PHASE_LABELS } from '../../data/recommendations/jobs.ts'
+import { enqueueJob, getJob, PHASE_LABELS, type GenerationJob } from '../../data/recommendations/jobs.ts'
 import { getLuckyState, LUCKY_RUN_NAME } from '../../data/recommendations/lucky.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
@@ -33,6 +33,8 @@ import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType, type ActiveMediaTyp
 import { RETURN_TO_PARAM } from '../../ui/backLink.ts'
 import { LUCKY_PAGE_ORIGIN } from '../../browser/draw-lucky-form.tsx'
 import { GeneratingPage } from './generating-page.tsx'
+import { getUnconfirmedRun, listUnconfirmedRuns } from '../../data/recommendations/unconfirmed.ts'
+import { UnconfirmedRunPage } from './unconfirmed-page.tsx'
 import { LuckyPickPage, type LuckyPickPageProps } from './lucky-page.tsx'
 import { RecommendationsPage, type RecommendationsPageProps } from './page.tsx'
 import { RecommendationRunPage } from './run-page.tsx'
@@ -55,12 +57,16 @@ const generateSchema = f.object({
 })
 
 async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
-  const [allRuns, runsFromOthers, friends, dailyRuns, lucky] = await Promise.all([
+  const [allRuns, runsFromOthers, friends, dailyRuns, lucky, unconfirmedRuns] = await Promise.all([
     listRecommendationRuns(db, user.id, mediaType),
     listRecommendationRunsFromOthers(db, user.id, mediaType),
     listFollowedUsers(db, user.id),
     getDailyRunAllowance(db, user),
     getLuckyState(user),
+    // Not filtered by media type, unlike the runs above: there are at most three,
+    // and a list this small hiding two thirds of itself behind a tab is a way to
+    // lose them.
+    listUnconfirmedRuns(db, user.id),
   ])
 
   // The page shows these as separate sections rather than one list.
@@ -78,6 +84,7 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     dailyRuns,
     lucky,
     runs,
+    unconfirmedRuns,
     luckyRuns,
     runsFromOthers,
     friends,
@@ -95,8 +102,22 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
   }
 }
 
-// Both actions refuse for the same reason in the same words — an empty log
-// gives the profile nothing to work from, whichever kind of run asked for it.
+// Where a finished job sends someone: a real run, or the unconfirmed picks kept
+// when the catalog wouldn't answer. Spelled once, because the redirect and the poll
+// the generating page runs both need it and must not be able to disagree.
+function finishedHref(job: GenerationJob): string | null {
+  if (job.runId != null) {
+    const href = routes.recommendations.show.href({ runId: String(job.runId) })
+    return job.prunedOldestRun ? `${href}?prunedOldest=1` : href
+  }
+  if (job.unconfirmedRunId != null) {
+    return routes.recommendations.unconfirmed.href({ unconfirmedId: String(job.unconfirmedRunId) })
+  }
+  return null
+}
+
+// Both actions refuse for the same reason in the same words — an empty log gives
+// the profile nothing to work from, whichever kind of run asked for it.
 function describeMissingLogs(missing: MissingSourceLogs[], viewerId: number): string {
   return missing
     .map(({ userId, label, missing: types }) => {
@@ -425,10 +446,8 @@ export default createController(routes.recommendations, {
       const job = await getJob(context.get(Database), context.params.jobId, auth.identity.id)
       if (!job) return new Response('Not Found', { status: 404 })
 
-      if (job.runId != null) {
-        const href = routes.recommendations.show.href({ runId: String(job.runId) })
-        return redirect(job.prunedOldestRun ? `${href}?prunedOldest=1` : href, 303)
-      }
+      const finished = finishedHref(job)
+      if (finished) return redirect(finished, 303)
 
       return context.render(
         <GeneratingPage
@@ -439,6 +458,7 @@ export default createController(routes.recommendations, {
           queuedAhead={job.queuedAhead ?? null}
           error={job.error}
           statusHref={routes.recommendations.status.href({ jobId: context.params.jobId })}
+          formHref={routes.recommendations.index.href()}
           displayName={displayLabel(auth.identity)}
         />,
       )
@@ -450,19 +470,30 @@ export default createController(routes.recommendations, {
       const job = await getJob(context.get(Database), context.params.jobId, auth.identity.id)
       if (!job) return Response.json({ error: 'not_found' }, { status: 404 })
 
+      const finished = finishedHref(job)
+
       return Response.json({
         status: job.status,
         queuedAhead: job.queuedAhead ?? null,
         phase: job.phase,
         label: PHASE_LABELS[job.phase],
-        done: job.runId != null,
-        href:
-          job.runId == null
-            ? null
-            : routes.recommendations.show.href({ runId: String(job.runId) }) +
-              (job.prunedOldestRun ? '?prunedOldest=1' : ''),
+        done: finished != null,
+        href: finished,
         error: job.error ?? null,
       })
+    },
+
+    async unconfirmed(context) {
+      const auth = context.get(Auth)
+
+      const run = await getUnconfirmedRun(
+        context.get(Database),
+        Number(context.params.unconfirmedId),
+        auth.identity.id,
+      )
+      if (!run) return new Response('Not Found', { status: 404 })
+
+      return context.render(<UnconfirmedRunPage run={run} displayName={displayLabel(auth.identity)} />)
     },
 
     async show(context) {

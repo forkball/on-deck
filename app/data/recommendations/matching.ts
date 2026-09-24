@@ -4,7 +4,7 @@ import { pool } from '../db.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { requestStructured } from './claude.ts'
-import { GenerationError } from './errors.ts'
+import { CatalogUnavailableError, GenerationError } from './errors.ts'
 import type { DecadeRelation, Pick } from './picks.ts'
 import { track } from './timings.ts'
 
@@ -263,7 +263,7 @@ async function forEachWithConcurrency<T>(
 
 // One wording for one condition, however many stages reach it.
 function catalogDown(what: string): GenerationError {
-  return new GenerationError(
+  return new CatalogUnavailableError(
     `${what} — the catalog isn't answering right now. Try generating again in a few minutes.`,
   )
 }
@@ -433,16 +433,29 @@ export function filterByGenre(
   genre: string,
   lookup: CatalogLookup = lookupForType,
 ): Promise<Candidate[]> {
+  // Constant for the call, not per candidate.
+  const needsLookup = genreMissNeedsLookup(mediaType)
   const carriesGenre = (match: CatalogSearchResult) => match.tags.includes(genre)
 
+  // A Google Books record with no categories at all is not a book of some other
+  // genre — it is a record nobody catalogued. Older works are full of them: of
+  // eight romance titles probed, the editions for Rebecca, Emma and It carried no
+  // categories on any edition the search returned, so requiring a positive tag
+  // threw away every classic and left a romance run with nothing in it.
+  //
+  // Unknown is not a no, so it is kept, and the prompt's own clause is what stands
+  // behind it — the same standing the decade and series levers have for books. A
+  // record that *does* carry categories is still held to them: that is real
+  // evidence, and a book tagged only [horror] is not the romance that was asked
+  // for.
   return filterByDetail(
     candidates,
     mediaType,
     {
       // Every provider but Google Books answers genres on search, so for them a miss
       // is the answer and nothing is looked up.
-      answered: (match) => carriesGenre(match) || !genreMissNeedsLookup(mediaType),
-      matches: carriesGenre,
+      answered: (match) => carriesGenre(match) || !needsLookup,
+      matches: (match) => carriesGenre(match) || (needsLookup && match.tags.length === 0),
       what: 'genre',
     },
     lookup,

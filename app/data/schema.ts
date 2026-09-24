@@ -141,6 +141,8 @@ export const recommendationJobs = table({
     phases: c.text().notNull(),
     phase: c.text().notNull(),
     run_id: c.integer(),
+    // Set instead of run_id when the catalog wouldn't answer — see unconfirmed.ts.
+    unconfirmed_run_id: c.integer(),
     pruned_oldest_run: c.integer().notNull(),
     error: c.text(),
     timings: c.text(),
@@ -192,6 +194,21 @@ export const recommendationRunMembers = table({
   columns: {
     run_id: c.integer().notNull().references('recommendation_runs', 'id'),
     user_id: c.integer().notNull().references('users', 'id'),
+  },
+})
+
+// The model's answer when the catalog couldn't be reached — see the migration for
+// why these don't live in recommendation_runs.
+export const unconfirmedRuns = table({
+  name: 'unconfirmed_runs',
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    user_id: c.integer().notNull().references('users', 'id'),
+    media_type: c.text().notNull(),
+    params: c.text().notNull(),
+    picks: c.text().notNull(),
+    reason: c.text().notNull(),
+    created_at: c.integer().notNull(),
   },
 })
 
@@ -287,6 +304,7 @@ export type UserMediaInteraction = TableRow<typeof userMediaInteractions>
 export type UserTasteProfile = TableRow<typeof userTasteProfiles>
 export type UserRecommendation = TableRow<typeof userRecommendations>
 export type UserFollow = TableRow<typeof userFollows>
+export type UnconfirmedRun = TableRow<typeof unconfirmedRuns>
 export type RecommendationRun = TableRow<typeof recommendationRuns>
 export type RecommendationJob = TableRow<typeof recommendationJobs>
 export type RecommendationRunMember = TableRow<typeof recommendationRunMembers>

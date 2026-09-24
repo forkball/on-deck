@@ -138,7 +138,7 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
        values ($1, 'movie', $2, '{}') returning id`,
       [userId, Date.now()],
     )
-    await completeJob(db, first.jobId, run.id, false)
+    await completeJob(db, first.jobId, { kind: 'run', runId: run.id, prunedOldestRun: false })
 
     assert.equal((await enqueue(userId)).ok, true)
   })

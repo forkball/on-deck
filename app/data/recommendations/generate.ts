@@ -10,6 +10,7 @@ import { createNotification } from '../notifications.ts'
 import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
 import { recordRunAgainstDailyLimit, runCostFor } from './dailyLimit.ts'
+import { GenerationError } from './errors.ts'
 import { buildExclusions } from './exclusions.ts'
 import { phasesFor, type GenerationPhase } from './jobs.ts'
 import {
@@ -44,6 +45,35 @@ import { emptyDrops, logPickTally } from './tally.ts'
 import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
 
+// Which levers a run was narrowed by, in the words the form used for them, so the
+// advice names the thing there is a control for.
+const FILTER_LABELS: [keyof RecommendationFilters, string][] = [
+  ['genre', 'genre'],
+  ['decade', 'decade'],
+  ['length', 'length'],
+  ['playerType', 'player type'],
+  ['multiplayerType', 'multiplayer type'],
+  ['platform', 'platform'],
+  ['series', 'series'],
+]
+
+// Exported for its own test: the levers are read off a shape that grows, and copy
+// that forgets one sends somebody looking for a filter it never mentions.
+export function nothingLeftMessage(filters: RecommendationFilters, mediaType: MediaType): string {
+  const noun = mediaTypeUiFor(mediaType).plural
+  const set = FILTER_LABELS.filter(([key]) => filters[key] != null).map(([, label]) => label)
+
+  if (set.length === 0) {
+    return `Nothing came back that we could confirm this time. Try generating again.`
+  }
+
+  const list = set.length === 1 ? set[0] : `${set.slice(0, -1).join(', ')} and ${set[set.length - 1]}`
+  return (
+    `No ${noun} made it through the ${list} ${set.length === 1 ? 'filter' : 'filters'}. ` +
+    `Try widening ${set.length === 1 ? 'it' : 'them'} and generating again.`
+  )
+}
+
 // Exported so the page can say how many a run comes back with rather than
 // restating the number in copy that would then drift from it.
 export const TARGET_COUNT = 8
@@ -68,10 +98,11 @@ export interface GenerateOptions {
   lucky?: boolean
 }
 
-export interface GenerateRecommendationsOutcome {
-  runId: number
-  prunedOldestRun: boolean
-}
+// A run, or the model's own answer kept when nothing could confirm it. Callers
+// have to look at which, because the two land on different pages.
+export type GenerateRecommendationsOutcome =
+  | { kind: 'run'; runId: number; prunedOldestRun: boolean }
+  | { kind: 'unconfirmed'; unconfirmedRunId: number }
 
 export interface MissingSourceLogs {
   userId: number
@@ -312,6 +343,17 @@ export async function generateRecommendations(
     })
   }
 
+  // A run with nothing in it is not a run. Saving one spends the day's allowance,
+  // takes one of the three slots a person keeps, prunes the oldest real run to make
+  // room for it, and notifies them that their recommendations are ready — all for a
+  // page with nothing on it. Every gate between the picks and here is a filter they
+  // set, so the useful answer is which one to loosen, not an empty list.
+  //
+  // Thrown rather than returned: failJob puts a GenerationError's message in front
+  // of whoever is waiting, and the job lands as failed rather than as a completed
+  // run that isn't one.
+  if (results.length === 0) throw new GenerationError(nothingLeftMessage(filters, mediaType))
+
   const runId = await track('run.save', () =>
     saveRun(db, {
       requestingUserId,
@@ -352,7 +394,7 @@ export async function generateRecommendations(
     track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType, { lucky })),
   ])
 
-  return { runId, prunedOldestRun }
+  return { kind: 'run', runId, prunedOldestRun }
 }
 
 // Mutual follows only — the picker requires one direction, this requires the

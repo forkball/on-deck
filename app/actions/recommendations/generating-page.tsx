@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import { PHASE_LABELS, type GenerationPhase } from '../../data/recommendations/jobs.ts'
 import { GenerationProgress } from '../../browser/generation-progress.tsx'
 import { Document } from '../../ui/components/document.tsx'
+import { GenerationFailure } from '../../ui/shared/generation-failure.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 
 export interface GeneratingPageProps {
@@ -14,6 +15,7 @@ export interface GeneratingPageProps {
   queuedAhead: number | null
   error?: string
   statusHref: string
+  formHref: string
   displayName: string
 }
 
@@ -22,7 +24,8 @@ export interface GeneratingPageProps {
 // with a quieter poll.
 export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
   return () => {
-    const { jobId, phase, phases, status, queuedAhead, error, statusHref, displayName } = handle.props
+    const { jobId, phase, phases, status, queuedAhead, error, statusHref, formHref, displayName } =
+      handle.props
 
     return (
       <Document
@@ -39,11 +42,12 @@ export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
           <h1>Putting your picks together</h1>
 
           {error ? (
-            <p mix={css({ color: '#b91c1c' })}>{error}</p>
+            <GenerationFailure message={error} backHref={formHref} />
           ) : (
             <>
               <GenerationProgress
                 statusHref={statusHref}
+                formHref={formHref}
                 initialLabel={PHASE_LABELS[phase]}
                 initialPhase={phase}
                 initialStatus={status}
