@@ -1,5 +1,6 @@
 import { clientEntry, css, on, ref } from 'remix/ui'
 
+import { count } from '../ui/shared/count.ts'
 import { postInPlace } from './shared/submit-in-place.ts'
 
 export type ImportPickerProps = {
@@ -35,8 +36,8 @@ const DEBOUNCE_MS = 250
 const MIN_QUERY = 2
 
 function resultsLine(data: PickerData, typed: boolean): string {
-  const count = `${data.candidates.length} ${data.candidates.length === 1 ? 'result' : 'results'}`
-  return !typed && data.year != null ? `${count} · searched with your row's year` : count
+  const results = count(data.candidates.length, 'result', 'results')
+  return !typed && data.year != null ? `${results} · searched with your row's year` : results
 }
 
 // One picker for the whole page rather than one modal per row: a 400-row import

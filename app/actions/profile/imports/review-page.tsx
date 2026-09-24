@@ -13,6 +13,7 @@ import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
 import { Collapsible } from '../../../ui/shared/collapsible.tsx'
+import { count } from '../../../ui/shared/count.ts'
 import { Field } from '../../../ui/shared/field.tsx'
 import { StarRatingDisplay } from '../../../ui/components/star-rating.tsx'
 
@@ -605,9 +606,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
           {saved ? (
             <>
-              <h1>
-                Saved {counts.save} {counts.save === 1 ? singular : plural} to your log
-              </h1>
+              <h1>Saved {count(counts.save, singular, plural)} to your log</h1>
               <p mix={css({ color: '#15803d' })}>They're in your log now.</p>
               <ul mix={css({ color: '#555' })}>
                 <li>{model.confidentCount} matched without help</li>
@@ -956,7 +955,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 <form method="post" action={routes.profile.imports.save.href({ batchId })}>
                   <button type="submit" class="primary">
                     {counts.save > 0
-                      ? `Save ${counts.save} ${counts.save === 1 ? singular : plural} to my log`
+                      ? `Save ${count(counts.save, singular, plural)} to my log`
                       : 'Nothing new — finish'}
                   </button>
                 </form>
