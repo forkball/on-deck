@@ -30,6 +30,23 @@ export function matchesDecade(releaseYear: number | null, decade: number, relati
   return releaseYear >= decade && releaseYear < decade + 10
 }
 
+// Whether a pick's own answer satisfies the series lever.
+//
+// The model is the only source there is: no book catalog records whether a work
+// belongs to a series, Google Books having stopped returning seriesInfo (see
+// BOOK_SERIES_TYPES). So the prompt asks for series or standalone, asks the pick to
+// label itself, and this holds it to the label — which catches the realistic
+// failure, a model drifting off the constraint across eighteen picks, rather than
+// one mislabelling a book it just named.
+//
+// No label is not a "no": a run resumed from a checkpoint written before the field
+// was asked for carries picks without it, and dropping those would empty the run
+// for a reason that has nothing to do with the books.
+export function matchesSeries(pick: Pick, series: string): boolean {
+  if (pick.part_of_series == null) return true
+  return series === 'series' ? pick.part_of_series : !pick.part_of_series
+}
+
 // Which year the decade lever is answered with.
 //
 // The catalog's, except for books. Google Books' publishedDate is the *edition*:

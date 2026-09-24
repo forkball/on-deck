@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 import {
   applyVerdicts,
   decadeYear,
+  matchesSeries,
   filterByGenre,
   filterByLength,
   matchesDecade,
@@ -62,6 +63,24 @@ describe('matchesDecade', () => {
     for (const relation of ['before', 'within', 'after'] as const) {
       assert.ok(!matchesDecade(null, 1990, relation))
     }
+  })
+})
+
+describe('matchesSeries', () => {
+  const pick = (part_of_series?: boolean) => ({ title: 'Lords and Ladies', year: 1992, reason: '', part_of_series })
+
+  it('holds the model to the label it gave', () => {
+    assert.ok(matchesSeries(pick(true), 'series'))
+    assert.ok(!matchesSeries(pick(false), 'series'))
+    assert.ok(matchesSeries(pick(false), 'standalone'))
+    assert.ok(!matchesSeries(pick(true), 'standalone'))
+  })
+
+  // A checkpoint written before the field was asked for. Dropping these would empty
+  // a resumed run for a reason that has nothing to do with the books.
+  it('reads an unlabelled pick as no answer rather than as standalone', () => {
+    assert.ok(matchesSeries(pick(undefined), 'series'))
+    assert.ok(matchesSeries(pick(undefined), 'standalone'))
   })
 })
 

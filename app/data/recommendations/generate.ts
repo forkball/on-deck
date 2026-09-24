@@ -18,6 +18,7 @@ import {
   filterByLength,
   genreMissNeedsLookup,
   matchesDecade,
+  matchesSeries,
   resolveFromCatalog,
   searchForPicks,
   titlesLikelyMatch,
@@ -226,15 +227,16 @@ export async function generateRecommendations(
       continue
     }
     // Genre is checked after this loop, not in it: for books the search hit
-    // can't answer it. `series` is checked nowhere — the pick prompt is the only
-    // thing that can ask for it, see BOOK_SERIES_TYPES.
+    // can't answer it. `series` is checked against the pick's own label, since no
+    // catalog carries the answer — see matchesSeries.
     if (
       (filters.decade != null &&
         !matchesDecade(decadeYear(mediaType, pick, match), filters.decade, filters.decadeRelation)) ||
       (filters.playerType && !match.tags.includes(filters.playerType)) ||
       (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) ||
       // Platforms are their own field, not tags, and compare by family.
-      (filters.platform && !platformFamilies(match.platforms ?? []).includes(filters.platform))
+      (filters.platform && !platformFamilies(match.platforms ?? []).includes(filters.platform)) ||
+      (filters.series && !matchesSeries(pick, filters.series))
     ) {
       drops.filtered++
       continue

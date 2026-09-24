@@ -7,6 +7,10 @@ export interface Pick {
   title: string
   year: number
   reason: string
+  // Only asked for when the series lever is set, and absent on picks carried in a
+  // checkpoint written before it was — see matchesSeries, which reads nothing as
+  // "no answer given" rather than as standalone.
+  part_of_series?: boolean
 }
 
 export interface TasteSummary {
@@ -57,25 +61,33 @@ export interface RecommendationFilters {
   series?: string
 }
 
-const PICKS_SCHEMA = {
-  type: 'object' as const,
-  additionalProperties: false,
-  properties: {
-    picks: {
-      type: 'array' as const,
-      items: {
-        type: 'object' as const,
-        additionalProperties: false,
-        properties: {
-          title: { type: 'string' as const },
-          year: { type: 'number' as const },
-          reason: { type: 'string' as const },
+// Built per request rather than a constant: part_of_series is asked for only when
+// the lever needs it, and structured output requires every property it declares, so
+// a field that is sometimes wanted can't just be optional in one fixed schema.
+function picksSchema(withSeries: boolean) {
+  const properties = {
+    title: { type: 'string' as const },
+    year: { type: 'number' as const },
+    reason: { type: 'string' as const },
+    ...(withSeries ? { part_of_series: { type: 'boolean' as const } } : {}),
+  }
+
+  return {
+    type: 'object' as const,
+    additionalProperties: false,
+    properties: {
+      picks: {
+        type: 'array' as const,
+        items: {
+          type: 'object' as const,
+          additionalProperties: false,
+          properties,
+          required: Object.keys(properties),
         },
-        required: ['title', 'year', 'reason'],
       },
     },
-  },
-  required: ['picks'],
+    required: ['picks'],
+  }
 }
 
 // Enough over TARGET_COUNT to survive the gates dropping some, and no more: a
@@ -141,6 +153,14 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string, m
   if (filters.platform) clauses.push(`Only suggest ${noun} playable on ${filters.platform}.`)
   if (filters.series === 'series') clauses.push(`Only suggest ${noun} that are part of a series.`)
   if (filters.series === 'standalone') clauses.push(`Only suggest standalone ${noun}, not part of a series.`)
+  // Nothing in any book catalog answers this, so the model is asked to label its own
+  // picks and is held to the labels — see matchesSeries.
+  if (filters.series != null) {
+    clauses.push(
+      `Set "part_of_series" on every pick: true if it belongs to a series, false if it stands alone. ` +
+        `Answer for the work itself, not for whether the author wrote other books.`,
+    )
+  }
   return clauses.length > 0 ? ` ${clauses.join(' ')}` : ''
 }
 
@@ -200,7 +220,7 @@ export async function requestPicks(
     max_tokens: maxTokens,
     output_config: {
       effort: 'medium',
-      format: { type: 'json_schema', schema: PICKS_SCHEMA },
+      format: { type: 'json_schema', schema: picksSchema(filters.series != null) },
     },
     messages: [
       {
