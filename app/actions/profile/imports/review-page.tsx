@@ -563,28 +563,45 @@ function groupAnchor(key: string): string {
 
 const sectionStyle = css({ marginBottom: '18px', scrollMarginTop: '12px' })
 
-// One tap to every group, so reaching the third doesn't mean scrolling
-// through all of the first two — at a few hundred rows that was dozens of
-// screens on a phone. Plain fragment links: nothing to hydrate, and they work
-// with JS off. Only worth showing when there is more than one place to go.
-function JumpLinks(handle: Handle<{ links: { href: string; label: string }[] }>) {
+// One tap to every group, from anywhere on the page: they live in the pinned
+// save bar, because at a few hundred rows the reader is almost never at the
+// top, and reaching the third group meant scrolling through the first two.
+// Plain fragment links, so nothing to hydrate and they work with JS off. They
+// wrap rather than scroll sideways: a row that ran off the edge of a phone hid
+// the last group, which is the one hardest to reach. Only worth showing when
+// there is more than one place to go.
+function JumpLinks(handle: Handle<{ links: { href: string; label: string; count: number }[] }>) {
   return () => {
     const { links } = handle.props
     if (links.length < 2) return null
 
     return (
       <nav
+        aria-label="Jump to a group"
         mix={css({
+          flex: '1 1 100%',
           display: 'flex',
           flexWrap: 'wrap',
-          gap: '4px 14px',
+          gap: '4px',
           fontSize: '13px',
-          margin: '6px 0 14px',
         })}
       >
         {links.map((link) => (
-          <a key={link.href} href={link.href}>
-            {link.label}
+          <a
+            key={link.href}
+            href={link.href}
+            mix={css({
+              flex: '0 0 auto',
+              whiteSpace: 'nowrap',
+              border: '1px solid #d9cfbe',
+              borderRadius: '999px',
+              padding: '2px 8px',
+              background: '#f6efe3',
+              color: '#3c3c3c',
+              textDecoration: 'none',
+            })}
+          >
+            {link.label} <span mix={css({ color: '#8d8579' })}>{link.count}</span>
           </a>
         ))}
       </nav>
@@ -636,6 +653,7 @@ function BulkAccept(handle: Handle<{ batchId: string; kind: BulkKind; count: num
 interface ReasonGroup {
   key: string
   title: string
+  short: string
   blurb: string
   entries: ReviewRow[]
 }
@@ -800,22 +818,6 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 </b>
                 , {model.uncertain.length} worth a look, and {model.notFound.length} we couldn't find.
               </p>
-              <JumpLinks
-                links={[
-                  ...uncertainGroups.map((group) => ({
-                    href: `#${groupAnchor(group.key)}`,
-                    label: `${group.title} (${group.entries.length})`,
-                  })),
-                  ...(model.notFound.length > 0
-                    ? [
-                        {
-                          href: `#${groupAnchor('not-found')}`,
-                          label: `Couldn't find (${model.notFound.length})`,
-                        },
-                      ]
-                    : []),
-                ]}
-              />
               {reviewsOnly && (
                 <p
                   mix={css({
@@ -1032,6 +1034,24 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   flexWrap: 'wrap',
                 })}
               >
+                <JumpLinks
+                  links={[
+                    ...uncertainGroups.map((group) => ({
+                      href: `#${groupAnchor(group.key)}`,
+                      label: group.short,
+                      count: group.entries.length,
+                    })),
+                    ...(model.notFound.length > 0
+                      ? [
+                          {
+                            href: `#${groupAnchor('not-found')}`,
+                            label: 'Not found',
+                            count: model.notFound.length,
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
                 <span mix={css({ fontSize: '13px', color: '#888', flex: '1 1 100%' })}>{saveLine}</span>
                 <form method="post" action={routes.profile.imports.save.href({ batchId })}>
                   <button type="submit" class="primary">
