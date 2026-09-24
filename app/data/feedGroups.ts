@@ -4,7 +4,7 @@ import type { FeedItem } from './feed.ts'
 // folds them behind a divider. Below this a run of rows reads fine as it is;
 // at it, one person's burst — a batch of generated runs, a library import —
 // starts pushing everyone else off the screen.
-export const MIN_GROUP_SIZE = 4
+export const MIN_GROUP_SIZE = 3
 
 // The most rows one group will hold. A group has to arrive whole, so a page
 // is extended past its limit to finish one (see loadFeedPage's callers); this

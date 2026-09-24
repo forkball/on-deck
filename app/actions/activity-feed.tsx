@@ -44,28 +44,27 @@ function FeedRow(handle: Handle<{ item: FeedItem }>) {
 // as that day alone.
 const RANGE_FORMAT = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 
-// What the divider says about the rows behind it: who, how many of what, and
-// over what stretch of time. Each of those is shared by every row in the group
+// What the divider says about the rows behind it: who, what, and over what
+// stretch of time. How many is the count badge's to say — see FeedGroup. Each of those is shared by every row in the group
 // — that is what groupKeyOf guarantees — so the sentence is true of all of them.
 function groupSummary(items: FeedItem[]): { who: string; what: string; when: string } {
   const first = items[0]
-  const count = items.length
 
   let who: string
   let what: string
   if (first.kind === 'run') {
     who = first.run.owner?.label ?? 'You'
-    what = `generated ${count} recommendations`
+    what = 'generated recommendations'
   } else {
     who = first.entry.actor.label
     // Named by type when the burst is all one type, which an import always is.
     const types = new Set(items.map((item) => (item.kind === 'log' ? item.entry.item?.type : null)))
     const [type] = types
-    what = `logged ${count} ${types.size === 1 && type ? mediaTypeUiFor(type).plural : 'titles'}`
+    what = `logged ${types.size === 1 && type ? mediaTypeUiFor(type).plural : 'titles'}`
   }
 
   // Newest first, so the oldest is last.
-  const when = RANGE_FORMAT.formatRange(new Date(items[count - 1].at), new Date(first.at))
+  const when = RANGE_FORMAT.formatRange(new Date(items[items.length - 1].at), new Date(first.at))
   return { who, what, when }
 }
 
@@ -92,6 +91,16 @@ const GROUP_STYLE = css({
   '& .chevron': { display: 'inline-block', transition: 'transform 120ms ease' },
   '& > details[open] > summary .chevron': { transform: 'rotate(90deg)' },
   '& .when': { color: '#888', fontSize: '12px' },
+  // Only while folded: open, the rows are right there to count.
+  '& .count': {
+    marginLeft: '6px',
+    padding: '1px 8px',
+    border: '1px solid #ccc',
+    borderRadius: '999px',
+    fontSize: '12px',
+    whiteSpace: 'nowrap',
+  },
+  '& > details[open] > summary .count': { display: 'none' },
 })
 
 const GROUP_BODY_STYLE = css({
@@ -109,6 +118,9 @@ const GROUP_BODY_STYLE = css({
 // chooses to fold a burst they've seen away; the divider still marks where one
 // person's run of activity starts and how far it reaches.
 //
+// Folded, the divider carries a count of the rows behind it, since nothing
+// else on screen says how much was put away.
+//
 // A native <details>, as Collapsible is, so toggling it needs no script — which
 // matters here, since appended pages arrive as markup and nothing hydrates them.
 function FeedGroup(handle: Handle<{ items: FeedItem[] }>) {
@@ -125,6 +137,7 @@ function FeedGroup(handle: Handle<{ items: FeedItem[] }>) {
                 ▸
               </span>{' '}
               <strong>{who}</strong> {what} <span class="when">· {when}</span>
+              <span class="count">{items.length} entries</span>
             </span>
           </summary>
           <ul mix={GROUP_BODY_STYLE}>
