@@ -130,7 +130,7 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
           <strong>You already have a recommendation like this.</strong>
         </p>
         <p mix={css({ margin: '0 0 12px', color: '#555' })}>
-          Those exact settings produced <a href={href}>{duplicate.name || 'an earlier run'}</a> on{' '}
+          Those exact settings produced {duplicate.name ? <em>{duplicate.name}</em> : 'an earlier run'} on{' '}
           {new Date(duplicate.createdAt).toLocaleDateString()}, and you haven't logged anything from it yet.
           Generating again will replace it with a different set of picks.
         </p>
