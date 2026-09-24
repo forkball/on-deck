@@ -30,8 +30,21 @@ describe('describeParams', () => {
     assert.match(line?.modelNote ?? '', /No catalogue the app reads records/)
   })
 
+  // Genre is the half-and-half one: checked where Google Books has categories, kept
+  // on the model's word where it has none. The note says which, rather than
+  // implying the catalog confirmed every pick.
+  it('marks a book genre as only partly checked', () => {
+    assert.match(
+      lineFor('Genre', { genre: 'horror' }, 'book')?.modelNote ?? '',
+      /none at all for many older works/,
+    )
+  })
+
+  it('leaves a movie genre unmarked, since its search hit answers', () => {
+    assert.equal(lineFor('Genre', { genre: 'horror' }, 'movie')?.modelNote, undefined)
+  })
+
   it('leaves the catalog-checked levers unmarked', () => {
-    assert.equal(lineFor('Genre', { genre: 'horror' }, 'book')?.modelNote, undefined)
     assert.equal(lineFor('Length', { length: 'short' }, 'book')?.modelNote, undefined)
     assert.equal(lineFor('Based on', {}, 'book')?.modelNote, undefined)
   })

@@ -340,6 +340,48 @@ describe('filterByGenre', () => {
     assert.deepEqual(kept, [])
   })
 
+  // Run 125 in production: 13 lookups, 0 kept, an empty romance run. Google Books
+  // has no categories at all for a great many older works, and requiring a positive
+  // tag read every one of them as "some other genre".
+  it('keeps a book whose record carries no categories at all', async () => {
+    const kept = await filterByGenre(
+      [book('uncatalogued', 'A', null, [])],
+      'book',
+      'romance',
+      async (_type, id) => detail(id, null, []),
+    )
+
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['uncatalogued'],
+    )
+  })
+
+  it('still drops a book whose record names a different genre', async () => {
+    const kept = await filterByGenre(
+      [book('horror novel', 'A', null, [])],
+      'book',
+      'romance',
+      async (_type, id) => detail(id, null, ['horror']),
+    )
+
+    assert.deepEqual(kept, [])
+  })
+
+  // The same emptiness on a provider that answers genres on search is a sparse or
+  // placeholder entry, not an uncatalogued work — TMDB omits genre_ids on those —
+  // and keeping them would put junk in front of someone.
+  it('does not extend the benefit of the doubt to a medium whose search answers', async () => {
+    const kept = await filterByGenre(
+      [book('sparse entry', 'A', null, [])],
+      'movie',
+      'romance',
+      async () => null,
+    )
+
+    assert.deepEqual(kept, [])
+  })
+
   it('reads a miss on a hit that does answer genres as the answer', async () => {
     const asked: string[] = []
     const kept = await filterByGenre(

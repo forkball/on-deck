@@ -12,7 +12,7 @@ import { Document } from '../../ui/components/document.tsx'
 import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
 import { StarRatingInput } from '../../ui/components/star-rating.tsx'
 import { StatusSelect } from '../../ui/components/status-select.tsx'
-import { decadeComesFromPick } from '../../data/recommendations/matching.ts'
+import { decadeComesFromPick, genreMissNeedsLookup } from '../../data/recommendations/matching.ts'
 import { ModelProvided } from './model-provided.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { PlatformList } from '../../ui/components/platform-list.tsx'
@@ -44,6 +44,10 @@ export interface ParamLine {
   modelNote?: string
 }
 
+const BOOK_GENRE_NOTE =
+  "Checked against Google Books' categories wherever it has them. It has none at all for " +
+  "many older works, and those were kept on the model's word rather than thrown away."
+
 const BOOK_YEAR_NOTE =
   'Applied from the year the model gave for each book. Google Books dates editions, ' +
   'not works — its record for Dune says 2005 — so there is no catalogue year to check this against.'
@@ -56,7 +60,12 @@ export function describeParams(params: GenerationParams, mediaType: MediaType): 
   const lines: ParamLine[] = [
     { text: `Based on: ${params.sourceTypes.map((type) => SOURCE_LABELS[type]).join(', ')}` },
   ]
-  if (params.genre) lines.push({ text: `Genre: ${params.genre.replace(/^./, (c) => c.toUpperCase())}` })
+  if (params.genre) {
+    lines.push({
+      text: `Genre: ${params.genre.replace(/^./, (c) => c.toUpperCase())}`,
+      modelNote: genreMissNeedsLookup(mediaType) ? BOOK_GENRE_NOTE : undefined,
+    })
+  }
   if (params.decade != null) {
     const label =
       params.decadeRelation === 'before'
