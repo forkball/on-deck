@@ -30,6 +30,10 @@ function recordUsage(name: string, maxTokens: number, response: Anthropic.Messag
 export async function requestStructured<T>(
   name: string,
   params: Anthropic.MessageCreateParamsNonStreaming,
+  // Handed the answer as it arrived, before parsing. The picks call keeps it, so a
+  // run that came back wrong can be read rather than guessed at — see
+  // transcripts.ts.
+  onRaw?: (text: string) => void,
 ): Promise<T> {
   const response = await track(name, () => claude.messages.create(params))
 
@@ -40,5 +44,7 @@ export async function requestStructured<T>(
   if (!textBlock) {
     throw new Error(`No text block in Claude response — stop_reason: ${response.stop_reason}`)
   }
+
+  onRaw?.(textBlock.text)
   return JSON.parse(textBlock.text) as T
 }

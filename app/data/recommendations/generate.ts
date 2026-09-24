@@ -41,7 +41,8 @@ import {
   type GenerationParams,
   type RecommendationResult,
 } from './runs.ts'
-import { emptyDrops, logPickTally } from './tally.ts'
+import { emptyDrops, logPickTally, type PickTally } from './tally.ts'
+import { finishTranscript, startTranscript } from './transcripts.ts'
 import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
 
@@ -96,6 +97,9 @@ export interface GenerateOptions {
   // group has logged, and charged to its own once-a-day cap rather than the
   // general allowance. Same queue, same stages, same tables.
   lucky?: boolean
+  // The job this run is being made for, recorded on its transcript so a run can be
+  // traced back from the queue.
+  jobId?: string
 }
 
 // A run, or the model's own answer kept when nothing could confirm it. Callers
@@ -216,11 +220,28 @@ export async function generateRecommendations(
   const { titles: excluded, externalIds: excludedExternalIds } = buildExclusions(exclusionLogs, { lucky })
 
   let picks: Pick[]
+  // Null on a resumed run: the model was asked on the attempt before this one, and
+  // that attempt kept its own transcript.
+  let transcriptId: number | null = null
   if (checkpoint.picks?.length) {
     picks = checkpoint.picks
   } else {
     enterPhase('picks')
-    picks = await requestPicks(profiles, excluded, filters, mediaType, profileTypes)
+    const asked = await requestPicks(profiles, excluded, filters, mediaType, profileTypes)
+    picks = asked.picks
+    // Before anything is done with the answer, so a run that dies in the stages
+    // below still leaves what was asked and what came back.
+    transcriptId = await startTranscript(db, {
+      userId: requestingUserId,
+      jobId: options.jobId,
+      mediaType,
+      filters,
+      prompt: asked.prompt,
+      response: asked.response,
+    }).catch((error) => {
+      console.warn('[generation] transcript could not be started:', error)
+      return null
+    })
     checkpoint = { ...checkpoint, picks }
     onCheckpoint(checkpoint)
   }
@@ -298,6 +319,7 @@ export async function generateRecommendations(
   }
 
   let results: RecommendationResult[]
+  let tally: PickTally | null = null
 
   if (checkpoint.verified?.length) {
     const ids = checkpoint.verified.map((entry) => entry.mediaItemId)
@@ -335,12 +357,13 @@ export async function generateRecommendations(
 
     // Only on this path — a resumed run skipped verification, and a tally
     // missing a stage reads as though everything was counted.
-    logPickTally({
+    tally = {
       requested: picks.length,
       kept: results.length,
       surplus: verified.length - results.length,
       dropped: drops,
-    })
+    }
+    logPickTally(tally)
   }
 
   // A run with nothing in it is not a run. Saving one spends the day's allowance,
@@ -352,7 +375,12 @@ export async function generateRecommendations(
   // Thrown rather than returned: failJob puts a GenerationError's message in front
   // of whoever is waiting, and the job lands as failed rather than as a completed
   // run that isn't one.
-  if (results.length === 0) throw new GenerationError(nothingLeftMessage(filters, mediaType))
+  if (results.length === 0) {
+    // Before the throw: an empty run is the case most worth being able to read
+    // afterwards, and it leaves no run row to hang the numbers off.
+    if (transcriptId != null && tally) await finishTranscript(db, transcriptId, { tally })
+    throw new GenerationError(nothingLeftMessage(filters, mediaType))
+  }
 
   const runId = await track('run.save', () =>
     saveRun(db, {
@@ -393,6 +421,10 @@ export async function generateRecommendations(
     track('run.notify', () => notifyMutualFollowers(db, requestingUserId, memberUserIds, runId)),
     track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType, { lucky })),
   ])
+
+  // Off the critical path deliberately: nobody's run should fail over its own
+  // record of itself, which is why finishTranscript swallows its errors.
+  if (transcriptId != null && tally) await finishTranscript(db, transcriptId, { runId, tally })
 
   return { kind: 'run', runId, prunedOldestRun }
 }

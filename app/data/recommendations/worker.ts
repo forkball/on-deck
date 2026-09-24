@@ -94,7 +94,7 @@ export function startGenerationWorker(): GenerationWorker {
             latest = checkpoint
             void saveCheckpoint(db, job.id, checkpoint).catch(() => {})
           },
-          { lucky: lucky === true },
+          { lucky: lucky === true, jobId: job.id },
         ),
       )
 
