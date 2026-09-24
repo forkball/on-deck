@@ -6,6 +6,7 @@ import {
   classifyMatch,
   conflictFields,
   describeReason,
+  bulkKind,
   inlineAlternates,
   isBulkAcceptable,
   isSubtitleOnly,
@@ -97,6 +98,23 @@ describe('isBulkAcceptable', () => {
 
   it('does not sweep up a different-looking title', () => {
     assert.ok(!isBulkAcceptable(classifyMatch({ title: 'Solyaris', year: 1972 }, film('Solaris', 1972))))
+  })
+})
+
+describe('bulkKind', () => {
+  const noYear = classifyMatch({ title: 'Heat', year: null }, film('Heat', 1995))
+
+  it('clears a no-year row that has only one film by that name', () => {
+    assert.equal(bulkKind(noYear, 'Heat', film('Heat', 1995), 1), 'sole')
+  })
+
+  it('leaves a no-year row with namesakes to be answered', () => {
+    assert.equal(bulkKind(noYear, 'Heat', film('Heat', 1995), 2), null)
+  })
+
+  // Staged before namesakes were kept: nothing says it is the only one.
+  it('does not assume a row with no namesakes recorded is the only one', () => {
+    assert.equal(bulkKind(noYear, 'Heat', film('Heat', 1995), null), null)
   })
 })
 
@@ -203,7 +221,7 @@ describe('describeReason', () => {
 
 describe('reasonGroup', () => {
   it('uses the media noun it is given', () => {
-    assert.match(reasonGroup('no_year', 'book', 'books').blurb, /Several books/)
+    assert.match(reasonGroup('no_year', 'book', 'books').blurb, /no year for these books/)
   })
 
   it('has a fallback for a reason without its own group', () => {
@@ -266,14 +284,22 @@ describe('inlineAlternates', () => {
     )
   })
 
-  it('is nothing to choose between when there is only one namesake', () => {
+  // Every no-year card asks the same way, so one namesake is one button —
+  // and a list of one is what marks it as the only film by that name.
+  it('offers the lone namesake on its own', () => {
     const results = [film('Little Women: LA Story', 2016, 'la')]
-    assert.equal(inlineAlternates(row, noYear, film('Little Women', 2019, 'lw19'), results), null)
+    assert.deepEqual(
+      inlineAlternates(row, noYear, film('Little Women', 2019, 'lw19'), results)?.map((a) => a.externalId),
+      ['lw19'],
+    )
   })
 
-  it('hands a long list of namesakes to the picker instead', () => {
+  it('keeps our pick and the next two of a long list, leaving the rest to the picker', () => {
     const results = [1933, 1949, 1994, 2018].map((year) => film('Little Women', year, `lw${year}`))
-    assert.equal(inlineAlternates(row, noYear, film('Little Women', 2019, 'lw19'), results), null)
+    assert.deepEqual(
+      inlineAlternates(row, noYear, film('Little Women', 2019, 'lw19'), results)?.map((a) => a.externalId),
+      ['lw19', 'lw1933', 'lw1949'],
+    )
   })
 
   it('only applies to rows flagged for having no year', () => {

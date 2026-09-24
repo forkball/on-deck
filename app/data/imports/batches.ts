@@ -209,8 +209,9 @@ function toStagedRow(row: ImportRow): StagedRow {
 }
 
 // Written by matching as an array of candidates. Anything else — null, or a
-// shape from some future change — reads as none, which leaves the card on the
-// picker rather than rendering buttons from something it can't trust.
+// shape from some future change — reads as none, and the card falls back to a
+// single button for matching's own pick rather than render buttons from
+// something it can't trust.
 function readAlternates(value: unknown): CandidateLike[] | null {
   if (!Array.isArray(value)) return null
   const alternates = value.filter(
@@ -221,7 +222,7 @@ function readAlternates(value: unknown): CandidateLike[] | null {
       typeof entry.title === 'string' &&
       (entry.releaseYear === null || typeof entry.releaseYear === 'number'),
   )
-  return alternates.length === value.length && alternates.length >= 2 ? alternates : null
+  return alternates.length === value.length && alternates.length > 0 ? alternates : null
 }
 
 function toCatalogEntry(item: { id: number; title: string; metadata: unknown }): CatalogEntry {

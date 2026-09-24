@@ -8,9 +8,10 @@
 -- same-titled results turns that into one tap per row, with no extra catalog
 -- traffic on page view.
 --
--- Only set when there are two or three to choose between — see
--- inlineAlternates. Null for everything else, including every row staged before
--- this column existed, which simply keeps the picker.
+-- Set for every no-year row: up to three same-titled films, one when the
+-- catalog has only that one — see inlineAlternates. Null for other rows, and
+-- for every row staged before this column existed, whose cards fall back to a
+-- single button for matching's own pick.
 --
 -- Shape: [{ "externalId": "…", "title": "…", "releaseYear": 1994 | null }],
 -- matching's own pick first.

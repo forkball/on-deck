@@ -104,7 +104,7 @@ describe('buildReview bucketing', () => {
       'keep',
     )
 
-    assert.deepEqual(model.bulk, { year: [1], subtitle: [] })
+    assert.deepEqual(model.bulk, { year: [1], subtitle: [], sole: [] })
   })
 
   it('offers a subtitle added in the same year as a one-tap accept', () => {
@@ -149,7 +149,7 @@ describe('buildReview bucketing', () => {
     )
 
     // Not the one years out, and not a title that is simply different.
-    assert.deepEqual(model.bulk, { year: [], subtitle: [1] })
+    assert.deepEqual(model.bulk, { year: [], subtitle: [1], sole: [] })
   })
 })
 

@@ -422,9 +422,16 @@ function UncertainCard(
   return () => {
     const { batchId, entry, pastParticiple, next } = handle.props
     const { row, item, chip } = entry
-    // A no-year row with a couple of namesakes is a "which one?" question, so
-    // the card asks it directly rather than behind the picker.
-    const choices = row.reason === 'no_year' ? row.alternates : null
+    // Every no-year row is a "which one?" question, and every card in its group
+    // asks it the same way: the namesakes matching kept, or — for a row staged
+    // before it kept them — just its own pick.
+    const choices =
+      row.reason !== 'no_year'
+        ? null
+        : (row.alternates ??
+          (item && row.matchedExternalId
+            ? [{ externalId: row.matchedExternalId, title: item.title, releaseYear: item.releaseYear }]
+            : null))
 
     return (
       <Card attention id={rowAnchor(row.id)}>
@@ -626,8 +633,11 @@ function BulkAccept(handle: Handle<{ batchId: string; kind: BulkKind; count: num
     const { batchId, kind, count: n, of } = handle.props
     if (n === 0) return null
 
-    const what =
-      kind === 'year' ? 'within a year of your file' : 'your title with a subtitle added, same year'
+    const what = {
+      year: 'within a year of your file',
+      subtitle: 'your title with a subtitle added, same year',
+      sole: 'the only film by that name',
+    }[kind]
 
     return (
       <form
@@ -954,6 +964,14 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                           batchId={batchId}
                           kind="year"
                           count={model.bulk.year.length}
+                          of={group.entries.length}
+                        />
+                      )}
+                      {group.key === 'no_year' && (
+                        <BulkAccept
+                          batchId={batchId}
+                          kind="sole"
+                          count={model.bulk.sole.length}
                           of={group.entries.length}
                         />
                       )}

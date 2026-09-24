@@ -198,10 +198,10 @@ export function buildReview(
   // legitimate way to finish a 400-row import.
   uncertain.sort((a, b) => suspicion(verdictOf(b.row)) - suspicion(verdictOf(a.row)))
 
-  const bulk: Record<BulkKind, number[]> = { year: [], subtitle: [] }
+  const bulk: Record<BulkKind, number[]> = { year: [], subtitle: [], sole: [] }
   for (const { row, item } of uncertain) {
     const match = item ? { externalId: '', title: item.title, releaseYear: item.releaseYear } : null
-    const kind = bulkKind(verdictOf(row), row.title, match)
+    const kind = bulkKind(verdictOf(row), row.title, match, row.alternates?.length ?? null)
     if (kind) bulk[kind].push(row.id)
   }
 

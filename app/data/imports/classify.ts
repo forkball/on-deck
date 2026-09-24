@@ -125,7 +125,7 @@ export function reasonGroup(
       return {
         title: 'No year in your file',
         short: 'No year',
-        blurb: `Several ${plural} share these names. Pick the one you meant.`,
+        blurb: `Your file gives no year for these ${plural}, and some names belong to more than one. Pick the one you meant.`,
       }
     case 'year_drift':
       return {
@@ -169,10 +169,20 @@ export function isSubtitleOnly(rowTitle: string, matchTitle: string): boolean {
 // Year drift within a year is the festival/re-release tail; a subtitle added
 // in the same year is the other long tail of a real export. Both leave anything
 // that could plausibly be a different film to be looked at one by one.
-export type BulkKind = 'year' | 'subtitle'
+//
+// The third is a no-year row whose title the catalog has only one film for:
+// nothing to tell apart, so nothing to ask. `namesakes` is how many same-titled
+// films matching kept for the row (inlineAlternates), null when it kept none.
+export type BulkKind = 'year' | 'subtitle' | 'sole'
 
-export function bulkKind(verdict: Verdict, rowTitle: string, match: CandidateLike | null): BulkKind | null {
+export function bulkKind(
+  verdict: Verdict,
+  rowTitle: string,
+  match: CandidateLike | null,
+  namesakes: number | null = null,
+): BulkKind | null {
   if (isBulkAcceptable(verdict)) return 'year'
+  if (verdict.reason === 'no_year' && namesakes === 1) return 'sole'
   if (
     verdict.reason === 'title_differs' &&
     verdict.yearDelta === 0 &&
@@ -266,11 +276,14 @@ function normalizeNote(note: string | null): string {
 // the default because it is the only direction that destroys nothing.
 export type ConflictChoice = 'keep' | 'take'
 
-// The same-titled films a no-year row could have meant, when there are few
-// enough to offer as buttons on the card. Two is the least that makes it a
-// choice; past three it is a list, and the picker — with posters and a search
-// box — is the better place to choose from one. Matching's own pick leads, so
-// the card reads "ours, or one of these".
+// The same-titled films a no-year row could have meant, as the year buttons its
+// card offers. Every no-year card asks "which one?" the same way, so this is
+// never "no choices": one namesake is one button, and past three it is the
+// three matching ranked first, with the picker behind "Something else…" for the
+// rest. Matching's own pick leads, so the card reads "ours, or one of these".
+//
+// A single entry therefore means the catalog has exactly one film by that
+// name — which is what the "only film by that name" bulk accept relies on.
 export const MAX_INLINE_ALTERNATES = 3
 
 export function inlineAlternates(
@@ -291,5 +304,5 @@ export function inlineAlternates(
     namesakes.push({ externalId: result.externalId, title: result.title, releaseYear: result.releaseYear })
   }
 
-  return namesakes.length >= 2 && namesakes.length <= MAX_INLINE_ALTERNATES ? namesakes : null
+  return namesakes.slice(0, MAX_INLINE_ALTERNATES)
 }

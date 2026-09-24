@@ -221,7 +221,8 @@ export default createController(routes.profile.imports, {
       const db = context.get(Database)
       const { model } = await loadReview(db, batch)
 
-      const kind = context.get(FormData).get('kind') === 'subtitle' ? 'subtitle' : 'year'
+      const requested = context.get(FormData).get('kind')
+      const kind = requested === 'subtitle' || requested === 'sole' ? requested : 'year'
 
       await acceptBulk(db, batch, model.bulk[kind])
       return backToReview(batch)
