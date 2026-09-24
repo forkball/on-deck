@@ -614,6 +614,10 @@ function drawerStyle(): Parameters<typeof css>[0] {
     '& .drawer-panel': { display: 'none', maxHeight: '45vh', overflowY: 'auto', padding: '4px 0 10px' },
     '& .drawer-confirm': { display: 'none', padding: '4px 0 10px' },
     '& .drawer-arrow::before': { content: '"▲"' },
+    // Laid out here rather than with its own css(): each css() is a separate
+    // cascade layer, and a later layer beats this one whatever the selector,
+    // so a row styled on its own could never be hidden from here.
+    '& .drawer-row': { display: 'flex', alignItems: 'center', gap: '8px 12px' },
     [`${open} .drawer-panel`]: { display: 'block' },
     [`${open} .drawer-arrow::before`]: { content: '"▼"' },
     '@media (min-width: 720px)': {
@@ -625,6 +629,9 @@ function drawerStyle(): Parameters<typeof css>[0] {
     },
     [`${confirming} .drawer-confirm`]: { display: 'block' },
     [`${confirming} .drawer-panel`]: { display: 'none' },
+    // The confirmation stands in for the bar's own row while it is open, so
+    // there is one Save on screen — the one that saves — rather than two.
+    [`${confirming} .drawer-row`]: { display: 'none' },
   }
   return style as Parameters<typeof css>[0]
 }
@@ -734,14 +741,22 @@ function ReviewDrawer(
             </p>
             <div mix={css({ display: 'flex', alignItems: 'center', gap: '8px 14px', flexWrap: 'wrap' })}>
               {saveForm(`Yes, ${saveLabel.toLowerCase()}`)}
-              <label for={CONFIRM_TOGGLE} class="linkish" mix={css({ fontSize: '14px', cursor: 'pointer' })}>
+              <label
+                for={CONFIRM_TOGGLE}
+                mix={css({
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  color: '#6b6459',
+                  textDecoration: 'underline',
+                })}
+              >
                 Go back
               </label>
             </div>
           </div>
         )}
 
-        <div mix={css({ display: 'flex', alignItems: 'center', gap: '8px 12px' })}>
+        <div class="drawer-row">
           <label
             for={DRAWER_TOGGLE}
             mix={css({ flex: '1 1 auto', minWidth: 0, cursor: 'pointer', fontSize: '13px', color: '#555' })}
