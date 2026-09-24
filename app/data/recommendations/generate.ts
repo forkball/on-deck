@@ -98,10 +98,11 @@ export interface GenerateOptions {
   lucky?: boolean
 }
 
-export interface GenerateRecommendationsOutcome {
-  runId: number
-  prunedOldestRun: boolean
-}
+// A run, or the model's own answer kept when nothing could confirm it. Callers
+// have to look at which, because the two land on different pages.
+export type GenerateRecommendationsOutcome =
+  | { kind: 'run'; runId: number; prunedOldestRun: boolean }
+  | { kind: 'unconfirmed'; unconfirmedRunId: number }
 
 export interface MissingSourceLogs {
   userId: number
@@ -393,7 +394,7 @@ export async function generateRecommendations(
     track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType, { lucky })),
   ])
 
-  return { runId, prunedOldestRun }
+  return { kind: 'run', runId, prunedOldestRun }
 }
 
 // Mutual follows only — the picker requires one direction, this requires the

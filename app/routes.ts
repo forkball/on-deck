@@ -111,6 +111,8 @@ export const routes = route({
     luckyPage: get('lucky'),
     generating: get('generating/:jobId'),
     status: get('status/:jobId'),
+    // Ahead of `show`, which would otherwise take 'unconfirmed' for a run id.
+    unconfirmed: get('unconfirmed/:unconfirmedId'),
     show: get(':runId'),
   }),
   users: route('users', {

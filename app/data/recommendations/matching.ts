@@ -4,7 +4,7 @@ import { pool } from '../db.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { requestStructured } from './claude.ts'
-import { GenerationError } from './errors.ts'
+import { CatalogUnavailableError, GenerationError } from './errors.ts'
 import type { DecadeRelation, Pick } from './picks.ts'
 import { track } from './timings.ts'
 
@@ -263,7 +263,7 @@ async function forEachWithConcurrency<T>(
 
 // One wording for one condition, however many stages reach it.
 function catalogDown(what: string): GenerationError {
-  return new GenerationError(
+  return new CatalogUnavailableError(
     `${what} — the catalog isn't answering right now. Try generating again in a few minutes.`,
   )
 }

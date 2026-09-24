@@ -11,11 +11,12 @@ import {
   touchJobClaim,
   type ClaimedJob,
 } from './jobs.ts'
-import { GenerationError } from './errors.ts'
+import { CatalogUnavailableError, GenerationError } from './errors.ts'
 import { generateRecommendations, type GenerationCheckpoint } from './generate.ts'
 import type { MediaType } from '../mediaItems.ts'
 import type { RecommendationFilters } from './picks.ts'
 import { saveRunTimings } from './runs.ts'
+import { saveUnconfirmedRun } from './unconfirmed.ts'
 import { startTimings, summarizeTimings, type RunTimings } from './timings.ts'
 
 // Drains the recommendation queue through a fixed number of slots. Every
@@ -62,6 +63,11 @@ export function startGenerationWorker(): GenerationWorker {
       void touchJobClaim(db, job.id).catch(() => {})
     }, HEARTBEAT_MS)
 
+    // The picks as of the last checkpoint. Held here because the catch below needs
+    // them: a run the catalog killed still has the model's answer in hand, and the
+    // claimed job's copy is whatever a previous attempt left behind.
+    let latest = (job.checkpoint ?? {}) as GenerationCheckpoint
+
     try {
       const { memberIds, mediaType, filters, sourceTypes, name, lucky } = job.params
 
@@ -82,14 +88,42 @@ export function startGenerationWorker(): GenerationWorker {
           name,
           (phase) => void setPhase(db, job.id, phase).catch(() => {}),
           job.checkpoint as GenerationCheckpoint,
-          (checkpoint) => void saveCheckpoint(db, job.id, checkpoint).catch(() => {}),
+          (checkpoint) => {
+            latest = checkpoint
+            void saveCheckpoint(db, job.id, checkpoint).catch(() => {})
+          },
           { lucky: lucky === true },
         ),
       )
 
-      runId = outcome.runId
-      await completeJob(db, job.id, outcome.runId, outcome.prunedOldestRun)
+      runId = outcome.kind === 'run' ? outcome.runId : null
+      await completeJob(db, job.id, outcome)
     } catch (error) {
+      // The catalog went quiet, but the model already answered. Rather than losing
+      // that answer to a retry someone has to ask for — and that costs another
+      // profile and picks call — it is kept as an unconfirmed run: the picks, the
+      // filters they were made under, and the line explaining what couldn't be
+      // checked. Nothing is upserted into the catalog and nothing can be logged
+      // from it, because nothing here has been confirmed to exist.
+      if (error instanceof CatalogUnavailableError && latest.picks?.length) {
+        try {
+          const unconfirmedRunId = await saveUnconfirmedRun(db, {
+            userId: job.userId,
+            mediaType: job.params.mediaType as MediaType,
+            filters: job.params.filters as RecommendationFilters,
+            picks: latest.picks,
+            reason: error.message,
+          })
+          await completeJob(db, job.id, { kind: 'unconfirmed', unconfirmedRunId })
+          return
+        } catch (saveError) {
+          // Falls through to the ordinary failure below: someone waiting on a run
+          // that couldn't be salvaged should be told the catalog is down, not that
+          // saving what it couldn't confirm also failed.
+          console.error(`[generation] job=${job.id} could not keep unconfirmed picks:`, saveError)
+        }
+      }
+
       // An actual error, so retrying would reproduce it. Interrupted jobs never
       // reach here — their machine died — and the staleness sweep recovers them.
       //

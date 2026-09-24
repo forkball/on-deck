@@ -7,3 +7,14 @@ export class GenerationError extends Error {
     this.name = 'GenerationError'
   }
 }
+
+// The catalog wouldn't answer — distinct from the other generation failures
+// because the run is recoverable from here: the model has already said what it
+// thinks, and that answer is worth showing even though nothing could confirm it.
+// See generate.ts, which turns one of these into an unconfirmed run.
+export class CatalogUnavailableError extends GenerationError {
+  constructor(message: string) {
+    super(message)
+    this.name = 'CatalogUnavailableError'
+  }
+}
