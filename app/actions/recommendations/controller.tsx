@@ -305,18 +305,13 @@ export default createController(routes.recommendations, {
 
       // No pre-check: the insert refuses a second active run for this user, so
       // two requests arriving together can't both get through.
-      const enqueued = await enqueueJob(
-        db,
-        auth.identity.id,
-        {
-          memberIds,
-          mediaType,
-          filters: filters as Record<string, unknown>,
-          sourceTypes,
-          name: parsed.value.name || undefined,
-        },
-        { withLengthCheck: filters.length != null },
-      )
+      const enqueued = await enqueueJob(db, auth.identity.id, {
+        memberIds,
+        mediaType,
+        filters: filters as Record<string, unknown>,
+        sourceTypes,
+        name: parsed.value.name || undefined,
+      })
 
       if (!enqueued.ok) {
         return context.render(
@@ -402,19 +397,14 @@ export default createController(routes.recommendations, {
 
       // No duplicate check: a lucky run carries no levers to match on, and its
       // once-a-day cap already rules out drawing the same thing twice in a day.
-      const enqueued = await enqueueJob(
-        db,
-        auth.identity.id,
-        {
-          memberIds,
-          mediaType,
-          filters: {},
-          sourceTypes: [mediaType],
-          name: LUCKY_RUN_NAME,
-          lucky: true,
-        },
-        { withLengthCheck: false },
-      )
+      const enqueued = await enqueueJob(db, auth.identity.id, {
+        memberIds,
+        mediaType,
+        filters: {},
+        sourceTypes: [mediaType],
+        name: LUCKY_RUN_NAME,
+        lucky: true,
+      })
 
       if (!enqueued.ok) {
         return context.render(

@@ -11,10 +11,13 @@ import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
 import { recordRunAgainstDailyLimit, runCostFor } from './dailyLimit.ts'
 import { buildExclusions } from './exclusions.ts'
-import type { GenerationPhase } from './jobs.ts'
+import { phasesFor, type GenerationPhase } from './jobs.ts'
 import {
+  decadeYear,
+  filterByGenre,
   filterByLength,
   matchesDecade,
+  matchesSeries,
   resolveFromCatalog,
   searchForPicks,
   titlesLikelyMatch,
@@ -227,14 +230,17 @@ export async function generateRecommendations(
       drops.titleMismatch++
       continue
     }
+    // Genre is checked after this loop, not in it: for books the search hit
+    // can't answer it. `series` is checked against the pick's own label, since no
+    // catalog carries the answer — see matchesSeries.
     if (
-      (filters.genre && !match.tags.includes(filters.genre)) ||
-      (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade, filters.decadeRelation)) ||
+      (filters.decade != null &&
+        !matchesDecade(decadeYear(mediaType, pick, match), filters.decade, filters.decadeRelation)) ||
       (filters.playerType && !match.tags.includes(filters.playerType)) ||
       (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) ||
       // Platforms are their own field, not tags, and compare by family.
       (filters.platform && !platformFamilies(match.platforms ?? []).includes(filters.platform)) ||
-      (filters.series && !match.tags.includes(filters.series))
+      (filters.series && !matchesSeries(pick, filters.series))
     ) {
       drops.filtered++
       continue
@@ -245,10 +251,19 @@ export async function generateRecommendations(
   }
 
   let candidates: Candidate[] = shortlist
+  if (filters.genre) {
+    // The same function the job's phase list was built from, so a stage entered
+    // here is a stage that list holds.
+    if (phasesFor({ mediaType, filters }).includes('genres')) enterPhase('genres')
+    const inGenre = await filterByGenre(candidates, mediaType, filters.genre)
+    drops.genre = candidates.length - inGenre.length
+    candidates = inGenre
+  }
   if (filters.length) {
     enterPhase('lengths')
-    candidates = await filterByLength(shortlist, mediaType, filters.length)
-    drops.length = shortlist.length - candidates.length
+    const atLength = await filterByLength(candidates, mediaType, filters.length)
+    drops.length = candidates.length - atLength.length
+    candidates = atLength
   }
 
   let results: RecommendationResult[]

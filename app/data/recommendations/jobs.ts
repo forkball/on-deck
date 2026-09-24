@@ -1,12 +1,21 @@
 import { lt } from 'remix/data-table'
 
 import { pool, type Db } from '../db.ts'
+import type { MediaType } from '../mediaItems.ts'
+import { genreMissNeedsLookup } from './matching.ts'
 import { recommendationJobs, type RecommendationJob } from '../schema.ts'
 import type { RunTimings } from './timings.ts'
 
 // In the database, not process memory: the POST and the poll that follows it can
 // land on different machines.
-export type GenerationPhase = 'profiles' | 'picks' | 'matching' | 'lengths' | 'verifying' | 'saving'
+export type GenerationPhase =
+  | 'profiles'
+  | 'picks'
+  | 'matching'
+  | 'genres'
+  | 'lengths'
+  | 'verifying'
+  | 'saving'
 
 // One per real await in generateRecommendations — adding a stage there means
 // adding it here too.
@@ -14,6 +23,7 @@ export const PHASE_LABELS: Record<GenerationPhase, string> = {
   profiles: 'Reading what everyone has logged…',
   picks: 'Choosing picks…',
   matching: 'Looking each one up…',
+  genres: 'Checking genres…',
   lengths: 'Checking lengths…',
   verifying: 'Making sure they match…',
   saving: 'Saving your picks…',
@@ -23,6 +33,7 @@ export const PHASE_ORDER: GenerationPhase[] = [
   'profiles',
   'picks',
   'matching',
+  'genres',
   'lengths',
   'verifying',
   'saving',
@@ -34,8 +45,8 @@ export interface GenerationJob {
   userId: number
   status: JobStatus
   queuedAhead?: number
-  // Only the stages this run will hit — the length check runs only when that
-  // lever is set.
+  // Only the stages this run will hit — the genre and length checks each run
+  // only when their lever is set, and the genre one only when it costs lookups.
   phases: GenerationPhase[]
   phase: GenerationPhase
   runId?: number
@@ -83,6 +94,28 @@ export interface JobParams {
   lucky?: boolean
 }
 
+// The stages a run with these params will actually reach, in order.
+//
+// Read from the params rather than passed alongside them: a caller computing this
+// and a run entering the stages are two statements of one fact, and the run is the
+// one that can't be wrong. generateRecommendations asks this too, so a stage it
+// enters is a stage the progress list already holds — a phase missing from that
+// list reads as a bar that has stalled.
+//
+// The genre check is a stage only where it costs a round of lookups. Everywhere
+// else the genre is read off the search hit inside `matching`, which is already
+// its own stage.
+export function phasesFor(params: {
+  mediaType: string
+  filters: { genre?: unknown; length?: unknown }
+}): GenerationPhase[] {
+  const skipped = new Set<GenerationPhase>()
+  if (params.filters.genre == null || !genreMissNeedsLookup(params.mediaType as MediaType))
+    skipped.add('genres')
+  if (params.filters.length == null) skipped.add('lengths')
+  return PHASE_ORDER.filter((phase) => !skipped.has(phase))
+}
+
 // `active_job` when the user already has one queued or running.
 export type EnqueueJobResult = { ok: true; jobId: string } | { ok: false; reason: 'active_job' }
 
@@ -90,17 +123,12 @@ export type EnqueueJobResult = { ok: true; jobId: string } | { ok: false; reason
 // index (see the 20260816120000 migration) is what makes one-per-user hold under
 // concurrent requests — reading first and inserting after leaves a window two
 // requests can both pass through.
-export async function enqueueJob(
-  db: Db,
-  userId: number,
-  params: JobParams,
-  options: { withLengthCheck: boolean },
-): Promise<EnqueueJobResult> {
+export async function enqueueJob(db: Db, userId: number, params: JobParams): Promise<EnqueueJobResult> {
   await sweep(db)
 
   const id = crypto.randomUUID()
   const now = Date.now()
-  const phases = options.withLengthCheck ? PHASE_ORDER : PHASE_ORDER.filter((phase) => phase !== 'lengths')
+  const phases = phasesFor(params)
 
   const { rows } = await pool.query<{ id: string }>(
     `insert into recommendation_jobs

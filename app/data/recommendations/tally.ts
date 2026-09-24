@@ -5,6 +5,7 @@ export interface PickDrops {
   duplicate: number
   titleMismatch: number
   filtered: number
+  genre: number
   length: number
   unverified: number
 }
@@ -25,6 +26,7 @@ export function emptyDrops(): PickDrops {
     duplicate: 0,
     titleMismatch: 0,
     filtered: 0,
+    genre: 0,
     length: 0,
     unverified: 0,
   }
@@ -50,6 +52,7 @@ const DROP_LABELS: Record<keyof PickDrops, string> = {
   duplicate: 'duplicate',
   titleMismatch: 'title-mismatch',
   filtered: 'filtered',
+  genre: 'genre',
   length: 'length',
   unverified: 'unverified',
 }

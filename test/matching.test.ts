@@ -3,6 +3,9 @@ import { describe, it } from 'node:test'
 
 import {
   applyVerdicts,
+  decadeYear,
+  matchesSeries,
+  filterByGenre,
   filterByLength,
   matchesDecade,
   searchForPicks,
@@ -60,6 +63,50 @@ describe('matchesDecade', () => {
     for (const relation of ['before', 'within', 'after'] as const) {
       assert.ok(!matchesDecade(null, 1990, relation))
     }
+  })
+})
+
+describe('matchesSeries', () => {
+  const pick = (part_of_series?: boolean) => ({
+    title: 'Lords and Ladies',
+    year: 1992,
+    reason: '',
+    part_of_series,
+  })
+
+  it('holds the model to the label it gave', () => {
+    assert.ok(matchesSeries(pick(true), 'series'))
+    assert.ok(!matchesSeries(pick(false), 'series'))
+    assert.ok(matchesSeries(pick(false), 'standalone'))
+    assert.ok(!matchesSeries(pick(true), 'standalone'))
+  })
+
+  // A checkpoint written before the field was asked for. Dropping these would empty
+  // a resumed run for a reason that has nothing to do with the books.
+  it('reads an unlabelled pick as no answer rather than as standalone', () => {
+    assert.ok(matchesSeries(pick(undefined), 'series'))
+    assert.ok(matchesSeries(pick(undefined), 'standalone'))
+  })
+})
+
+describe('decadeYear', () => {
+  const pick = { title: 'Dune', year: 1965, reason: '' }
+  // What Google Books answers for Dune: a 2005 reprint.
+  const edition = { releaseYear: 2005 } as unknown as Parameters<typeof decadeYear>[2]
+
+  it('reads a book from the pick, since the catalog only holds an edition', () => {
+    assert.equal(decadeYear('book', pick, edition), 1965)
+    assert.ok(matchesDecade(decadeYear('book', pick, edition), 1960))
+  })
+
+  it('reads every other medium from the catalog, which releases once', () => {
+    assert.equal(decadeYear('movie', pick, edition), 2005)
+    assert.ok(!matchesDecade(decadeYear('movie', pick, edition), 1960))
+  })
+
+  it('passes an unknown catalog year through rather than substituting the pick', () => {
+    const undated = { releaseYear: null } as unknown as Parameters<typeof decadeYear>[2]
+    assert.equal(decadeYear('movie', pick, undated), null)
   })
 })
 
@@ -139,13 +186,14 @@ describe('applyVerdicts', () => {
   })
 })
 
-// A book candidate as the pipeline holds one: a search hit that may or may not
-// have carried its page count, plus the id a by-id lookup would be asked about.
-const book = (title: string, externalId: string, pageCount: number | null): Candidate =>
-  ({ pick: pickOf(title), match: { title, externalId, pageCount } }) as unknown as Candidate
+// A book candidate as the pipeline holds one: a search hit that may or may not have
+// carried its page count or its genres, plus the id a by-id lookup would be asked
+// about.
+const book = (title: string, externalId: string, pageCount: number | null, tags: string[] = []): Candidate =>
+  ({ pick: pickOf(title), match: { title, externalId, pageCount, tags } }) as unknown as Candidate
 
-const detail = (externalId: string, pageCount: number) =>
-  ({ title: externalId, externalId, pageCount }) as unknown as Awaited<ReturnType<CatalogLookup>>
+const detail = (externalId: string, pageCount: number | null, tags: string[] = []) =>
+  ({ title: externalId, externalId, pageCount, tags }) as unknown as Awaited<ReturnType<CatalogLookup>>
 
 describe('filterByLength', () => {
   it('reads the dimension off the search hit without paying for a lookup', async () => {
@@ -224,6 +272,127 @@ describe('filterByLength', () => {
       async (_type, externalId) => {
         if (externalId === 'B') throw new Error('Google Books lookup failed: 429')
         return detail(externalId, 100)
+      },
+    )
+
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['answered'],
+    )
+  })
+})
+
+describe('filterByGenre', () => {
+  it('trusts a tag the search hit carries without paying for a lookup', async () => {
+    const asked: string[] = []
+    const kept = await filterByGenre(
+      [book('tagged', 'A', null, ['science fiction']), book('other genre', 'B', null, ['romance'])],
+      'book',
+      'science fiction',
+      async (_type, externalId) => {
+        asked.push(externalId)
+        return null
+      },
+    )
+
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['tagged'],
+    )
+    assert.deepEqual(asked, ['B'])
+  })
+
+  // The bug this exists for: Google Books' search payload carries "Fiction" and
+  // nothing under it, so every fiction genre was dropping the whole shortlist.
+  it('keeps a book whose by-id record carries the genre its hit did not', async () => {
+    const kept = await filterByGenre(
+      [book('untagged', 'A', null, [])],
+      'book',
+      'science fiction',
+      async (_type, externalId) => detail(externalId, null, ['science fiction', 'classics']),
+    )
+
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['untagged'],
+    )
+  })
+
+  it('carries the detail record forward, so the length check reuses the lookup', async () => {
+    const kept = await filterByGenre(
+      [book('untagged', 'A', null, [])],
+      'book',
+      'romance',
+      async (_type, externalId) => detail(externalId, 320, ['romance']),
+    )
+
+    assert.equal(kept[0].match.pageCount, 320)
+  })
+
+  it('drops a book the by-id record says is a different genre', async () => {
+    const kept = await filterByGenre(
+      [book('untagged', 'A', null, [])],
+      'book',
+      'horror',
+      async (_type, externalId) => detail(externalId, null, ['romance']),
+    )
+
+    assert.deepEqual(kept, [])
+  })
+
+  it('reads a miss on a hit that does answer genres as the answer', async () => {
+    const asked: string[] = []
+    const kept = await filterByGenre(
+      [book('sci-fi film', 'A', null, ['science fiction']), book('romance film', 'B', null, ['romance'])],
+      'movie',
+      'science fiction',
+      async (_type, externalId) => {
+        asked.push(externalId)
+        return detail(externalId, null, ['science fiction'])
+      },
+    )
+
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['sci-fi film'],
+    )
+    assert.deepEqual(asked, [])
+  })
+
+  it('drops a candidate the provider throws on instead of failing the run', async () => {
+    const kept = await filterByGenre(
+      [book('tagged', 'A', null, ['horror']), book('unlookupable', 'B', null, [])],
+      'book',
+      'horror',
+      async (_type, externalId) => {
+        if (externalId === 'B') throw new Error('Google Books lookup failed: 429')
+        return null
+      },
+    )
+
+    assert.deepEqual(
+      kept.map((c) => c.pick.title),
+      ['tagged'],
+    )
+  })
+
+  it('says the catalog is down rather than saving an empty run', async () => {
+    await assert.rejects(
+      filterByGenre([book('unlookupable', 'B', null, [])], 'book', 'horror', async () => {
+        throw new Error('Google Books lookup failed: 429')
+      }),
+      /catalog isn't answering/,
+    )
+  })
+
+  it('keeps an answered candidate even when a sibling lookup threw', async () => {
+    const kept = await filterByGenre(
+      [book('answered', 'A', null, []), book('threw', 'B', null, [])],
+      'book',
+      'horror',
+      async (_type, externalId) => {
+        if (externalId === 'B') throw new Error('Google Books lookup failed: 429')
+        return detail(externalId, null, ['horror'])
       },
     )
 
