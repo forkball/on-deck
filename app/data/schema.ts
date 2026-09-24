@@ -197,6 +197,24 @@ export const recommendationRunMembers = table({
   },
 })
 
+// What was asked of the model and what it said back — see the migration for why
+// this is a table rather than a log line.
+export const generationTranscripts = table({
+  name: 'generation_transcripts',
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    user_id: c.integer().notNull().references('users', 'id'),
+    job_id: c.text(),
+    run_id: c.integer(),
+    media_type: c.text().notNull(),
+    params: c.text().notNull(),
+    prompt: c.text().notNull(),
+    response: c.text().notNull(),
+    tally: c.text(),
+    created_at: c.integer().notNull(),
+  },
+})
+
 // The model's answer when the catalog couldn't be reached — see the migration for
 // why these don't live in recommendation_runs.
 export const unconfirmedRuns = table({
@@ -304,6 +322,7 @@ export type UserMediaInteraction = TableRow<typeof userMediaInteractions>
 export type UserTasteProfile = TableRow<typeof userTasteProfiles>
 export type UserRecommendation = TableRow<typeof userRecommendations>
 export type UserFollow = TableRow<typeof userFollows>
+export type GenerationTranscript = TableRow<typeof generationTranscripts>
 export type UnconfirmedRun = TableRow<typeof unconfirmedRuns>
 export type RecommendationRun = TableRow<typeof recommendationRuns>
 export type RecommendationJob = TableRow<typeof recommendationJobs>

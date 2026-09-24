@@ -164,13 +164,21 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string, m
   return clauses.length > 0 ? ` ${clauses.join(' ')}` : ''
 }
 
+// The picks, plus what was said to get them. The caller keeps both — see
+// transcripts.ts for why they aren't simply logged.
+export interface PicksResult {
+  picks: Pick[]
+  prompt: string
+  response: string
+}
+
 export async function requestPicks(
   profiles: MemberProfile[] | MultiSourceMemberProfile[],
   excluded: ExcludedTitles,
   filters: RecommendationFilters = {},
   mediaType: MediaType = 'movie',
   sourceTypes: MediaType[] = ['movie'],
-): Promise<Pick[]> {
+): Promise<PicksResult> {
   const isGroup = profiles.length > 1
   const subject = isGroup ? null : profiles[0].label
   const noun = mediaTypeUiFor(mediaType).plural
@@ -215,31 +223,36 @@ export async function requestPicks(
   // call wants .stream() and get_final_message(), not a bigger ceiling.
   const maxTokens = Math.min(6000 + 3000 * profiles.length + (hasFilters ? 4000 : 0), 32000)
 
-  const { picks } = await requestStructured<{ picks: Pick[] }>('picks.model', {
-    model: 'claude-sonnet-5',
-    max_tokens: maxTokens,
-    output_config: {
-      effort: 'medium',
-      format: { type: 'json_schema', schema: picksSchema(filters.series != null) },
-    },
-    messages: [
-      {
-        role: 'user',
-        content:
-          prompt +
-          describeSeen(excluded.seen, noun, subject) +
-          (excluded.rejected.length > 0
-            ? subject
-              ? `\n\n${subject} has explicitly ruled these out as not interesting — never suggest them, and treat ` +
-                `them as a signal about what to steer away from more broadly: ` +
-                `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
-              : `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
-                `as a signal about what to steer away from more broadly: ` +
-                `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
-            : ''),
-      },
-    ],
-  })
+  const content =
+    prompt +
+    describeSeen(excluded.seen, noun, subject) +
+    (excluded.rejected.length > 0
+      ? subject
+        ? `\n\n${subject} has explicitly ruled these out as not interesting — never suggest them, and treat ` +
+          `them as a signal about what to steer away from more broadly: ` +
+          `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
+        : `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
+          `as a signal about what to steer away from more broadly: ` +
+          `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
+      : '')
 
-  return picks
+  let response = ''
+
+  const { picks } = await requestStructured<{ picks: Pick[] }>(
+    'picks.model',
+    {
+      model: 'claude-sonnet-5',
+      max_tokens: maxTokens,
+      output_config: {
+        effort: 'medium',
+        format: { type: 'json_schema', schema: picksSchema(filters.series != null) },
+      },
+      messages: [{ role: 'user', content }],
+    },
+    (raw) => {
+      response = raw
+    },
+  )
+
+  return { picks, prompt: content, response }
 }
