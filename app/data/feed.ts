@@ -1,4 +1,5 @@
 import type { Db } from './db.ts'
+import { groupKeyOf, MAX_GROUP_SIZE, trailingRunLength } from './feedGroups.ts'
 import { listFollowingLogActivity, type FollowingLogEntry } from './mediaItems.ts'
 import {
   listRecommendationRuns,
@@ -129,4 +130,44 @@ export async function loadFeedPage(
   }
 
   return { items, cursor: exhausted ? null : cursor }
+}
+
+// One page of the feed, run on past its limit to finish whatever group it ends
+// in — what the home page and its auto-loader actually ask for.
+//
+// The feed folds a burst of one person's rows behind a divider (see
+// feedGroups.ts), and that only works if the burst arrives whole: cut at a page
+// edge, a thirty-film import would come back as three dividers of ten, the
+// appended ones with no way to join the one already on the page. So the page
+// looks one step ahead for rows continuing its last one, and takes them.
+//
+// Two reads at most beyond the page itself: one ahead, as far as a group could
+// still grow, and — only when the continuation stopped short of what that read
+// returned — the same read again cut to exactly the rows taken, so the cursor
+// lands after the last of them rather than after rows the page didn't keep.
+export async function loadGroupedFeedPage(
+  db: Db,
+  userId: number,
+  limit: number,
+  from: FeedCursor = {},
+): Promise<FeedPage> {
+  const page = await loadFeedPage(db, userId, limit, from)
+  if (!page.cursor || page.items.length === 0) return page
+
+  const room = MAX_GROUP_SIZE - trailingRunLength(page.items)
+  if (room <= 0) return page
+
+  const key = groupKeyOf(page.items[page.items.length - 1])
+  const ahead = await loadFeedPage(db, userId, room, page.cursor)
+
+  let continuing = 0
+  while (continuing < ahead.items.length && groupKeyOf(ahead.items[continuing]) === key) continuing++
+  if (continuing === 0) return page
+
+  // The first `continuing` rows of the merged feed are the same rows whatever
+  // limit they are read at, so a read cut to that many is those rows exactly.
+  const taken =
+    continuing === ahead.items.length ? ahead : await loadFeedPage(db, userId, continuing, page.cursor)
+
+  return { items: [...page.items, ...taken.items], cursor: taken.cursor }
 }
