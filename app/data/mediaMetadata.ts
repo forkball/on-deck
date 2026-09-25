@@ -11,6 +11,9 @@ export interface MediaMetadata {
   creator: string | null
   images: string[]
   platforms: string[]
+  // What the provider called the series this belongs to. Empty for a medium whose
+  // catalog doesn't say — see CatalogSearchResult.series.
+  series: string[]
   // Lowercased genre labels from the source catalog. Covered by the GIN index
   // on this column, so `metadata @> '{"tags":["horror"]}'` avoids a scan.
   tags: string[]
@@ -52,6 +55,7 @@ function emptyMetadata(): MediaMetadata {
     creator: null,
     images: [],
     platforms: [],
+    series: [],
     tags: [],
     enrichedAt: null,
   }
@@ -78,6 +82,7 @@ export function parseMediaMetadata(metadata: unknown): MediaMetadata {
       creator: stringOrNull(parsed.creator),
       images: stringArray(parsed.images),
       platforms: stringArray(parsed.platforms),
+      series: stringArray(parsed.series),
       tags: stringArray(parsed.tags),
       enrichedAt: numberOrNull(parsed.enrichedAt),
     }

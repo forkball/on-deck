@@ -5,6 +5,7 @@ import {
   applyVerdicts,
   chooseMatch,
   seriesKey,
+  seriesKeysFor,
   decadeYear,
   matchesSeries,
   filterByGenre,
@@ -93,6 +94,43 @@ describe('seriesKey', () => {
     assert.equal(seriesKey(pick('')), null)
     assert.equal(seriesKey(pick('   ')), null)
     assert.equal(seriesKey(pick(undefined)), null)
+  })
+})
+
+describe('seriesKeysFor', () => {
+  const pick = (series_name?: string) => ({ title: 'x', year: 2023, reason: '', series_name })
+  const match = (series?: string[]) =>
+    ({ title: 'x', series }) as unknown as Parameters<typeof seriesKeysFor>[1]
+
+  // A game is placed by IGDB, which returns collections and franchises on search.
+  it('takes the catalog over the model when the catalog says', () => {
+    assert.deepEqual(seriesKeysFor(pick('something the model invented'), match(['Portal'])), ['portal'])
+  })
+
+  // Both groupings count: Zelda games share a franchise while sitting in different
+  // collections, and two games from one franchise are the complaint.
+  it('keeps every grouping the catalog names', () => {
+    assert.deepEqual(seriesKeysFor(pick(''), match(['Breath of the Wild', 'The Legend of Zelda'])), [
+      'breath of the wild',
+      'legend of zelda',
+    ])
+  })
+
+  it('normalises the catalog the same way as the model', () => {
+    assert.deepEqual(
+      seriesKeysFor(pick(''), match(['The Portal Collection'])),
+      seriesKeysFor(pick('Portal'), match()),
+    )
+  })
+
+  // Books, where no catalog carries it at all.
+  it('falls back to the model when the catalog is silent', () => {
+    assert.deepEqual(seriesKeysFor(pick('The Empyrean'), match()), ['empyrean'])
+    assert.deepEqual(seriesKeysFor(pick('The Empyrean'), match([])), ['empyrean'])
+  })
+
+  it('answers nothing for a standalone the catalog also says nothing about', () => {
+    assert.deepEqual(seriesKeysFor(pick(''), match()), [])
   })
 })
 

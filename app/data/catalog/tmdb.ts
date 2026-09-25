@@ -60,6 +60,11 @@ export interface TmdbSearchResult {
   playtimeHours?: number | null
   seasonCount?: number | null
   creator?: string | null
+  // The series, franchise or collection a provider says this belongs to, when it
+  // says. IGDB fills it from collections and franchises; TMDB has
+  // belongs_to_collection on its detail record and doesn't yet; Google Books has
+  // nothing to fill it with, which is why books ask the model — see seriesKeysFor.
+  series?: string[]
   images?: string[] | null
   platforms?: string[] | null
   // Set only when a result's actual provenance differs from the provider
