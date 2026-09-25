@@ -118,9 +118,12 @@ runs `npm run db:migrate` once per deploy. Booting deliberately doesn't migrate
 machine racing to apply the same migration on every boot.
 
 Pushing to `main` deploys: `.github/workflows/ci.yml` runs `flyctl deploy`
-once its `checks` job passes. Checks and deploy share a file because `needs:`
-cannot reach across workflows — a deploy that did not wait for its own checks
-would not be a gate.
+once its `verify` job passes. The two share a file because `needs:` cannot
+reach across workflows — a deploy that did not wait for its own checks would
+not be a gate.
+
+`verify` is also the name to require in branch protection, and the rule matches
+on that string: rename the job and the rule stops applying, silently.
 
 First-time setup:
 

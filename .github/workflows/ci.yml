@@ -1,5 +1,8 @@
-# Checks and deploy share a file because `needs:` cannot reach across
+# Verify and deploy share a file because `needs:` cannot reach across
 # workflows, and a deploy that does not wait for its checks is not a gate.
+#
+# `verify` is the name branch protection matches on. Renaming it silently
+# unmatches the rule and merges open back up, so rename both together.
 
 name: CI
 on:
@@ -8,7 +11,7 @@ on:
     branches: [main]
 
 jobs:
-  checks:
+  verify:
     runs-on: ubuntu-latest
     services:
       # Without DATABASE_URL, 12 of 28 test files skip themselves and the run
@@ -39,7 +42,7 @@ jobs:
       - run: npm test
 
   deploy:
-    needs: checks
+    needs: verify
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     concurrency: deploy-group
