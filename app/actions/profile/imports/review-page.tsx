@@ -553,15 +553,28 @@ function NotFoundCard(handle: Handle<{ batchId: string; row: ReviewRow['row']; n
 // answering is what empties a section, and a hundred answered lines would put
 // it back.
 function AnsweredList(
-  handle: Handle<{ batchId: string; section: SectionKey; entries: ReviewRow[]; pastParticiple: string }>,
+  handle: Handle<{
+    batchId: string
+    section: SectionKey
+    entries: ReviewRow[]
+    pastParticiple: string
+    // A finished section's ticked accept, which the drawer stops showing —
+    // here it can still be unticked.
+    accepted?: DrawerSection['bulk']
+  }>,
 ) {
   return () => {
-    const { batchId, section, entries, pastParticiple } = handle.props
+    const { batchId, section, entries, pastParticiple, accepted } = handle.props
     if (entries.length === 0) return null
 
     return (
       <div mix={css({ margin: '0 0 10px', fontSize: '14px' })}>
         <Collapsible summary={<span mix={css({ color: '#6b6459' })}>{entries.length} answered</span>}>
+          {accepted && (
+            <div mix={css({ margin: '6px 0 2px' })}>
+              <BulkAccept batchId={batchId} {...accepted} indent={false} />
+            </div>
+          )}
           <ul mix={css({ listStyle: 'none', margin: '6px 0 0', padding: 0 })}>
             {entries.map((entry) => {
               const { row, item } = entry
@@ -824,9 +837,14 @@ function ReviewDrawer(
                       ? `${section.open} left · not saved`
                       : `${section.open} of ${section.total} left`}
                 </span>
-                {section.bulk && (section.bulk.count > 0 || section.bulk.accepted > 0) && (
-                  <BulkAccept batchId={batchId} {...section.bulk} />
-                )}
+                {/* Only while the section has cards left: once it is done the row's
+                    ✓ says so, and a ticked box beside it read as a second "done".
+                    A finished section's accept moves to its answered list. */}
+                {section.open > 0 &&
+                  section.bulk &&
+                  (section.bulk.count > 0 || section.bulk.accepted > 0) && (
+                    <BulkAccept batchId={batchId} {...section.bulk} />
+                  )}
               </li>
             ))}
           </ul>
@@ -926,10 +944,18 @@ function bulkFor(key: SectionKey, model: ReviewModel): DrawerSection['bulk'] {
 // ticked it stays ticked, and pressing it again unticks — the accepted rows go
 // back to the page as cards.
 function BulkAccept(
-  handle: Handle<{ batchId: string; kind: BulkKind; count: number; accepted: number; what: string }>,
+  handle: Handle<{
+    batchId: string
+    kind: BulkKind
+    count: number
+    accepted: number
+    what: string
+    // Lined up under the drawer row's title; off where it stands alone.
+    indent?: boolean
+  }>,
 ) {
   return () => {
-    const { batchId, kind, count, accepted, what } = handle.props
+    const { batchId, kind, count, accepted, what, indent = true } = handle.props
     const ticked = accepted > 0
     const n = ticked ? accepted : count
     return (
@@ -937,7 +963,7 @@ function BulkAccept(
         method="post"
         action={routes.profile.imports.bulk.href({ batchId })}
         data-in-place
-        mix={css({ flex: '1 0 100%', paddingLeft: 'calc(1em + 8px)' })}
+        mix={css({ flex: '1 0 100%', paddingLeft: indent ? 'calc(1em + 8px)' : 0 })}
       >
         <input type="hidden" name="kind" value={kind} />
         {ticked && <input type="hidden" name="undo" value="1" />}
@@ -978,6 +1004,13 @@ function groupByReason(uncertain: ReviewRow[], singular: string, plural: string)
 }
 
 const REVIEW_SECTIONS = ['title_differs', 'no_year', 'year_drift'] as const
+
+// The accept a finished section is still holding, if any — see AnsweredList.
+function finishedAccept(key: SectionKey, model: ReviewModel): DrawerSection['bulk'] {
+  const open = model.sections.find((section) => section.key === key)?.open ?? 0
+  const bulk = bulkFor(key, model)
+  return open === 0 && bulk && bulk.accepted > 0 ? bulk : null
+}
 
 function isReviewSection(key: string): key is (typeof REVIEW_SECTIONS)[number] {
   return (REVIEW_SECTIONS as readonly string[]).includes(key)
@@ -1281,6 +1314,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                             section={group.key}
                             entries={model.answered[group.key]}
                             pastParticiple={pastParticiple}
+                            accepted={finishedAccept(group.key, model)}
                           />
                         )}
                         <div id={`import-uncertain-${group.key}`}>
