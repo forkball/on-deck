@@ -772,7 +772,15 @@ function ReviewDrawer(
               {unchecked > 0 && ` ${unchecked} of them unchecked, saved as we matched them.`}
               {leftOut > 0 && ` ${leftOut} left out.`}
             </p>
-            <div mix={css({ display: 'flex', alignItems: 'center', gap: '8px 14px', flexWrap: 'wrap' })}>
+            <div
+              mix={css({
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px 14px',
+                flexWrap: 'wrap',
+              })}
+            >
               {saveForm(confirmLabel)}
               <label
                 for={CONFIRM_TOGGLE}
