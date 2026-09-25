@@ -121,11 +121,10 @@ function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
               )}
             </>
           ) : followsAnyone ? (
-            <Empty>Quiet so far — nothing logged or generated yet.</Empty>
+            <Empty>Quiet so far — nothing logged yet.</Empty>
           ) : (
             <Empty>
-              Nothing here yet — <a href={routes.recommendations.index.href()}>generate a recommendation</a>{' '}
-              or <a href={routes.users.search.href()}>find people</a> to follow.
+              Nothing here yet — <a href={routes.users.search.href()}>find people</a> to follow.
             </Empty>
           )}
         </Section>
