@@ -57,6 +57,11 @@ export async function createBatch(
     total_rows: rows.length,
     matched_rows: 0,
     conflict_choice: 'keep',
+    // Held until its rows are in: the batch is written first and the rows
+    // after, and a worker polling in between claimed an empty batch, matched
+    // nothing and put it straight into review with every row still pending.
+    // If this upload dies before letting go, the claim goes stale like any other.
+    claimed_at: now,
     created_at: now,
     updated_at: now,
   })
@@ -92,6 +97,8 @@ export async function createBatch(
       values,
     )
   }
+
+  await db.update(importBatches, id, { claimed_at: undefined })
 
   return id
 }

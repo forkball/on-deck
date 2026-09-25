@@ -623,7 +623,7 @@ function drawerStyle(): Parameters<typeof css>[0] {
     // Laid out here rather than with its own css(): each css() is a separate
     // cascade layer, and a later layer beats this one whatever the selector,
     // so a row styled on its own could never be hidden from here.
-    '& .drawer-row': { display: 'flex', alignItems: 'center', gap: '8px' },
+    '& .drawer-row': { display: 'flex', alignItems: 'center', gap: '8px 12px' },
     [`${open} .drawer-panel`]: { display: 'block' },
     [`${open} .drawer-arrow::before`]: { content: '"▼"' },
     '@media (min-width: 720px)': {
@@ -665,7 +665,10 @@ function ReviewDrawer(
   return () => {
     const { batchId, sections, unchecked, leftOut, save, singular, plural } = handle.props
     const needsConfirm = unchecked > 0 || leftOut > 0
-    const saveLabel = save > 0 ? `Save ${count(save, singular, plural)}` : 'Finish'
+    // The bar's button is just "Save": the count belongs to the confirmation,
+    // which spells out what goes in and how much of it is unchecked.
+    const saveLabel = save > 0 ? 'Save' : 'Finish'
+    const confirmLabel = save > 0 ? `Yes, save ${count(save, singular, plural)}` : 'Yes, finish'
 
     // The one number that matters while working: what would save unchecked.
     // Per-section progress is the checklist's job.
@@ -674,7 +677,7 @@ function ReviewDrawer(
 
     const saveForm = (label: string) => (
       <form method="post" action={routes.profile.imports.save.href({ batchId })}>
-        <button type="submit" class="primary compact">
+        <button type="submit" class="primary">
           {label}
         </button>
       </form>
@@ -727,9 +730,7 @@ function ReviewDrawer(
                       ? `${section.open} left · not saved`
                       : `${section.open} of ${section.total} left`}
                 </span>
-                {section.bulk && section.bulk.count > 0 && (
-                  <BulkAccept batchId={batchId} {...section.bulk} />
-                )}
+                {section.bulk && section.bulk.count > 0 && <BulkAccept batchId={batchId} {...section.bulk} />}
               </li>
             ))}
           </ul>
@@ -745,7 +746,7 @@ function ReviewDrawer(
               {leftOut > 0 && ` ${leftOut} left out.`}
             </p>
             <div mix={css({ display: 'flex', alignItems: 'center', gap: '8px 14px', flexWrap: 'wrap' })}>
-              {saveForm(`Yes, ${saveLabel.toLowerCase()}`)}
+              {saveForm(confirmLabel)}
               <label
                 for={CONFIRM_TOGGLE}
                 mix={css({
@@ -762,8 +763,8 @@ function ReviewDrawer(
         )}
 
         <div class="drawer-row">
-          {/* One line: beside the Save button a 320px phone leaves it about
-              110px, and letting it wrap broke "260 unchecked" in two. */}
+          {/* One line: it is short, and wrapping broke "260 unchecked" in two
+              beside a longer Save on a 320px phone. */}
           <label
             for={DRAWER_TOGGLE}
             mix={css({
@@ -787,7 +788,7 @@ function ReviewDrawer(
             // rather than submitting. The look sits on the inner span, as in
             // Modal — DoodleCSS pads <label> from an unlayered rule.
             <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
-              <span class="doodle-border primary compact">{saveLabel}…</span>
+              <span class="doodle-border primary">{saveLabel}</span>
             </label>
           ) : (
             saveForm(saveLabel)
