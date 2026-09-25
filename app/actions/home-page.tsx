@@ -33,6 +33,16 @@ export interface HomePageProps {
 
 const HEADING = css({ margin: '0 0 12px', fontSize: '18px' })
 
+// The page's two ways in, styled as buttons the way the lucky-pick and sign-in
+// links are: DoodleCSS's border does the drawing. Each grows to fill its row,
+// so side by side they split the width and stacked on a phone they match.
+const CTA_BUTTON = css({
+  flex: '1 1 auto',
+  textAlign: 'center',
+  textDecoration: 'none',
+  whiteSpace: 'nowrap',
+})
+
 function Section(handle: Handle<{ title: string; children?: RemixNode }>) {
   return () => {
     const { title, children } = handle.props
@@ -188,10 +198,14 @@ export function HomePage(handle: Handle<HomePageProps>) {
           {dashboard ? (
             <>
               <h1 mix={css({ margin: 0 })}>Hey, {dashboard.displayName}</h1>
-              <p mix={css({ margin: '8px 0 0', color: '#555' })}>
-                <a href={routes.media.href()}>Search for media to log</a> or{' '}
-                <a href={routes.recommendations.index.href()}>get recommendations</a>.
-              </p>
+              <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '16px' })}>
+                <a href={routes.media.href()} class="doodle-border" mix={CTA_BUTTON}>
+                  Search for media to log
+                </a>
+                <a href={routes.recommendations.index.href()} class="doodle-border" mix={CTA_BUTTON}>
+                  Get recommendations
+                </a>
+              </div>
               <Dashboard dashboard={dashboard} />
             </>
           ) : (
