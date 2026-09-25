@@ -17,6 +17,7 @@ import { mediaTypeUiFor } from '../../../mediaTypes.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
 import { routes } from '../../../routes.ts'
 import { Document } from '../../../ui/components/document.tsx'
+import { Modal } from '../../../ui/components/modal.tsx'
 import { Nav } from '../../../ui/components/nav.tsx'
 import { Collapsible } from '../../../ui/shared/collapsible.tsx'
 import { count } from '../../../ui/shared/count.ts'
@@ -593,11 +594,10 @@ const sectionStyle = css({ marginBottom: '18px', scrollMarginTop: '12px' })
 // vanishing. It starts collapsed on a phone and open where there is room.
 //
 // Save asks twice only when it matters: if anything would go in unchecked or
-// be left out, the first press opens a confirmation that says so; with
-// everything checked it just saves.
+// be left out, the first press opens a Modal that says so; with everything
+// checked it just saves.
 //
-// CSS-only, like Modal: two visually-hidden checkboxes, one for the drawer and
-// one for the confirmation. A checkbox's checked state is the DOM's, not the
+// CSS-only, like Modal: a visually-hidden checkbox opens the drawer. A checkbox's checked state is the DOM's, not the
 // server markup's, so it survives the in-place reload after each decision —
 // the drawer stays however it was left. With JS off it works the same.
 const DRAWER_TOGGLE = 'import-drawer-toggle'
@@ -606,7 +606,6 @@ const CONFIRM_TOGGLE = 'import-confirm-toggle'
 // The checkbox means "not the default": open on a phone, closed on desktop.
 function drawerStyle(): Parameters<typeof css>[0] {
   const open = `&:has(#${DRAWER_TOGGLE}:checked)`
-  const confirming = `&:has(#${CONFIRM_TOGGLE}:checked)`
   const style: Record<string, unknown> = {
     position: 'sticky',
     bottom: 0,
@@ -618,7 +617,6 @@ function drawerStyle(): Parameters<typeof css>[0] {
     padding: '8px 0',
     '& .drawer-check': { position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' },
     '& .drawer-panel': { display: 'none', maxHeight: '45vh', overflowY: 'auto', padding: '4px 0 10px' },
-    '& .drawer-confirm': { display: 'none', padding: '4px 0 10px' },
     '& .drawer-arrow::before': { content: '"▲"' },
     // Laid out here rather than with its own css(): each css() is a separate
     // cascade layer, and a later layer beats this one whatever the selector,
@@ -631,13 +629,7 @@ function drawerStyle(): Parameters<typeof css>[0] {
       '& .drawer-arrow::before': { content: '"▼"' },
       [`${open} .drawer-panel`]: { display: 'none' },
       [`${open} .drawer-arrow::before`]: { content: '"▲"' },
-      [`${confirming} .drawer-panel`]: { display: 'none' },
     },
-    [`${confirming} .drawer-confirm`]: { display: 'block' },
-    [`${confirming} .drawer-panel`]: { display: 'none' },
-    // The confirmation stands in for the bar's own row while it is open, so
-    // there is one Save on screen — the one that saves — rather than two.
-    [`${confirming} .drawer-row`]: { display: 'none' },
   }
   return style as Parameters<typeof css>[0]
 }
@@ -691,9 +683,6 @@ function ReviewDrawer(
           class="drawer-check"
           aria-label="Show the review checklist"
         />
-        {needsConfirm && (
-          <input type="checkbox" id={CONFIRM_TOGGLE} class="drawer-check" aria-label="Confirm saving" />
-        )}
 
         <div class="drawer-panel">
           <ul mix={css({ listStyle: 'none', margin: 0, padding: 0 })}>
@@ -736,32 +725,6 @@ function ReviewDrawer(
           </ul>
         </div>
 
-        {needsConfirm && (
-          <div class="drawer-confirm">
-            <p mix={css({ fontSize: '14px', margin: '0 0 8px' })}>
-              {save > 0
-                ? `${count(save, singular, plural)} go into your log.`
-                : 'Nothing new goes into your log.'}
-              {unchecked > 0 && ` ${unchecked} of them unchecked, saved as we matched them.`}
-              {leftOut > 0 && ` ${leftOut} left out.`}
-            </p>
-            <div mix={css({ display: 'flex', alignItems: 'center', gap: '8px 14px', flexWrap: 'wrap' })}>
-              {saveForm(confirmLabel)}
-              <label
-                for={CONFIRM_TOGGLE}
-                mix={css({
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  color: '#6b6459',
-                  textDecoration: 'underline',
-                })}
-              >
-                Go back
-              </label>
-            </div>
-          </div>
-        )}
-
         <div class="drawer-row">
           {/* One line: it is short, and wrapping broke "260 unchecked" in two
               beside a longer Save on a 320px phone. */}
@@ -784,7 +747,7 @@ function ReviewDrawer(
             {progress}
           </label>
           {needsConfirm ? (
-            // A label dressed as the Save button: it opens the confirmation
+            // A label dressed as the Save button: it opens the Modal below
             // rather than submitting. The look sits on the inner span, as in
             // Modal — DoodleCSS pads <label> from an unlayered rule.
             <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
@@ -794,6 +757,30 @@ function ReviewDrawer(
             saveForm(saveLabel)
           )}
         </div>
+
+        {needsConfirm && (
+          <Modal
+            id={CONFIRM_TOGGLE}
+            title={unchecked > 0 ? `Save with ${unchecked} unchecked?` : 'Save the rest?'}
+          >
+            <p mix={css({ margin: '0 0 16px' })}>
+              {save > 0
+                ? `${count(save, singular, plural)} go into your log.`
+                : 'Nothing new goes into your log.'}
+              {unchecked > 0 && ` ${unchecked} of them unchecked, saved as we matched them.`}
+              {leftOut > 0 && ` ${leftOut} left out.`}
+            </p>
+            <div mix={css({ display: 'flex', alignItems: 'center', gap: '8px 14px', flexWrap: 'wrap' })}>
+              {saveForm(confirmLabel)}
+              <label
+                for={CONFIRM_TOGGLE}
+                mix={css({ cursor: 'pointer', color: '#6b6459', textDecoration: 'underline' })}
+              >
+                Go back
+              </label>
+            </div>
+          </Modal>
+        )}
       </div>
     )
   }
