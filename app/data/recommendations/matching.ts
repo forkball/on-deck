@@ -128,6 +128,30 @@ export function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolea
   return similarity >= TITLE_SIMILARITY_THRESHOLD
 }
 
+// Which hit a pick is about, out of everything the search returned.
+//
+// Title first, then year. The other way round let the year choose a hit that was
+// never the book: asked for "Bitten" (2001), nearest-year picked "No Biting:
+// Policy and Practice for Toddlers", and "Kushiel's Dart" picked "Rapport". Both
+// were then dropped as title mismatches — losing the pick altogether, while the
+// real book sat further down the same list. Five of eighteen went that way in one
+// run, two of them recoverable.
+//
+// Null means no hit is this book, which is a different thing from a hit being the
+// wrong edition, and is counted as such by the caller.
+export function chooseMatch(pick: Pick, matches: CatalogSearchResult[]): CatalogSearchResult | null {
+  const sameWork = matches.filter((match) => titlesLikelyMatch(pick.title, match.title))
+  if (sameWork.length === 0) return null
+
+  // Among the ones that are the right book, the year picks the right edition.
+  return (
+    sameWork.find((match) => match.releaseYear === pick.year) ??
+    [...sameWork].sort(
+      (a, b) => Math.abs((a.releaseYear ?? 0) - pick.year) - Math.abs((b.releaseYear ?? 0) - pick.year),
+    )[0]
+  )
+}
+
 // Each verdict carries the index of the entry it's about, so answers pair up by
 // id rather than by position — a verdict list one short would otherwise slide
 // every answer after it onto the wrong film.

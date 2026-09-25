@@ -128,7 +128,15 @@ export function describeSeen(seen: string[], noun: string, subject: string | nul
 
 function buildFilterInstructions(filters: RecommendationFilters, noun: string, mediaType: MediaType): string {
   const clauses: string[] = []
-  if (filters.genre) clauses.push(`Only suggest ${noun} in the "${filters.genre}" genre.`)
+  if (filters.genre) {
+    clauses.push(
+      `Only suggest ${noun} in the "${filters.genre}" genre. This one is checked: each pick is looked up and ` +
+        `discarded unless the catalog itself files it under "${filters.genre}", so a ${noun} from another genre ` +
+        `that merely contains ${filters.genre} will not survive. Where this genre and the taste profile barely ` +
+        `overlap, the genre wins — suggest the "${filters.genre}" ${noun} this reader is most likely to enjoy, ` +
+        `rather than the ${noun} closest to their profile that gestures at "${filters.genre}".`,
+    )
+  }
   if (filters.decade != null) {
     if (filters.decadeRelation === 'before') {
       clauses.push(`Only suggest ${noun} originally released before ${filters.decade}.`)

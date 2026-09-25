@@ -14,6 +14,7 @@ import { GenerationError } from './errors.ts'
 import { buildExclusions } from './exclusions.ts'
 import { phasesFor, type GenerationPhase } from './jobs.ts'
 import {
+  chooseMatch,
   decadeYear,
   filterByGenre,
   filterByLength,
@@ -21,7 +22,6 @@ import {
   matchesSeries,
   resolveFromCatalog,
   searchForPicks,
-  titlesLikelyMatch,
   verifyPicksAgainstOverviews,
   withOverviews,
   type Candidate,
@@ -264,11 +264,11 @@ export async function generateRecommendations(
       continue
     }
 
-    const match =
-      matches.find((m) => m.releaseYear === pick.year) ??
-      [...matches].sort(
-        (a, b) => Math.abs((a.releaseYear ?? 0) - pick.year) - Math.abs((b.releaseYear ?? 0) - pick.year),
-      )[0]
+    const match = chooseMatch(pick, matches)
+    if (!match) {
+      drops.titleMismatch++
+      continue
+    }
 
     if (excludedExternalIds.has(match.externalId)) {
       drops.alreadyLogged++
@@ -276,10 +276,6 @@ export async function generateRecommendations(
     }
     if (seenExternalIds.has(match.externalId)) {
       drops.duplicate++
-      continue
-    }
-    if (!titlesLikelyMatch(pick.title, match.title)) {
-      drops.titleMismatch++
       continue
     }
     // Genre is checked after this loop, not in it: for books the search hit
