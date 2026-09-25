@@ -4,7 +4,13 @@ import { css } from 'remix/ui'
 import { ImportPicker } from '../../../browser/import-picker.tsx'
 import { InPlaceForms } from '../../../browser/in-place-forms.tsx'
 import { LazyList } from '../../../browser/lazy-list.tsx'
-import type { ConflictEntry, DuplicateEntry, ReviewModel, ReviewRow } from '../../../data/imports/review.ts'
+import type {
+  ConflictEntry,
+  DuplicateEntry,
+  ReviewModel,
+  ReviewRow,
+  SectionKey,
+} from '../../../data/imports/review.ts'
 import { reasonGroup, type BulkKind, type LogValues } from '../../../data/imports/classify.ts'
 import type { ImportBatch } from '../../../data/schema.ts'
 import { mediaTypeUiFor } from '../../../mediaTypes.ts'
@@ -642,6 +648,7 @@ interface DrawerSection {
   href: string
   total: number
   open: number
+  bulk: { kind: BulkKind; count: number; what: string } | null
 }
 
 function ReviewDrawer(
@@ -692,8 +699,9 @@ function ReviewDrawer(
                 key={section.key}
                 mix={css({
                   display: 'flex',
+                  flexWrap: 'wrap',
                   alignItems: 'baseline',
-                  gap: '8px',
+                  gap: '4px 8px',
                   padding: '4px 0',
                   fontSize: '14px',
                   borderBottom: '1px solid #eee4d6',
@@ -719,6 +727,9 @@ function ReviewDrawer(
                       ? `${section.open} left · not saved`
                       : `${section.open} of ${section.total} left`}
                 </span>
+                {section.bulk && section.bulk.count > 0 && (
+                  <BulkAccept batchId={batchId} {...section.bulk} />
+                )}
               </li>
             ))}
           </ul>
@@ -778,45 +789,46 @@ function ReviewDrawer(
   }
 }
 
-// A one-tap accept, at the top of the group it clears rather than after it:
-// under a hundred cards it was the last thing anyone would reach, and it's the
-// fastest answer on the page. Which rows it covers is decided by bulkKind and
-// recomputed by the action, so the count here is what it does.
-function BulkAccept(handle: Handle<{ batchId: string; kind: BulkKind; count: number; of: number }>) {
+// Which bulk accept, if any, a section offers. Which rows it covers is decided
+// by bulkKind and recomputed by the action, so the count shown is what it does.
+const SECTION_BULK: Partial<Record<SectionKey, { kind: BulkKind; what: string }>> = {
+  title_differs: { kind: 'subtitle', what: 'your title plus a subtitle' },
+  no_year: { kind: 'sole', what: 'the only film by that name' },
+  year_drift: { kind: 'year', what: 'within a year of your file' },
+}
+
+function bulkFor(key: SectionKey, bulk: ReviewModel['bulk']): DrawerSection['bulk'] {
+  const offer = SECTION_BULK[key]
+  return offer ? { ...offer, count: bulk[offer.kind].length } : null
+}
+
+// A one-tap accept, on the section's own checklist row: it clears most of a
+// section in one go, so it sits with that section's progress rather than as
+// another block above a hundred cards. Its own line under the title, indented
+// to the title, so the title and count keep their row on a phone.
+function BulkAccept(handle: Handle<{ batchId: string; kind: BulkKind; count: number; what: string }>) {
   return () => {
-    const { batchId, kind, count: n, of } = handle.props
-    if (n === 0) return null
-
-    const what = {
-      year: 'within a year of your file',
-      subtitle: 'your title with a subtitle added, same year',
-      sole: 'the only film by that name',
-    }[kind]
-
+    const { batchId, kind, count: n, what } = handle.props
     return (
       <form
         method="post"
         action={routes.profile.imports.bulk.href({ batchId })}
         data-in-place
         mix={css({
+          flex: '1 0 100%',
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
-          flexWrap: 'wrap',
-          border: '1px dashed #cfc5b6',
-          borderRadius: '8px',
-          padding: '11px 14px',
-          background: '#fbf6ee',
-          margin: '0 0 10px',
+          gap: '8px',
+          paddingLeft: 'calc(1em + 8px)',
+          fontSize: '13px',
+          color: '#6b6459',
         })}
       >
         <input type="hidden" name="kind" value={kind} />
-        <span mix={css({ flex: '1 1 220px', fontSize: '14px' })}>
-          {n === of ? `All ${n} are ${what}.` : `${n} of these are ${what}.`}
-        </span>
-        <button type="submit" mix={css({ fontSize: '13px' })}>
-          Accept all {n}
+        <button type="submit" class="compact">
+          Accept {n}
         </button>
+        <span>{what}</span>
       </form>
     )
   }
@@ -1112,30 +1124,6 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                             {group.blurb}
                           </p>
                         )}
-                        {group.key === 'year_drift' && (
-                          <BulkAccept
-                            batchId={batchId}
-                            kind="year"
-                            count={model.bulk.year.length}
-                            of={group.entries.length}
-                          />
-                        )}
-                        {group.key === 'no_year' && (
-                          <BulkAccept
-                            batchId={batchId}
-                            kind="sole"
-                            count={model.bulk.sole.length}
-                            of={group.entries.length}
-                          />
-                        )}
-                        {group.key === 'title_differs' && (
-                          <BulkAccept
-                            batchId={batchId}
-                            kind="subtitle"
-                            count={model.bulk.subtitle.length}
-                            of={group.entries.length}
-                          />
-                        )}
                         <div id={`import-uncertain-${group.key}`}>
                           {group.entries.map((entry) => (
                             <UncertainCard
@@ -1202,6 +1190,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       ? "Couldn't find"
                       : reasonGroup(section.key, singular, plural).title,
                   href: `#${groupAnchor(section.key === 'not_found' ? 'not-found' : section.key)}`,
+                  bulk: bulkFor(section.key, model.bulk),
                 }))}
                 unchecked={model.uncertain.length}
                 leftOut={counts.leftOut}
