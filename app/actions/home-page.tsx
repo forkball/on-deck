@@ -200,7 +200,7 @@ export function HomePage(handle: Handle<HomePageProps>) {
               <h1 mix={css({ margin: 0 })}>Hey, {dashboard.displayName}</h1>
               <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '16px' })}>
                 <a href={routes.media.href()} class="doodle-border" mix={CTA_BUTTON}>
-                  Search for media to log
+                  Search for media
                 </a>
                 <a href={routes.recommendations.index.href()} class="doodle-border" mix={CTA_BUTTON}>
                   Get recommendations
