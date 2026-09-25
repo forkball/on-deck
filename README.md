@@ -122,8 +122,9 @@ once its `verify` job passes. The two share a file because `needs:` cannot
 reach across workflows — a deploy that did not wait for its own checks would
 not be a gate.
 
-`verify` is also the name to require in branch protection, and the rule matches
-on that string: rename the job and the rule stops applying, silently.
+`verify` is also the name to require in branch protection. The rule matches on
+that string, so renaming this job without editing the rule leaves every pull
+request blocked on a check that no longer reports — change both together.
 
 First-time setup:
 
