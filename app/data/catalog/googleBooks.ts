@@ -199,9 +199,23 @@ export async function getBookById(externalId: string): Promise<CatalogSearchResu
 // anchor on, so it's restricted to the observed id shape.
 const BARE_ID = /^[A-Za-z0-9_-]{10,15}$/
 
+// What Google serves today: the id is the last path segment, after a slug of the
+// title, and there is no `id=` anywhere in it —
+// google.ca/books/edition/Iron_Flame/xIS9EAAAQBAJ. Anyone copying a link out of
+// the address bar in 2026 gets this form, and only this form; the `?id=` shape
+// below is what books.google.com and play.google.com still emit. Both are
+// accepted, since old links keep working and pasted links come from everywhere.
+//
+// The slug is skipped rather than matched: it is the title, so it carries
+// apostrophes, accents and non-Latin scripts, and `_` when Google omits it.
+const EDITION_PATH = /\/books\/edition\/[^/]*\/([A-Za-z0-9_-]{10,15})/
+
 export function parseGoogleBooksId(input: string): string | null {
   const trimmed = input.trim()
   if (BARE_ID.test(trimmed)) return trimmed
+
+  const path = trimmed.match(EDITION_PATH)
+  if (path) return path[1]
 
   const match = trimmed.match(/[?&]id=([A-Za-z0-9_-]{6,})/)
   return match ? match[1] : null
