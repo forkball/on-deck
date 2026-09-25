@@ -623,7 +623,7 @@ function drawerStyle(): Parameters<typeof css>[0] {
     // Laid out here rather than with its own css(): each css() is a separate
     // cascade layer, and a later layer beats this one whatever the selector,
     // so a row styled on its own could never be hidden from here.
-    '& .drawer-row': { display: 'flex', alignItems: 'center', gap: '8px 12px' },
+    '& .drawer-row': { display: 'flex', alignItems: 'center', gap: '8px' },
     [`${open} .drawer-panel`]: { display: 'block' },
     [`${open} .drawer-arrow::before`]: { content: '"▼"' },
     '@media (min-width: 720px)': {
@@ -674,7 +674,7 @@ function ReviewDrawer(
 
     const saveForm = (label: string) => (
       <form method="post" action={routes.profile.imports.save.href({ batchId })}>
-        <button type="submit" class="primary">
+        <button type="submit" class="primary compact">
           {label}
         </button>
       </form>
@@ -762,9 +762,18 @@ function ReviewDrawer(
         )}
 
         <div class="drawer-row">
+          {/* One line: beside the Save button a 320px phone leaves it about
+              110px, and letting it wrap broke "260 unchecked" in two. */}
           <label
             for={DRAWER_TOGGLE}
-            mix={css({ flex: '1 1 auto', minWidth: 0, cursor: 'pointer', fontSize: '13px', color: '#555' })}
+            mix={css({
+              flex: '1 1 auto',
+              minWidth: 0,
+              whiteSpace: 'nowrap',
+              cursor: 'pointer',
+              fontSize: '13px',
+              color: '#555',
+            })}
           >
             <span
               class="drawer-arrow"
@@ -778,7 +787,7 @@ function ReviewDrawer(
             // rather than submitting. The look sits on the inner span, as in
             // Modal — DoodleCSS pads <label> from an unlayered rule.
             <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
-              <span class="doodle-border primary">{saveLabel}…</span>
+              <span class="doodle-border primary compact">{saveLabel}…</span>
             </label>
           ) : (
             saveForm(saveLabel)

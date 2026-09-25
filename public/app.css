@@ -228,8 +228,11 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 
 /* A button in a row of short alternatives — the year choices on an import
    review card. Three of them at the standard padding ran 12px wider than a
-   card on a 320px phone and split across lines. */
-.doodle button.compact {
+   card on a 320px phone and split across lines. The import drawer's Save
+   takes it too, for the same phone: at full padding it left the "260
+   unchecked" beside it a few pixels short of one line. */
+.doodle button.compact,
+.doodle .doodle-border.compact {
   padding: 4px 10px;
 }
 
