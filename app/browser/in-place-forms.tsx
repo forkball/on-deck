@@ -8,6 +8,10 @@ import { submitInPlace } from './shared/submit-in-place.ts'
 // few forms per card and hundreds of cards, and one entry each tripped the
 // runtime's update-loop guard while hydrating.
 //
+// A form inside a `<details data-close-on-submit>` folds it once the answer
+// lands — the import review's answered lines, which open to change an answer
+// and should read as answered again afterwards.
+//
 // With JS off nothing attaches and each form posts natively.
 export const InPlaceForms = clientEntry(import.meta.url, function InPlaceForms(handle) {
   return () => (
@@ -22,6 +26,7 @@ export const InPlaceForms = clientEntry(import.meta.url, function InPlaceForms(h
 
             event.preventDefault()
             void submitInPlace(form, signal, async () => {
+              form.closest('details[data-close-on-submit]')?.removeAttribute('open')
               await handle.frames.top.reload()
             })
           },

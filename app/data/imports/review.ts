@@ -99,6 +99,9 @@ export interface ReviewModel {
   // Which confirmed rows each accept took, so its box stays ticked and
   // unticking it gives back exactly these.
   accepted: Record<BulkKind, number[]>
+  // Rows of each section already answered — confirmed, repointed or dropped —
+  // so the page can keep them findable and let an answer be changed.
+  answered: Record<SectionKey, ReviewRow[]>
   // The footer's arithmetic. `unchanged` is kept conflicts, rows kept by hand,
   // and rows already logged exactly as the file has them — the last is what
   // makes a second upload of the same export say "870 already in your log"
@@ -258,6 +261,23 @@ export function buildReview(
   )
   const leftOut = leftOutRows.length
 
+  // Conflicts and held duplicates have their own cards, whatever section their
+  // reason would put them in.
+  const elsewhere = new Set([...conflicts.map(({ row }) => row.id), ...held])
+  const answered: Record<SectionKey, ReviewRow[]> = {
+    title_differs: [],
+    no_year: [],
+    year_drift: [],
+    not_found: [],
+  }
+  for (const row of rows) {
+    if ((row.state !== 'confirmed' && row.state !== 'skipped') || elsewhere.has(row.id)) continue
+    const key = sectionOf(row)
+    if (!key) continue
+    const item = row.mediaItemId == null ? null : (items.get(row.mediaItemId) ?? null)
+    answered[key].push({ row, item, chip: row.state === 'confirmed' ? null : describeReason(verdictOf(row)) })
+  }
+
   const totals = new Map<SectionKey, number>()
   for (const row of rows) {
     const key = sectionOf(row)
@@ -283,6 +303,7 @@ export function buildReview(
     leftOutRows,
     bulk,
     accepted,
+    answered,
     counts: { total: rows.length, save, unchanged, leftOut },
   }
 }

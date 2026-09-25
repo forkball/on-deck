@@ -519,6 +519,110 @@ function UncertainCard(
   }
 }
 
+function NotFoundCard(handle: Handle<{ batchId: string; row: ReviewRow['row']; next?: string }>) {
+  return () => {
+    const { batchId, row, next } = handle.props
+    return (
+      <Card id={rowAnchor(row.id)}>
+        <div>
+          {row.title} <span mix={css({ color: '#888' })}>{row.year ?? 'no year'}</span>
+        </div>
+        <Actions>
+          <PickerButton rowId={row.id} label="Find it" variant="primary" />
+          <ResolveForm
+            batchId={batchId}
+            rowId={row.id}
+            action="skip"
+            label="Leave out"
+            variant="quiet"
+            anchor={next}
+          />
+        </Actions>
+      </Card>
+    )
+  }
+}
+
+// What's been answered in a section, kept on the page so an answer can be
+// changed: one line each saying what the answer was, which opens back into the
+// same card with the same choices. Picking one there answers again — the
+// actions don't care whether the row was open — and the line updates.
+//
+// Collapsed as a whole, at the top of the section rather than under its cards,
+// where a hundred of them would stand between you and it; collapsed because
+// answering is what empties a section, and a hundred answered lines would put
+// it back.
+function AnsweredList(
+  handle: Handle<{ batchId: string; section: SectionKey; entries: ReviewRow[]; pastParticiple: string }>,
+) {
+  return () => {
+    const { batchId, section, entries, pastParticiple } = handle.props
+    if (entries.length === 0) return null
+
+    return (
+      <div mix={css({ margin: '0 0 10px', fontSize: '14px' })}>
+        <Collapsible summary={<span mix={css({ color: '#6b6459' })}>{entries.length} answered</span>}>
+          <ul mix={css({ listStyle: 'none', margin: '6px 0 0', padding: 0 })}>
+            {entries.map((entry) => {
+              const { row, item } = entry
+              const dropped = row.state === 'skipped'
+              return (
+                // A block, not a list item: DoodleCSS draws a "* " marker on every
+                // `ul li` from an unlayered rule that no css() here can outrank.
+                <li key={row.id} mix={css({ display: 'block', borderBottom: '1px solid #eee4d6' })}>
+                  <details data-close-on-submit>
+                    <summary
+                      mix={css({
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        gap: '8px',
+                        padding: '6px 0',
+                        cursor: 'pointer',
+                        listStyle: 'none',
+                        '&::-webkit-details-marker': { display: 'none' },
+                      })}
+                    >
+                      <span
+                        aria-hidden="true"
+                        mix={css({ width: '1em', color: dropped ? '#a8a097' : '#15803d' })}
+                      >
+                        {dropped ? '✕' : '✓'}
+                      </span>
+                      <span mix={css({ flex: '1 1 auto', minWidth: 0 })}>
+                        {row.title}
+                        <span mix={css({ color: '#888' })}>
+                          {dropped ? ' · not saving' : item ? ` → ${answeredMatch(row.title, item)}` : ''}
+                        </span>
+                      </span>
+                      <span mix={css({ color: '#6b6459', fontSize: '13px', textDecoration: 'underline' })}>
+                        Change
+                      </span>
+                    </summary>
+                    {section === 'not_found' ? (
+                      <NotFoundCard batchId={batchId} row={row} />
+                    ) : (
+                      <UncertainCard batchId={batchId} entry={entry} pastParticiple={pastParticiple} />
+                    )}
+                  </details>
+                </li>
+              )
+            })}
+          </ul>
+        </Collapsible>
+      </div>
+    )
+  }
+}
+
+// What an answered line says it was matched to. The year alone when the title
+// is the one in the file — for a no-year row that is the whole answer — and
+// the catalog's title too when it differs.
+function answeredMatch(title: string, item: NonNullable<ReviewRow['item']>): string {
+  const year = item.releaseYear == null ? '' : String(item.releaseYear)
+  if (item.title.trim().toLowerCase() === title.trim().toLowerCase()) return year || item.title
+  return year ? `${item.title} ${year}` : item.title
+}
+
 // The year is the whole difference between namesakes, so it is the label.
 function choiceLabel(year: number | null): string {
   return year == null ? 'Undated' : String(year)
@@ -873,13 +977,44 @@ function groupByReason(uncertain: ReviewRow[], singular: string, plural: string)
   return [...groups.values()]
 }
 
+const REVIEW_SECTIONS = ['title_differs', 'no_year', 'year_drift'] as const
+
+function isReviewSection(key: string): key is (typeof REVIEW_SECTIONS)[number] {
+  return (REVIEW_SECTIONS as readonly string[]).includes(key)
+}
+
+// A section stays on the page once all its cards are answered — its answered
+// list is where an answer gets changed — so a group can have no open cards.
+function withAnswered(
+  groups: ReasonGroup[],
+  model: ReviewModel,
+  singular: string,
+  plural: string,
+): ReasonGroup[] {
+  for (const key of REVIEW_SECTIONS) {
+    if (model.answered[key].length > 0 && !groups.some((group) => group.key === key)) {
+      groups.push({ key, entries: [], ...reasonGroup(key, singular, plural) })
+    }
+  }
+  const rank = (key: string) => {
+    const at = (REVIEW_SECTIONS as readonly string[]).indexOf(key)
+    return at === -1 ? REVIEW_SECTIONS.length : at
+  }
+  return groups.sort((a, b) => rank(a.key) - rank(b.key))
+}
+
 export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
   return () => {
     const { displayName, batch, model, saved, offerFeed, reviewsOnly, error } = handle.props
     const { counts } = model
     const { singular, plural, pastParticiple, hrefs } = mediaTypeUiFor(batch.media_type as MediaType)
     const batchId = batch.id
-    const uncertainGroups = groupByReason(model.uncertain, singular, plural)
+    const uncertainGroups = withAnswered(
+      groupByReason(model.uncertain, singular, plural),
+      model,
+      singular,
+      plural,
+    )
     const next = nextAnchors([...uncertainGroups.flatMap((group) => group.entries), ...model.notFound])
     return (
       <Document title="Review your import | On Deck">
@@ -1118,7 +1253,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   </Flag>
                 )}
 
-                {model.uncertain.length > 0 && (
+                {uncertainGroups.length > 0 && (
                   <>
                     <h2>
                       Worth a look{' '}
@@ -1139,6 +1274,14 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                           <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 8px' })}>
                             {group.blurb}
                           </p>
+                        )}
+                        {isReviewSection(group.key) && (
+                          <AnsweredList
+                            batchId={batchId}
+                            section={group.key}
+                            entries={model.answered[group.key]}
+                            pastParticiple={pastParticiple}
+                          />
                         )}
                         <div id={`import-uncertain-${group.key}`}>
                           {group.entries.map((entry) => (
@@ -1161,7 +1304,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   </>
                 )}
 
-                {model.notFound.length > 0 && (
+                {(model.notFound.length > 0 || model.answered.not_found.length > 0) && (
                   <>
                     <hr />
                     <h2 id={groupAnchor('not-found')} mix={css({ scrollMarginTop: '12px' })}>
@@ -1172,24 +1315,15 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       No catalog result under that name. <b>These won't be saved</b> unless you track them
                       down.
                     </p>
+                    <AnsweredList
+                      batchId={batchId}
+                      section="not_found"
+                      entries={model.answered.not_found}
+                      pastParticiple={pastParticiple}
+                    />
                     <div id="import-not-found">
                       {model.notFound.map(({ row }) => (
-                        <Card key={row.id} id={rowAnchor(row.id)}>
-                          <div>
-                            {row.title} <span mix={css({ color: '#888' })}>{row.year ?? 'no year'}</span>
-                          </div>
-                          <Actions>
-                            <PickerButton rowId={row.id} label="Find it" variant="primary" />
-                            <ResolveForm
-                              batchId={batchId}
-                              rowId={row.id}
-                              action="skip"
-                              label="Leave out"
-                              variant="quiet"
-                              anchor={next.get(row.id)}
-                            />
-                          </Actions>
-                        </Card>
+                        <NotFoundCard key={row.id} batchId={batchId} row={row} next={next.get(row.id)} />
                       ))}
                     </div>
                     <LazyList listId="import-not-found" initial={ROWS_VISIBLE} step={ROWS_VISIBLE} />

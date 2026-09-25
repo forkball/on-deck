@@ -108,6 +108,34 @@ describe('buildReview bucketing', () => {
     assert.deepEqual(model.bulk, { year: [1], subtitle: [], sole: [] })
   })
 
+  it('keeps answered rows under their section, so an answer can be changed', () => {
+    const rows = [
+      row({ id: 1, state: 'confirmed', reason: 'year_drift', yearDelta: 1, mediaItemId: 1 }),
+      row({ id: 2, state: 'skipped', reason: 'no_year', year: null, mediaItemId: 2 }),
+      row({ id: 3, state: 'skipped', reason: null, mediaItemId: null }),
+      row({ id: 4, state: 'uncertain', reason: 'year_drift', yearDelta: 1, mediaItemId: 3 }),
+      row({ id: 5, state: 'confident', reason: 'exact', mediaItemId: 4 }),
+    ]
+    const model = buildReview(
+      rows,
+      catalog(
+        entry(1, 'Kwaidan', 1965),
+        entry(2, 'Suspiria', 1977),
+        entry(3, 'Ran', 1985),
+        entry(4, 'Heat', 1995),
+      ),
+      logged(),
+      'keep',
+    )
+
+    const ids = (key: keyof typeof model.answered) => model.answered[key].map(({ row }) => row.id)
+    assert.deepEqual(ids('year_drift'), [1])
+    assert.deepEqual(ids('no_year'), [2])
+    assert.deepEqual(ids('not_found'), [3])
+    assert.deepEqual(ids('title_differs'), [])
+    assert.equal(model.answered.year_drift[0]?.item?.title, 'Kwaidan')
+  })
+
   it('lists what each accept took, and not rows confirmed by hand', () => {
     const rows = [
       row({
