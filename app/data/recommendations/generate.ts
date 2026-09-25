@@ -16,13 +16,13 @@ import { phasesFor, type GenerationPhase } from './jobs.ts'
 import {
   chooseMatch,
   decadeYear,
-  seriesKey,
   filterByGenre,
   filterByLength,
   matchesDecade,
   matchesSeries,
   resolveFromCatalog,
   searchForPicks,
+  seriesKeysFor,
   verifyPicksAgainstOverviews,
   withOverviews,
   type Candidate,
@@ -256,14 +256,10 @@ export async function generateRecommendations(
   // over-request slack has to reach it.
   const shortlist: Candidate[] = []
   const seenExternalIds = new Set<string>()
-  // One per series. The model is asked for this too, and mostly obliges, but it
-  // returned A Court of Thorns and Roses beside A Court of Mist and Fury, and Fourth
-  // Wing beside Iron Flame, in a single run of eight.
-  //
-  // The model is the only source for books — no book catalog records series
-  // membership, see BOOK_SERIES_TYPES. TMDB and IGDB do carry one (a collection, a
-  // franchise), neither of which is fetched today, so a film or game run leans on
-  // the same answer for want of asking for a better one.
+  // One per series, placed by the catalog wherever it says and by the model where no
+  // catalog does — see seriesKeysFor. The model is asked for this on every run and
+  // mostly obliges, but it returned A Court of Thorns and Roses beside A Court of
+  // Mist and Fury, and Fourth Wing beside Iron Flame, in a single run of eight.
   //
   // A series is only spent by a pick that survives to the shortlist, since the add
   // below sits after every other gate: a sibling dropped as already-logged leaves
@@ -292,10 +288,10 @@ export async function generateRecommendations(
       drops.duplicate++
       continue
     }
-    const series = seriesKey(pick)
+    const series = seriesKeysFor(pick, match)
     // The first of a series is the one kept, and the picks arrive ranked, so that is
     // the one the model thought was the better entry point.
-    if (series && seenSeries.has(series)) {
+    if (series.some((key) => seenSeries.has(key))) {
       drops.sameSeries++
       continue
     }
@@ -316,7 +312,7 @@ export async function generateRecommendations(
     }
 
     seenExternalIds.add(match.externalId)
-    if (series) seenSeries.add(series)
+    for (const key of series) seenSeries.add(key)
     shortlist.push({ pick, match })
   }
 

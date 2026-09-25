@@ -156,20 +156,45 @@ export function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolea
 // series membership. Unlike that lever, this one is asked for on every run, because
 // a run that spends four of its eight slots on two series is the complaint whatever
 // was filtered.
-export function seriesKey(pick: Pick): string | null {
+function normalizeSeries(name: string): string | null {
   // The ampersand before normalising, or "Thorns & Roses" and "Thorns and Roses"
   // come out as different keys and the series is counted twice.
   //
-  // Then the words around the name that the model adds or drops freely between one
-  // pick and its sibling: "The Empyrean", "Empyrean series", "The Empyrean Trilogy"
-  // are one series, and a key that treats them as three misses the duplicate it
-  // exists to catch.
-  const name = normalizeTitle((pick.series_name ?? '').replace(/&/g, ' and '))
+  // Then the words around the name that get added or dropped freely between one
+  // entry and its sibling: "The Empyrean", "Empyrean series", "The Empyrean
+  // Trilogy" and "Empyrean Book 2" are one series, and a key that treats them as
+  // four misses the duplicate it exists to catch. Catalogs vary the same way —
+  // IGDB has both "Portal" and "The Legend of Zelda" as written.
+  const key = normalizeTitle(name.replace(/&/g, ' and '))
     .replace(/^the /, '')
-    .replace(/(?: (?:series|trilogy|saga|cycle|duology|quartet|books?|\d+))+$/, '')
+    .replace(/(?: (?:series|trilogy|saga|cycle|duology|quartet|collection|franchise|books?|\d+))+$/, '')
     .trim()
 
-  return name || null
+  return key || null
+}
+
+export function seriesKey(pick: Pick): string | null {
+  return normalizeSeries(pick.series_name ?? '')
+}
+
+// Every series a candidate belongs to, the catalog's answer first.
+//
+// IGDB carries collections and franchises and returns both on search, so a game
+// costs nothing to place and is placed by the provider rather than by the model.
+// Books have no such field anywhere — Google Books dropped it and Open Library
+// keeps it as a free-form subject — so they fall back to what the model said, which
+// for them is the only answer there is. TMDB does carry belongs_to_collection, on
+// its detail record only, and isn't asked for it yet: films fall back too.
+//
+// A list rather than one key, because IGDB's two groupings both count: Zelda games
+// share a franchise while sitting in different collections, and either overlapping
+// is enough to be the same series.
+export function seriesKeysFor(pick: Pick, match: CatalogSearchResult): string[] {
+  const fromCatalog = (match.series ?? []).map(normalizeSeries).filter((key): key is string => key != null)
+  if (fromCatalog.length > 0) return [...new Set(fromCatalog)]
+
+  const fromPick = seriesKey(pick)
+  return fromPick ? [fromPick] : []
 }
 
 // Which hit a pick is about, out of everything the search returned.
@@ -683,6 +708,7 @@ export async function resolveFromCatalog(
         creator: metadata.creator,
         images: metadata.images,
         platforms: metadata.platforms,
+        series: metadata.series,
       })
       break
     }
