@@ -48,11 +48,14 @@ export function Modal(
     // form back in front of someone — without it a 400 comes back as a page
     // with the error hidden behind a trigger they'd have to find again.
     defaultOpen?: boolean
+    // False when the content carries its own way out — a confirmation whose
+    // "Go back" already closes it doesn't need a ✕ beside the title too.
+    closeButton?: boolean
     children?: RemixNode
   }>,
 ) {
   return () => {
-    const { id, triggerLabel, title, fab, defaultOpen, children } = handle.props
+    const { id, triggerLabel, title, fab, defaultOpen, closeButton = true, children } = handle.props
 
     return (
       <div mix={css(modalStyle(id))}>
@@ -110,9 +113,11 @@ export function Modal(
               })}
             >
               {title && <h3 mix={css({ margin: 0 })}>{title}</h3>}
-              <label for={id} mix={css({ cursor: 'pointer' })}>
-                <span mix={css({ fontSize: '20px' })}>✕</span>
-              </label>
+              {closeButton && (
+                <label for={id} mix={css({ cursor: 'pointer' })}>
+                  <span mix={css({ fontSize: '20px' })}>✕</span>
+                </label>
+              )}
             </div>
             {children}
           </div>

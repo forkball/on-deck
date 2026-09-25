@@ -597,9 +597,10 @@ const sectionStyle = css({ marginBottom: '18px', scrollMarginTop: '12px' })
 // be left out, the first press opens a Modal that says so; with everything
 // checked it just saves.
 //
-// CSS-only, like Modal: a visually-hidden checkbox opens the drawer. A checkbox's checked state is the DOM's, not the
-// server markup's, so it survives the in-place reload after each decision —
-// the drawer stays however it was left. With JS off it works the same.
+// CSS-only, like Modal: a visually-hidden checkbox opens the drawer. A
+// checkbox's checked state is the DOM's, not the server markup's, so it
+// survives the in-place reload after each decision — the drawer stays however
+// it was left. With JS off it works the same.
 const DRAWER_TOGGLE = 'import-drawer-toggle'
 const CONFIRM_TOGGLE = 'import-confirm-toggle'
 
@@ -761,6 +762,7 @@ function ReviewDrawer(
         {needsConfirm && (
           <Modal
             id={CONFIRM_TOGGLE}
+            closeButton={false}
             title={unchecked > 0 ? `Save with ${unchecked} unchecked?` : 'Save the rest?'}
           >
             <p mix={css({ margin: '0 0 16px' })}>
