@@ -255,6 +255,9 @@ export const importRows = table({
     // Same-titled films a no-year row could have meant. See the migration and
     // inlineAlternates in app/data/imports/classify.ts.
     alternates: c.json().nullable(),
+    // Which one-tap accept confirmed the row, so unticking it can put back
+    // exactly those. See the migration.
+    accepted_by: c.text(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
   },

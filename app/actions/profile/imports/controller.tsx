@@ -6,6 +6,7 @@ import { redirect } from 'remix/response/redirect'
 import { getCatalogProvider } from '../../../data/catalog/provider.ts'
 import {
   acceptBulk,
+  unacceptBulk,
   confirmRow,
   keepRow,
   loadBatch,
@@ -221,10 +222,15 @@ export default createController(routes.profile.imports, {
       const db = context.get(Database)
       const { model } = await loadReview(db, batch)
 
-      const requested = context.get(FormData).get('kind')
+      const form = context.get(FormData)
+      const requested = form.get('kind')
       const kind = requested === 'subtitle' || requested === 'sole' ? requested : 'year'
 
-      await acceptBulk(db, batch, model.bulk[kind])
+      // The box is a toggle: ticked, the same press takes the accepted rows
+      // back. Also recomputed, so it undoes what that accept took and nothing
+      // confirmed by hand.
+      if (form.get('undo') === '1') await unacceptBulk(db, batch, model.accepted[kind])
+      else await acceptBulk(db, batch, kind, model.bulk[kind])
       return backToReview(batch)
     },
 

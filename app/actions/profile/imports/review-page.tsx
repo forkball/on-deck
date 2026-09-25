@@ -641,7 +641,7 @@ interface DrawerSection {
   href: string
   total: number
   open: number
-  bulk: { kind: BulkKind; count: number; what: string } | null
+  bulk: { kind: BulkKind; count: number; accepted: number; what: string } | null
 }
 
 function ReviewDrawer(
@@ -720,7 +720,9 @@ function ReviewDrawer(
                       ? `${section.open} left · not saved`
                       : `${section.open} of ${section.total} left`}
                 </span>
-                {section.bulk && section.bulk.count > 0 && <BulkAccept batchId={batchId} {...section.bulk} />}
+                {section.bulk && (section.bulk.count > 0 || section.bulk.accepted > 0) && (
+                  <BulkAccept batchId={batchId} {...section.bulk} />
+                )}
               </li>
             ))}
           </ul>
@@ -803,9 +805,10 @@ const SECTION_BULK: Partial<Record<SectionKey, { kind: BulkKind; what: string }>
   year_drift: { kind: 'year', what: 'within a year of your file' },
 }
 
-function bulkFor(key: SectionKey, bulk: ReviewModel['bulk']): DrawerSection['bulk'] {
+function bulkFor(key: SectionKey, model: ReviewModel): DrawerSection['bulk'] {
   const offer = SECTION_BULK[key]
-  return offer ? { ...offer, count: bulk[offer.kind].length } : null
+  if (!offer) return null
+  return { ...offer, count: model.bulk[offer.kind].length, accepted: model.accepted[offer.kind].length }
 }
 
 // A one-tap accept, on the section's own checklist row: it clears most of a
@@ -815,10 +818,16 @@ function bulkFor(key: SectionKey, bulk: ReviewModel['bulk']): DrawerSection['bul
 //
 // It reads as a checkbox but is a submit button drawn as one (`.checkline` in
 // app.css): ticking it is the whole action, and a button does that with JS off
-// too, where a real checkbox would need a script to post on change.
-function BulkAccept(handle: Handle<{ batchId: string; kind: BulkKind; count: number; what: string }>) {
+// too, where a real checkbox would need a script to post on change. Once
+// ticked it stays ticked, and pressing it again unticks — the accepted rows go
+// back to the page as cards.
+function BulkAccept(
+  handle: Handle<{ batchId: string; kind: BulkKind; count: number; accepted: number; what: string }>,
+) {
   return () => {
-    const { batchId, kind, count: n, what } = handle.props
+    const { batchId, kind, count, accepted, what } = handle.props
+    const ticked = accepted > 0
+    const n = ticked ? accepted : count
     return (
       <form
         method="post"
@@ -827,7 +836,12 @@ function BulkAccept(handle: Handle<{ batchId: string; kind: BulkKind; count: num
         mix={css({ flex: '1 0 100%', paddingLeft: 'calc(1em + 8px)' })}
       >
         <input type="hidden" name="kind" value={kind} />
-        <button type="submit" class="checkline">
+        {ticked && <input type="hidden" name="undo" value="1" />}
+        <button
+          type="submit"
+          class={ticked ? 'checkline ticked' : 'checkline'}
+          aria-pressed={ticked ? 'true' : 'false'}
+        >
           <span class="checkline-box" aria-hidden="true" />
           Accept {n} · {what}
         </button>
@@ -1192,7 +1206,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       ? "Couldn't find"
                       : reasonGroup(section.key, singular, plural).title,
                   href: `#${groupAnchor(section.key === 'not_found' ? 'not-found' : section.key)}`,
-                  bulk: bulkFor(section.key, model.bulk),
+                  bulk: bulkFor(section.key, model),
                 }))}
                 unchecked={model.uncertain.length}
                 leftOut={counts.leftOut}

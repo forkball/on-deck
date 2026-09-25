@@ -237,8 +237,9 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
    checklist. Ticking is the whole action, so it posts like any button (and
    with JS off); the box borrows DoodleCSS's own checkbox stroke so it reads as
    one. Unlayered for the usual reason: `.doodle button` sets the border and
-   padding from here. While it posts it is disabled, and the box shows
-   Doodle's checked mark. */
+   padding from here. `.ticked` shows Doodle's checked mark; while it posts it
+   is disabled and shows the state it is heading to, so a tap flips the box at
+   once rather than after the round trip. */
 .doodle button.checkline {
   display: inline-flex;
   align-items: center;
@@ -271,8 +272,13 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   font-size: 14px;
 }
 
+.doodle button.checkline.ticked .checkline-box::after,
 .doodle button.checkline:disabled .checkline-box::after {
   content: '*';
   font-size: 1.2em;
   margin-bottom: -0.3em;
+}
+
+.doodle button.checkline.ticked:disabled .checkline-box::after {
+  content: none;
 }

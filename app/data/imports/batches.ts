@@ -16,7 +16,7 @@ import {
   type ImportBatch,
   type ImportRow,
 } from '../schema.ts'
-import type { CandidateLike, ConflictChoice, RowState } from './classify.ts'
+import type { BulkKind, CandidateLike, ConflictChoice, RowState } from './classify.ts'
 import {
   buildReview,
   type CatalogEntry,
@@ -212,7 +212,12 @@ function toStagedRow(row: ImportRow): StagedRow {
     mediaItemId: row.media_item_id ?? null,
     matchedExternalId: row.matched_external_id ?? null,
     alternates: readAlternates(row.alternates),
+    acceptedBy: readAcceptedBy(row.accepted_by),
   }
+}
+
+function readAcceptedBy(value: string | null | undefined): BulkKind | null {
+  return value === 'year' || value === 'subtitle' || value === 'sole' ? value : null
 }
 
 // Written by matching as an array of candidates. Anything else — null, or a
@@ -295,7 +300,7 @@ export async function confirmRow(db: Db, batch: ImportBatch, rowId: number): Pro
   const row = await ownedRow(db, batch, rowId)
   if (!row) return false
 
-  await db.update(importRows, row.id, { state: 'confirmed', updated_at: Date.now() })
+  await db.update(importRows, row.id, { state: 'confirmed', accepted_by: undefined, updated_at: Date.now() })
   return true
 }
 
@@ -305,7 +310,7 @@ export async function keepRow(db: Db, batch: ImportBatch, rowId: number): Promis
   const row = await ownedRow(db, batch, rowId)
   if (!row) return false
 
-  await db.update(importRows, row.id, { state: 'kept', updated_at: Date.now() })
+  await db.update(importRows, row.id, { state: 'kept', accepted_by: undefined, updated_at: Date.now() })
   return true
 }
 
@@ -313,7 +318,7 @@ export async function skipRow(db: Db, batch: ImportBatch, rowId: number): Promis
   const row = await ownedRow(db, batch, rowId)
   if (!row) return false
 
-  await db.update(importRows, row.id, { state: 'skipped', updated_at: Date.now() })
+  await db.update(importRows, row.id, { state: 'skipped', accepted_by: undefined, updated_at: Date.now() })
   return true
 }
 
@@ -347,6 +352,7 @@ export async function repointRow(
     // The reason stays: it records which review section the row was settled
     // in. verdictOf treats a confirmed row as settled whatever it says.
     state: 'confirmed',
+    accepted_by: undefined,
     year_delta: null,
     matched_external_id: item.external_id,
     media_item_id: item.id,
@@ -358,12 +364,33 @@ export async function repointRow(
 
 // The long tail of a large import, cleared in one click. Bounded to the rows
 // the page offered — anything wider would sweep up matches nobody vouched for.
-export async function acceptBulk(db: Db, batch: ImportBatch, rowIds: number[]): Promise<number> {
+// Each row records which accept took it, so unaccepting can give back exactly
+// those.
+export async function acceptBulk(
+  db: Db,
+  batch: ImportBatch,
+  kind: BulkKind,
+  rowIds: number[],
+): Promise<number> {
   if (rowIds.length === 0) return 0
 
   await db.updateMany(
     importRows,
-    { state: 'confirmed', updated_at: Date.now() },
+    { state: 'confirmed', accepted_by: kind, updated_at: Date.now() },
+    { where: and(eq('batch_id', batch.id), inList('id', rowIds)) },
+  )
+
+  return rowIds.length
+}
+
+// Unticking an accept: the rows it took go back to being questions, with the
+// reason and year gap matching gave them, which the accept left in place.
+export async function unacceptBulk(db: Db, batch: ImportBatch, rowIds: number[]): Promise<number> {
+  if (rowIds.length === 0) return 0
+
+  await db.updateMany(
+    importRows,
+    { state: 'uncertain', accepted_by: undefined, updated_at: Date.now() },
     { where: and(eq('batch_id', batch.id), inList('id', rowIds)) },
   )
 

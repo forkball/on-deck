@@ -41,6 +41,8 @@ export interface StagedRow {
   // Same-titled films a no-year row could have meant, matching's own pick
   // first — see inlineAlternates. Null means choose in the picker.
   alternates: CandidateLike[] | null
+  // Which one-tap accept confirmed this row, if one did.
+  acceptedBy: BulkKind | null
 }
 
 export interface CatalogEntry {
@@ -94,6 +96,9 @@ export interface ReviewModel {
   sections: SectionProgress[]
   // Which rows of `uncertain` each one-tap accept would clear — see bulkKind.
   bulk: Record<BulkKind, number[]>
+  // Which confirmed rows each accept took, so its box stays ticked and
+  // unticking it gives back exactly these.
+  accepted: Record<BulkKind, number[]>
   // The footer's arithmetic. `unchanged` is kept conflicts, rows kept by hand,
   // and rows already logged exactly as the file has them — the last is what
   // makes a second upload of the same export say "870 already in your log"
@@ -231,6 +236,12 @@ export function buildReview(
   uncertain.sort((a, b) => suspicion(verdictOf(b.row)) - suspicion(verdictOf(a.row)))
 
   const bulk: Record<BulkKind, number[]> = { year: [], subtitle: [], sole: [] }
+  // What each accept already took, so its box can stay ticked and unticking
+  // can give back exactly these.
+  const accepted: Record<BulkKind, number[]> = { year: [], subtitle: [], sole: [] }
+  for (const row of rows) {
+    if (row.state === 'confirmed' && row.acceptedBy) accepted[row.acceptedBy].push(row.id)
+  }
   for (const { row, item } of uncertain) {
     const match = item ? { externalId: '', title: item.title, releaseYear: item.releaseYear } : null
     const kind = bulkKind(verdictOf(row), row.title, match, row.alternates?.length ?? null)
@@ -271,6 +282,7 @@ export function buildReview(
     alreadyLoggedIds,
     leftOutRows,
     bulk,
+    accepted,
     counts: { total: rows.length, save, unchanged, leftOut },
   }
 }

@@ -29,6 +29,7 @@ function row(partial: Partial<StagedRow> = {}): StagedRow {
     mediaItemId: 1,
     matchedExternalId: null,
     alternates: null,
+    acceptedBy: null,
     ...partial,
   }
 }
@@ -105,6 +106,31 @@ describe('buildReview bucketing', () => {
     )
 
     assert.deepEqual(model.bulk, { year: [1], subtitle: [], sole: [] })
+  })
+
+  it('lists what each accept took, and not rows confirmed by hand', () => {
+    const rows = [
+      row({
+        id: 1,
+        state: 'confirmed',
+        reason: 'year_drift',
+        yearDelta: 1,
+        mediaItemId: 1,
+        acceptedBy: 'year',
+      }),
+      row({ id: 2, state: 'confirmed', reason: 'year_drift', yearDelta: 1, mediaItemId: 2 }),
+      row({ id: 3, state: 'uncertain', reason: 'year_drift', yearDelta: 1, mediaItemId: 3 }),
+    ]
+    const model = buildReview(
+      rows,
+      catalog(entry(1, 'Kwaidan', 1965), entry(2, 'Ran', 1985), entry(3, 'Ikiru', 1952)),
+      logged(),
+      'keep',
+    )
+
+    assert.deepEqual(model.accepted, { year: [1], subtitle: [], sole: [] })
+    // The one still open is offered as usual beside it.
+    assert.deepEqual(model.bulk.year, [3])
   })
 
   it('offers a subtitle added in the same year as a one-tap accept', () => {
