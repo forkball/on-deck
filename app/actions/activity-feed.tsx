@@ -45,8 +45,9 @@ function FeedRow(handle: Handle<{ item: FeedItem }>) {
 const RANGE_FORMAT = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 
 // What the divider says about the rows behind it: who, what, and over what
-// stretch of time. How many is the count badge's to say — see FeedGroup. Each of those is shared by every row in the group
-// — that is what groupKeyOf guarantees — so the sentence is true of all of them.
+// stretch of time. Each of those is shared by every row in the group — that is
+// what groupKeyOf guarantees — so the sentence is true of all of them. (How
+// many is the count badge's to say — see FeedGroup.)
 function groupSummary(items: FeedItem[]): { who: string; what: string; when: string } {
   const first = items[0]
 
@@ -64,7 +65,7 @@ function groupSummary(items: FeedItem[]): { who: string; what: string; when: str
   }
 
   // Newest first, so the oldest is last.
-  const when = RANGE_FORMAT.formatRange(new Date(items[items.length - 1].at), new Date(first.at))
+  const when = RANGE_FORMAT.formatRange(new Date(items.at(-1)!.at), new Date(first.at))
   return { who, what, when }
 }
 
@@ -85,26 +86,28 @@ const GROUP_STYLE = css({
   // The rules either side of the label that make it read as a divider.
   '& > details > summary::before, & > details > summary::after': {
     content: '""',
-    flex: '1 1 12px',
-    minWidth: '12px',
+    flex: '1 0 12px',
     borderTop: '1px dashed #bbb',
   },
-  // On a narrow screen the label wraps; centred, and with the date range and
-  // the count each kept whole, it breaks between phrases rather than mid-date.
-  '& > details > summary > span': { textAlign: 'center' },
+  // The label's phrases are flex items, so on a narrow screen it wraps between
+  // them — never partway through the date range or the count.
+  '& > details > summary > span': {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    columnGap: '6px',
+  },
   '& .chevron': { display: 'inline-block', transition: 'transform 120ms ease' },
   '& > details[open] > summary .chevron': { transform: 'rotate(90deg)' },
-  '& .when': { color: '#888', fontSize: '12px', whiteSpace: 'nowrap' },
-  // Only while folded: open, the rows are right there to count.
+  '& .when': { color: '#888', fontSize: '12px' },
   '& .count': {
-    display: 'inline-block',
-    marginLeft: '6px',
     padding: '1px 8px',
     border: '1px solid #ccc',
     borderRadius: '999px',
     fontSize: '12px',
-    whiteSpace: 'nowrap',
   },
+  // Only while folded: open, the rows are right there to count.
   '& > details[open] > summary .count': { display: 'none' },
 })
 
@@ -121,10 +124,8 @@ const GROUP_BODY_STYLE = css({
 // A run of one person's rows folded behind a divider — see feedGroups.ts for
 // when that happens. Open at first, so nothing is hidden until the reader
 // chooses to fold a burst they've seen away; the divider still marks where one
-// person's run of activity starts and how far it reaches.
-//
-// Folded, the divider carries a count of the rows behind it, since nothing
-// else on screen says how much was put away.
+// person's run of activity starts and how far it reaches, and once folded
+// carries a count of what was put away.
 //
 // A native <details>, as Collapsible is, so toggling it needs no script — which
 // matters here, since appended pages arrive as markup and nothing hydrates them.
@@ -138,10 +139,13 @@ function FeedGroup(handle: Handle<{ items: FeedItem[] }>) {
         <details open>
           <summary>
             <span>
-              <span class="chevron" aria-hidden="true">
-                ▸
-              </span>{' '}
-              <strong>{who}</strong> {what} <span class="when">· {when}</span>
+              <span>
+                <span class="chevron" aria-hidden="true">
+                  ▸
+                </span>{' '}
+                <strong>{who}</strong> {what}
+              </span>
+              <span class="when">· {when}</span>
               <span class="count">{items.length} entries</span>
             </span>
           </summary>
