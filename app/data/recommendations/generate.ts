@@ -256,9 +256,18 @@ export async function generateRecommendations(
   // over-request slack has to reach it.
   const shortlist: Candidate[] = []
   const seenExternalIds = new Set<string>()
-  // One book per series. The model is asked for this too, and mostly obliges, but it
+  // One per series. The model is asked for this too, and mostly obliges, but it
   // returned A Court of Thorns and Roses beside A Court of Mist and Fury, and Fourth
   // Wing beside Iron Flame, in a single run of eight.
+  //
+  // The model is the only source for books — no book catalog records series
+  // membership, see BOOK_SERIES_TYPES. TMDB and IGDB do carry one (a collection, a
+  // franchise), neither of which is fetched today, so a film or game run leans on
+  // the same answer for want of asking for a better one.
+  //
+  // A series is only spent by a pick that survives to the shortlist, since the add
+  // below sits after every other gate: a sibling dropped as already-logged leaves
+  // its series free for the next entry from it.
   const seenSeries = new Set<string>()
   const drops = emptyDrops()
 

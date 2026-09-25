@@ -214,10 +214,13 @@ export async function requestPicks(
     filters.platform != null ||
     filters.series != null
   const requestedCount = hasFilters ? REQUESTED_COUNT + 6 : REQUESTED_COUNT
+  const { singular } = mediaTypeUiFor(mediaType)
   const seriesRule =
-    ` Set "series_name" on each pick: the series it belongs to, or "" if it stands alone. Suggest at most one ` +
-    `${noun} per series — the one someone new to that series should start with — so eight recommendations are ` +
-    `eight different things to read rather than half of one shelf.`
+    ` Set "series_name" on each pick: the series it belongs to, or "" if it stands alone.` +
+    (filters.series === 'standalone'
+      ? ''
+      : ` Suggest at most one ${singular} per series — the one someone new to that series should start with — ` +
+        `so the list is that many different ${noun} rather than half of one shelf.`)
 
   const filterInstructions =
     buildFilterInstructions(filters, noun, mediaType) + sourceInstructions + seriesRule
