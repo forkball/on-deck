@@ -128,6 +128,26 @@ export function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolea
   return similarity >= TITLE_SIMILARITY_THRESHOLD
 }
 
+// What two picks have to share to be the same series, or null when a pick names
+// none. Normalised because the model writes the name freely — "The Empyrean" in one
+// pick and "Empyrean" in the next.
+//
+// The model is the only source, as with the series lever: no book catalog records
+// series membership. Unlike that lever, this one is asked for on every run, because
+// a run that spends four of its eight slots on two series is the complaint whatever
+// was filtered.
+export function seriesKey(pick: Pick): string | null {
+  const name = pick.series_name
+    ?.toLowerCase()
+    // Before punctuation is stripped, or "Thorns & Roses" and "Thorns and Roses"
+    // normalise to different keys and the series is counted twice.
+    .replace(/&/g, ' and ')
+    .replace(/^the\s+/, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+  return name ? name : null
+}
+
 // Which hit a pick is about, out of everything the search returned.
 //
 // Title first, then year. The other way round let the year choose a hit that was

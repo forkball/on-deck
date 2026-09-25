@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 import {
   applyVerdicts,
   chooseMatch,
+  seriesKey,
   decadeYear,
   matchesSeries,
   filterByGenre,
@@ -64,6 +65,27 @@ describe('matchesDecade', () => {
     for (const relation of ['before', 'within', 'after'] as const) {
       assert.ok(!matchesDecade(null, 1990, relation))
     }
+  })
+})
+
+describe('seriesKey', () => {
+  const pick = (series_name?: string) => ({ title: 'x', year: 2023, reason: '', series_name })
+
+  it('matches the same series written two ways', () => {
+    assert.equal(seriesKey(pick('The Empyrean')), seriesKey(pick('Empyrean')))
+    assert.equal(seriesKey(pick('A Court of Thorns and Roses')), seriesKey(pick('a court of thorns & roses')))
+  })
+
+  it('keeps different series apart', () => {
+    assert.notEqual(seriesKey(pick('The Empyrean')), seriesKey(pick('Throne of Glass')))
+  })
+
+  // Standalones must not collapse into one another: every one of them answers null,
+  // and null is never looked up in the set of series already taken.
+  it('answers null for a standalone, however it says so', () => {
+    assert.equal(seriesKey(pick('')), null)
+    assert.equal(seriesKey(pick('   ')), null)
+    assert.equal(seriesKey(pick(undefined)), null)
   })
 })
 
