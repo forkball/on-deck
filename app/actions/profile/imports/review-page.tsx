@@ -775,10 +775,9 @@ function ReviewDrawer(
             <div
               mix={css({
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px 14px',
-                flexWrap: 'wrap',
+                gap: '10px',
               })}
             >
               {saveForm(confirmLabel)}
