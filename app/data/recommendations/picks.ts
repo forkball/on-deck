@@ -11,6 +11,9 @@ export interface Pick {
   // checkpoint written before it was — see matchesSeries, which reads nothing as
   // "no answer given" rather than as standalone.
   part_of_series?: boolean
+  // The series this belongs to, empty for a standalone. Asked for on every run, to
+  // keep one series from taking several of the eight slots — see seriesKey.
+  series_name?: string
 }
 
 export interface TasteSummary {
@@ -69,6 +72,9 @@ function picksSchema(withSeries: boolean) {
     title: { type: 'string' as const },
     year: { type: 'number' as const },
     reason: { type: 'string' as const },
+    // A string rather than a nullable one: structured output takes a single type
+    // per property, and "" is a clearer "no series" than a magic word would be.
+    series_name: { type: 'string' as const },
     ...(withSeries ? { part_of_series: { type: 'boolean' as const } } : {}),
   }
 
@@ -208,7 +214,16 @@ export async function requestPicks(
     filters.platform != null ||
     filters.series != null
   const requestedCount = hasFilters ? REQUESTED_COUNT + 6 : REQUESTED_COUNT
-  const filterInstructions = buildFilterInstructions(filters, noun, mediaType) + sourceInstructions
+  const { singular } = mediaTypeUiFor(mediaType)
+  const seriesRule =
+    ` Set "series_name" on each pick: the series it belongs to, or "" if it stands alone.` +
+    (filters.series === 'standalone'
+      ? ''
+      : ` Suggest at most one ${singular} per series — the one someone new to that series should start with — ` +
+        `so the list is that many different ${noun} rather than half of one shelf.`)
+
+  const filterInstructions =
+    buildFilterInstructions(filters, noun, mediaType) + sourceInstructions + seriesRule
 
   const prompt = isGroup
     ? `Group of ${profiles.length} people, each with their own ${noun} taste profile:\n${JSON.stringify(profiles, null, 2)}\n\n` +

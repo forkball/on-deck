@@ -16,6 +16,7 @@ import { phasesFor, type GenerationPhase } from './jobs.ts'
 import {
   chooseMatch,
   decadeYear,
+  seriesKey,
   filterByGenre,
   filterByLength,
   matchesDecade,
@@ -255,6 +256,19 @@ export async function generateRecommendations(
   // over-request slack has to reach it.
   const shortlist: Candidate[] = []
   const seenExternalIds = new Set<string>()
+  // One per series. The model is asked for this too, and mostly obliges, but it
+  // returned A Court of Thorns and Roses beside A Court of Mist and Fury, and Fourth
+  // Wing beside Iron Flame, in a single run of eight.
+  //
+  // The model is the only source for books — no book catalog records series
+  // membership, see BOOK_SERIES_TYPES. TMDB and IGDB do carry one (a collection, a
+  // franchise), neither of which is fetched today, so a film or game run leans on
+  // the same answer for want of asking for a better one.
+  //
+  // A series is only spent by a pick that survives to the shortlist, since the add
+  // below sits after every other gate: a sibling dropped as already-logged leaves
+  // its series free for the next entry from it.
+  const seenSeries = new Set<string>()
   const drops = emptyDrops()
 
   for (const [i, pick] of picks.entries()) {
@@ -278,6 +292,13 @@ export async function generateRecommendations(
       drops.duplicate++
       continue
     }
+    const series = seriesKey(pick)
+    // The first of a series is the one kept, and the picks arrive ranked, so that is
+    // the one the model thought was the better entry point.
+    if (series && seenSeries.has(series)) {
+      drops.sameSeries++
+      continue
+    }
     // Genre is checked after this loop, not in it: for books the search hit
     // can't answer it. `series` is checked against the pick's own label, since no
     // catalog carries the answer — see matchesSeries.
@@ -295,6 +316,7 @@ export async function generateRecommendations(
     }
 
     seenExternalIds.add(match.externalId)
+    if (series) seenSeries.add(series)
     shortlist.push({ pick, match })
   }
 

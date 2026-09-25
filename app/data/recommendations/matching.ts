@@ -46,6 +46,14 @@ export function matchesDecade(
 // No label is not a "no": a run resumed from a checkpoint written before the field
 // was asked for carries picks without it, and dropping those would empty the run
 // for a reason that has nothing to do with the books.
+//
+// Two model answers now overlap: part_of_series, asked only when this lever is set,
+// and series_name, asked on every run for the dedupe. This reads the boolean, which
+// is the one the prompt asks as a yes/no; a pick answering `true` with no name is
+// therefore still part of a series here while spending no slot in the dedupe, which
+// is the safe way round. Deriving one from the other would collapse the pair and the
+// conditional schema with it — worth doing, and not worth doing in the same change
+// as the lever it would alter.
 export function matchesSeries(pick: Pick, series: string): boolean {
   if (pick.part_of_series == null) return true
   return series === 'series' ? pick.part_of_series : !pick.part_of_series
@@ -116,16 +124,52 @@ function withoutSubtitle(title: string): string {
   return normalizeTitle(main ?? title)
 }
 
+// The half of sameness that needs no distance: the same title, or the same title
+// with a subtitle on one side or the other. Named so chooseMatch can prefer these
+// over the fuzzy ones without restating the rule — it had a copy of two of these
+// three branches, and drifting copies of "is this the same book" is the last thing
+// this file needs.
+export function titlesMatchOutright(pickTitle: string, foundTitle: string): boolean {
+  const a = normalizeTitle(pickTitle)
+  const b = normalizeTitle(foundTitle)
+  if (!a || !b) return false
+
+  return a === b || a === withoutSubtitle(foundTitle) || withoutSubtitle(pickTitle) === b
+}
+
 export function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolean {
   const a = normalizeTitle(pickTitle)
   const b = normalizeTitle(foundTitle)
   if (!a || !b) return false
-  if (a === b) return true
-  if (a === withoutSubtitle(foundTitle) || withoutSubtitle(pickTitle) === b) return true
+  if (titlesMatchOutright(pickTitle, foundTitle)) return true
 
   const distance = levenshteinDistance(a, b)
   const similarity = 1 - distance / Math.max(a.length, b.length)
   return similarity >= TITLE_SIMILARITY_THRESHOLD
+}
+
+// What two picks have to share to be the same series, or null when a pick names
+// none. Normalised because the model writes the name freely — "The Empyrean" in one
+// pick and "Empyrean" in the next.
+//
+// The model is the only source, as with the series lever: no book catalog records
+// series membership. Unlike that lever, this one is asked for on every run, because
+// a run that spends four of its eight slots on two series is the complaint whatever
+// was filtered.
+export function seriesKey(pick: Pick): string | null {
+  // The ampersand before normalising, or "Thorns & Roses" and "Thorns and Roses"
+  // come out as different keys and the series is counted twice.
+  //
+  // Then the words around the name that the model adds or drops freely between one
+  // pick and its sibling: "The Empyrean", "Empyrean series", "The Empyrean Trilogy"
+  // are one series, and a key that treats them as three misses the duplicate it
+  // exists to catch.
+  const name = normalizeTitle((pick.series_name ?? '').replace(/&/g, ' and '))
+    .replace(/^the /, '')
+    .replace(/(?: (?:series|trilogy|saga|cycle|duology|quartet|books?|\d+))+$/, '')
+    .trim()
+
+  return name || null
 }
 
 // Which hit a pick is about, out of everything the search returned.
@@ -143,13 +187,33 @@ export function chooseMatch(pick: Pick, matches: CatalogSearchResult[]): Catalog
   const sameWork = matches.filter((match) => titlesLikelyMatch(pick.title, match.title))
   if (sameWork.length === 0) return null
 
-  // Among the ones that are the right book, the year picks the right edition.
-  return (
-    sameWork.find((match) => match.releaseYear === pick.year) ??
-    [...sameWork].sort(
-      (a, b) => Math.abs((a.releaseYear ?? 0) - pick.year) - Math.abs((b.releaseYear ?? 0) - pick.year),
-    )[0]
-  )
+  // Hits actually called what the pick is called, give or take a subtitle, ahead of
+  // the ones that only clear the fuzzy check.
+  //
+  // What that buys: a sibling in the same series stops being eligible while the book
+  // itself is in the results. Searching "A Court of Thorns and Roses" returns "A
+  // Court of Mist and Fury" at 0.59 similarity — past the 0.5 the fuzzy check asks
+  // for, and a different book. Raising that threshold instead would cost more than
+  // it saves: "Foundation" against "Foundation and Empire" is already only 0.48, so
+  // there is no room between the two, and a rejected fuzzy match loses the pick
+  // altogether while this ordering loses nothing.
+  const named = sameWork.filter((match) => titlesMatchOutright(pick.title, match.title))
+  // Not `pool`: this module imports a database pool.
+  const editions = named.length > 0 ? named : sameWork
+
+  const distance = (match: CatalogSearchResult) => Math.abs((match.releaseYear ?? 0) - pick.year)
+
+  return [...editions].sort(
+    (a, b) =>
+      // Nearest the pick's year: the work's year for a film, the closest pressing to
+      // it for a book.
+      distance(a) - distance(b) ||
+      // Then the edition people actually have, and then the plainest title, which is
+      // how "Iron Flame" wins over "Iron Flame: The Fiery Sequel to the Sunday Times
+      // Bestseller and TikTok Sensation Fourth Wing".
+      b.popularity - a.popularity ||
+      a.title.length - b.title.length,
+  )[0]
 }
 
 // Each verdict carries the index of the entry it's about, so answers pair up by
@@ -442,9 +506,18 @@ async function filterByDetail(
       kept.push(entry)
       continue
     }
+
+    // The by-id record's title only replaces the search hit's if it is still
+    // recognisably the book. Google answers with two different titles for one
+    // volume: dIIO0AEACAAJ is "Iron Flame: The Fiery Sequel to the Sunday Times
+    // Bestseller and TikTok Sensation Fourth Wing" in search and "Iron Flame.
+    // Limited Special Edition - Sprayed Edges" by id. The search title is the one
+    // that was checked against the pick; the second was never checked, and it is
+    // what got stored and shown for a run.
+    const title = titlesLikelyMatch(entry.pick.title, detail.title) ? detail.title : entry.match.title
     // The detail record, not the search one: it carries the dimension that was just
     // paid for, and whatever else the search payload omitted.
-    kept.push({ pick: entry.pick, match: detail })
+    kept.push({ pick: entry.pick, match: { ...detail, title } })
   }
 
   // Dropping one candidate the provider wouldn't answer for is the rule working.

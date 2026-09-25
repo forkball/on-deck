@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 import {
   applyVerdicts,
   chooseMatch,
+  seriesKey,
   decadeYear,
   matchesSeries,
   filterByGenre,
@@ -67,9 +68,37 @@ describe('matchesDecade', () => {
   })
 })
 
+describe('seriesKey', () => {
+  const pick = (series_name?: string) => ({ title: 'x', year: 2023, reason: '', series_name })
+
+  it('matches the same series written two ways', () => {
+    assert.equal(seriesKey(pick('The Empyrean')), seriesKey(pick('Empyrean')))
+    assert.equal(seriesKey(pick('A Court of Thorns and Roses')), seriesKey(pick('a court of thorns & roses')))
+  })
+
+  it('keeps different series apart', () => {
+    assert.notEqual(seriesKey(pick('The Empyrean')), seriesKey(pick('Throne of Glass')))
+  })
+
+  // Standalones must not collapse into one another: every one of them answers null,
+  // and null is never looked up in the set of series already taken.
+  it('ignores the words a model adds around a series name', () => {
+    const empyrean = seriesKey(pick('The Empyrean'))
+    assert.equal(seriesKey(pick('Empyrean series')), empyrean)
+    assert.equal(seriesKey(pick('The Empyrean Trilogy')), empyrean)
+    assert.equal(seriesKey(pick('Empyrean Book 2')), empyrean)
+  })
+
+  it('answers null for a standalone, however it says so', () => {
+    assert.equal(seriesKey(pick('')), null)
+    assert.equal(seriesKey(pick('   ')), null)
+    assert.equal(seriesKey(pick(undefined)), null)
+  })
+})
+
 describe('chooseMatch', () => {
-  const hit = (title: string, releaseYear: number | null) =>
-    ({ title, releaseYear, externalId: title, tags: [] }) as unknown as Parameters<
+  const hit = (title: string, releaseYear: number | null, popularity = 0) =>
+    ({ title, releaseYear, externalId: title, tags: [], popularity }) as unknown as Parameters<
       typeof chooseMatch
     >[1][number]
 
@@ -97,6 +126,64 @@ describe('chooseMatch', () => {
     const chosen = chooseMatch(pick('Outlander', 1991), [hit('Outlander', 2015), hit('Outlander', 1994)])
 
     assert.equal(chosen?.releaseYear, 1994)
+  })
+
+  // A collector's printing whose title is spelled with a colon reads as the book
+  // plus a subtitle, so it clears every title check there is. The year is what
+  // separates them, and the year of a book is the year of its pressing, so this is
+  // as good as this rule gets: it is the sibling case below that the named tier is
+  // actually for.
+  it('cannot tell a collectors pressing from the book on title alone', () => {
+    const chosen = chooseMatch(pick('Iron Flame', 2023), [
+      hit('Iron Flame: Limited Special Edition - Sprayed Edges', 2023),
+      hit('Iron Flame', 2024),
+    ])
+
+    assert.equal(chosen?.title, 'Iron Flame: Limited Special Edition - Sprayed Edges')
+  })
+
+  // Searching "A Court of Thorns and Roses" returns "A Court of Mist and Fury",
+  // 0.69 similar — past the 0.5 the fuzzy check asks for, and a different book. It
+  // stops being eligible while the book itself is on the list.
+  it('prefers the book over a sibling that only passes the fuzzy check', () => {
+    const chosen = chooseMatch(pick('A Court of Thorns and Roses', 2015), [
+      hit('A Court of Mist and Fury', 2016),
+      hit('A Court of Thorns and Roses', 2019),
+    ])
+
+    assert.equal(chosen?.title, 'A Court of Thorns and Roses')
+  })
+
+  // Unchanged behaviour, kept because it is the property the named tier rests on:
+  // a subtitle is not a different book.
+  it('takes a subtitle as the same book, since publishers add them freely', () => {
+    const chosen = chooseMatch(pick('The Night Circus', 2011), [
+      hit('The Night Circus: A Novel', 2011),
+      hit('The Night Circus Companion', 2013),
+    ])
+
+    assert.equal(chosen?.title, 'The Night Circus: A Novel')
+  })
+
+  it('breaks a year tie on the edition people actually have', () => {
+    const chosen = chooseMatch(pick('Graceling', 2008), [hit('Graceling', 2008), hit('Graceling', 2008, 48)])
+
+    assert.equal(chosen?.popularity, 48)
+  })
+
+  it('counts a pick that carries the subtitle as named, not merely fuzzy', () => {
+    const chosen = chooseMatch(pick('Iron Flame: Empyrean Book 2', 2023), [
+      hit('Iron Flame. Limited Special Edition - Sprayed Edges', 2023),
+      hit('Iron Flame', 2024),
+    ])
+
+    assert.equal(chosen?.title, 'Iron Flame')
+  })
+
+  it('still falls back to a fuzzy match when nothing carries the plain title', () => {
+    const chosen = chooseMatch(pick('WALL-E', 2008), [hit('Wall E', 2008)])
+
+    assert.equal(chosen?.title, 'Wall E')
   })
 
   it('answers null when no hit is the book at all', () => {
@@ -509,6 +596,31 @@ describe('filterByGenre', () => {
       kept.map((c) => c.pick.title),
       ['answered', 'threw'],
     )
+  })
+})
+
+describe('filterByGenre title handling', () => {
+  it('keeps the checked title when the by-id record answers with another one', async () => {
+    const candidates = [book('Iron Flame', 'dIIO0AEACAAJ', null, [])]
+    const kept = await filterByGenre(candidates, 'book', 'romance', async (_type, externalId) =>
+      detail(externalId, 640, ['romance']),
+    )
+
+    // Google answers "Iron Flame. Limited Special Edition - Sprayed Edges" for this
+    // volume by id, having answered a subtitled form of the real title in search.
+    // `detail` here stands in for that: its title is the external id, which is not
+    // the book, so the search title survives while the tags and pages come across.
+    assert.equal(kept[0].match.title, 'Iron Flame')
+    assert.equal(kept[0].match.pageCount, 640)
+    assert.deepEqual(kept[0].match.tags, ['romance'])
+  })
+
+  it('takes the by-id title when it is still the book', async () => {
+    const kept = await filterByGenre([book('The Night Circus', 'A', null, [])], 'book', 'romance', async () =>
+      detail('The Night Circus: A Novel', null, ['romance']),
+    )
+
+    assert.equal(kept[0].match.title, 'The Night Circus: A Novel')
   })
 })
 
