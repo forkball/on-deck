@@ -134,16 +134,13 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
           {new Date(duplicate.createdAt).toLocaleDateString()}, and you haven't logged anything from it yet.
           Generating again will replace it with a different set of picks.
         </p>
-        <div mix={css({ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' })}>
-          <a href={href}>Show me that one →</a>
-          <form method="post" action={routes.recommendations.generate.href()}>
-            {duplicate.fields.map(([name, value], index) => (
-              <input key={`${name}-${index}`} type="hidden" name={name} value={value} />
-            ))}
-            <input type="hidden" name="force" value="1" />
-            <button type="submit">Generate a new one anyway</button>
-          </form>
-        </div>
+        <form method="post" action={routes.recommendations.generate.href()}>
+          {duplicate.fields.map(([name, value], index) => (
+            <input key={`${name}-${index}`} type="hidden" name={name} value={value} />
+          ))}
+          <input type="hidden" name="force" value="1" />
+          <button type="submit">Generate a new one anyway</button>
+        </form>
       </div>
     )
   }
