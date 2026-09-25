@@ -58,7 +58,7 @@ export default createController(routes.profile, {
         getLuckyState(auth.identity),
         listBatches(db, auth.identity.id),
       ])
-      // An import left in review — "Decide later" lands here — has to be
+      // An import left in review — every answer is kept as it is made — has to be
       // findable from here, or the only way back is starting another upload.
       const waitingImports = batches
         .filter((batch) => batch.status === 'matching' || batch.status === 'review')

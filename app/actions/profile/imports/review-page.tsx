@@ -722,9 +722,6 @@ function ReviewDrawer(
               </li>
             ))}
           </ul>
-          <p mix={css({ fontSize: '13px', color: '#888', margin: '8px 0 0' })}>
-            Not now? <a href={routes.profile.index.href()}>Decide later</a> — your answers so far are kept.
-          </p>
         </div>
 
         {needsConfirm && (
