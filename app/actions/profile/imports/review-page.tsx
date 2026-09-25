@@ -657,16 +657,13 @@ function ReviewDrawer(
 ) {
   return () => {
     const { batchId, sections, unchecked, leftOut, save, singular, plural } = handle.props
-    const done = sections.filter((section) => section.open === 0).length
     const needsConfirm = unchecked > 0 || leftOut > 0
     const saveLabel = save > 0 ? `Save ${count(save, singular, plural)}` : 'Finish'
 
-    const progress = [
-      sections.length > 0 && `${done} of ${count(sections.length, 'section', 'sections')} done`,
-      unchecked > 0 && `${unchecked} unchecked`,
-    ]
-      .filter(Boolean)
-      .join(' · ')
+    // The one number that matters while working: what would save unchecked.
+    // Per-section progress is the checklist's job.
+    const progress =
+      sections.length === 0 ? 'Nothing to review' : unchecked > 0 ? `${unchecked} unchecked` : 'All checked'
 
     const saveForm = (label: string) => (
       <form method="post" action={routes.profile.imports.save.href({ batchId })}>
@@ -766,7 +763,7 @@ function ReviewDrawer(
               aria-hidden="true"
               mix={css({ marginRight: '6px', color: '#8d8579' })}
             />
-            {progress || 'Nothing to review'}
+            {progress}
           </label>
           {needsConfirm ? (
             // A label dressed as the Save button: it opens the confirmation
