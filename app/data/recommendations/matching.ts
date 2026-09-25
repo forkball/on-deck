@@ -163,13 +163,37 @@ export function chooseMatch(pick: Pick, matches: CatalogSearchResult[]): Catalog
   const sameWork = matches.filter((match) => titlesLikelyMatch(pick.title, match.title))
   if (sameWork.length === 0) return null
 
-  // Among the ones that are the right book, the year picks the right edition.
-  return (
-    sameWork.find((match) => match.releaseYear === pick.year) ??
-    [...sameWork].sort(
-      (a, b) => Math.abs((a.releaseYear ?? 0) - pick.year) - Math.abs((b.releaseYear ?? 0) - pick.year),
-    )[0]
+  // Hits actually called what the pick is called, give or take a subtitle, ahead of
+  // the ones that only pass the fuzzy check. Two things come out of that.
+  //
+  // The edition stops being a collector's printing: a run delivered "Iron Flame.
+  // Limited Special Edition - Sprayed Edges" because that pressing happened to sit
+  // nearest the pick's year.
+  //
+  // And a sibling in the same series stops being eligible while the book itself is
+  // on the list. Searching "A Court of Thorns and Roses" returns "A Court of Mist
+  // and Fury", which is 0.69 similar — comfortably past the 0.5 the fuzzy check
+  // asks for, and a different book.
+  const named = sameWork.filter(
+    (match) =>
+      normalizeTitle(match.title) === normalizeTitle(pick.title) ||
+      withoutSubtitle(match.title) === normalizeTitle(pick.title),
   )
+  const pool = named.length > 0 ? named : sameWork
+
+  const distance = (match: CatalogSearchResult) => Math.abs((match.releaseYear ?? 0) - pick.year)
+
+  return [...pool].sort(
+    (a, b) =>
+      // Nearest the pick's year: the work's year for a film, the closest pressing to
+      // it for a book.
+      distance(a) - distance(b) ||
+      // Then the edition people actually have, and then the plainest title, which is
+      // how "Iron Flame" wins over "Iron Flame: The Fiery Sequel to the Sunday Times
+      // Bestseller and TikTok Sensation Fourth Wing".
+      b.popularity - a.popularity ||
+      a.title.length - b.title.length,
+  )[0]
 }
 
 // Each verdict carries the index of the entry it's about, so answers pair up by

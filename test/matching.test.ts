@@ -90,8 +90,8 @@ describe('seriesKey', () => {
 })
 
 describe('chooseMatch', () => {
-  const hit = (title: string, releaseYear: number | null) =>
-    ({ title, releaseYear, externalId: title, tags: [] }) as unknown as Parameters<
+  const hit = (title: string, releaseYear: number | null, popularity = 0) =>
+    ({ title, releaseYear, externalId: title, tags: [], popularity }) as unknown as Parameters<
       typeof chooseMatch
     >[1][number]
 
@@ -119,6 +119,51 @@ describe('chooseMatch', () => {
     const chosen = chooseMatch(pick('Outlander', 1991), [hit('Outlander', 2015), hit('Outlander', 1994)])
 
     assert.equal(chosen?.releaseYear, 1994)
+  })
+
+  // A run delivered "Iron Flame. Limited Special Edition - Sprayed Edges" because
+  // that pressing sat nearest the pick's year. The book called what the pick is
+  // called comes first now, whatever year it carries.
+  it('prefers the edition called what the book is called', () => {
+    const chosen = chooseMatch(pick('Iron Flame', 2023), [
+      hit('Iron Flame. Limited Special Edition - Sprayed Edges', 2023),
+      hit('Iron Flame', 2024),
+    ])
+
+    assert.equal(chosen?.title, 'Iron Flame')
+  })
+
+  // Searching "A Court of Thorns and Roses" returns "A Court of Mist and Fury",
+  // 0.69 similar — past the 0.5 the fuzzy check asks for, and a different book. It
+  // stops being eligible while the book itself is on the list.
+  it('prefers the book over a sibling that only passes the fuzzy check', () => {
+    const chosen = chooseMatch(pick('A Court of Thorns and Roses', 2015), [
+      hit('A Court of Mist and Fury', 2016),
+      hit('A Court of Thorns and Roses', 2019),
+    ])
+
+    assert.equal(chosen?.title, 'A Court of Thorns and Roses')
+  })
+
+  it('takes a subtitle as the same book, since publishers add them freely', () => {
+    const chosen = chooseMatch(pick('The Night Circus', 2011), [
+      hit('The Night Circus: A Novel', 2011),
+      hit('The Night Circus Companion', 2013),
+    ])
+
+    assert.equal(chosen?.title, 'The Night Circus: A Novel')
+  })
+
+  it('breaks a year tie on the edition people actually have', () => {
+    const chosen = chooseMatch(pick('Graceling', 2008), [hit('Graceling', 2008), hit('Graceling', 2008, 48)])
+
+    assert.equal(chosen?.popularity, 48)
+  })
+
+  it('still falls back to a fuzzy match when nothing carries the plain title', () => {
+    const chosen = chooseMatch(pick('WALL-E', 2008), [hit('Wall E', 2008)])
+
+    assert.equal(chosen?.title, 'Wall E')
   })
 
   it('answers null when no hit is the book at all', () => {
