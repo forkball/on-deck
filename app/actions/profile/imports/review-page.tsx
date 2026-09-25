@@ -806,6 +806,10 @@ function bulkFor(key: SectionKey, bulk: ReviewModel['bulk']): DrawerSection['bul
 // section in one go, so it sits with that section's progress rather than as
 // another block above a hundred cards. Its own line under the title, indented
 // to the title, so the title and count keep their row on a phone.
+//
+// It reads as a checkbox but is a submit button drawn as one (`.checkline` in
+// app.css): ticking it is the whole action, and a button does that with JS off
+// too, where a real checkbox would need a script to post on change.
 function BulkAccept(handle: Handle<{ batchId: string; kind: BulkKind; count: number; what: string }>) {
   return () => {
     const { batchId, kind, count: n, what } = handle.props
@@ -814,21 +818,13 @@ function BulkAccept(handle: Handle<{ batchId: string; kind: BulkKind; count: num
         method="post"
         action={routes.profile.imports.bulk.href({ batchId })}
         data-in-place
-        mix={css({
-          flex: '1 0 100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          paddingLeft: 'calc(1em + 8px)',
-          fontSize: '13px',
-          color: '#6b6459',
-        })}
+        mix={css({ flex: '1 0 100%', paddingLeft: 'calc(1em + 8px)' })}
       >
         <input type="hidden" name="kind" value={kind} />
-        <button type="submit" class="compact">
-          Accept {n}
+        <button type="submit" class="checkline">
+          <span class="checkline-box" aria-hidden="true" />
+          Accept {n} · {what}
         </button>
-        <span>{what}</span>
       </form>
     )
   }

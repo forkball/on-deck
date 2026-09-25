@@ -232,3 +232,47 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 .doodle button.compact {
   padding: 4px 10px;
 }
+
+/* A submit drawn as a checkbox — the bulk accepts on the import review's
+   checklist. Ticking is the whole action, so it posts like any button (and
+   with JS off); the box borrows DoodleCSS's own checkbox stroke so it reads as
+   one. Unlayered for the usual reason: `.doodle button` sets the border and
+   padding from here. While it posts it is disabled, and the box shows
+   Doodle's checked mark. */
+.doodle button.checkline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-image: none;
+  background: none;
+  padding: 2px 0;
+  font-size: 13px;
+  color: #6b6459;
+  text-align: left;
+  cursor: pointer;
+}
+
+.doodle button.checkline:hover:not(:disabled) {
+  color: #3c3c3c;
+}
+
+.doodle .checkline-box {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 5px;
+  border-image: url(/vendor/doodle/checkbox.svg) 6 6 6 6 stretch stretch;
+  font-size: 14px;
+}
+
+.doodle button.checkline:disabled .checkline-box::after {
+  content: '*';
+  font-size: 1.2em;
+  margin-bottom: -0.3em;
+}
