@@ -109,6 +109,12 @@ const GROUP_STYLE = css({
   },
   // Only while folded: open, the rows are right there to count.
   '& > details[open] > summary .count': { display: 'none' },
+  // On a phone the label starts at the left edge, the way the rows under it do,
+  // with just the trailing rule — centred, a wrapped label reads as ragged.
+  '@media (max-width: 600px)': {
+    '& > details > summary::before': { display: 'none' },
+    '& > details > summary > span': { justifyContent: 'flex-start' },
+  },
 })
 
 const GROUP_BODY_STYLE = css({
