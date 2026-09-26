@@ -1042,6 +1042,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
     const { counts } = model
     const { singular, plural, pastParticiple, hrefs } = mediaTypeUiFor(batch.media_type as MediaType)
     const batchId = batch.id
+    const answeredCount = Object.values(model.answered).reduce((sum, rows) => sum + rows.length, 0)
     const uncertainGroups = withAnswered(
       groupByReason(model.uncertain, singular, plural),
       model,
@@ -1174,10 +1175,11 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   {counts.total} rows.{' '}
                   {model.alreadyLoggedIds.length > 0 &&
                     `${model.alreadyLoggedIds.length} already in your log, `}
-                  <b mix={css({ fontWeight: 400 })}>
-                    {model.confidentCount + model.confirmedCount} matched cleanly
-                  </b>
-                  , {model.uncertain.length} worth a look, and {model.notFound.length} we couldn't find.
+                  {/* Matching's own count, not yours: what you've settled is
+                      "answered", the word each section's list uses for it. */}
+                  <b mix={css({ fontWeight: 400 })}>{model.confidentCount} matched cleanly</b>
+                  {answeredCount > 0 && `, ${answeredCount} answered`}, {model.uncertain.length} worth a look,
+                  and {model.notFound.length} we couldn't find.
                 </p>
                 {reviewsOnly && (
                   <p
