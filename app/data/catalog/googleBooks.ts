@@ -1,3 +1,4 @@
+import { stripPublisherPromo } from './blurb.ts'
 import { createProviderCircuit } from './circuit.ts'
 import { fetchWithRetry } from './retry.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
@@ -83,17 +84,20 @@ function toHttps(url: string | undefined): string | null {
 }
 
 // Descriptions carry basic HTML (<b>, <i>, <br>) and entities, since they're
-// lifted from the Play Books listing rather than plain text.
+// lifted from the Play Books listing rather than plain text. Paragraph and line
+// breaks become newlines rather than vanishing, which also gives
+// stripPublisherPromo the line ends it uses to tell a banner from the synopsis.
 function cleanDescription(raw: string): string {
-  return raw
+  const text = raw
     .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
-    .trim()
+  return stripPublisherPromo(text)
 }
 
 function toResult(volume: GoogleBooksVolume): CatalogSearchResult {

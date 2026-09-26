@@ -1,3 +1,4 @@
+import { stripPublisherPromo } from './blurb.ts'
 import { fetchWithRetry } from './retry.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
 
@@ -210,7 +211,7 @@ export async function getWorkById(externalId: string): Promise<CatalogSearchResu
     // The work record carries no readership figure; the search index is where
     // popularity comes from, and a lookup never competes with search hits.
     popularity: 0,
-    overview: description ?? null,
+    overview: description ? stripPublisherPromo(description) : null,
     runtimeMinutes: null,
     pageCount: null,
     creator: null,

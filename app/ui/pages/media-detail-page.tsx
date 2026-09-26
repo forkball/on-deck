@@ -17,6 +17,7 @@ import { StatusSelect } from '../components/status-select.tsx'
 import { Collapsible } from '../shared/collapsible.tsx'
 import { Field } from '../shared/field.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
+import { stripPublisherPromo } from '../../data/catalog/blurb.ts'
 import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { backLinkFrom, withReturnTo } from '../backLink.ts'
 
@@ -112,7 +113,13 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
               )}
               <PlatformList platforms={platforms} />
               {overview ? (
-                <ExpandableText text={overview} id={`overview-${item.id}`} />
+                <ExpandableText
+                  // Rows stored before the providers stripped jacket copy still
+                  // carry it; stripping is idempotent, so doing it again on
+                  // cleaned text changes nothing.
+                  text={mediaType === 'book' ? stripPublisherPromo(overview) : overview}
+                  id={`overview-${item.id}`}
+                />
               ) : (
                 <p>No description available.</p>
               )}
