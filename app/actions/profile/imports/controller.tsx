@@ -11,6 +11,7 @@ import {
   loadBatch,
   loadReview,
   loadRows,
+  reopenRow,
   repointRow,
   saveBatch,
   setConflictChoice,
@@ -196,6 +197,8 @@ export default createController(routes.profile.imports, {
         await keepRow(db, batch, rowId)
       } else if (action === 'skip') {
         await skipRow(db, batch, rowId)
+      } else if (action === 'reopen') {
+        await reopenRow(db, batch, rowId)
       } else if (action === 'repoint') {
         const externalId = String(formData.get('external_id') ?? '').trim()
         if (!externalId) return backToReview(batch, 'Choose a film first.')

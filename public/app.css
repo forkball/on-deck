@@ -194,14 +194,17 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
    padding and colour from an unlayered rule, so a layered css() declaration is
    dropped without a word — which is why this lives here, like the modal trigger
    and rating chip above. */
-.doodle button.linkish {
+.doodle button.linkish,
+.doodle a.linkish {
   padding: 0;
+  font-weight: normal;
   font-size: 13px;
   color: #6b6459;
   text-decoration: underline;
 }
 
-.doodle button.linkish:hover {
+.doodle button.linkish:hover,
+.doodle a.linkish:hover {
   color: #3c3c3c;
 }
 

@@ -215,6 +215,7 @@ function toStagedRow(row: ImportRow): StagedRow {
     matchedExternalId: row.matched_external_id ?? null,
     alternates: readAlternates(row.alternates),
     acceptedBy: parseBulkKind(row.accepted_by),
+    updatedAt: row.updated_at,
   }
 }
 
@@ -280,6 +281,7 @@ export async function loadReview(
     rows,
     model: buildReview(staged, itemMap, existing, batch.conflict_choice as ConflictChoice, {
       saved: batch.status === 'done',
+      since: batch.updated_at,
     }),
   }
 }
@@ -296,6 +298,29 @@ async function settleRow(db: Db, batch: ImportBatch, rowId: number, state: RowSt
   if (!row) return false
 
   await db.update(importRows, row.id, { state, accepted_by: undefined, updated_at: Date.now() })
+  return true
+}
+
+// Undo for one answer: the row is a question again. A found "couldn't find"
+// row goes back to not found.
+export async function reopenRow(db: Db, batch: ImportBatch, rowId: number): Promise<boolean> {
+  const row = await ownedRow(db, batch, rowId)
+  if (!row || (row.state !== 'confirmed' && row.state !== 'skipped')) return false
+
+  const now = Date.now()
+  if (row.reason === 'title_differs' || row.reason === 'no_year' || row.reason === 'year_drift') {
+    await db.update(importRows, row.id, { state: 'uncertain', accepted_by: undefined, updated_at: now })
+  } else if (row.reason == null) {
+    await db.update(importRows, row.id, {
+      state: 'not_found',
+      media_item_id: null,
+      matched_external_id: undefined,
+      accepted_by: undefined,
+      updated_at: now,
+    })
+  } else {
+    return false
+  }
   return true
 }
 

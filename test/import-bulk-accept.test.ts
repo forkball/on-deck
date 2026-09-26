@@ -9,6 +9,8 @@ import {
   loadBatch,
   loadRows,
   recordMatch,
+  reopenRow,
+  skipRow,
   unacceptBulk,
 } from '../app/data/imports/batches.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
@@ -60,5 +62,19 @@ describe('unticking a bulk accept', { skip: skipWithoutDatabase }, () => {
     assert.equal(after.get(kwaidan!.id)?.year_delta, 1)
     assert.equal(after.get(kwaidan!.id)?.accepted_by, null)
     assert.equal(after.get(ran!.id)?.state, 'confirmed')
+  })
+
+  it('reopens an answered row as a question again', async () => {
+    const batch = (await loadBatch(db, batchId, userId))!
+    const [kwaidan] = await loadRows(db, batchId)
+
+    await skipRow(db, batch, kwaidan!.id)
+    assert.equal(await reopenRow(db, batch, kwaidan!.id), true)
+    const row = (await loadRows(db, batchId)).find((candidate) => candidate.id === kwaidan!.id)
+    assert.equal(row?.state, 'uncertain')
+    assert.equal(row?.reason, 'year_drift')
+
+    // Only an answer can be undone.
+    assert.equal(await reopenRow(db, batch, kwaidan!.id), false)
   })
 })
