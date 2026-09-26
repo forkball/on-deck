@@ -804,9 +804,9 @@ function ReviewDrawer(
     const progress =
       sections.length === 0 ? 'Nothing to review' : unchecked > 0 ? `${unchecked} unchecked` : 'All checked'
 
-    const saveForm = (label: string) => (
+    const saveForm = (label: string, cls = 'primary') => (
       <form method="post" action={routes.profile.imports.save.href({ batchId })}>
-        <button type="submit" class="primary">
+        <button type="submit" class={cls}>
           {label}
         </button>
       </form>
@@ -893,10 +893,10 @@ function ReviewDrawer(
           {needsConfirm ? (
             // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
             <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
-              <span class="doodle-border primary">{saveLabel}</span>
+              <span class="doodle-border primary slim">{saveLabel}</span>
             </label>
           ) : (
-            saveForm(saveLabel)
+            saveForm(saveLabel, 'primary slim')
           )}
         </div>
 

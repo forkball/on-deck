@@ -229,6 +229,12 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   color: #3c3c3c;
 }
 
+/* Thinner, for the Save pinned in the import review's bottom bar. */
+.doodle button.slim,
+.doodle .doodle-border.slim {
+  padding-block: 0;
+}
+
 /* Narrower, for a row of short alternatives (the year choices on a 320px phone). */
 .doodle button.compact {
   padding: 4px 10px;
