@@ -259,7 +259,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               survives a trip to "Just me" and back. The server ignores it on a
               run with nobody else in it. */}
           <div mix={css({ display: !isLucky && mode === 'group' ? 'block' : 'none' })}>
-            <p mix={sectionLabel}>Already logged</p>
+            <p mix={sectionLabel}>How new should picks be?</p>
             <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
               {SEEN_BY_OPTIONS.map((option) =>
                 radioOption({
