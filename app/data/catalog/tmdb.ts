@@ -1,3 +1,5 @@
+import type { CastMember } from '../mediaMetadata.ts'
+
 const TMDB_API_BASE = 'https://api.themoviedb.org/3'
 
 const GENRE_ID_TO_NAME: Record<number, string> = {
@@ -60,6 +62,13 @@ export interface TmdbSearchResult {
   playtimeHours?: number | null
   seasonCount?: number | null
   creator?: string | null
+  // Every name behind `creator`, which joins them. Kept as a list for the page to
+  // count — "Directors" for the Wachowskis — while every other reader keeps
+  // taking the one string. Only movies fill it.
+  creators?: string[]
+  // Top-billed first. Only a movie's detail lookup fills it; search has no credits.
+  cast?: CastMember[]
+  tagline?: string | null
   // The item's page on its catalog, for a provider whose page can't be built from
   // externalId alone — see catalogPageFor. Only IGDB sets it.
   sourceUrl?: string | null
@@ -77,6 +86,9 @@ export interface TmdbSearchResult {
   // id format that belongs to the primary provider instead.
   sourceOverride?: string
 }
+
+// Enough to say who is in it without the page turning into a credits roll.
+const CAST_LIMIT = 5
 
 interface TmdbSearchResponse {
   results: {
@@ -172,7 +184,29 @@ interface TmdbMovieDetailResponse {
   popularity: number
   overview: string
   runtime: number | null
-  credits?: { crew?: { job?: string; name?: string }[] }
+  tagline?: string | null
+  credits?: {
+    // Already in billing order, which is the order worth showing.
+    cast?: { name?: string; character?: string | null }[]
+    crew?: { job?: string; name?: string }[]
+  }
+}
+
+// Every director, not the first: a co-directed film otherwise credits one of
+// its directors and drops the rest.
+function directorsOf(r: TmdbMovieDetailResponse): string[] {
+  const names = (r.credits?.crew ?? [])
+    .filter((member) => member.job === 'Director')
+    .map((member) => member.name)
+    .filter((name): name is string => Boolean(name))
+  return [...new Set(names)]
+}
+
+function castOf(r: TmdbMovieDetailResponse): CastMember[] {
+  return (r.credits?.cast ?? [])
+    .filter((member): member is { name: string; character?: string | null } => Boolean(member.name))
+    .slice(0, CAST_LIMIT)
+    .map((member) => ({ name: member.name, character: member.character?.trim() || null }))
 }
 
 export async function getMovieById(externalId: string): Promise<TmdbSearchResult | null> {
@@ -193,6 +227,7 @@ export async function getMovieById(externalId: string): Promise<TmdbSearchResult
   }
 
   const r = (await response.json()) as TmdbMovieDetailResponse
+  const directors = directorsOf(r)
 
   return {
     externalId: String(r.id),
@@ -203,7 +238,10 @@ export async function getMovieById(externalId: string): Promise<TmdbSearchResult
     popularity: r.popularity,
     overview: r.overview?.trim() || null,
     runtimeMinutes: r.runtime ?? null,
-    creator: r.credits?.crew?.find((member) => member.job === 'Director')?.name ?? null,
+    creator: directors.length > 0 ? directors.join(', ') : null,
+    creators: directors,
+    cast: castOf(r),
+    tagline: r.tagline?.trim() || null,
   }
 }
 

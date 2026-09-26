@@ -36,6 +36,9 @@ function buildMetadata(
     playtimeHours: result.playtimeHours ?? prev?.playtimeHours ?? null,
     seasonCount: result.seasonCount ?? prev?.seasonCount ?? null,
     creator: result.creator ?? prev?.creator ?? null,
+    creators: result.creators?.length ? result.creators : (prev?.creators ?? []),
+    cast: result.cast?.length ? result.cast : (prev?.cast ?? []),
+    tagline: result.tagline ?? prev?.tagline ?? null,
     sourceUrl: result.sourceUrl ?? prev?.sourceUrl ?? null,
     // `??` won't do: an empty array is truthy, so a lookup returning no stills
     // would replace a set we already had.

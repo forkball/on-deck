@@ -44,9 +44,22 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
     const { mediaType, item, interaction, from, displayName, canRematch, rematchError, rematched, merged } =
       handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
-    const { releaseYear, posterUrl, overview, creator, images, platforms, tags } = parseMediaMetadata(
-      item.metadata,
-    )
+    const {
+      releaseYear,
+      posterUrl,
+      overview,
+      creator,
+      creators,
+      cast,
+      tagline,
+      runtimeMinutes,
+      images,
+      platforms,
+      tags,
+    } = parseMediaMetadata(item.metadata)
+    // Only a movie's is the length of the thing itself — a show's is one episode.
+    const runtime = mediaType === 'movie' ? formatRuntime(runtimeMinutes) : null
+    const genres = tags.map((t) => t.replace(/^./, (c) => c.toUpperCase())).join(', ')
     // A medium with stills shows them instead of a poster, having none to show:
     // 16:9 key art in a 220px portrait slot renders as a letterbox, and the
     // first still is that same art, so nothing is lost by dropping the slot.
@@ -103,15 +116,16 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 {item.title}
                 {releaseYear ? ` (${releaseYear})` : ''}
               </h1>
+              {tagline && (
+                <p mix={css({ margin: '-8px 0 12px', color: '#555', fontStyle: 'italic' })}>{tagline}</p>
+              )}
               {creator && (
                 <p mix={css({ margin: '0 0 8px', color: '#555' })}>
-                  {ui.creditLabel}: <strong>{creator}</strong>
+                  {creators.length > 1 ? `${ui.creditLabel}s` : ui.creditLabel}: <strong>{creator}</strong>
                 </p>
               )}
-              {tags.length > 0 && (
-                <p mix={css({ color: '#555' })}>
-                  {tags.map((t) => t.replace(/^./, (c) => c.toUpperCase())).join(', ')}
-                </p>
+              {(genres || runtime) && (
+                <p mix={css({ color: '#555' })}>{[genres, runtime].filter(Boolean).join(' · ')}</p>
               )}
               <PlatformList platforms={platforms} />
               {overview ? (
@@ -124,6 +138,21 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 />
               ) : (
                 <p>No description available.</p>
+              )}
+              {cast.length > 0 && (
+                <section mix={css({ marginTop: '16px' })}>
+                  <h2 mix={css({ fontSize: '16px', margin: '0 0 6px' })}>Cast</h2>
+                  <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, color: '#555' })}>
+                    {cast.map((member) => (
+                      // Block, so DoodleCSS's "* " marker has nowhere to go —
+                      // see run-list.tsx.
+                      <li mix={css({ display: 'block', margin: '0 0 2px' })}>
+                        <strong mix={css({ color: '#333' })}>{member.name}</strong>
+                        {member.character ? ` as ${member.character}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               )}
               {catalogPage && (
                 <p mix={css({ margin: '12px 0 0', fontSize: '14px' })}>
@@ -311,4 +340,14 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
       </Document>
     )
   }
+}
+
+// "2h 16m", or "45m" under an hour. Null when there is nothing to say — TMDB
+// answers 0 for a film it has no runtime for, which is not a runtime.
+function formatRuntime(minutes: number | null): string | null {
+  if (!minutes || minutes <= 0) return null
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  if (hours === 0) return `${rest}m`
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`
 }
