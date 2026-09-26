@@ -1,6 +1,6 @@
 import { clientEntry, css, on } from 'remix/ui'
 
-import { Field } from '../ui/shared/field.tsx'
+import { Field, hintStyle, labelTextStyle } from '../ui/shared/field.tsx'
 import { FriendPicker, radioOption, sectionLabel, type FriendOption } from './friend-picker.tsx'
 
 export type { FriendOption }
@@ -278,9 +278,12 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 )}
               </summary>
 
+              {/* Labelled like the fields below it rather than with another
+                  section heading: it is one setting among them, and two caps
+                  headings stacked read as a section with nothing in it. */}
               <div mix={css({ marginTop: '12px', marginBottom: '16px' })}>
-                <p mix={sectionLabel}>Base picks on</p>
-                <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
+                <p mix={[labelTextStyle, css({ margin: '0 0 4px' })]}>Base picks on</p>
+                <div mix={css({ display: 'flex', gap: '8px 20px', flexWrap: 'wrap' })}>
                   {sources.map((source) => (
                     <label key={source.value}>
                       <input
@@ -305,7 +308,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   ))}
                 </div>
                 {hasSource && (
-                  <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
+                  <p mix={hintStyle}>
                     You'll still get {mediaTypeLabel} picks — this only changes which taste they're drawn
                     from.
                   </p>

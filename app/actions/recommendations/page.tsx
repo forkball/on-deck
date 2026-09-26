@@ -234,7 +234,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             runsLimit={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.limit : undefined}
             sources={ACTIVE_MEDIA_TYPES.map((type) => ({
               value: type,
-              label: `${MEDIA_TYPE_UI[type].attributive} taste`,
+              label: MEDIA_TYPE_UI[type].tabLabel,
             }))}
             genres={genres}
             lengthOptions={lengthOptions}
