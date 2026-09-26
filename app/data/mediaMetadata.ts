@@ -9,6 +9,9 @@ export interface MediaMetadata {
   playtimeHours: number | null
   seasonCount: number | null
   creator: string | null
+  // The catalog page, when it can't be built from external_id — see
+  // catalogPageFor, which is what reads it.
+  sourceUrl: string | null
   images: string[]
   platforms: string[]
   // What the provider called the series this belongs to. Empty for a medium whose
@@ -53,6 +56,7 @@ function emptyMetadata(): MediaMetadata {
     playtimeHours: null,
     seasonCount: null,
     creator: null,
+    sourceUrl: null,
     images: [],
     platforms: [],
     series: [],
@@ -80,6 +84,7 @@ export function parseMediaMetadata(metadata: unknown): MediaMetadata {
       playtimeHours: numberOrNull(parsed.playtimeHours),
       seasonCount: numberOrNull(parsed.seasonCount),
       creator: stringOrNull(parsed.creator),
+      sourceUrl: stringOrNull(parsed.sourceUrl),
       images: stringArray(parsed.images),
       platforms: stringArray(parsed.platforms),
       series: stringArray(parsed.series),
