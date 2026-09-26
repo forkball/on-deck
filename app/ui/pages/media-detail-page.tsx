@@ -357,13 +357,6 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                     </dl>
                   </section>
                 )}
-                {catalogPage && (
-                  <p mix={css({ margin: '12px 0 0', fontSize: '14px' })}>
-                    <a href={catalogPage.url} target="_blank" rel="noopener noreferrer">
-                      View on {catalogPage.name}
-                    </a>
-                  </p>
-                )}
                 {watch && <WhereToWatch {...watch} title={item.title} returnTo={returnTo} />}
 
                 {/* Top margin matters now that the description above may end
@@ -411,6 +404,15 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                       {rematchError && <p mix={css({ color: '#c33', margin: '8px 0 0' })}>{rematchError}</p>}
                     </Collapsible>
                   </div>
+                )}
+                {/* Last: it leaves the page, so it closes it rather than
+                    sitting between the panels. */}
+                {catalogPage && (
+                  <p mix={css({ margin: '20px 0 0', fontSize: '14px' })}>
+                    <a href={catalogPage.url} target="_blank" rel="noopener noreferrer">
+                      View on {catalogPage.name}
+                    </a>
+                  </p>
                 )}
               </div>
             </div>
