@@ -1,6 +1,7 @@
 import { clientEntry, css, on } from 'remix/ui'
 
-import { Field } from '../ui/shared/field.tsx'
+import { Field, hintStyle } from '../ui/shared/field.tsx'
+import { SEEN_BY_OPTIONS, type SeenBy } from '../ui/shared/seen-by.ts'
 import { FriendPicker, radioOption, sectionLabel, type FriendOption } from './friend-picker.tsx'
 
 export type { FriendOption }
@@ -50,6 +51,15 @@ const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series',
 
 const PLACEHOLDER_SOURCES: string[] = []
 
+// The shortlist's caption, which otherwise promises a rule the group just
+// changed. Alone, the default reads the same: one person is "most of you".
+function shortlistCaption(count: number, seenBy: SeenBy, isGroup: boolean): string {
+  if (!isGroup) return `Up to ${count} picks, minus what you've already finished.`
+  if (seenBy === 'no_one') return `Up to ${count} picks, minus anything any of you has finished.`
+  if (seenBy === 'any') return `Up to ${count} picks, whether or not you've seen them.`
+  return `Up to ${count} picks, minus what most of you have already finished.`
+}
+
 // Submitting redirects almost immediately to a page reporting the real stage,
 // so this only covers that hop: the button disables itself so a second
 // submit can't start a second run.
@@ -59,6 +69,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let submitting = false
     let runKind: 'shortlist' | 'lucky' = handle.props.startLucky ? 'lucky' : 'shortlist'
     let mode: 'self' | 'group' = 'self'
+    let seenBy: SeenBy = 'no_one'
     let search = ''
     let page = 1
     const selectedFriends = new Set<number>()
@@ -101,6 +112,9 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         { label: 'You', loggedTypes: viewerLoggedTypes },
         ...(mode === 'group' ? friends.filter((friend) => selectedFriends.has(friend.id)) : []),
       ]
+      // Who is actually in it, not which radio is set. "With friends" with nobody
+      // ticked isn't a group run yet, and can't be submitted.
+      const isGroupRun = membersInRun.length > 1
       const sourceLabel = (value: string) => sources.find((source) => source.value === value)?.label ?? value
       const blockedBy = membersInRun
         .map((member) => ({
@@ -114,8 +128,13 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       // go anywhere".
       const isLucky = runKind === 'lucky'
       const luckyBlockedBy = membersInRun.filter((member) => !member.loggedTypes.includes(mediaType))
+      // Either kind of run: both read the same picker. The button just stays
+      // disabled — nothing ticked is a step not taken yet, not a mistake.
+      const noFriendsPicked = mode === 'group' && !isGroupRun
       const disabled =
-        submitting || (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
+        submitting ||
+        noFriendsPicked ||
+        (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
 
       const caption = css({ margin: '10px 0 0', fontSize: '12px', color: '#888', lineHeight: 1.4 })
 
@@ -126,6 +145,20 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         border: '1px solid #ccc',
         fontSize: '11px',
         color: '#555',
+      })
+
+      // Settings falls into sections — what taste picks are drawn from, what
+      // narrows them, and what only a group has — each under a heading that
+      // reads as part of the panel rather than a second caps section label.
+      const settingsSection = css({ display: 'flex', flexDirection: 'column', gap: '8px' })
+      const sectionDivider = css({ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e5e5e5' })
+      const settingsHeading = css({ margin: 0, fontSize: '14px', fontWeight: 600, color: '#333' })
+      // auto-fill rather than auto-fit, so a section with one field keeps the
+      // same column width as one with five instead of stretching it across.
+      const settingsGrid = css({
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+        gap: '12px',
       })
 
       // A field that doesn't apply to the run being made is hidden rather
@@ -174,7 +207,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   )}
                 </div>
                 <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
-                  {`Up to ${shortlistCount} picks, minus what most of you have already finished.`}
+                  {shortlistCaption(shortlistCount, seenBy, isGroupRun)}
                   {runsRemaining == null && runsLeftLabel && ` ${runsLeftLabel}.`}
                 </p>
               </div>
@@ -258,9 +291,9 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 )}
               </summary>
 
-              <div mix={css({ marginTop: '12px', marginBottom: '16px' })}>
-                <p mix={sectionLabel}>Base picks on</p>
-                <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
+              <section mix={[settingsSection, css({ marginTop: '12px' })]}>
+                <p mix={settingsHeading}>Taste</p>
+                <div mix={css({ display: 'flex', gap: '8px 20px', flexWrap: 'wrap' })}>
                   {sources.map((source) => (
                     <label key={source.value}>
                       <input
@@ -285,120 +318,144 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   ))}
                 </div>
                 {hasSource && (
-                  <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
+                  <p mix={hintStyle}>
                     You'll still get {mediaTypeLabel} picks — this only changes which taste they're drawn
                     from.
                   </p>
                 )}
-              </div>
+              </section>
 
-              <div
-                mix={css({
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                  gap: '12px',
-                })}
-              >
-                <Field label="Genre">
-                  <select name="genre" defaultValue="">
-                    <option value="">Any</option>
-                    {genres.map((genre) => (
-                      <option value={genre}>{genre.replace(/^./, (c) => c.toUpperCase())}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Decade">
-                  <select
-                    name="decade"
-                    defaultValue=""
-                    mix={on('change', (event) => {
-                      decade = (event.target as HTMLSelectElement).value
-                      handle.update()
-                    })}
-                  >
-                    <option value="">Any</option>
-                    {DECADES.map((value) => (
-                      <option key={value} value={String(value)}>
-                        {value}s
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                {decade !== '' && (
-                  <Field label="Relative to decade">
-                    <select name="decade_relation" defaultValue="within">
-                      <option value="before">Before</option>
-                      <option value="within">Within</option>
-                      <option value="after">After</option>
+              <section mix={[settingsSection, sectionDivider]}>
+                <p mix={settingsHeading}>Filters</p>
+                <div mix={settingsGrid}>
+                  <Field label="Genre">
+                    <select name="genre" defaultValue="">
+                      <option value="">Any</option>
+                      {genres.map((genre) => (
+                        <option value={genre}>{genre.replace(/^./, (c) => c.toUpperCase())}</option>
+                      ))}
                     </select>
                   </Field>
-                )}
-                <Field label="Length">
-                  <select name="length" defaultValue="">
-                    <option value="">Any</option>
-                    {lengthOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                {playerTypes.length > 0 && (
-                  <Field label="Player type">
+                  <Field label="Decade">
                     <select
-                      name="player_type"
+                      name="decade"
                       defaultValue=""
                       mix={on('change', (event) => {
-                        playerType = (event.target as HTMLSelectElement).value
+                        decade = (event.target as HTMLSelectElement).value
                         handle.update()
                       })}
                     >
                       <option value="">Any</option>
-                      {playerTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {PLAYER_TYPE_LABELS[type] ?? type}
+                      {DECADES.map((value) => (
+                        <option key={value} value={String(value)}>
+                          {value}s
                         </option>
                       ))}
                     </select>
                   </Field>
-                )}
-                {playerType === 'multiplayer' && multiplayerTypes.length > 0 && (
-                  <Field label="Multiplayer type">
-                    <select name="multiplayer_type" defaultValue="">
+                  {decade !== '' && (
+                    <Field label="Relative to decade">
+                      <select name="decade_relation" defaultValue="within">
+                        <option value="before">Before</option>
+                        <option value="within">Within</option>
+                        <option value="after">After</option>
+                      </select>
+                    </Field>
+                  )}
+                  <Field label="Length">
+                    <select name="length" defaultValue="">
                       <option value="">Any</option>
-                      {multiplayerTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {MULTIPLAYER_TYPE_LABELS[type] ?? type}
+                      {lengthOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
                   </Field>
-                )}
-                {platforms.length > 0 && (
-                  <Field label="Platform">
-                    <select name="platform" defaultValue="">
-                      <option value="">Any</option>
-                      {platforms.map((platform) => (
-                        <option key={platform} value={platform}>
-                          {platform}
+                  {playerTypes.length > 0 && (
+                    <Field label="Player type">
+                      <select
+                        name="player_type"
+                        defaultValue=""
+                        mix={on('change', (event) => {
+                          playerType = (event.target as HTMLSelectElement).value
+                          handle.update()
+                        })}
+                      >
+                        <option value="">Any</option>
+                        {playerTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {PLAYER_TYPE_LABELS[type] ?? type}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
+                  {playerType === 'multiplayer' && multiplayerTypes.length > 0 && (
+                    <Field label="Multiplayer type">
+                      <select name="multiplayer_type" defaultValue="">
+                        <option value="">Any</option>
+                        {multiplayerTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {MULTIPLAYER_TYPE_LABELS[type] ?? type}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
+                  {platforms.length > 0 && (
+                    <Field label="Platform">
+                      <select name="platform" defaultValue="">
+                        <option value="">Any</option>
+                        {platforms.map((platform) => (
+                          <option key={platform} value={platform}>
+                            {platform}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
+                  {seriesTypes.length > 0 && (
+                    <Field label="Series">
+                      <select name="series" defaultValue="">
+                        <option value="">Any</option>
+                        {seriesTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {SERIES_TYPE_LABELS[type] ?? type}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
+                </div>
+              </section>
+
+              {/* Hidden rather than unmounted, like the friend list, so a
+                  choice survives a trip to "Just me" and back, or unticking
+                  everyone. */}
+              <section
+                mix={[settingsSection, sectionDivider, css({ display: isGroupRun ? 'block' : 'none' })]}
+              >
+                <p mix={settingsHeading}>Group</p>
+                <div mix={settingsGrid}>
+                  <Field label="History">
+                    <select
+                      name="seen_by"
+                      defaultValue="no_one"
+                      mix={on('change', (event) => {
+                        seenBy = (event.target as HTMLSelectElement).value as SeenBy
+                        handle.update()
+                      })}
+                    >
+                      {SEEN_BY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
                   </Field>
-                )}
-                {seriesTypes.length > 0 && (
-                  <Field label="Series">
-                    <select name="series" defaultValue="">
-                      <option value="">Any</option>
-                      {seriesTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {SERIES_TYPE_LABELS[type] ?? type}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-              </div>
+                </div>
+              </section>
             </details>
           </div>
 

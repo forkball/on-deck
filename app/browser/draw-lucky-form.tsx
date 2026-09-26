@@ -35,7 +35,8 @@ export const DrawLuckyForm = clientEntry<DrawLuckyFormProps>(import.meta.url, fu
       ...(mode === 'group' ? friends.filter((friend) => selectedFriends.has(friend.id)) : []),
     ]
     const blockedBy = membersInRun.filter((member) => !member.loggedTypes.includes(mediaType))
-    const disabled = submitting || blockedBy.length > 0
+    const noFriendsPicked = mode === 'group' && membersInRun.length === 1
+    const disabled = submitting || noFriendsPicked || blockedBy.length > 0
 
     return (
       <form

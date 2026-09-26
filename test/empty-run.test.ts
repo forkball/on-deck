@@ -25,6 +25,11 @@ describe('nothingLeftMessage', () => {
     assert.match(nothingLeftMessage({ multiplayerType: 'coop' }, 'game'), /multiplayer type filter/)
   })
 
+  it('names the already-seen lever only when it narrowed the run', () => {
+    assert.match(nothingLeftMessage({ seenBy: 'no_one' }, 'movie'), /already-seen filter/)
+    assert.match(nothingLeftMessage({ seenBy: 'any' }, 'movie'), /confirm this time/)
+  })
+
   it('says something true when no filter was set at all', () => {
     assert.match(nothingLeftMessage({}, 'book'), /confirm this time/)
   })

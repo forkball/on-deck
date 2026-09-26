@@ -1,4 +1,5 @@
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
+import type { SeenBy } from '../../ui/shared/seen-by.ts'
 import { describeLength, getCatalogProvider, type LengthBucket } from '../catalog/provider.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { requestStructured } from './claude.ts'
@@ -62,7 +63,28 @@ export interface RecommendationFilters {
   platform?: string
   // Books only — see BOOK_SERIES_TYPES.
   series?: string
+  // Group runs only, and never 'half' — see ui/shared/seen-by.ts. Enforced by
+  // buildExclusions rather than a gate of its own.
+  seenBy?: SeenBy
 }
+
+// Whether a lever cut this run down. Every lever does whenever it is set, but
+// seenBy is also set to widen ('any'), so the one exception is spelled here for
+// everything that asks.
+export function narrows(filters: RecommendationFilters, key: keyof RecommendationFilters): boolean {
+  return key === 'seenBy' ? filters.seenBy === 'no_one' : filters[key] != null
+}
+
+const NARROWING_KEYS: (keyof RecommendationFilters)[] = [
+  'genre',
+  'decade',
+  'length',
+  'playerType',
+  'multiplayerType',
+  'platform',
+  'series',
+  'seenBy',
+]
 
 // Built per request rather than a constant: part_of_series is asked for only when
 // the lever needs it, and structured output requires every property it declares, so
@@ -167,6 +189,12 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string, m
   if (filters.platform) clauses.push(`Only suggest ${noun} playable on ${filters.platform}.`)
   if (filters.series === 'series') clauses.push(`Only suggest ${noun} that are part of a series.`)
   if (filters.series === 'standalone') clauses.push(`Only suggest standalone ${noun}, not part of a series.`)
+  // No clause for 'no_one': the seen list below already names everything anyone
+  // has finished. 'any' empties that list, so without this the model would still
+  // steer clear of what it guesses they've seen.
+  if (filters.seenBy === 'any') {
+    clauses.push(`It's fine to suggest ${noun} some or all of them have already seen.`)
+  }
   // Nothing in any book catalog answers this, so the model is asked to label its own
   // picks and is held to the labels — see matchesSeries.
   if (filters.series != null) {
@@ -205,14 +233,7 @@ export async function requestPicks(
     : sourceTypes.length > 1
       ? ` Each person has a separate profile per type above; weigh all of them.`
       : ''
-  const hasFilters =
-    filters.genre != null ||
-    filters.decade != null ||
-    filters.length != null ||
-    filters.playerType != null ||
-    filters.multiplayerType != null ||
-    filters.platform != null ||
-    filters.series != null
+  const hasFilters = NARROWING_KEYS.some((key) => narrows(filters, key))
   const requestedCount = hasFilters ? REQUESTED_COUNT + 6 : REQUESTED_COUNT
   const { singular } = mediaTypeUiFor(mediaType)
   const seriesRule =
