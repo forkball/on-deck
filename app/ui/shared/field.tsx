@@ -38,7 +38,7 @@ export const fieldStyle = css({
   },
 })
 
-export const labelTextStyle = css({ fontSize: '13px', color: '#555' })
+const labelTextStyle = css({ fontSize: '13px', color: '#555' })
 export const hintStyle = css({ display: 'block', margin: '4px 0 0', fontSize: '12px', color: '#888' })
 const errorStyle = css({ display: 'block', margin: '4px 0 0', fontSize: '12px', color: '#b91c1c' })
 
