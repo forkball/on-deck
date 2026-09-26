@@ -25,6 +25,8 @@ import type { MediaControllerContext, MediaItemControllerContext } from '../midd
 import { displayLabel } from '../data/users.ts'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../mediaTypes.ts'
 import { parseMediaMetadata } from '../data/mediaMetadata.ts'
+import { loadWatchProviders } from '../data/watchProviders.ts'
+import { guessWatchRegion, parseWatchRegion } from '../data/watchRegion.ts'
 import { MediaDetailPage } from '../ui/pages/media-detail-page.tsx'
 import { MediaSearchPage } from '../ui/pages/media-search-page.tsx'
 import { RETURN_TO_PARAM, withReturnTo } from '../ui/backLink.ts'
@@ -129,8 +131,16 @@ export function createMediaActions(mediaType: ActiveMediaType) {
         backfillCatalogDetail(db, mediaType, item)
       }
 
-      const interaction = await getUserInteractionForItem(db, identity.id, mediaItemId)
+      const [interaction, watchRegions] = await Promise.all([
+        getUserInteractionForItem(db, identity.id, mediaItemId),
+        loadWatchProviders(db, item),
+      ])
       const from = context.url.searchParams.get(RETURN_TO_PARAM) || undefined
+
+      // A country someone chose, else a guess from their browser's language.
+      const chosenRegion = parseWatchRegion(identity.watch_region)
+      const region = chosenRegion ?? guessWatchRegion(context.request.headers.get('accept-language'))
+      const watch = watchRegions ? { region, providers: watchRegions[region] ?? null } : null
 
       return context.render(
         <MediaDetailPage
@@ -143,6 +153,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
           rematchError={context.url.searchParams.get('rematchError') || undefined}
           rematched={context.url.searchParams.get('rematched') === '1'}
           merged={context.url.searchParams.get('merged') === '1'}
+          watch={watch}
         />,
       )
     },

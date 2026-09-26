@@ -16,7 +16,8 @@ import {
   profileSettingsFor,
   regenerateTasteProfile,
 } from '../../data/recommendations/tasteProfile.ts'
-import { updateProfileSettings } from '../../data/users.ts'
+import { updateProfileSettings, updateWatchRegion } from '../../data/users.ts'
+import { parseWatchRegion } from '../../data/watchRegion.ts'
 
 import {
   countFollowers,
@@ -98,6 +99,22 @@ export default createController(routes.profile, {
       })
 
       return redirect(`${routes.profile.edit.index.href()}?tab=taste&saved=1`, 303)
+    },
+
+    // Posted from a detail page's "where to watch" list, and sends you back to
+    // it. A value not in the list is ignored rather than stored, since it could
+    // only ever show nothing.
+    async watchRegion(context) {
+      const auth = context.get(Auth)
+      const formData = context.get(FormData)
+
+      const region = parseWatchRegion(formData.get('region'))
+      if (region) await updateWatchRegion(context.get(Database), auth.identity.id, region)
+
+      // Same-origin paths only — this is a redirect to a value from a form.
+      const returnTo = String(formData.get('return_to') ?? '')
+      const safe = returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : routes.home.href()
+      return redirect(safe, 303)
     },
 
     async rebuild(context) {
