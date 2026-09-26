@@ -121,6 +121,9 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         { label: 'You', loggedTypes: viewerLoggedTypes },
         ...(mode === 'group' ? friends.filter((friend) => selectedFriends.has(friend.id)) : []),
       ]
+      // Who is actually in it, not which radio is set: "With friends" with nobody
+      // ticked is a run for one, and the server treats it as one.
+      const isGroupRun = membersInRun.length > 1
       const sourceLabel = (value: string) => sources.find((source) => source.value === value)?.label ?? value
       const blockedBy = membersInRun
         .map((member) => ({
@@ -208,7 +211,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   )}
                 </div>
                 <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
-                  {shortlistCaption(shortlistCount, seenBy, mode === 'group')}
+                  {shortlistCaption(shortlistCount, seenBy, isGroupRun)}
                   {runsRemaining == null && runsLeftLabel && ` ${runsLeftLabel}.`}
                 </p>
               </div>
@@ -432,10 +435,11 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               </section>
 
               {/* Hidden rather than unmounted, like the friend list, so a
-                  choice survives a trip to "Just me" and back. The server
-                  ignores it on a run with nobody else in it. */}
+                  choice survives a trip to "Just me" and back, or unticking
+                  everyone. The server ignores it on a run with nobody else in
+                  it. */}
               <section
-                mix={[settingsSection, sectionDivider, css({ display: mode === 'group' ? 'block' : 'none' })]}
+                mix={[settingsSection, sectionDivider, css({ display: isGroupRun ? 'block' : 'none' })]}
               >
                 <p mix={settingsHeading}>Group</p>
                 <div mix={settingsGrid}>
