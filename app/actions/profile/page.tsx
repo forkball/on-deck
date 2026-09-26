@@ -272,17 +272,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           <Toast message="Saved." />
         ) : null}
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <div mix={css({ display: 'flex', alignItems: 'baseline', gap: '12px' })}>
-            <h1>{displayName}</h1>
-            <a
-              href={routes.profile.edit.index.href()}
-              title="Settings"
-              aria-label="Settings"
-              mix={css({ fontSize: '20px', textDecoration: 'none' })}
-            >
-              ✎
-            </a>
-          </div>
+          <h1>{displayName}</h1>
           <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
             <a href={routes.profile.following.href()}>{followingCount} following</a> ·{' '}
             <a href={routes.profile.followers.href()}>
@@ -291,7 +281,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           </p>
 
           {/* Rendered the way other people see it on users/show-page —
-              editing it lives behind the pencil above. */}
+              editing it lives under Settings in the nav. */}
           {bio ? (
             <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>
           ) : (
