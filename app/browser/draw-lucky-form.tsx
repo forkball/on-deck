@@ -1,6 +1,6 @@
 import { clientEntry, css, on } from 'remix/ui'
 
-import { FriendPicker, type FriendOption } from './friend-picker.tsx'
+import { FriendPicker, NO_FRIENDS_PICKED, type FriendOption } from './friend-picker.tsx'
 
 // Tells the shared `lucky` action which page a submission came from, so a
 // failure re-renders that page rather than the general recommendations one.
@@ -35,7 +35,8 @@ export const DrawLuckyForm = clientEntry<DrawLuckyFormProps>(import.meta.url, fu
       ...(mode === 'group' ? friends.filter((friend) => selectedFriends.has(friend.id)) : []),
     ]
     const blockedBy = membersInRun.filter((member) => !member.loggedTypes.includes(mediaType))
-    const disabled = submitting || blockedBy.length > 0
+    const noFriendsPicked = mode === 'group' && selectedFriends.size === 0
+    const disabled = submitting || noFriendsPicked || blockedBy.length > 0
 
     return (
       <form
@@ -86,6 +87,10 @@ export const DrawLuckyForm = clientEntry<DrawLuckyFormProps>(import.meta.url, fu
 
         <input type="hidden" name="mediaType" value={mediaType} />
         <input type="hidden" name="origin" value={LUCKY_PAGE_ORIGIN} />
+
+        {noFriendsPicked && (
+          <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>{NO_FRIENDS_PICKED}</p>
+        )}
 
         {blockedBy.length > 0 && (
           <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>

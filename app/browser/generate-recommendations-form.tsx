@@ -1,7 +1,13 @@
 import { clientEntry, css, on } from 'remix/ui'
 
 import { Field, hintStyle } from '../ui/shared/field.tsx'
-import { FriendPicker, radioOption, sectionLabel, type FriendOption } from './friend-picker.tsx'
+import {
+  FriendPicker,
+  NO_FRIENDS_PICKED,
+  radioOption,
+  sectionLabel,
+  type FriendOption,
+} from './friend-picker.tsx'
 
 export type { FriendOption }
 
@@ -137,8 +143,12 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       // go anywhere".
       const isLucky = runKind === 'lucky'
       const luckyBlockedBy = membersInRun.filter((member) => !member.loggedTypes.includes(mediaType))
+      // Either kind of run: both read the same picker.
+      const noFriendsPicked = mode === 'group' && selectedFriends.size === 0
       const disabled =
-        submitting || (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
+        submitting ||
+        noFriendsPicked ||
+        (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
 
       const caption = css({ margin: '10px 0 0', fontSize: '12px', color: '#888', lineHeight: 1.4 })
 
@@ -463,6 +473,10 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               </section>
             </details>
           </div>
+
+          {noFriendsPicked && (
+            <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>{NO_FRIENDS_PICKED}</p>
+          )}
 
           {isLucky
             ? luckyBlockedBy.length > 0 && (

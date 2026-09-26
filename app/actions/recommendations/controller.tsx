@@ -117,6 +117,10 @@ function finishedHref(job: GenerationJob): string | null {
   return null
 }
 
+// Worded as the forms word it (NO_FRIENDS_PICKED in friend-picker.tsx), which
+// server code may not import — see AGENTS.md.
+const NO_FRIENDS_PICKED_ERROR = 'Tick at least one friend, or switch to "Just me".'
+
 // Both actions refuse for the same reason in the same words — an empty log gives
 // the profile nothing to work from, whichever kind of run asked for it.
 function describeMissingLogs(missing: MissingSourceLogs[], viewerId: number): string {
@@ -210,6 +214,18 @@ export default createController(routes.recommendations, {
               .map((value) => Number(value))
               .filter((id) => Number.isInteger(id))
           : []
+
+      // The form won't submit this, so it only arrives hand-built. Refused
+      // rather than run for one: "with friends" and nobody else is a mistake.
+      if (parsed.value.mode === 'group' && friendIds.length === 0) {
+        const mediaType = parseMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
+        return context.render(
+          await indexPage(context.get(Database), auth.identity, mediaType, {
+            error: NO_FRIENDS_PICKED_ERROR,
+          }),
+          { status: 400 },
+        )
+      }
 
       const filters: RecommendationFilters = {}
       if (parsed.value.genre) filters.genre = parsed.value.genre
@@ -390,6 +406,10 @@ export default createController(routes.recommendations, {
               .filter((id) => Number.isInteger(id))
           : [],
       )
+      if (formData.get('mode') === 'group' && requested.size === 0) {
+        return context.render(await renderFailure(mediaType, NO_FRIENDS_PICKED_ERROR), { status: 400 })
+      }
+
       const friendIds =
         requested.size === 0
           ? []

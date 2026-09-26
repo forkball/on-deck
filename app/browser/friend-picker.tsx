@@ -58,6 +58,10 @@ export function radioOption(props: {
 
 const FRIENDS_PAGE_SIZE = 8
 
+// Both forms using the picker refuse "With friends" with nobody ticked, in
+// these words, rather than quietly running it for one.
+export const NO_FRIENDS_PICKED = 'Tick at least one friend, or switch to "Just me".'
+
 export interface FriendPickerProps {
   friends: FriendOption[]
   mode: 'self' | 'group'
