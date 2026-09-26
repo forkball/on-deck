@@ -449,7 +449,10 @@ function UncertainCard(
           ) : null}
         </div>
         <div mix={css({ color: '#888', fontSize: '13px' })}>
-          <Rated values={row} /> · {pastParticiple} {formatDate(row.consumedAt)}
+          <Rated values={row} />
+          <div>
+            {pastParticiple} {formatDate(row.consumedAt)}
+          </div>
         </div>
 
         {choices ? (
