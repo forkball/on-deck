@@ -51,8 +51,8 @@ const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series',
 const PLACEHOLDER_SOURCES: string[] = []
 
 // Values match SeenByExpectation in data/recommendations/picks.ts, which this
-// module can't import. 'half' is first-checked because it is what a group run
-// did before there was a choice.
+// module can't import. Only finished ones count toward any of them — a want-to
+// or in-progress row rules nothing out.
 const SEEN_BY_OPTIONS = [
   { value: 'no_one', label: 'No one has logged it' },
   { value: 'half', label: "At least half haven't logged it" },
@@ -78,7 +78,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let submitting = false
     let runKind: 'shortlist' | 'lucky' = handle.props.startLucky ? 'lucky' : 'shortlist'
     let mode: 'self' | 'group' = 'self'
-    let seenBy: SeenBy = 'half'
+    let seenBy: SeenBy = 'no_one'
     let search = ''
     let page = 1
     const selectedFriends = new Set<number>()
@@ -255,31 +255,6 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             findPeopleHref={findPeopleHref}
           />
 
-          {/* Hidden rather than unmounted, like the fields above, so a choice
-              survives a trip to "Just me" and back. The server ignores it on a
-              run with nobody else in it. */}
-          <div mix={css({ display: !isLucky && mode === 'group' ? 'block' : 'none' })}>
-            <p mix={sectionLabel}>How new should picks be?</p>
-            <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
-              {SEEN_BY_OPTIONS.map((option) =>
-                radioOption({
-                  name: 'seen_by',
-                  value: option.value,
-                  checked: option.value === 'half',
-                  onChange: () => {
-                    seenBy = option.value
-                    handle.update()
-                  },
-                  children: option.label,
-                }),
-              )}
-            </div>
-            <p mix={caption}>
-              Only finished ones count — want-to and in-progress don't rule anything out. Anything someone
-              marked not interested is always left out.
-            </p>
-          </div>
-
           <input type="hidden" name="mediaType" value={mediaType} />
 
           <div mix={[css({ borderTop: '1px solid #eee', paddingTop: '16px' }), onlyForShortlist]}>
@@ -431,6 +406,27 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                     </select>
                   </Field>
                 )}
+                {/* Hidden rather than unmounted, like the friend list, so a
+                    choice survives a trip to "Just me" and back. The server
+                    ignores it on a run with nobody else in it. */}
+                <div mix={css({ display: mode === 'group' ? 'block' : 'none' })}>
+                  <Field label="Group history">
+                    <select
+                      name="seen_by"
+                      defaultValue="no_one"
+                      mix={on('change', (event) => {
+                        seenBy = (event.target as HTMLSelectElement).value as SeenBy
+                        handle.update()
+                      })}
+                    >
+                      {SEEN_BY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
                 {seriesTypes.length > 0 && (
                   <Field label="Series">
                     <select name="series" defaultValue="">

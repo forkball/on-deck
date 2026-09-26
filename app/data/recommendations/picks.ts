@@ -49,8 +49,9 @@ export interface ExcludedTitles {
 export type DecadeRelation = 'before' | 'within' | 'after'
 
 // How much of a group may already have finished a pick: nobody, no more than
-// half, or any number. Absent means 'half' — the rule every group run had before
-// there was a choice — so older runs and their duplicate keys read the same.
+// half, or any number. The form defaults to 'no_one'; absent means 'half', the
+// rule every group run had before there was a choice, so runs saved then and
+// their duplicate keys read the same.
 export type SeenByExpectation = 'no_one' | 'half' | 'any'
 
 // All hard-filter the final picks, not just hint the prompt.

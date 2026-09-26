@@ -57,7 +57,8 @@ const SERIES_NOTE =
   "Applied from the model's own answer for each pick. No catalogue the app reads records " +
   'whether a work belongs to a series.'
 
-// Absent is 'half', and isn't listed: it is what a group run does unasked.
+// Absent is 'half' and isn't listed: it is how runs from before the choice read,
+// and 'half' is stored as absent so it keys the same as them.
 const SEEN_BY_LABELS: Record<SeenByExpectation, string> = {
   no_one: 'no one',
   half: 'up to half the group',

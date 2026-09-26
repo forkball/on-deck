@@ -234,11 +234,13 @@ export default createController(routes.recommendations, {
       if (parsed.value.platform) filters.platform = parsed.value.platform
       if (parsed.value.series) filters.series = parsed.value.series
       // A group question: alone, "no one" and "half" are the same rule, and "any"
-      // would be asking for things already watched. 'half' is left unset — it is
-      // what a group run does unasked, and an unset lever keys the same as one
-      // saved before the choice existed.
-      if (friendIds.length > 0 && (parsed.value.seen_by === 'no_one' || parsed.value.seen_by === 'any')) {
-        filters.seenBy = parsed.value.seen_by
+      // would be asking for things already watched. 'no_one' when the field is
+      // missing, since that is what the form defaults to. 'half' is left unset —
+      // it is how runs saved before the choice existed read, so it keys the same
+      // as them.
+      const seenBy = parsed.value.seen_by || 'no_one'
+      if (friendIds.length > 0 && (seenBy === 'no_one' || seenBy === 'any')) {
+        filters.seenBy = seenBy
       }
 
       const sourceTypes = formData
