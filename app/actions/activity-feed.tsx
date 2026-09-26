@@ -107,6 +107,14 @@ const GROUP_STYLE = css({
   },
   // Only while folded: open, the rows are right there to count.
   '& > details[open] > summary .count': { display: 'none' },
+  // On a phone there isn't room for the date beside the title without
+  // crowding it, so it drops to its own line — left-aligned under the title,
+  // past the chevron, rather than over at the right edge.
+  '@media (max-width: 600px)': {
+    '& > details > summary': { alignItems: 'flex-start' },
+    '& .rule': { display: 'none' },
+    '& .when': { marginLeft: 0, flexBasis: '100%', paddingLeft: '1.1em' },
+  },
 })
 
 const GROUP_BODY_STYLE = css({
