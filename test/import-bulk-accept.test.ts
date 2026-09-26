@@ -8,6 +8,7 @@ import {
   createBatch,
   loadBatch,
   loadRows,
+  pointRowAt,
   recordMatch,
   reopenRow,
   skipRow,
@@ -39,8 +40,22 @@ describe('unticking a bulk accept', { skip: skipWithoutDatabase }, () => {
     }
   })
 
+  const itemIds: number[] = []
+  const newItem = async (externalId: string) => {
+    const {
+      rows: [item],
+    } = await pool.query<{ id: number; external_id: string }>(
+      `insert into media_items (type, external_source, external_id, title, metadata, created_at)
+       values ('movie', 'test', $1, 'Kwaidan', '{}'::jsonb, $2) returning id, external_id`,
+      [`${externalId}-${Date.now()}-${Math.random()}`, Date.now()],
+    )
+    itemIds.push(item!.id)
+    return item!
+  }
+
   after(async () => {
     await pool.query('delete from import_rows where batch_id = $1', [batchId])
+    await pool.query('delete from media_items where id = any($1)', [itemIds])
     await pool.query('delete from import_batches where user_id = $1', [userId])
     await deleteUsers([userId])
     await pool.end()
@@ -76,5 +91,30 @@ describe('unticking a bulk accept', { skip: skipWithoutDatabase }, () => {
 
     // Only an answer can be undone.
     assert.equal(await reopenRow(db, batch, kwaidan!.id), false)
+  })
+
+  it('undoing a picked film restores the match it replaced', async () => {
+    const batch = (await loadBatch(db, batchId, userId))!
+    const ours = await newItem('ours')
+    const picked = await newItem('picked')
+    const [kwaidan] = await loadRows(db, batchId)
+    await recordMatch(db, kwaidan!.id, {
+      state: 'uncertain',
+      reason: 'year_drift',
+      yearDelta: 1,
+      externalId: ours.external_id,
+      mediaItemId: ours.id,
+    })
+
+    const staged = (await loadRows(db, batchId)).find((row) => row.id === kwaidan!.id)!
+    await pointRowAt(db, staged, picked)
+    await reopenRow(db, batch, kwaidan!.id)
+
+    const row = (await loadRows(db, batchId)).find((candidate) => candidate.id === kwaidan!.id)
+    assert.equal(row?.state, 'uncertain')
+    assert.equal(row?.media_item_id, ours.id)
+    assert.equal(row?.matched_external_id, ours.external_id)
+    assert.equal(row?.year_delta, 1)
+    assert.equal(row?.previous_match, null)
   })
 })

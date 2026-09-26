@@ -308,6 +308,8 @@ export const importRows = table({
     // Which one-tap accept confirmed the row, so unticking it can put back
     // exactly those. See the migration.
     accepted_by: c.text(),
+    // The match before a repoint, restored by undo. See the migration.
+    previous_match: c.json().nullable(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
   },

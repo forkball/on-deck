@@ -709,11 +709,16 @@ const drawerStyle = css({
   '& .drawer-row': { display: 'flex', alignItems: 'center', gap: '8px 12px', padding: '8px 0 4px' },
   [`${drawerOpen} .drawer-panel`]: { display: 'block' },
   [`${drawerOpen} .drawer-arrow::before`]: { content: '"▼"' },
+  // Points at the checklist's accepts only while they're out of sight.
+  '& .drawer-hint': { display: 'block', paddingLeft: '19px', color: ACCENT, fontSize: '12px' },
+  [`${drawerOpen} .drawer-hint`]: { display: 'none' },
   '@media (min-width: 720px)': {
     '& .drawer-panel': { display: 'block' },
     '& .drawer-arrow::before': { content: '"▼"' },
+    '& .drawer-hint': { display: 'none' },
     [`${drawerOpen} .drawer-panel`]: { display: 'none' },
     [`${drawerOpen} .drawer-arrow::before`]: { content: '"▲"' },
+    [`${drawerOpen} .drawer-hint`]: { display: 'block' },
   },
 } as Parameters<typeof css>[0])
 
@@ -829,6 +834,9 @@ function ReviewDrawer(
 
     const progress =
       sections.length === 0 ? 'Nothing to review' : unchecked > 0 ? `${unchecked} unchecked` : 'All checked'
+    const quickAccepts = sections.filter(
+      (section) => section.open > 0 && section.bulk && section.bulk.count > 0 && section.bulk.accepted === 0,
+    ).length
 
     const saveForm = (label: string, cls = 'primary') => (
       <form method="post" action={routes.profile.imports.save.href({ batchId })}>
@@ -915,6 +923,9 @@ function ReviewDrawer(
               mix={css({ marginRight: '6px', color: '#8d8579' })}
             />
             {progress}
+            {quickAccepts > 0 && (
+              <span class="drawer-hint">{count(quickAccepts, 'quick accept', 'quick accepts')} in here</span>
+            )}
           </label>
           {needsConfirm ? (
             // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
