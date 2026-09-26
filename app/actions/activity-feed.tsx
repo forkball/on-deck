@@ -2,7 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { FeedItem } from '../data/feed.ts'
-import { groupFeed } from '../data/feedGroups.ts'
+import { COLLAPSE_THRESHOLD, groupFeed } from '../data/feedGroups.ts'
 import { mediaTypeUiFor } from '../mediaTypes.ts'
 import { routes } from '../routes.ts'
 import { RunListItem } from '../ui/components/run-list.tsx'
@@ -133,10 +133,12 @@ const GROUP_BODY_STYLE = css({
 })
 
 // A run of one person's rows folded behind a divider — see feedGroups.ts for
-// when that happens. Open at first, so nothing is hidden until the reader
-// chooses to fold a burst they've seen away; the divider still marks where one
-// person's run of activity starts and how far it reaches, and once folded
-// carries a count of what was put away.
+// when that happens. Open below COLLAPSE_THRESHOLD, so an ordinary handful of
+// titles isn't hidden until the reader chooses to fold it away; at or past it
+// — a library import, most often — that much at once is what collapsing
+// exists for, so it starts closed instead. The divider marks where one
+// person's run of activity starts and how far it reaches either way, and once
+// folded carries a count of what was put away.
 //
 // A native <details>, as Collapsible is, so toggling it needs no script — which
 // matters here, since appended pages arrive as markup and nothing hydrates them.
@@ -147,7 +149,7 @@ function FeedGroup(handle: Handle<{ items: FeedItem[] }>) {
 
     return (
       <li mix={GROUP_STYLE}>
-        <details open>
+        <details open={items.length < COLLAPSE_THRESHOLD}>
           <summary>
             <span class="title">
               <span class="chevron" aria-hidden="true">

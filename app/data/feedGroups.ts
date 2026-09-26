@@ -12,6 +12,11 @@ export const MIN_GROUP_SIZE = 3
 // once — becomes several groups one after another, which still reads fine.
 export const MAX_GROUP_SIZE = 50
 
+// At and above this many rows, a group starts closed rather than open — see
+// FeedGroup. A handful of titles reads fine spread out; a library import is
+// the thing collapsing exists for, so it shouldn't land open by default.
+export const COLLAPSE_THRESHOLD = 15
+
 // One thing the feed renders: a row on its own, or a run of rows folded behind
 // a divider. `key` is the grouping key the rows share — see groupKeyOf.
 export type FeedEntry = { kind: 'item'; item: FeedItem } | { kind: 'group'; key: string; items: FeedItem[] }
