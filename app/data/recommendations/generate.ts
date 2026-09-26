@@ -57,13 +57,21 @@ const FILTER_LABELS: [keyof RecommendationFilters, string][] = [
   ['multiplayerType', 'multiplayer type'],
   ['platform', 'platform'],
   ['series', 'series'],
+  ['seenBy', 'already-seen'],
 ]
+
+// Every lever but one is narrowing whenever it is set. seenBy is also set to
+// widen ('any'), and advice to loosen that would send somebody to a control
+// already as loose as it goes.
+function narrowedBy(filters: RecommendationFilters, key: keyof RecommendationFilters): boolean {
+  return key === 'seenBy' ? filters.seenBy === 'no_one' : filters[key] != null
+}
 
 // Exported for its own test: the levers are read off a shape that grows, and copy
 // that forgets one sends somebody looking for a filter it never mentions.
 export function nothingLeftMessage(filters: RecommendationFilters, mediaType: MediaType): string {
   const noun = mediaTypeUiFor(mediaType).plural
-  const set = FILTER_LABELS.filter(([key]) => filters[key] != null).map(([, label]) => label)
+  const set = FILTER_LABELS.filter(([key]) => narrowedBy(filters, key)).map(([, label]) => label)
 
   if (set.length === 0) {
     return `Nothing came back that we could confirm this time. Try generating again.`
@@ -218,7 +226,10 @@ export async function generateRecommendations(
     ),
   )
 
-  const { titles: excluded, externalIds: excludedExternalIds } = buildExclusions(exclusionLogs, { lucky })
+  const { titles: excluded, externalIds: excludedExternalIds } = buildExclusions(exclusionLogs, {
+    lucky,
+    seenBy: filters.seenBy,
+  })
 
   let picks: Pick[]
   // Null on a resumed run: the model was asked on the attempt before this one, and
@@ -412,6 +423,7 @@ export async function generateRecommendations(
         multiplayerType: filters.multiplayerType,
         platform: filters.platform,
         series: filters.series,
+        seenBy: filters.seenBy,
         sourceTypes: profileTypes,
       } satisfies GenerationParams,
       results,

@@ -48,6 +48,11 @@ export interface ExcludedTitles {
 // Ignored unless `decade` is set too.
 export type DecadeRelation = 'before' | 'within' | 'after'
 
+// How much of a group may already have finished a pick: nobody, no more than
+// half, or any number. Absent means 'half' — the rule every group run had before
+// there was a choice — so older runs and their duplicate keys read the same.
+export type SeenByExpectation = 'no_one' | 'half' | 'any'
+
 // All hard-filter the final picks, not just hint the prompt.
 export interface RecommendationFilters {
   genre?: string
@@ -62,6 +67,9 @@ export interface RecommendationFilters {
   platform?: string
   // Books only — see BOOK_SERIES_TYPES.
   series?: string
+  // Group runs only, and never 'half' — see SeenByExpectation. Enforced by
+  // buildExclusions rather than a gate of its own.
+  seenBy?: SeenByExpectation
 }
 
 // Built per request rather than a constant: part_of_series is asked for only when
@@ -167,6 +175,12 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string, m
   if (filters.platform) clauses.push(`Only suggest ${noun} playable on ${filters.platform}.`)
   if (filters.series === 'series') clauses.push(`Only suggest ${noun} that are part of a series.`)
   if (filters.series === 'standalone') clauses.push(`Only suggest standalone ${noun}, not part of a series.`)
+  // No clause for 'no_one': the seen list below already names everything anyone
+  // has finished. 'any' empties that list, so without this the model would still
+  // steer clear of what it guesses they've seen.
+  if (filters.seenBy === 'any') {
+    clauses.push(`It's fine to suggest ${noun} some or all of them have already seen.`)
+  }
   // Nothing in any book catalog answers this, so the model is asked to label its own
   // picks and is held to the labels — see matchesSeries.
   if (filters.series != null) {
@@ -212,7 +226,9 @@ export async function requestPicks(
     filters.playerType != null ||
     filters.multiplayerType != null ||
     filters.platform != null ||
-    filters.series != null
+    filters.series != null ||
+    // Drops more at the already-seen gate, so it wants the same slack.
+    filters.seenBy === 'no_one'
   const requestedCount = hasFilters ? REQUESTED_COUNT + 6 : REQUESTED_COUNT
   const { singular } = mediaTypeUiFor(mediaType)
   const seriesRule =

@@ -77,6 +77,44 @@ describe('buildExclusions', () => {
     assert.ok(externalIds.has('tt9'))
   })
 
+  it('excludes what anyone has finished, when the group asks for no one', () => {
+    const alice = [entry('tt1', 'Heat', 'consumed'), entry('tt2', 'Ronin', 'want_to_consume')]
+    const bob: UserLogEntry[] = []
+    const carol: UserLogEntry[] = []
+
+    const { externalIds, titles } = buildExclusions([alice, bob, carol], { seenBy: 'no_one' })
+
+    assert.ok(externalIds.has('tt1'), 'one of three has finished it, and that is enough')
+    assert.ok(!externalIds.has('tt2'), 'a want-to is not something they have seen')
+    assert.deepEqual(titles.seen, ['Heat'])
+  })
+
+  it('excludes nothing finished, when the group says it does not matter', () => {
+    const alice = [entry('tt1', 'Heat', 'consumed'), entry('tt4', 'Cats', 'not_interested')]
+    const bob = [entry('tt1', 'Heat', 'consumed')]
+
+    const { externalIds, titles } = buildExclusions([alice, bob], { seenBy: 'any' })
+
+    assert.ok(!externalIds.has('tt1'), 'everyone has finished it, and that is allowed')
+    assert.deepEqual(titles.seen, [])
+    assert.ok(externalIds.has('tt4'), 'a rejection is still out')
+  })
+
+  it('reads half as the ordinary rule', () => {
+    const alice = [entry('tt1', 'Heat', 'consumed'), entry('tt2', 'Ronin', 'consumed')]
+    const bob = [entry('tt1', 'Heat', 'consumed')]
+
+    assert.deepEqual(buildExclusions([alice, bob], { seenBy: 'half' }), buildExclusions([alice, bob]))
+  })
+
+  it('keeps the lucky bar whatever the group asked for', () => {
+    const alice = [entry('tt2', 'Ronin', 'want_to_consume')]
+
+    const { externalIds } = buildExclusions([alice, []], { lucky: true, seenBy: 'any' })
+
+    assert.ok(externalIds.has('tt2'))
+  })
+
   it('names each rejected title once, however many people rejected it', () => {
     const alice = [entry('tt4', 'Cats', 'not_interested')]
     const bob = [entry('tt4', 'Cats', 'not_interested')]

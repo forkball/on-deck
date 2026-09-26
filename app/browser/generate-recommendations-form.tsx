@@ -50,6 +50,25 @@ const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series',
 
 const PLACEHOLDER_SOURCES: string[] = []
 
+// Values match SeenByExpectation in data/recommendations/picks.ts, which this
+// module can't import. 'half' is first-checked because it is what a group run
+// did before there was a choice.
+const SEEN_BY_OPTIONS = [
+  { value: 'no_one', label: 'No one has logged it' },
+  { value: 'half', label: "At least half haven't logged it" },
+  { value: 'any', label: "Doesn't matter" },
+] as const
+type SeenBy = (typeof SEEN_BY_OPTIONS)[number]['value']
+
+// The shortlist's caption, which otherwise promises a rule the group just
+// changed. Alone, the default reads the same: one person is "most of you".
+function shortlistCaption(count: number, seenBy: SeenBy, isGroup: boolean): string {
+  if (!isGroup) return `Up to ${count} picks, minus what you've already finished.`
+  if (seenBy === 'no_one') return `Up to ${count} picks, minus anything any of you has finished.`
+  if (seenBy === 'any') return `Up to ${count} picks, whether or not you've seen them.`
+  return `Up to ${count} picks, minus what most of you have already finished.`
+}
+
 // Submitting redirects almost immediately to a page reporting the real stage,
 // so this only covers that hop: the button disables itself so a second
 // submit can't start a second run.
@@ -59,6 +78,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let submitting = false
     let runKind: 'shortlist' | 'lucky' = handle.props.startLucky ? 'lucky' : 'shortlist'
     let mode: 'self' | 'group' = 'self'
+    let seenBy: SeenBy = 'half'
     let search = ''
     let page = 1
     const selectedFriends = new Set<number>()
@@ -174,7 +194,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   )}
                 </div>
                 <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
-                  {`Up to ${shortlistCount} picks, minus what most of you have already finished.`}
+                  {shortlistCaption(shortlistCount, seenBy, mode === 'group')}
                   {runsRemaining == null && runsLeftLabel && ` ${runsLeftLabel}.`}
                 </p>
               </div>
@@ -234,6 +254,31 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             }}
             findPeopleHref={findPeopleHref}
           />
+
+          {/* Hidden rather than unmounted, like the fields above, so a choice
+              survives a trip to "Just me" and back. The server ignores it on a
+              run with nobody else in it. */}
+          <div mix={css({ display: !isLucky && mode === 'group' ? 'block' : 'none' })}>
+            <p mix={sectionLabel}>Already logged</p>
+            <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
+              {SEEN_BY_OPTIONS.map((option) =>
+                radioOption({
+                  name: 'seen_by',
+                  value: option.value,
+                  checked: option.value === 'half',
+                  onChange: () => {
+                    seenBy = option.value
+                    handle.update()
+                  },
+                  children: option.label,
+                }),
+              )}
+            </div>
+            <p mix={caption}>
+              Only finished ones count — want-to and in-progress don't rule anything out. Anything someone
+              marked not interested is always left out.
+            </p>
+          </div>
 
           <input type="hidden" name="mediaType" value={mediaType} />
 

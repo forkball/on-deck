@@ -16,7 +16,7 @@ import {
   type UserMediaInteraction,
 } from '../schema.ts'
 import { displayLabel } from '../users.ts'
-import type { DecadeRelation, RecommendationFilters } from './picks.ts'
+import type { DecadeRelation, RecommendationFilters, SeenByExpectation } from './picks.ts'
 import type { RunTimings } from './timings.ts'
 
 export const MAX_RUNS_PER_USER = 3
@@ -74,6 +74,7 @@ export interface GenerationParams {
   multiplayerType?: string
   platform?: string
   series?: string
+  seenBy?: SeenByExpectation
   sourceTypes: MediaType[]
 }
 
@@ -101,6 +102,7 @@ function parseParams(run: RecommendationRun): GenerationParams {
       multiplayerType: parsed.multiplayerType,
       platform: parsed.platform,
       series: parsed.series,
+      seenBy: parsed.seenBy,
       sourceTypes:
         parsed.sourceTypes && parsed.sourceTypes.length > 0 ? parsed.sourceTypes : [run.media_type],
     }
@@ -121,6 +123,7 @@ function paramsKey(filters: RecommendationFilters, sourceTypes: MediaType[], mem
     filters.multiplayerType ?? null,
     filters.platform ?? null,
     filters.series ?? null,
+    filters.seenBy ?? null,
     [...sourceTypes].sort(),
     [...memberIds].sort((a, b) => a - b),
   ])
@@ -172,6 +175,7 @@ export async function findUnusedDuplicateRun(
         multiplayerType: params.multiplayerType,
         platform: params.platform,
         series: params.series,
+        seenBy: params.seenBy,
       },
       params.sourceTypes,
       memberIdsByRun.get(run.id) ?? [],

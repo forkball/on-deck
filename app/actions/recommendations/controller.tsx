@@ -53,6 +53,7 @@ const generateSchema = f.object({
   multiplayer_type: f.field(s.defaulted(s.string(), '')),
   platform: f.field(s.defaulted(s.string(), '')),
   series: f.field(s.defaulted(s.string(), '')),
+  seen_by: f.field(s.defaulted(s.string(), '')),
   name: f.field(s.defaulted(s.string(), '')),
 })
 
@@ -232,6 +233,13 @@ export default createController(routes.recommendations, {
       if (parsed.value.multiplayer_type) filters.multiplayerType = parsed.value.multiplayer_type
       if (parsed.value.platform) filters.platform = parsed.value.platform
       if (parsed.value.series) filters.series = parsed.value.series
+      // A group question: alone, "no one" and "half" are the same rule, and "any"
+      // would be asking for things already watched. 'half' is left unset — it is
+      // what a group run does unasked, and an unset lever keys the same as one
+      // saved before the choice existed.
+      if (friendIds.length > 0 && (parsed.value.seen_by === 'no_one' || parsed.value.seen_by === 'any')) {
+        filters.seenBy = parsed.value.seen_by
+      }
 
       const sourceTypes = formData
         .getAll('source')
@@ -315,6 +323,7 @@ export default createController(routes.recommendations, {
                   ['multiplayer_type', filters.multiplayerType ?? ''],
                   ['platform', filters.platform ?? ''],
                   ['series', filters.series ?? ''],
+                  ['seen_by', filters.seenBy ?? ''],
                   ...sourceTypes.map((type) => ['source', type] as [string, string]),
                   ...friendIds.map((id) => ['friend_ids', String(id)] as [string, string]),
                 ],

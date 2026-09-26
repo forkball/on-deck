@@ -1,5 +1,5 @@
 import type { UserLogEntry } from '../mediaItems.ts'
-import type { ExcludedTitles } from './picks.ts'
+import type { ExcludedTitles, SeenByExpectation } from './picks.ts'
 
 // Type-only imports, deliberately: this module holds the rule for what a run may
 // not suggest, and nothing else. Keeping it free of the database and of the
@@ -20,17 +20,36 @@ export interface ExclusionOptions {
   // and only excludes what most of the group has actually finished, so one
   // person's want-to-watch showing up is a feature there and a bug here.
   lucky?: boolean
+  // What the person asked for on an ordinary group run: exclude what anyone has
+  // finished, what most have (the default), or nothing they've finished at all.
+  // Only the finished rule moves — a rejection is out whichever is chosen, and a
+  // lucky run ignores this for its own stricter bar.
+  seenBy?: SeenByExpectation
+}
+
+// How many members have to have finished something before it is out. Infinity
+// for 'any': nobody's having seen it counts against it.
+function seenThresholdFor(memberCount: number, options: ExclusionOptions): number {
+  if (options.lucky === true) return 1
+  switch (options.seenBy) {
+    case 'no_one':
+      return 1
+    case 'any':
+      return Infinity
+    default:
+      // More than half, so at least half the group hasn't seen what's left.
+      return Math.floor(memberCount / 2) + 1
+  }
 }
 
 // One entry per member, each their whole log for the type being generated.
 //
-// Two rules, and only the id set enforces either: seen excludes once most of the
-// group has (all of it, for a lucky run), and a rejection excludes on its own,
+// Two rules, and only the id set enforces either: seen excludes once enough of
+// the group has — see seenThresholdFor — and a rejection excludes on its own,
 // from anyone.
 export function buildExclusions(memberLogs: UserLogEntry[][], options: ExclusionOptions = {}): Exclusions {
   const lucky = options.lucky === true
-  const memberCount = memberLogs.length
-  const seenThreshold = lucky ? 1 : Math.floor(memberCount / 2) + 1
+  const seenThreshold = seenThresholdFor(memberLogs.length, options)
 
   const titles: ExcludedTitles = { seen: [], rejected: [] }
   const externalIds = new Set<string>()

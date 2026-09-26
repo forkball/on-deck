@@ -3,6 +3,7 @@ import { css } from 'remix/ui'
 
 import type { GenerationParams, RecommendationRunDetail } from '../../data/recommendations/runs.ts'
 import type { MediaType } from '../../data/mediaItems.ts'
+import type { SeenByExpectation } from '../../data/recommendations/picks.ts'
 import { Toast } from '../../ui/components/toast.tsx'
 import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
@@ -56,6 +57,13 @@ const SERIES_NOTE =
   "Applied from the model's own answer for each pick. No catalogue the app reads records " +
   'whether a work belongs to a series.'
 
+// Absent is 'half', and isn't listed: it is what a group run does unasked.
+const SEEN_BY_LABELS: Record<SeenByExpectation, string> = {
+  no_one: 'no one',
+  half: 'up to half the group',
+  any: "doesn't matter",
+}
+
 export function describeParams(params: GenerationParams, mediaType: MediaType): ParamLine[] {
   const lines: ParamLine[] = [
     { text: `Based on: ${params.sourceTypes.map((type) => SOURCE_LABELS[type]).join(', ')}` },
@@ -101,6 +109,7 @@ export function describeParams(params: GenerationParams, mediaType: MediaType): 
       modelNote: SERIES_NOTE,
     })
   }
+  if (params.seenBy) lines.push({ text: `Already seen by: ${SEEN_BY_LABELS[params.seenBy]}` })
   return lines
 }
 
