@@ -5,7 +5,7 @@ import {
   guessWatchRegion,
   justWatchSearchUrl,
   parseWatchRegion,
-  watchRegionOptions,
+  WATCH_REGION_OPTIONS,
 } from '../app/data/watchRegion.ts'
 
 describe('guessWatchRegion', () => {
@@ -52,9 +52,9 @@ describe('parseWatchRegion', () => {
   })
 })
 
-describe('watchRegionOptions', () => {
+describe('WATCH_REGION_OPTIONS', () => {
   it('names every country and sorts by the name shown', () => {
-    const options = watchRegionOptions()
+    const options = WATCH_REGION_OPTIONS
     assert.ok(options.some((option) => option.value === 'CA' && option.label === 'Canada'))
     const labels = options.map((option) => option.label)
     assert.deepEqual(

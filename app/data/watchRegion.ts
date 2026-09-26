@@ -200,12 +200,11 @@ export function watchRegionName(region: WatchRegion): string {
   return regionNames.of(region) ?? region
 }
 
-// For the picker: every country, alphabetical by the name shown.
-export function watchRegionOptions(): { value: WatchRegion; label: string }[] {
-  return WATCH_REGIONS.map((value) => ({ value, label: watchRegionName(value) })).sort((a, b) =>
-    a.label.localeCompare(b.label),
-  )
-}
+// For the picker: every country, alphabetical by the name shown. Built once —
+// the list and its English names are fixed, and every movie and TV page renders it.
+export const WATCH_REGION_OPTIONS: readonly { value: WatchRegion; label: string }[] = WATCH_REGIONS.map(
+  (value) => ({ value, label: watchRegionName(value) }),
+).sort((a, b) => a.label.localeCompare(b.label))
 
 // JustWatch's path segments are ISO codes lowercased, except the one country
 // whose site predates the ISO spelling.

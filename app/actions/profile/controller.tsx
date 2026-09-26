@@ -37,6 +37,7 @@ import { parseInteractionStatus } from '../../interactionStatus.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { ProfilePage } from './page.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
+import { safeReturnPath } from '../../ui/backLink.ts'
 
 const RECENT_COUNT = 5
 const PAGE_SIZE = 10
@@ -111,10 +112,7 @@ export default createController(routes.profile, {
       const region = parseWatchRegion(formData.get('region'))
       if (region) await updateWatchRegion(context.get(Database), auth.identity.id, region)
 
-      // Same-origin paths only — this is a redirect to a value from a form.
-      const returnTo = String(formData.get('return_to') ?? '')
-      const safe = returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : routes.home.href()
-      return redirect(safe, 303)
+      return redirect(safeReturnPath(String(formData.get('return_to') ?? '')) ?? routes.home.href(), 303)
     },
 
     async rebuild(context) {

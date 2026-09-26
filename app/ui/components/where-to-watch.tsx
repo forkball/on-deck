@@ -1,11 +1,11 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { RegionWatchProviders, WatchProvider } from '../../data/catalog/tmdb.ts'
+import type { RegionWatchProviders, WatchProvider } from '../../data/watchProviders.ts'
 import {
   justWatchSearchUrl,
   watchRegionName,
-  watchRegionOptions,
+  WATCH_REGION_OPTIONS,
   type WatchRegion,
 } from '../../data/watchRegion.ts'
 import { routes } from '../../routes.ts'
@@ -64,21 +64,16 @@ export function WhereToWatch(handle: Handle<WhereToWatchProps>) {
                 mix={css({ display: 'flex', flexDirection: 'column', maxHeight: '300px', overflowY: 'auto' })}
               >
                 <input type="hidden" name="return_to" value={returnTo} />
-                {watchRegionOptions().map((option) => (
+                {WATCH_REGION_OPTIONS.map((option) => (
+                  // Styled as a row in app.css (`button.menu-choice`), not here:
+                  // Doodle's button rules are unlayered and a css() mix can't
+                  // outrank them. The current country is bold via aria-current.
                   <button
                     type="submit"
                     name="region"
                     value={option.value}
+                    class="menu-choice"
                     aria-current={option.value === region ? 'true' : undefined}
-                    // Inline, because `.doodle button` draws its sketched border
-                    // and centers the text at a specificity a class can't beat.
-                    style="border: none; border-image: none; text-align: left; padding: 4px 8px; font-size: 14px"
-                    mix={css({
-                      cursor: 'pointer',
-                      borderRadius: '4px',
-                      fontWeight: option.value === region ? 'bold' : 'normal',
-                      '&:hover': { backgroundColor: '#efe6db' },
-                    })}
                   >
                     {option.value === region ? `✓ ${option.label}` : option.label}
                   </button>

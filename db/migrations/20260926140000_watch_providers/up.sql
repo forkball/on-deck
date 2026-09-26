@@ -10,7 +10,7 @@
 -- of every list query that reads that column.
 create table media_watch_providers (
   media_item_id integer primary key references media_items (id) on delete cascade,
-  -- { "<country code>": { link, stream: [...], free: [...], ads: [...] } }
+  -- { "<country code>": { stream: [...], free: [...], ads: [...] } }
   regions jsonb not null,
   fetched_at bigint not null
 );

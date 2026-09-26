@@ -176,24 +176,8 @@ describe('getTvShowById', () => {
 })
 
 describe('getWatchProviders', () => {
-  const realFetch = globalThis.fetch
-  const realKey = process.env.TMDB_API_KEY
-  let requested: URL | null = null
   let answer: Response = Response.json({})
-
-  beforeEach(() => {
-    process.env.TMDB_API_KEY = 'test'
-    globalThis.fetch = (async (input: URL) => {
-      requested = input
-      return answer
-    }) as typeof fetch
-  })
-
-  afterEach(() => {
-    globalThis.fetch = realFetch
-    if (realKey === undefined) delete process.env.TMDB_API_KEY
-    else process.env.TMDB_API_KEY = realKey
-  })
+  const tmdb = stubTmdb(() => answer)
 
   it("keeps each country's included services in TMDB's order, and leaves rent and buy out", async () => {
     answer = Response.json({
@@ -211,7 +195,7 @@ describe('getWatchProviders', () => {
     })
 
     const regions = await getWatchProviders('tv', '1396')
-    assert.equal(requested?.pathname, '/3/tv/1396/watch/providers')
+    assert.equal(tmdb.requested?.pathname, '/3/tv/1396/watch/providers')
     assert.deepEqual(regions, {
       CA: {
         stream: [

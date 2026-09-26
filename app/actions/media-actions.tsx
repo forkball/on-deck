@@ -131,16 +131,16 @@ export function createMediaActions(mediaType: ActiveMediaType) {
         backfillCatalogDetail(db, mediaType, item)
       }
 
-      const [interaction, watchRegions] = await Promise.all([
+      // A country someone chose, else a guess from their browser's language.
+      const region =
+        parseWatchRegion(identity.watch_region) ??
+        guessWatchRegion(context.request.headers.get('accept-language'))
+      const [interaction, availability] = await Promise.all([
         getUserInteractionForItem(db, identity.id, mediaItemId),
-        loadWatchProviders(db, item),
+        loadWatchProviders(item, region),
       ])
       const from = context.url.searchParams.get(RETURN_TO_PARAM) || undefined
-
-      // A country someone chose, else a guess from their browser's language.
-      const chosenRegion = parseWatchRegion(identity.watch_region)
-      const region = chosenRegion ?? guessWatchRegion(context.request.headers.get('accept-language'))
-      const watch = watchRegions ? { region, providers: watchRegions[region] ?? null } : null
+      const watch = availability && { region, providers: availability.providers }
 
       return context.render(
         <MediaDetailPage

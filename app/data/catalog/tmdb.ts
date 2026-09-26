@@ -358,13 +358,21 @@ export interface WatchProvider {
 
 // One country's answer. Only what comes with a service or costs nothing — rent
 // and buy are left to JustWatch, which the section links to (justWatchSearchUrl).
-//
-// TMDB's own per-country `link` is dropped: it is a page on TMDB that only sends
-// people on to JustWatch. Rows stored before this still carry it, unread.
+// TMDB's own per-country `link` isn't kept: it is a page on TMDB that only sends
+// people on to JustWatch.
 export interface RegionWatchProviders {
   stream: WatchProvider[]
   free: WatchProvider[]
   ads: WatchProvider[]
+}
+
+export type WatchProvidersByRegion = Record<string, RegionWatchProviders>
+
+// Which of TMDB's two id spaces a row's external_id is in — movie 1396 and
+// show 1396 are different works — or null for a row that isn't TMDB's.
+export function tmdbKindOf(item: { type: string; external_source: string }): 'movie' | 'tv' | null {
+  if (item.external_source !== 'tmdb') return null
+  return item.type === 'movie' || item.type === 'tv' ? item.type : null
 }
 
 interface TmdbWatchProvider {
@@ -401,7 +409,7 @@ export async function getWatchProviders(
   kind: 'movie' | 'tv',
   externalId: string,
   signal?: AbortSignal,
-): Promise<Record<string, RegionWatchProviders> | null> {
+): Promise<WatchProvidersByRegion | null> {
   const apiKey = process.env.TMDB_API_KEY
   if (!apiKey) {
     throw new Error('TMDB_API_KEY is required')
