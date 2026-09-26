@@ -73,38 +73,32 @@ const GROUP_STYLE = css({
   // Flex for the same reason RunListItem is: it keeps DoodleCSS's list marker off.
   display: 'flex',
   flexDirection: 'column',
+  // Title at the left edge, the way the rows under it are; the date sits at
+  // the right, with a dashed rule filling whatever room is left between them.
+  // The same layout at every width — nothing here is a phone-only rule.
   '& > details > summary': {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: '10px',
+    columnGap: '10px',
     cursor: 'pointer',
     listStyle: 'none',
     fontSize: '14px',
     color: '#555',
   },
   '& > details > summary::-webkit-details-marker': { display: 'none' },
-  // The rules either side of the label that make it read as a divider.
-  '& > details > summary::before, & > details > summary::after': {
-    content: '""',
-    flex: '1 0 12px',
-    borderTop: '1px dashed #bbb',
-  },
-  // The label's phrases are flex items, so on a narrow screen it wraps between
-  // them — never partway through the date range or the count.
-  '& > details > summary > span': {
-    display: 'flex',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-    columnGap: '6px',
-  },
+  // The title's phrases are flex items, so a long one wraps between them —
+  // never partway through the count.
+  '& .title': { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '6px' },
   '& .chevron': { display: 'inline-block', transition: 'transform 120ms ease' },
   '& > details[open] > summary .chevron': { transform: 'rotate(90deg)' },
-  // The title line — chevron, who, what, and (folded) the count — is one flex
-  // run, so the count sits right beside the rest of the title rather than
-  // wrapping onto the date's line.
-  '& .title': { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '6px' },
-  '& .when': { color: '#888', fontSize: '12px' },
+  // Grows to fill the gap on a wide screen; shrinks to nothing rather than
+  // forcing the date onto the title's line where there isn't room.
+  '& .rule': { flex: '1 1 12px', minWidth: '12px', borderTop: '1px dashed #bbb' },
+  // marginLeft: auto is a second way to the same edge: if the row wraps and
+  // the date ends up alone on its own line, the rule has nothing to grow
+  // against, so this is what still sends the date to the right.
+  '& .when': { color: '#888', fontSize: '12px', whiteSpace: 'nowrap', marginLeft: 'auto' },
   '& .count': {
     padding: '1px 8px',
     border: '1px solid #ccc',
@@ -113,18 +107,6 @@ const GROUP_STYLE = css({
   },
   // Only while folded: open, the rows are right there to count.
   '& > details[open] > summary .count': { display: 'none' },
-  // On a phone the label starts at the left edge, the way the rows under it do,
-  // with just the trailing rule, and the date range drops to its own line under
-  // the title — lined up with the name, past the chevron.
-  '@media (max-width: 600px)': {
-    '& > details > summary': { alignItems: 'flex-start' },
-    '& > details > summary::before': { display: 'none' },
-    // Level with the title line rather than centred between the two.
-    '& > details > summary::after': { marginTop: '0.7em' },
-    '& > details > summary > span': { flexDirection: 'column', alignItems: 'flex-start', rowGap: '2px' },
-    '& .when': { paddingLeft: '1.1em' },
-    '& .dot': { display: 'none' },
-  },
 })
 
 const GROUP_BODY_STYLE = css({
@@ -154,19 +136,15 @@ function FeedGroup(handle: Handle<{ items: FeedItem[] }>) {
       <li mix={GROUP_STYLE}>
         <details open>
           <summary>
-            <span>
-              <span class="title">
-                <span class="chevron" aria-hidden="true">
-                  ▸
-                </span>{' '}
-                <strong>{who}</strong> {what}
-                <span class="count">{items.length} entries</span>
-              </span>
-              <span class="when">
-                <span class="dot">· </span>
-                {when}
-              </span>
+            <span class="title">
+              <span class="chevron" aria-hidden="true">
+                ▸
+              </span>{' '}
+              <strong>{who}</strong> {what}
+              <span class="count">{items.length} entries</span>
             </span>
+            <span class="rule" aria-hidden="true" />
+            <span class="when">{when}</span>
           </summary>
           <ul mix={GROUP_BODY_STYLE}>
             {items.map((item) => (
