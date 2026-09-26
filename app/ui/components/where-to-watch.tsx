@@ -43,7 +43,6 @@ export function WhereToWatch(handle: Handle<WhereToWatchProps>) {
       // about where to get the title rather than about the title.
       <section
         mix={css({
-          marginTop: '24px',
           border: '1px solid #ddd',
           borderRadius: '8px',
           padding: '12px 16px 16px',

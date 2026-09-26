@@ -119,8 +119,9 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
               everything about the title beside them — so the log sits where you
               land, not below the cast and the streaming list. A phone has one
               column, and both wrappers step aside (display: contents) so their
-              pieces can be reordered: poster, title and credits, your log, then
-              the rest. One copy of each piece, in one DOM order, either way. */}
+              pieces can be reordered: poster, title and credits, the synopsis,
+              your log, then the rest. One copy of each piece, in one DOM order,
+              either way. */}
           <div
             mix={css({
               display: 'flex',
@@ -174,7 +175,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                   justifyContent: 'space-between',
                   alignItems: 'flex-start',
                   gap: '12px 16px',
-                  [PHONE]: { order: 3 },
+                  [PHONE]: { order: 4 },
                 })}
               >
                 <div>
@@ -285,31 +286,38 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 </Modal>
               </div>
             </div>
-            <div mix={css({ flex: '1 1 auto', minWidth: 0, [PHONE]: { display: 'contents' } })}>
-              <div mix={css({ [PHONE]: { order: 2 } })}>
-                <h1 mix={css({ marginTop: 0 })}>
+            <div
+              mix={css({
+                flex: '1 1 auto',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                [PHONE]: { display: 'contents' },
+              })}
+            >
+              <div mix={css({ display: 'flex', flexDirection: 'column', gap: '8px', [PHONE]: { order: 2 } })}>
+                <h1 mix={css({ margin: '0 0 4px' })}>
                   {item.title}
                   {years ? ` (${years})` : ''}
                 </h1>
-                {tagline && (
-                  <p mix={css({ margin: '-8px 0 12px', color: '#555', fontStyle: 'italic' })}>{tagline}</p>
-                )}
+                {tagline && <p mix={css({ margin: 0, color: '#555', fontStyle: 'italic' })}>{tagline}</p>}
                 {creator && (
-                  <p mix={css({ margin: '0 0 8px', color: '#555' })}>
+                  <p mix={css({ margin: 0, color: '#555' })}>
                     {creators.length > 1 ? ui.creditLabelPlural : ui.creditLabel}: <strong>{creator}</strong>
                   </p>
                 )}
                 {(genres || runtime) && (
-                  <p mix={css({ color: '#555', marginBottom: showFacts.length > 0 ? '4px' : undefined })}>
+                  <p mix={css({ margin: 0, color: '#555' })}>
                     {[genres, runtime].filter(Boolean).join(' · ')}
                   </p>
                 )}
                 {showFacts.length > 0 && (
-                  <p mix={css({ color: '#555', marginTop: 0 })}>{showFacts.join(' · ')}</p>
+                  <p mix={css({ margin: 0, color: '#555' })}>{showFacts.join(' · ')}</p>
                 )}
                 <PlatformList platforms={platforms} />
               </div>
-              <div mix={css({ [PHONE]: { order: 4 } })}>
+              <div mix={css({ '& > p': { margin: 0 }, [PHONE]: { order: 3 } })}>
                 {overview ? (
                   <ExpandableText
                     // Rows stored before the providers stripped jacket copy still
@@ -321,12 +329,19 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 ) : (
                   <p>No description available.</p>
                 )}
+              </div>
+              {/* Everything after the synopsis — on a phone, after your log.
+                  Spaced by its own gap, so none of the panels in it carry an
+                  outer margin: whichever comes first sits flush, in either
+                  layout. */}
+              <div
+                mix={css({ display: 'flex', flexDirection: 'column', gap: '16px', [PHONE]: { order: 5 } })}
+              >
                 {cast.length > 0 && (
                   // Boxed like the log box and Where to watch, so the page reads
                   // as the title's details and then a few distinct panels.
                   <section
                     mix={css({
-                      marginTop: '16px',
                       border: '1px solid #ddd',
                       borderRadius: '8px',
                       padding: '12px 16px 16px',
@@ -359,11 +374,8 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 )}
                 {watch && <WhereToWatch {...watch} title={item.title} returnTo={returnTo} />}
 
-                {/* Top margin matters now that the description above may end
-                  in a Read more toggle, which carries no bottom margin of
-                  its own — without this the two sit flush together. */}
                 {canRematch && (
-                  <div mix={css({ marginTop: '20px', marginBottom: '16px', color: '#555' })}>
+                  <div mix={css({ color: '#555' })}>
                     {/* Held open when the last attempt failed: collapsing would hide
                       both the error and the field it refers to, leaving the page
                       looking like nothing happened. */}
@@ -408,7 +420,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 {/* Last: it leaves the page, so it closes it rather than
                     sitting between the panels. */}
                 {catalogPage && (
-                  <p mix={css({ margin: '20px 0 0', fontSize: '14px' })}>
+                  <p mix={css({ margin: 0, fontSize: '14px' })}>
                     <a href={catalogPage.url} target="_blank" rel="noopener noreferrer">
                       View on {catalogPage.name}
                     </a>
