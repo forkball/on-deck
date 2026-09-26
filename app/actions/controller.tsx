@@ -58,7 +58,7 @@ function parseFeedCursor(raw: string | null): FeedCursor | undefined {
   if (typeof parsed !== 'object' || parsed === null) return undefined
 
   const cursor: FeedCursor = {}
-  for (const key of ['log', 'runs', 'runsFromOthers'] as const) {
+  for (const key of ['log', 'runsFromOthers'] as const) {
     // Left absent when the slot is missing or malformed, which reads as "start
     // this source from the newest" — see FeedCursor.
     const slot = parseRowCursor((parsed as Record<string, unknown>)[key])

@@ -8,7 +8,7 @@ import { followUser } from '../app/data/follows.ts'
 import { saveRun } from '../app/data/recommendations/runs.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 
-// The home page's activity feed: three lists merged into one, paged as a whole.
+// The home page's activity feed: two lists merged into one, paged as a whole.
 //
 // The paging is what these are really about. Each source keeps its own cursor
 // and only advances it as far as the rows that actually made the page, so the
@@ -99,7 +99,8 @@ describe('activity feed', { skip: skipWithoutDatabase }, () => {
   it('merges runs and logged activity into one list, newest first', async () => {
     const { items } = await loadFeedPage(db, viewer, 20)
 
-    assert.equal(items.length, 10)
+    // The friend's six log rows and two runs; the viewer's own two runs are out.
+    assert.equal(items.length, 8)
     assert.ok(
       items.some((item) => item.kind === 'run'),
       'expected runs in the feed',
@@ -117,16 +118,12 @@ describe('activity feed', { skip: skipWithoutDatabase }, () => {
     )
   })
 
-  it('says who generated a run, and says nothing for your own', async () => {
+  it('leaves out runs you generated, and says who generated the rest', async () => {
     const { items } = await loadFeedPage(db, viewer, 20)
     const runs = items.filter((item) => item.kind === 'run')
 
-    const mine = runs.filter((item) => item.kind === 'run' && item.run.owner === null)
-    const theirs = runs.filter((item) => item.kind === 'run' && item.run.owner !== null)
-
-    assert.equal(mine.length, 2)
-    assert.equal(theirs.length, 2)
-    for (const item of theirs) {
+    assert.equal(runs.length, 2)
+    for (const item of runs) {
       assert.ok(item.kind === 'run' && item.run.owner)
       assert.match(item.run.owner.label, /^feedpage-friend-/)
     }

@@ -1,11 +1,7 @@
 import type { Db } from './db.ts'
 import { groupKeyOf, MAX_GROUP_SIZE, trailingRunLength } from './feedGroups.ts'
 import { listFollowingLogActivity, type FollowingLogEntry } from './mediaItems.ts'
-import {
-  listRecommendationRuns,
-  listRecommendationRunsFromOthers,
-  type RecommendationRunSummary,
-} from './recommendations/runs.ts'
+import { listRecommendationRunsFromOthers, type RecommendationRunSummary } from './recommendations/runs.ts'
 
 // One row of the home page's activity feed. Recommendation runs and log entries
 // are interleaved by time rather than kept in sections of their own, so the row
@@ -19,10 +15,12 @@ export type FeedItem =
   | { kind: 'log'; at: number; id: number; entry: FollowingLogEntry }
   | { kind: 'run'; at: number; id: number; run: RecommendationRunSummary }
 
-// The three lists the feed is merged from. Runs you generated and runs someone
-// else generated for you are separate sources rather than one, because they are
-// separate queries with separate rules about what you may see.
-const SOURCES = ['log', 'runs', 'runsFromOthers'] as const
+// The lists the feed is merged from: what people you follow logged, and runs
+// someone else generated with you in them. Runs you generated yourself are left
+// out — the feed is what other people have been doing, and your own runs have
+// the recommendations page. The slot keeps its old name so a cursor a page
+// already holds still resumes the same source.
+const SOURCES = ['log', 'runsFromOthers'] as const
 type SourceName = (typeof SOURCES)[number]
 
 // Where one source resumes from. Structurally what both LogCursor and RunCursor
@@ -53,10 +51,7 @@ export interface FeedPage {
 }
 
 function sourceOf(item: FeedItem): SourceName {
-  if (item.kind === 'log') return 'log'
-  // Whose run it is decides which query produced it: `owner` is null only for
-  // the viewer's own, which is exactly what listRecommendationRuns returns.
-  return item.run.owner === null ? 'runs' : 'runsFromOthers'
+  return item.kind === 'log' ? 'log' : 'runsFromOthers'
 }
 
 // One page of the merged feed.
@@ -74,9 +69,8 @@ export async function loadFeedPage(
   from: FeedCursor = {},
 ): Promise<FeedPage> {
   // `null` means exhausted, so that source is skipped without a query.
-  const [logEntries, runs, runsFromOthers] = await Promise.all([
+  const [logEntries, runsFromOthers] = await Promise.all([
     from.log === null ? [] : listFollowingLogActivity(userId, limit, from.log),
-    from.runs === null ? [] : listRecommendationRuns(db, userId, undefined, limit, from.runs),
     from.runsFromOthers === null
       ? []
       : listRecommendationRunsFromOthers(db, userId, undefined, limit, from.runsFromOthers),
@@ -84,7 +78,6 @@ export async function loadFeedPage(
 
   const returned: Record<SourceName, number> = {
     log: logEntries.length,
-    runs: runs.length,
     runsFromOthers: runsFromOthers.length,
   }
 
@@ -95,7 +88,7 @@ export async function loadFeedPage(
       id: entry.interaction.id,
       entry,
     })),
-    ...[...runs, ...runsFromOthers].map((run): FeedItem => ({
+    ...runsFromOthers.map((run): FeedItem => ({
       kind: 'run',
       at: run.createdAt,
       id: run.id,
@@ -108,7 +101,7 @@ export async function loadFeedPage(
   candidates.sort((a, b) => b.at - a.at || b.id - a.id || a.kind.localeCompare(b.kind))
   const items = candidates.slice(0, limit)
 
-  const taken: Record<SourceName, number> = { log: 0, runs: 0, runsFromOthers: 0 }
+  const taken: Record<SourceName, number> = { log: 0, runsFromOthers: 0 }
   const cursor: FeedCursor = { ...from }
 
   for (const item of items) {

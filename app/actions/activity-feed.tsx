@@ -73,34 +73,32 @@ const GROUP_STYLE = css({
   // Flex for the same reason RunListItem is: it keeps DoodleCSS's list marker off.
   display: 'flex',
   flexDirection: 'column',
+  // Title at the left edge, the way the rows under it are; the date sits at
+  // the right, with a dashed rule filling whatever room is left between them.
+  // The same layout at every width — nothing here is a phone-only rule.
   '& > details > summary': {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: '10px',
+    columnGap: '10px',
     cursor: 'pointer',
     listStyle: 'none',
     fontSize: '14px',
     color: '#555',
   },
   '& > details > summary::-webkit-details-marker': { display: 'none' },
-  // The rules either side of the label that make it read as a divider.
-  '& > details > summary::before, & > details > summary::after': {
-    content: '""',
-    flex: '1 0 12px',
-    borderTop: '1px dashed #bbb',
-  },
-  // The label's phrases are flex items, so on a narrow screen it wraps between
-  // them — never partway through the date range or the count.
-  '& > details > summary > span': {
-    display: 'flex',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-    columnGap: '6px',
-  },
+  // The title's phrases are flex items, so a long one wraps between them —
+  // never partway through the count.
+  '& .title': { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '6px' },
   '& .chevron': { display: 'inline-block', transition: 'transform 120ms ease' },
   '& > details[open] > summary .chevron': { transform: 'rotate(90deg)' },
-  '& .when': { color: '#888', fontSize: '12px' },
+  // Grows to fill the gap on a wide screen; shrinks to nothing rather than
+  // forcing the date onto the title's line where there isn't room.
+  '& .rule': { flex: '1 1 12px', minWidth: '12px', borderTop: '1px dashed #bbb' },
+  // marginLeft: auto is a second way to the same edge: if the row wraps and
+  // the date ends up alone on its own line, the rule has nothing to grow
+  // against, so this is what still sends the date to the right.
+  '& .when': { color: '#888', fontSize: '12px', whiteSpace: 'nowrap', marginLeft: 'auto' },
   '& .count': {
     padding: '1px 8px',
     border: '1px solid #ccc',
@@ -109,6 +107,19 @@ const GROUP_STYLE = css({
   },
   // Only while folded: open, the rows are right there to count.
   '& > details[open] > summary .count': { display: 'none' },
+  // On a phone there isn't room for the date beside the title without
+  // crowding it, so it drops to its own line — left-aligned under the title,
+  // past the chevron, rather than over at the right edge.
+  '@media (max-width: 600px)': {
+    '& > details > summary': { alignItems: 'flex-start' },
+    '& .rule': { display: 'none' },
+    '& .when': { marginLeft: 0, flexBasis: '100%', paddingLeft: '1.1em' },
+    // The title itself only needs its content's width, so on its own it
+    // wouldn't give marginLeft: auto below anything to push against — this is
+    // what puts the rest of that first line's width at the count's disposal.
+    '& .title': { flexBasis: '100%' },
+    '& .count': { marginLeft: 'auto' },
+  },
 })
 
 const GROUP_BODY_STYLE = css({
@@ -138,16 +149,15 @@ function FeedGroup(handle: Handle<{ items: FeedItem[] }>) {
       <li mix={GROUP_STYLE}>
         <details open>
           <summary>
-            <span>
-              <span>
-                <span class="chevron" aria-hidden="true">
-                  ▸
-                </span>{' '}
-                <strong>{who}</strong> {what}
-              </span>
-              <span class="when">· {when}</span>
+            <span class="title">
+              <span class="chevron" aria-hidden="true">
+                ▸
+              </span>{' '}
+              <strong>{who}</strong> {what}
               <span class="count">{items.length} entries</span>
             </span>
+            <span class="rule" aria-hidden="true" />
+            <span class="when">{when}</span>
           </summary>
           <ul mix={GROUP_BODY_STYLE}>
             {items.map((item) => (
