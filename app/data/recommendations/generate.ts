@@ -274,7 +274,7 @@ export async function generateRecommendations(
       continue
     }
 
-    const match = chooseMatch(pick, matches)
+    const match = chooseMatch(pick, matches, mediaType)
     if (!match) {
       drops.titleMismatch++
       continue

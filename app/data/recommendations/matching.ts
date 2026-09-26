@@ -93,11 +93,21 @@ export function decadeYear(mediaType: MediaType, pick: Pick, match: CatalogSearc
 }
 
 function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return (
+    title
+      .toLowerCase()
+      // "&" reads as the word, not as punctuation to drop: publishers print "The
+      // Wrath & the Dawn" and "The Wrath and the Dawn" for one book, and deleting the
+      // symbol makes those two different titles — which cost a run its edition, the
+      // only outright match left being an anniversary printing eleven years late.
+      //
+      // resolveFromCatalog's SQL spells this same normalisation for the database to
+      // run. The two have to move together.
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  )
 }
 
 function levenshteinDistance(a: string, b: string): number {
@@ -157,15 +167,12 @@ export function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolea
 // a run that spends four of its eight slots on two series is the complaint whatever
 // was filtered.
 function normalizeSeries(name: string): string | null {
-  // The ampersand before normalising, or "Thorns & Roses" and "Thorns and Roses"
-  // come out as different keys and the series is counted twice.
-  //
-  // Then the words around the name that get added or dropped freely between one
+  // The words around the name that get added or dropped freely between one
   // entry and its sibling: "The Empyrean", "Empyrean series", "The Empyrean
   // Trilogy" and "Empyrean Book 2" are one series, and a key that treats them as
   // four misses the duplicate it exists to catch. Catalogs vary the same way —
   // IGDB has both "Portal" and "The Legend of Zelda" as written.
-  const key = normalizeTitle(name.replace(/&/g, ' and '))
+  const key = normalizeTitle(name)
     .replace(/^the /, '')
     .replace(/(?: (?:series|trilogy|saga|cycle|duology|quartet|collection|franchise|books?|\d+))+$/, '')
     .trim()
@@ -208,7 +215,11 @@ export function seriesKeysFor(pick: Pick, match: CatalogSearchResult): string[] 
 //
 // Null means no hit is this book, which is a different thing from a hit being the
 // wrong edition, and is counted as such by the caller.
-export function chooseMatch(pick: Pick, matches: CatalogSearchResult[]): CatalogSearchResult | null {
+export function chooseMatch(
+  pick: Pick,
+  matches: CatalogSearchResult[],
+  mediaType: MediaType = 'movie',
+): CatalogSearchResult | null {
   const sameWork = matches.filter((match) => titlesLikelyMatch(pick.title, match.title))
   if (sameWork.length === 0) return null
 
@@ -228,16 +239,30 @@ export function chooseMatch(pick: Pick, matches: CatalogSearchResult[]): Catalog
 
   const distance = (match: CatalogSearchResult) => Math.abs((match.releaseYear ?? 0) - pick.year)
 
-  return [...editions].sort(
-    (a, b) =>
-      // Nearest the pick's year: the work's year for a film, the closest pressing to
-      // it for a book.
-      distance(a) - distance(b) ||
-      // Then the edition people actually have, and then the plainest title, which is
-      // how "Iron Flame" wins over "Iron Flame: The Fiery Sequel to the Sunday Times
-      // Bestseller and TikTok Sensation Fourth Wing".
-      b.popularity - a.popularity ||
-      a.title.length - b.title.length,
+  // Google Books carries bibliographic stubs — a catalogue entry with no digitised
+  // copy, so no cover, no description, no page count. Three of one run's eight picks
+  // were stubs, and a description is not only what the page shows: it is what
+  // verifyPicksAgainstOverviews reads, so a stub tends to be dropped as unverified
+  // after being chosen over an edition that would have passed.
+  const carries = (match: CatalogSearchResult) => (match.overview ? 2 : 0) + (match.posterUrl ? 1 : 0)
+
+  // Where the catalog's year is the work's, it identifies the work and nothing may
+  // outrank it — a remake is a different film. Where it is the year of a pressing,
+  // as it is for a book (see decadeComesFromPick), it identifies nothing, and
+  // sorting by it first is what picked the stubs: a stub is often filed under the
+  // original year while the edition people can actually read is a later reprint.
+  const yearIdentifiesTheWork = !decadeComesFromPick(mediaType)
+
+  return [...editions].sort((a, b) =>
+    yearIdentifiesTheWork
+      ? distance(a) - distance(b) ||
+        carries(b) - carries(a) ||
+        b.popularity - a.popularity ||
+        a.title.length - b.title.length
+      : carries(b) - carries(a) ||
+        b.popularity - a.popularity ||
+        distance(a) - distance(b) ||
+        a.title.length - b.title.length,
   )[0]
 }
 
@@ -383,6 +408,16 @@ function catalogDown(what: string): GenerationError {
 
 export type CatalogSearch = (mediaType: MediaType, query: string) => Promise<CatalogSearchResult[]>
 
+// What to ask the catalog for. The title, plus who made it where the provider's
+// search reads that — see searchesCreator. A bare title frequently does not find a
+// book at all: "Iron Flame" returns a 1963 laboratory index and not the novel,
+// "Bitten" a French verb-conjugation guide, "Uprooted" a humanitarian policy
+// report. With the author appended each comes back first.
+export function searchQueryFor(mediaType: MediaType, pick: Pick): string {
+  const creator = getCatalogProvider(mediaType).searchesCreator === true ? pick.creator?.trim() : undefined
+  return creator ? `${pick.title} ${creator}` : pick.title
+}
+
 // One search per pick the local catalog didn't already answer for, bounded —
 // `Promise.all` put all 18 of a filtered run's on the wire at once, and one of
 // them throwing took the whole run with it after the picks were paid for.
@@ -408,7 +443,7 @@ export async function searchForPicks(
 
   await forEachWithConcurrency(toSearch, SEARCH_CONCURRENCY, async (index) => {
     try {
-      matches[index] = await search(mediaType, picks[index].title)
+      matches[index] = await search(mediaType, searchQueryFor(mediaType, picks[index]))
     } catch (error) {
       failed++
       console.warn(
@@ -668,10 +703,10 @@ export async function resolveFromCatalog(
       normalized: string
     }>(
       `select id, external_id, title, metadata, popularity_score,
-            btrim(regexp_replace(regexp_replace(lower(title), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g')) as normalized
+            btrim(regexp_replace(regexp_replace(replace(lower(title), '&', ' and '), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g')) as normalized
        from media_items
       where type = $1
-        and btrim(regexp_replace(regexp_replace(lower(title), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g')) = any($2)`,
+        and btrim(regexp_replace(regexp_replace(replace(lower(title), '&', ' and '), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g')) = any($2)`,
       [mediaType, wanted],
     ),
   )
