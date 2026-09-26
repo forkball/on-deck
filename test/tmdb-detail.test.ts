@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
 
-import { getMovieById, getTvShowById } from '../app/data/catalog/tmdb.ts'
+import { getMovieById, getTvShowById, getWatchProviders } from '../app/data/catalog/tmdb.ts'
 import { parseMediaMetadata } from '../app/data/mediaMetadata.ts'
 
 // The shape TMDB answers /movie/:id?append_to_response=credits with, cut down to
@@ -172,5 +172,47 @@ describe('getTvShowById', () => {
     const result = await getTvShowById('1396')
     assert.deepEqual(result?.creators, ['Vince Gilligan'])
     assert.equal(result?.creator, 'Vince Gilligan')
+  })
+})
+
+describe('getWatchProviders', () => {
+  let answer: Response = Response.json({})
+  const tmdb = stubTmdb(() => answer)
+
+  it("keeps each country's included services in TMDB's order, and leaves rent and buy out", async () => {
+    answer = Response.json({
+      results: {
+        CA: {
+          link: 'https://www.themoviedb.org/tv/1396-breaking-bad/watch?locale=CA',
+          flatrate: [
+            { provider_name: 'Crave', logo_path: '/crave.jpg', display_priority: 5 },
+            { provider_name: 'Netflix', logo_path: '/netflix.jpg', display_priority: 1 },
+          ],
+          ads: [{ provider_name: 'Pluto TV', logo_path: null, display_priority: 9 }],
+          buy: [{ provider_name: 'Apple TV', logo_path: '/apple.jpg', display_priority: 2 }],
+        },
+      },
+    })
+
+    const regions = await getWatchProviders('tv', '1396')
+    assert.equal(tmdb.requested?.pathname, '/3/tv/1396/watch/providers')
+    assert.deepEqual(regions, {
+      CA: {
+        stream: [
+          { name: 'Netflix', logoUrl: 'https://image.tmdb.org/t/p/w92/netflix.jpg' },
+          { name: 'Crave', logoUrl: 'https://image.tmdb.org/t/p/w92/crave.jpg' },
+        ],
+        free: [],
+        ads: [{ name: 'Pluto TV', logoUrl: null }],
+      },
+    })
+  })
+
+  it('answers null for a title TMDB does not know, and throws on any other failure', async () => {
+    answer = new Response('', { status: 404 })
+    assert.equal(await getWatchProviders('movie', '0'), null)
+
+    answer = new Response('down', { status: 503 })
+    await assert.rejects(() => getWatchProviders('movie', '603'))
   })
 })

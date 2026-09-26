@@ -40,6 +40,9 @@ export const users = table({
     is_admin: c.boolean().notNull().default(false),
     profile_log_limit: c.integer().nullable(),
     profile_use_notes: c.boolean().notNull().default(true),
+    // A country code for the "where to watch" list, chosen by the member. Null
+    // means guess from the browser's language — see watchRegion.ts.
+    watch_region: c.text().nullable(),
     created_at: c.integer().notNull(),
   },
 })
@@ -57,6 +60,18 @@ export const mediaItems = table({
     metadata: c.json().notNull(),
     popularity_score: c.decimal(10, 2),
     created_at: c.integer().notNull(),
+  },
+})
+
+// Streaming availability for a movie or show, every country at once. Refetched
+// on a clock, unlike metadata — see watchProviders.ts and the migration.
+export const mediaWatchProviders = table({
+  name: 'media_watch_providers',
+  primaryKey: ['media_item_id'],
+  columns: {
+    media_item_id: c.integer().notNull().references('media_items', 'id'),
+    regions: c.json().notNull(),
+    fetched_at: c.integer().notNull(),
   },
 })
 

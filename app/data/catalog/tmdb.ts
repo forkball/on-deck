@@ -349,3 +349,90 @@ export function parseTmdbId(input: string, segment: 'movie' | 'tv'): string | nu
   const match = trimmed.match(new RegExp(`themoviedb\\.org/${segment}/(\\d+)`))
   return match ? match[1] : null
 }
+
+// One streaming service, as the "where to watch" list shows it.
+export interface WatchProvider {
+  name: string
+  logoUrl: string | null
+}
+
+// One country's answer. Only what comes with a service or costs nothing — rent
+// and buy are left to JustWatch, which the section links to (justWatchSearchUrl).
+// TMDB's own per-country `link` isn't kept: it is a page on TMDB that only sends
+// people on to JustWatch.
+export interface RegionWatchProviders {
+  stream: WatchProvider[]
+  free: WatchProvider[]
+  ads: WatchProvider[]
+}
+
+export type WatchProvidersByRegion = Record<string, RegionWatchProviders>
+
+// Which of TMDB's two id spaces a row's external_id is in — movie 1396 and
+// show 1396 are different works — or null for a row that isn't TMDB's.
+export function tmdbKindOf(item: { type: string; external_source: string }): 'movie' | 'tv' | null {
+  if (item.external_source !== 'tmdb') return null
+  return item.type === 'movie' || item.type === 'tv' ? item.type : null
+}
+
+interface TmdbWatchProvider {
+  provider_name?: string
+  logo_path?: string | null
+  display_priority?: number
+}
+
+interface TmdbWatchProvidersResponse {
+  results?: Record<
+    string,
+    { flatrate?: TmdbWatchProvider[]; free?: TmdbWatchProvider[]; ads?: TmdbWatchProvider[] }
+  >
+}
+
+// TMDB's own ordering, which puts the services people have most first.
+function providersOf(entries: TmdbWatchProvider[] | undefined): WatchProvider[] {
+  return (entries ?? [])
+    .filter((entry): entry is TmdbWatchProvider & { provider_name: string } => Boolean(entry.provider_name))
+    .toSorted((a, b) => (a.display_priority ?? Infinity) - (b.display_priority ?? Infinity))
+    .map((entry) => ({
+      name: entry.provider_name,
+      logoUrl: entry.logo_path ? `https://image.tmdb.org/t/p/w92${entry.logo_path}` : null,
+    }))
+}
+
+// Every country in one request, keyed by country code. Its own request rather
+// than an append on the detail lookup: this goes stale and is refetched on a
+// clock, and the detail record doesn't — see watchProviders.ts.
+//
+// Null for a title TMDB doesn't know; throws on anything else going wrong, so a
+// failure is never stored as "available nowhere".
+export async function getWatchProviders(
+  kind: 'movie' | 'tv',
+  externalId: string,
+  signal?: AbortSignal,
+): Promise<WatchProvidersByRegion | null> {
+  const apiKey = process.env.TMDB_API_KEY
+  if (!apiKey) {
+    throw new Error('TMDB_API_KEY is required')
+  }
+
+  const url = new URL(`${TMDB_API_BASE}/${kind}/${encodeURIComponent(externalId)}/watch/providers`)
+  url.searchParams.set('api_key', apiKey)
+
+  const response = await fetch(url, { signal })
+  if (response.status === 404) return null
+  if (!response.ok) {
+    throw new Error(`TMDB watch providers lookup failed: ${response.status} ${await response.text()}`)
+  }
+
+  const data = (await response.json()) as TmdbWatchProvidersResponse
+  return Object.fromEntries(
+    Object.entries(data.results ?? {}).map(([region, entry]) => [
+      region,
+      {
+        stream: providersOf(entry.flatrate),
+        free: providersOf(entry.free),
+        ads: providersOf(entry.ads),
+      },
+    ]),
+  )
+}

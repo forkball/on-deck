@@ -14,6 +14,7 @@ import { Nav } from '../components/nav.tsx'
 import { NotesField } from '../components/notes-field.tsx'
 import { PlatformList } from '../components/platform-list.tsx'
 import { StatusSelect } from '../components/status-select.tsx'
+import { WhereToWatch, type WhereToWatchProps } from '../components/where-to-watch.tsx'
 import { Collapsible } from '../shared/collapsible.tsx'
 import { Field } from '../shared/field.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
@@ -35,14 +36,26 @@ export interface MediaDetailPageProps {
   rematchError?: string
   rematched?: boolean
   merged?: boolean
+  // Movies and TV only, and only once availability has been fetched.
+  watch?: Omit<WhereToWatchProps, 'title' | 'returnTo'> | null
 }
 
 // Shared by every media type's detail route. Everything type-specific comes
 // from MEDIA_TYPE_UI.
 export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
   return () => {
-    const { mediaType, item, interaction, from, displayName, canRematch, rematchError, rematched, merged } =
-      handle.props
+    const {
+      mediaType,
+      item,
+      interaction,
+      from,
+      displayName,
+      canRematch,
+      rematchError,
+      rematched,
+      merged,
+      watch,
+    } = handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
     const {
       releaseYear,
@@ -180,6 +193,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                   </a>
                 </p>
               )}
+              {watch && <WhereToWatch {...watch} title={item.title} returnTo={returnTo} />}
 
               {/* Top margin matters now that the description above may end
                   in a Read more toggle, which carries no bottom margin of

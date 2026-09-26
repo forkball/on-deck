@@ -1,5 +1,6 @@
 import { MEDIA_TYPE_UI } from '../../mediaTypes.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
+import { tmdbKindOf } from './tmdb.ts'
 import type { MediaItem } from '../schema.ts'
 
 export interface CatalogPage {
@@ -20,14 +21,14 @@ export function catalogPageFor(
   const id = encodeURIComponent(item.external_id)
 
   switch (item.external_source) {
-    case 'tmdb':
-      // The same id space is not shared: movie 1396 and show 1396 are different
-      // works, so the path has to come from the row's type.
-      if (item.type !== 'movie' && item.type !== 'tv') return null
-      return {
-        name: MEDIA_TYPE_UI[item.type].catalogName,
-        url: `https://www.themoviedb.org/${item.type}/${id}`,
-      }
+    case 'tmdb': {
+      // Movie 1396 and show 1396 are different works, so the path comes from
+      // which of TMDB's id spaces the row is in.
+      const kind = tmdbKindOf(item)
+      return (
+        kind && { name: MEDIA_TYPE_UI[kind].catalogName, url: `https://www.themoviedb.org/${kind}/${id}` }
+      )
+    }
     case 'google-books':
       return { name: MEDIA_TYPE_UI.book.catalogName, url: `https://books.google.com/books?id=${id}` }
     case 'openlibrary':
