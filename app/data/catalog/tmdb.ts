@@ -96,6 +96,26 @@ export interface TmdbSearchResult {
 // Enough to say who is in it without the page turning into a credits roll.
 const CAST_LIMIT = 5
 
+// "2008-01-20" → 2008. Null for an empty or malformed date rather than NaN.
+function yearOf(date: string | null | undefined): number | null {
+  return date ? Number(date.slice(0, 4)) || null : null
+}
+
+// Named people, blanks dropped and each once — TMDB lists a writer-director
+// under both jobs, and a show's co-creators in whatever order they were entered.
+function namesOf(entries: { name?: string }[] | undefined): string[] {
+  return [
+    ...new Set((entries ?? []).map((entry) => entry.name).filter((name): name is string => Boolean(name))),
+  ]
+}
+
+// Every name, not the first: a co-directed film or co-created show otherwise
+// credits one and drops the rest. `creator` keeps them as the one string every
+// other reader takes; `creators` is the list the page counts for its label.
+function creditsFrom(names: string[]): { creator: string | null; creators: string[] } {
+  return { creator: names.length > 0 ? names.join(', ') : null, creators: names }
+}
+
 interface TmdbSearchResponse {
   results: {
     id: number
@@ -129,7 +149,7 @@ export async function searchMovies(query: string): Promise<TmdbSearchResult[]> {
   return data.results.map((r) => ({
     externalId: String(r.id),
     title: r.title,
-    releaseYear: r.release_date ? Number(r.release_date.slice(0, 4)) : null,
+    releaseYear: yearOf(r.release_date),
     // TMDB occasionally omits genre_ids on sparse/placeholder entries.
     tags: (r.genre_ids ?? []).map((id) => GENRE_ID_TO_NAME[id]).filter((t): t is string => Boolean(t)),
     posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
@@ -172,7 +192,7 @@ export async function searchTv(query: string): Promise<TmdbSearchResult[]> {
   return data.results.map((r) => ({
     externalId: String(r.id),
     title: r.name,
-    releaseYear: r.first_air_date ? Number(r.first_air_date.slice(0, 4)) : null,
+    releaseYear: yearOf(r.first_air_date),
     tags: (r.genre_ids ?? []).map((id) => TV_GENRE_ID_TO_NAME[id]).filter((t): t is string => Boolean(t)),
     posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
     popularity: r.popularity,
@@ -196,16 +216,6 @@ interface TmdbMovieDetailResponse {
     cast?: { name?: string; character?: string | null }[]
     crew?: { job?: string; name?: string }[]
   }
-}
-
-// Every director, not the first: a co-directed film otherwise credits one of
-// its directors and drops the rest.
-function directorsOf(r: TmdbMovieDetailResponse): string[] {
-  const names = (r.credits?.crew ?? [])
-    .filter((member) => member.job === 'Director')
-    .map((member) => member.name)
-    .filter((name): name is string => Boolean(name))
-  return [...new Set(names)]
 }
 
 function movieCastOf(r: TmdbMovieDetailResponse): CastMember[] {
@@ -233,19 +243,17 @@ export async function getMovieById(externalId: string): Promise<TmdbSearchResult
   }
 
   const r = (await response.json()) as TmdbMovieDetailResponse
-  const directors = directorsOf(r)
 
   return {
     externalId: String(r.id),
     title: r.title,
-    releaseYear: r.release_date ? Number(r.release_date.slice(0, 4)) : null,
+    releaseYear: yearOf(r.release_date),
     tags: r.genres.map((g) => g.name.toLowerCase()),
     posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
     popularity: r.popularity,
     overview: r.overview?.trim() || null,
     runtimeMinutes: r.runtime ?? null,
-    creator: directors.length > 0 ? directors.join(', ') : null,
-    creators: directors,
+    ...creditsFrom(namesOf(r.credits?.crew?.filter((member) => member.job === 'Director'))),
     cast: movieCastOf(r),
     tagline: r.tagline?.trim() || null,
   }
@@ -282,16 +290,6 @@ interface TmdbTvDetailResponse {
   }
 }
 
-function namesOf(entries: { name?: string }[] | undefined): string[] {
-  return [
-    ...new Set((entries ?? []).map((entry) => entry.name).filter((name): name is string => Boolean(name))),
-  ]
-}
-
-function yearOf(date: string | null | undefined): number | null {
-  return date ? Number(date.slice(0, 4)) || null : null
-}
-
 // Most episodes first, which is what "main cast" means for a show: TMDB's own
 // order here follows billing on whichever season was entered last. An actor who
 // played several parts is credited with the one they played most.
@@ -323,7 +321,6 @@ export async function getTvShowById(externalId: string): Promise<TmdbSearchResul
   }
 
   const r = (await response.json()) as TmdbTvDetailResponse
-  const creators = namesOf(r.created_by)
 
   return {
     externalId: String(r.id),
@@ -339,8 +336,7 @@ export async function getTvShowById(externalId: string): Promise<TmdbSearchResul
     lastAirYear: yearOf(r.last_air_date),
     showStatus: r.status?.trim() || null,
     networks: namesOf(r.networks),
-    creator: creators.length > 0 ? creators.join(', ') : null,
-    creators,
+    ...creditsFrom(namesOf(r.created_by)),
     cast: tvCastOf(r),
     tagline: r.tagline?.trim() || null,
   }

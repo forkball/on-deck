@@ -43,6 +43,8 @@ interface MediaTypeUi {
   searchHeading: string
   statusVerbs: StatusVerbs
   creditLabel: string
+  // For more than one — the Wachowskis are "Directors".
+  creditLabelPlural: string
   pastParticiple: string
   // Closures, not Route objects: routes.movies.show and routes.tv.show are
   // different generic instantiations, and TypeScript won't call a union of
@@ -80,6 +82,7 @@ export const MEDIA_TYPE_UI = {
     statusVerbs: WATCH_VERBS,
     pastParticiple: 'watched',
     creditLabel: 'Director',
+    creditLabelPlural: 'Directors',
     hrefs: {
       search: () => routes.movies.search.href(),
       suggest: () => routes.movies.suggest.href(),
@@ -106,6 +109,7 @@ export const MEDIA_TYPE_UI = {
     statusVerbs: WATCH_VERBS,
     pastParticiple: 'watched',
     creditLabel: 'Creator',
+    creditLabelPlural: 'Creators',
     hrefs: {
       search: () => routes.tv.search.href(),
       suggest: () => routes.tv.suggest.href(),
@@ -134,6 +138,7 @@ export const MEDIA_TYPE_UI = {
     statusVerbs: READ_VERBS,
     pastParticiple: 'read',
     creditLabel: 'Author',
+    creditLabelPlural: 'Authors',
     hrefs: {
       search: () => routes.books.search.href(),
       suggest: () => routes.books.suggest.href(),
@@ -159,6 +164,7 @@ export const MEDIA_TYPE_UI = {
     statusVerbs: PLAY_VERBS,
     pastParticiple: 'played',
     creditLabel: 'Developer',
+    creditLabelPlural: 'Developers',
     hrefs: {
       search: () => routes.games.search.href(),
       suggest: () => routes.games.suggest.href(),

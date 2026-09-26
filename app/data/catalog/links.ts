@@ -1,4 +1,4 @@
-import { MEDIA_TYPE_UI, parseMediaType } from '../../mediaTypes.ts'
+import { MEDIA_TYPE_UI } from '../../mediaTypes.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import type { MediaItem } from '../schema.ts'
 
@@ -23,24 +23,25 @@ export function catalogPageFor(
     case 'tmdb':
       // The same id space is not shared: movie 1396 and show 1396 are different
       // works, so the path has to come from the row's type.
-      if (item.type === 'movie') return { name: 'TMDB', url: `https://www.themoviedb.org/movie/${id}` }
-      if (item.type === 'tv') return { name: 'TMDB', url: `https://www.themoviedb.org/tv/${id}` }
-      return null
+      if (item.type !== 'movie' && item.type !== 'tv') return null
+      return {
+        name: MEDIA_TYPE_UI[item.type].catalogName,
+        url: `https://www.themoviedb.org/${item.type}/${id}`,
+      }
     case 'google-books':
-      return { name: 'Google Books', url: `https://books.google.com/books?id=${id}` }
+      return { name: MEDIA_TYPE_UI.book.catalogName, url: `https://books.google.com/books?id=${id}` }
     case 'openlibrary':
+      // Books' registry entry names Google Books, the catalog they're searched
+      // in; this is the older one some rows still carry.
       return { name: 'Open Library', url: `https://openlibrary.org/works/${id}` }
     case 'igdb': {
       // IGDB addresses its pages by slug, which the numeric id can't be turned
       // back into, so the page URL is stored off the API response. Rows fetched
       // before that have none, and get a search for the title instead — a guessed
       // slug would 404 for every title IGDB disambiguates.
-      const { sourceUrl } = parseMediaMetadata(item.metadata)
       const game = MEDIA_TYPE_UI.game
-      if (sourceUrl) return { name: game.catalogName, url: sourceUrl }
-      return parseMediaType(item.type) === 'game'
-        ? { name: game.catalogName, url: game.catalogSearchUrl(item.title) }
-        : null
+      const { sourceUrl } = parseMediaMetadata(item.metadata)
+      return { name: game.catalogName, url: sourceUrl ?? game.catalogSearchUrl(item.title) }
     }
     default:
       return null

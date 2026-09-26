@@ -23,7 +23,7 @@ export interface MediaMetadata {
   // The names `creator` joins, when a provider gives more than one. Empty
   // otherwise, in which case `creator` is the whole answer.
   creators: string[]
-  // Top-billed first. Movies only, and only once a detail lookup has landed.
+  // Top-billed first. Movies and TV, and only once a detail lookup has landed.
   cast: CastMember[]
   tagline: string | null
   // The catalog page, when it can't be built from external_id — see
