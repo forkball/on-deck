@@ -172,10 +172,11 @@ describe('chooseMatch', () => {
   // as good as this rule gets: it is the sibling case below that the named tier is
   // actually for.
   it('cannot tell a collectors pressing from the book on title alone', () => {
-    const chosen = chooseMatch(pick('Iron Flame', 2023), [
-      hit('Iron Flame: Limited Special Edition - Sprayed Edges', 2023),
-      hit('Iron Flame', 2024),
-    ])
+    const chosen = chooseMatch(
+      pick('Iron Flame', 2023),
+      [hit('Iron Flame: Limited Special Edition - Sprayed Edges', 2023), hit('Iron Flame', 2024)],
+      'book',
+    )
 
     assert.equal(chosen?.title, 'Iron Flame: Limited Special Edition - Sprayed Edges')
   })
@@ -222,6 +223,38 @@ describe('chooseMatch', () => {
     const chosen = chooseMatch(pick('WALL-E', 2008), [hit('Wall E', 2008)])
 
     assert.equal(chosen?.title, 'Wall E')
+  })
+
+  // Three of one run's eight picks were Google Books stubs — a catalogue entry with
+  // no cover, no description and no page count — chosen over editions that had all
+  // three, because a stub is often filed under the original year while the readable
+  // edition is a later reprint. A book's catalog year is its pressing, so it does
+  // not get to outrank having something to show.
+  it('prefers an edition that carries something, for a medium whose year is a pressing', () => {
+    const stub = hit('Iron Flame', 2023)
+    const real = { ...hit('Iron Flame', 2024), overview: 'a plot', posterUrl: 'cover.jpg' }
+    const chosen = chooseMatch(pick('Iron Flame', 2023), [stub, real], 'book')
+
+    assert.equal(chosen?.releaseYear, 2024)
+  })
+
+  // A film's year is the film. A remake with a description may not displace the one
+  // that was asked for.
+  it('keeps the year first where it identifies the work', () => {
+    const asked = hit('Dune', 1984)
+    const remake = { ...hit('Dune', 2021), overview: 'a plot', posterUrl: 'cover.jpg' }
+    const chosen = chooseMatch(pick('Dune', 1984), [asked, remake], 'movie')
+
+    assert.equal(chosen?.releaseYear, 1984)
+  })
+
+  it('reads an ampersand as the word, since publishers print it both ways', () => {
+    const chosen = chooseMatch(pick('The Wrath & the Dawn', 2015), [
+      hit('The Wrath and the Dawn', 2016),
+      hit('The Wrath & the Dawn: Anniversary Edition', 2026),
+    ])
+
+    assert.equal(chosen?.title, 'The Wrath and the Dawn')
   })
 
   it('answers null when no hit is the book at all', () => {
