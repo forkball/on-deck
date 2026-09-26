@@ -48,8 +48,7 @@ export function Modal(
     // form back in front of someone — without it a 400 comes back as a page
     // with the error hidden behind a trigger they'd have to find again.
     defaultOpen?: boolean
-    // False when the content carries its own way out — a confirmation whose
-    // "Go back" already closes it doesn't need a ✕ beside the title too.
+    // False when the content has its own way out.
     closeButton?: boolean
     children?: RemixNode
   }>,

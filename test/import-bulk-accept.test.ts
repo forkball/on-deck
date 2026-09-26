@@ -52,7 +52,7 @@ describe('unticking a bulk accept', { skip: skipWithoutDatabase }, () => {
     await acceptBulk(db, batch, 'year', [kwaidan!.id])
     assert.equal((await loadRows(db, batchId)).find((row) => row.id === kwaidan!.id)?.accepted_by, 'year')
 
-    await unacceptBulk(db, batch, [kwaidan!.id])
+    await unacceptBulk(db, batch, 'year')
 
     const after = new Map((await loadRows(db, batchId)).map((row) => [row.id, row]))
     assert.equal(after.get(kwaidan!.id)?.state, 'uncertain')

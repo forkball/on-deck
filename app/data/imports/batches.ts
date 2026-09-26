@@ -16,7 +16,13 @@ import {
   type ImportBatch,
   type ImportRow,
 } from '../schema.ts'
-import type { BulkKind, CandidateLike, ConflictChoice, RowState } from './classify.ts'
+import {
+  parseBulkKind,
+  type BulkKind,
+  type CandidateLike,
+  type ConflictChoice,
+  type RowState,
+} from './classify.ts'
 import {
   buildReview,
   type CatalogEntry,
@@ -48,57 +54,55 @@ export async function createBatch(
   const id = crypto.randomUUID()
   const now = Date.now()
 
-  await db.create(importBatches, {
-    id,
-    user_id: userId,
-    media_type: mediaType,
-    source,
-    status: 'matching',
-    total_rows: rows.length,
-    matched_rows: 0,
-    conflict_choice: 'keep',
-    // Held until its rows are in: the batch is written first and the rows
-    // after, and a worker polling in between claimed an empty batch, matched
-    // nothing and put it straight into review with every row still pending.
-    // If this upload dies before letting go, the claim goes stale like any other.
-    claimed_at: now,
-    created_at: now,
-    updated_at: now,
-  })
-
-  // One statement rather than a create() per row: a 400-row export is 400 round
-  // trips to Supabase otherwise, which is most of the time the upload spends.
-  if (rows.length > 0) {
-    const COLUMNS = 12
-    const values: unknown[] = []
-    const tuples = rows.map((row, i) => {
-      const base = i * COLUMNS
-      values.push(
-        id,
-        row.rowIndex,
-        row.title,
-        row.year,
-        row.rating,
-        row.notes ?? null,
-        row.consumedAt,
-        row.logStatus ?? 'consumed',
-        row.author ?? null,
-        row.isbn ?? null,
-        now,
-        now,
-      )
-      return `(${Array.from({ length: COLUMNS }, (_, n) => `$${base + n + 1}`).join(', ')})`
-    })
-
-    await pool.query(
-      `insert into import_rows
-         (batch_id, row_index, raw_title, raw_year, rating, notes, consumed_at, log_status, author, isbn, created_at, updated_at)
-       values ${tuples.join(', ')}`,
-      values,
+  // Batch and rows in one transaction, so the worker can never claim a batch
+  // whose rows aren't in yet — it would match nothing and send it to review.
+  const client = await pool.connect()
+  try {
+    await client.query('begin')
+    await client.query(
+      `insert into import_batches
+         (id, user_id, media_type, source, status, total_rows, matched_rows, conflict_choice, created_at, updated_at)
+       values ($1, $2, $3, $4, 'matching', $5, 0, 'keep', $6, $6)`,
+      [id, userId, mediaType, source, rows.length, now],
     )
-  }
 
-  await db.update(importBatches, id, { claimed_at: undefined })
+    // One statement for all rows: a create() per row is a round trip each.
+    if (rows.length > 0) {
+      const COLUMNS = 12
+      const values: unknown[] = []
+      const tuples = rows.map((row, i) => {
+        const base = i * COLUMNS
+        values.push(
+          id,
+          row.rowIndex,
+          row.title,
+          row.year,
+          row.rating,
+          row.notes ?? null,
+          row.consumedAt,
+          row.logStatus ?? 'consumed',
+          row.author ?? null,
+          row.isbn ?? null,
+          now,
+          now,
+        )
+        return `(${Array.from({ length: COLUMNS }, (_, n) => `$${base + n + 1}`).join(', ')})`
+      })
+
+      await client.query(
+        `insert into import_rows
+           (batch_id, row_index, raw_title, raw_year, rating, notes, consumed_at, log_status, author, isbn, created_at, updated_at)
+         values ${tuples.join(', ')}`,
+        values,
+      )
+    }
+    await client.query('commit')
+  } catch (error) {
+    await client.query('rollback')
+    throw error
+  } finally {
+    client.release()
+  }
 
   return id
 }
@@ -149,9 +153,7 @@ export async function recordMatch(
   },
 ): Promise<void> {
   await db.update(importRows, rowId, {
-    // Serialized here: node-postgres sends a bare JS array as a Postgres array
-    // literal, which a jsonb column rejects. Objects go through as JSON, which
-    // is why metadata never needed this.
+    // node-postgres sends a bare array as a Postgres array, which jsonb rejects.
     alternates: result.alternates ? JSON.stringify(result.alternates) : null,
     state: result.state,
     reason: result.reason ?? undefined,
@@ -212,18 +214,11 @@ function toStagedRow(row: ImportRow): StagedRow {
     mediaItemId: row.media_item_id ?? null,
     matchedExternalId: row.matched_external_id ?? null,
     alternates: readAlternates(row.alternates),
-    acceptedBy: readAcceptedBy(row.accepted_by),
+    acceptedBy: parseBulkKind(row.accepted_by),
   }
 }
 
-function readAcceptedBy(value: string | null | undefined): BulkKind | null {
-  return value === 'year' || value === 'subtitle' || value === 'sole' ? value : null
-}
-
-// Written by matching as an array of candidates. Anything else — null, or a
-// shape from some future change — reads as none, and the card falls back to a
-// single button for matching's own pick rather than render buttons from
-// something it can't trust.
+// Anything but a non-empty array reads as none.
 function readAlternates(value: unknown): CandidateLike[] | null {
   if (!Array.isArray(value)) return null
   const alternates = value.filter(
@@ -294,33 +289,20 @@ async function ownedRow(db: Db, batch: ImportBatch, rowId: number): Promise<Impo
   return row ?? null
 }
 
-// Marks an uncertain match as read and correct. It was already going to save —
-// this only clears it off the page.
-export async function confirmRow(db: Db, batch: ImportBatch, rowId: number): Promise<boolean> {
+// A decision on one row by hand. It also takes the row out of any bulk accept,
+// so unticking that accept leaves it alone.
+async function settleRow(db: Db, batch: ImportBatch, rowId: number, state: RowState): Promise<boolean> {
   const row = await ownedRow(db, batch, rowId)
   if (!row) return false
 
-  await db.update(importRows, row.id, { state: 'confirmed', accepted_by: undefined, updated_at: Date.now() })
+  await db.update(importRows, row.id, { state, accepted_by: undefined, updated_at: Date.now() })
   return true
 }
 
-// Resolves a conflict in favour of the log. Distinct from skipping, which is
-// how a row is thrown away — this one is a row that was already there.
-export async function keepRow(db: Db, batch: ImportBatch, rowId: number): Promise<boolean> {
-  const row = await ownedRow(db, batch, rowId)
-  if (!row) return false
-
-  await db.update(importRows, row.id, { state: 'kept', accepted_by: undefined, updated_at: Date.now() })
-  return true
-}
-
-export async function skipRow(db: Db, batch: ImportBatch, rowId: number): Promise<boolean> {
-  const row = await ownedRow(db, batch, rowId)
-  if (!row) return false
-
-  await db.update(importRows, row.id, { state: 'skipped', accepted_by: undefined, updated_at: Date.now() })
-  return true
-}
+export const confirmRow = (db: Db, batch: ImportBatch, rowId: number) =>
+  settleRow(db, batch, rowId, 'confirmed')
+export const keepRow = (db: Db, batch: ImportBatch, rowId: number) => settleRow(db, batch, rowId, 'kept')
+export const skipRow = (db: Db, batch: ImportBatch, rowId: number) => settleRow(db, batch, rowId, 'skipped')
 
 export type RepointResult = { ok: true } | { ok: false; error: string }
 
@@ -362,39 +344,28 @@ export async function repointRow(
   return { ok: true }
 }
 
-// The long tail of a large import, cleared in one click. Bounded to the rows
-// the page offered — anything wider would sweep up matches nobody vouched for.
-// Each row records which accept took it, so unaccepting can give back exactly
-// those.
+// A section's one-tap accept. Each row records which accept took it, so
+// unticking gives back exactly those.
 export async function acceptBulk(
   db: Db,
   batch: ImportBatch,
   kind: BulkKind,
   rowIds: number[],
-): Promise<number> {
-  if (rowIds.length === 0) return 0
-
+): Promise<void> {
+  if (rowIds.length === 0) return
   await db.updateMany(
     importRows,
     { state: 'confirmed', accepted_by: kind, updated_at: Date.now() },
     { where: and(eq('batch_id', batch.id), inList('id', rowIds)) },
   )
-
-  return rowIds.length
 }
 
-// Unticking an accept: the rows it took go back to being questions, with the
-// reason and year gap matching gave them, which the accept left in place.
-export async function unacceptBulk(db: Db, batch: ImportBatch, rowIds: number[]): Promise<number> {
-  if (rowIds.length === 0) return 0
-
+export async function unacceptBulk(db: Db, batch: ImportBatch, kind: BulkKind): Promise<void> {
   await db.updateMany(
     importRows,
     { state: 'uncertain', accepted_by: undefined, updated_at: Date.now() },
-    { where: and(eq('batch_id', batch.id), inList('id', rowIds)) },
+    { where: and(eq('batch_id', batch.id), eq('state', 'confirmed'), eq('accepted_by', kind)) },
   )
-
-  return rowIds.length
 }
 
 export async function setConflictChoice(db: Db, batchId: string, choice: ConflictChoice): Promise<void> {

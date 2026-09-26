@@ -6,16 +6,18 @@ import { redirect } from 'remix/response/redirect'
 import { getCatalogProvider } from '../../../data/catalog/provider.ts'
 import {
   acceptBulk,
-  unacceptBulk,
   confirmRow,
   keepRow,
   loadBatch,
   loadReview,
+  loadRows,
   repointRow,
   saveBatch,
   setConflictChoice,
   skipRow,
+  unacceptBulk,
 } from '../../../data/imports/batches.ts'
+import { parseBulkKind } from '../../../data/imports/classify.ts'
 import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
 import type { ImportBatch, User } from '../../../data/schema.ts'
@@ -55,11 +57,8 @@ export function offersFeed(batch: ImportBatch, identity: User): boolean {
   )
 }
 
-// `anchor` is where on the page to land. With JS a decision updates the page in
-// place and this never shows; without it, every decision was a full page load
-// back at the top, so a long review meant scrolling back down after each one.
-// Only ids the page itself hands out are followed.
-const ANCHOR = /^(row-\d+|import-[a-z-]+)$/
+// Where a no-JS post lands, so a long review doesn't restart at the top.
+const ANCHOR = /^(row-\d+|import-save)$/
 
 function backToReview(batch: ImportBatch, error?: string, anchor?: string): Response {
   const href = routes.profile.imports.review.href({ batchId: batch.id })
@@ -144,7 +143,7 @@ export default createController(routes.profile.imports, {
       if (!found.ok) return found.response
       const { batch } = found
 
-      const { rows } = await loadReview(context.get(Database), batch)
+      const rows = await loadRows(context.get(Database), batch.id)
       const row = rows.find((candidate) => candidate.id === Number(context.params.rowId))
       if (!row) return new Response('Not found', { status: 404 })
 
@@ -208,29 +207,24 @@ export default createController(routes.profile.imports, {
       return backToReview(batch, undefined, anchor)
     },
 
-    // The page's one-tap accepts. Which rows qualify is recomputed here rather
-    // than taken from the form: the button says "the remaining N off-by-one
-    // matches", and that has to be what it does. The form only names which.
-    //
-    // No anchor: with JS the page updates in place; without it, a bulk accept
-    // is one reload for dozens of rows.
     async bulk(context: ImportBatchContext) {
       const found = await findBatch(context)
       if (!found.ok) return found.response
       const { batch } = found
 
       const db = context.get(Database)
-      const { model } = await loadReview(db, batch)
-
       const form = context.get(FormData)
-      const requested = form.get('kind')
-      const kind = requested === 'subtitle' || requested === 'sole' ? requested : 'year'
+      const kind = parseBulkKind(form.get('kind'))
+      if (!kind) return backToReview(batch)
 
-      // The box is a toggle: ticked, the same press takes the accepted rows
-      // back. Also recomputed, so it undoes what that accept took and nothing
-      // confirmed by hand.
-      if (form.get('undo') === '1') await unacceptBulk(db, batch, model.accepted[kind])
-      else await acceptBulk(db, batch, kind, model.bulk[kind])
+      // A toggle: ticked, the same press gives back the rows that accept took.
+      if (form.get('undo') === '1') {
+        await unacceptBulk(db, batch, kind)
+      } else {
+        // Recomputed rather than read from the form, so it takes what the page offered.
+        const { model } = await loadReview(db, batch)
+        await acceptBulk(db, batch, kind, model.bulk[kind])
+      }
       return backToReview(batch)
     },
 

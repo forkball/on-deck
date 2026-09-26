@@ -11,7 +11,7 @@ import type {
   ReviewRow,
   SectionKey,
 } from '../../../data/imports/review.ts'
-import { reasonGroup, type BulkKind, type LogValues } from '../../../data/imports/classify.ts'
+import { normalizeTitle, reasonGroup, type BulkKind, type LogValues } from '../../../data/imports/classify.ts'
 import type { ImportBatch } from '../../../data/schema.ts'
 import { mediaTypeUiFor } from '../../../mediaTypes.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
@@ -29,9 +29,7 @@ export interface ImportReviewPageProps {
   batch: ImportBatch
   model: ReviewModel
   saved?: boolean
-  // Shown once a Letterboxd import is saved, to a member whose diary isn't
-  // connected yet. Null when there is nothing to offer — wrong media type,
-  // gate closed, or already following.
+  // Offer the Letterboxd diary feed after saving.
   offerFeed?: boolean
   reviewsOnly?: boolean
   error?: string
@@ -39,23 +37,16 @@ export interface ImportReviewPageProps {
 
 const ACCENT = '#3E5C76'
 
-// Stands in for a row id inside the hrefs handed to the picker, which swaps it
-// per row rather than building URLs of its own.
+// Placeholder for a row id in the hrefs handed to the picker.
 const ROW_TOKEN = '__row__'
 
-// Every row is rendered; LazyList hides the tail until you scroll to it. A
-// slice would have been simpler and wrong — the rows past the cut were
-// unreachable, and for "couldn't find", which saves nothing by default, that
-// silently dropped them with no way to go and get them. Revealing costs no
-// request, and with JS off nothing is hidden at all.
+// Every row is rendered; LazyList hides the tail until you scroll to it.
 const CONFLICTS_VISIBLE = 10
 const ROWS_VISIBLE = 25
 
 const SAVE_ANCHOR = 'import-save'
 
-// For each card, in page order, the card after it — which takes a decided
-// card's place, so that is where a no-JS redirect should land. The last one
-// lands on the save bar.
+// Where a no-JS redirect lands after each card: the card after it, or the save bar.
 function nextAnchors(ordered: { row: { id: number } }[]): Map<number, string> {
   const next = new Map<number, string>()
   ordered.forEach(({ row }, i) => {
@@ -130,7 +121,6 @@ function Card(handle: Handle<{ children?: RemixNode; attention?: boolean; id?: s
       <div
         id={id}
         mix={css({
-          // Lands a little below the top edge when a redirect jumps to it.
           scrollMarginTop: '12px',
           border: `1px solid ${attention ? '#e3c9a3' : '#e2d8c8'}`,
           borderRadius: '8px',
@@ -145,10 +135,7 @@ function Card(handle: Handle<{ children?: RemixNode; attention?: boolean; id?: s
   }
 }
 
-// Each decision saves in the background and the page updates in place
-// (InPlaceForms), so working down a long list doesn't send you back to the top
-// after every answer. Without JS it is a plain post, and `anchor` — the id of
-// the card to land on afterwards — does the same job through the redirect.
+// Posts in place (InPlaceForms); without JS, `anchor` is where the redirect lands.
 function ResolveForm(
   handle: Handle<{
     batchId: string
@@ -173,7 +160,7 @@ function ResolveForm(
         <input type="hidden" name="action" value={action} />
         {anchor && <input type="hidden" name="anchor" value={anchor} />}
         {externalId && <input type="hidden" name="external_id" value={externalId} />}
-        <button type="submit" class={buttonClass(variant)} mix={css({ fontSize: '13px' })}>
+        <button type="submit" class={variant} mix={css({ fontSize: '13px' })}>
           {label}
         </button>
       </form>
@@ -181,21 +168,13 @@ function ResolveForm(
   }
 }
 
-// `quiet` is a text button, for the answer that shouldn't compete with the
-// others; `compact` is a narrower one, for a row of short alternatives.
-type ButtonVariant = 'primary' | 'quiet' | 'compact'
-
-function buttonClass(variant?: ButtonVariant): string | undefined {
-  return variant === 'quiet' ? 'linkish' : variant
-}
+type ButtonVariant = 'primary' | 'linkish' | 'compact'
 
 function rowAnchor(rowId: number): string {
   return `row-${rowId}`
 }
 
-// Opens the picker for one row. A plain button rather than a link: the modal is
-// a single client entry for the whole page, and this is how it is told which
-// row to open on.
+// Opens the page's one picker on this row.
 function PickerButton(handle: Handle<{ rowId: number; label: string; variant?: ButtonVariant }>) {
   return () => {
     const { rowId, label, variant } = handle.props
@@ -204,7 +183,7 @@ function PickerButton(handle: Handle<{ rowId: number; label: string; variant?: B
       <button
         type="button"
         data-import-picker={String(rowId)}
-        class={buttonClass(variant)}
+        class={variant}
         mix={css({ fontSize: '13px' })}
       >
         {label}
@@ -276,12 +255,7 @@ function ConflictCard(handle: Handle<{ batchId: string; entry: ConflictEntry; pa
         {line('On Deck', entry.existing)}
         {line('Import', entry.incoming)}
         <Actions>
-          {/* Per-row overrides of the switch above, and they beat it. Keeping
-              is not skipping: the row stays out of the log because it is
-              already in it. */}
-          {/* Neither is primary. The switch above states the batch default, and
-              taking the import is the only direction that overwrites something,
-              so weighting it would push toward the destructive answer. */}
+          {/* Per-row overrides of the switch above. Neither is primary: taking overwrites. */}
           <ResolveForm
             batchId={batchId}
             rowId={entry.row.id}
@@ -363,16 +337,13 @@ function DuplicateCard(
               />
             </Actions>
             <div mix={css({ margin: '16px 0 0' })}>
-              <form
-                method="post"
-                action={routes.profile.imports.resolve.href({ batchId, rowId: String(verdict.move.id) })}
-                data-in-place
-              >
-                <input type="hidden" name="action" value="skip" />
-                <button type="submit" class="linkish">
-                  Actually the same {singular} — leave row {verdict.move.index} out
-                </button>
-              </form>
+              <ResolveForm
+                batchId={batchId}
+                rowId={verdict.move.id}
+                action="skip"
+                label={`Actually the same ${singular} — leave row ${verdict.move.index} out`}
+                variant="linkish"
+              />
             </div>
           </>
         ) : (
@@ -415,9 +386,6 @@ function DuplicateCard(
   }
 }
 
-// Stacked the same way at every width: what your export said, what we matched
-// it to, the answers. Side by side it needed two columns on desktop and wrapped
-// into a card half a phone screen tall; stacked, it is short at both.
 function UncertainCard(
   handle: Handle<{
     batchId: string
@@ -429,9 +397,7 @@ function UncertainCard(
   return () => {
     const { batchId, entry, pastParticiple, next } = handle.props
     const { row, item, chip } = entry
-    // Every no-year row is a "which one?" question, and every card in its group
-    // asks it the same way: the namesakes matching kept, or — for a row staged
-    // before it kept them — just its own pick.
+    // No-year rows ask "which one?": the namesakes matching kept, else its own pick.
     const choices =
       row.reason !== 'no_year'
         ? null
@@ -475,14 +441,10 @@ function UncertainCard(
         </div>
 
         {choices ? (
-          // Three rows at every width — the question, the years, the way out —
-          // rather than one row left to wrap: on a 320px phone that split the
-          // years across lines and stranded the label beside the first one.
           <>
             <div mix={css({ fontSize: '13px', color: '#8d8579', marginTop: '10px' })}>Which one?</div>
             <Actions gap="6px">
-              {/* None of these is primary: with no year to go on, our pick was
-                  a guess, and weighting it would push the guess. */}
+              {/* None is primary: without a year our pick is a guess. */}
               {choices.map((choice) => {
                 const ours = choice.externalId === row.matchedExternalId
                 return (
@@ -500,13 +462,13 @@ function UncertainCard(
               })}
             </Actions>
             <Actions>
-              <PickerButton rowId={row.id} label="Something else…" variant="quiet" />
+              <PickerButton rowId={row.id} label="Something else…" variant="linkish" />
               <ResolveForm
                 batchId={batchId}
                 rowId={row.id}
                 action="skip"
                 label="Don't save"
-                variant="quiet"
+                variant="linkish"
                 anchor={next}
               />
             </Actions>
@@ -534,7 +496,7 @@ function NotFoundCard(handle: Handle<{ batchId: string; row: ReviewRow['row']; n
             rowId={row.id}
             action="skip"
             label="Leave out"
-            variant="quiet"
+            variant="linkish"
             anchor={next}
           />
         </Actions>
@@ -543,23 +505,15 @@ function NotFoundCard(handle: Handle<{ batchId: string; row: ReviewRow['row']; n
   }
 }
 
-// What's been answered in a section, kept on the page so an answer can be
-// changed: one line each saying what the answer was, which opens back into the
-// same card with the same choices. Picking one there answers again — the
-// actions don't care whether the row was open — and the line updates.
-//
-// Collapsed as a whole, at the top of the section rather than under its cards,
-// where a hundred of them would stand between you and it; collapsed because
-// answering is what empties a section, and a hundred answered lines would put
-// it back.
+// A section's answered rows, one line each, opening back into the card so the
+// answer can be changed. Collapsed, at the top of the section.
 function AnsweredList(
   handle: Handle<{
     batchId: string
     section: SectionKey
     entries: ReviewRow[]
     pastParticiple: string
-    // A finished section's ticked accept, which the drawer stops showing —
-    // here it can still be unticked.
+    // A finished section's accept, hidden from the drawer, so it can be unticked here.
     accepted?: DrawerSection['bulk']
   }>,
 ) {
@@ -572,7 +526,7 @@ function AnsweredList(
         <Collapsible summary={<span mix={css({ color: '#6b6459' })}>{entries.length} answered</span>}>
           {accepted && (
             <div mix={css({ margin: '6px 0 2px' })}>
-              <BulkAccept batchId={batchId} {...accepted} indent={false} />
+              <BulkAccept batchId={batchId} {...accepted} />
             </div>
           )}
           <ul mix={css({ listStyle: 'none', margin: '6px 0 0', padding: 0 })}>
@@ -580,8 +534,7 @@ function AnsweredList(
               const { row, item } = entry
               const dropped = row.state === 'skipped'
               return (
-                // A block, not a list item: DoodleCSS draws a "* " marker on every
-                // `ul li` from an unlayered rule that no css() here can outrank.
+                // A block, so DoodleCSS's "* " list marker doesn't show.
                 <li key={row.id} mix={css({ display: 'block', borderBottom: '1px solid #eee4d6' })}>
                   <details data-close-on-submit>
                     <summary
@@ -627,16 +580,13 @@ function AnsweredList(
   }
 }
 
-// What an answered line says it was matched to. The year alone when the title
-// is the one in the file — for a no-year row that is the whole answer — and
-// the catalog's title too when it differs.
+// The year alone when the title is the file's own, else the catalog title too.
 function answeredMatch(title: string, item: NonNullable<ReviewRow['item']>): string {
   const year = item.releaseYear == null ? '' : String(item.releaseYear)
-  if (item.title.trim().toLowerCase() === title.trim().toLowerCase()) return year || item.title
+  if (normalizeTitle(item.title) === normalizeTitle(title)) return year || item.title
   return year ? `${item.title} ${year}` : item.title
 }
 
-// The year is the whole difference between namesakes, so it is the label.
 function choiceLabel(year: number | null): string {
   return year == null ? 'Undated' : String(year)
 }
@@ -673,7 +623,7 @@ function MatchedAnswers(
             rowId={row.id}
             action="skip"
             label="Don't save"
-            variant="quiet"
+            variant="linkish"
             anchor={next}
           />
         </Actions>
@@ -688,74 +638,46 @@ function leftOutReason(state: string): string {
   return 'held back as a duplicate'
 }
 
-// The saved page's collapsed lists. Every row is rendered, collapsed: the
-// person asked for these films to be named, and a real export is hundreds at
-// most.
 const savedListStyle = css({ margin: 0, paddingLeft: '18px', fontSize: '14px' })
 
-// "Worth a look" split by what we're unsure about, in the order the cards
-// already sort — least certain first — so each group is one kind of question
-// and can be answered as one.
-function groupAnchor(key: string): string {
+function groupAnchor(key: SectionKey): string {
   return `group-${key}`
 }
 
-const sectionStyle = css({ marginBottom: '18px', scrollMarginTop: '12px' })
-
-// The review's pinned drawer: a checklist of the sections, and the one Save.
-//
-// Collapsed it is a single line — progress and the Save button — so the cards
-// get the screen; open, it lists every section with how much of it is left,
-// each a link to it, so the way to the next one is always one tap from
-// wherever the reader is. Finished sections stay listed, ticked, rather than
-// vanishing. It starts collapsed on a phone and open where there is room.
-//
-// Save asks twice only when it matters: if anything would go in unchecked or
-// be left out, the first press opens a Modal that says so; with everything
-// checked it just saves.
-//
-// CSS-only, like Modal: a visually-hidden checkbox opens the drawer. A
-// checkbox's checked state is the DOM's, not the server markup's, so it
-// survives the in-place reload after each decision — the drawer stays however
-// it was left. With JS off it works the same.
+// The pinned drawer: a checklist of the sections and the one Save, which asks
+// first only when something would go in unchecked or be left out. CSS-only: a
+// hidden checkbox opens it, and its state survives in-place reloads.
 const DRAWER_TOGGLE = 'import-drawer-toggle'
 const CONFIRM_TOGGLE = 'import-confirm-toggle'
 
-// The checkbox means "not the default": open on a phone, closed on desktop.
-function drawerStyle(): Parameters<typeof css>[0] {
-  const open = `&:has(#${DRAWER_TOGGLE}:checked)`
-  const style: Record<string, unknown> = {
-    position: 'sticky',
-    bottom: 0,
-    zIndex: 10,
-    background: '#FDF7F1',
-    borderTop: '1px solid #ddd',
-    boxShadow: '0 -6px 12px -10px rgba(0, 0, 0, 0.35)',
-    marginTop: '24px',
-    padding: '8px 0',
-    '& .drawer-check': { position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' },
-    '& .drawer-panel': { display: 'none', maxHeight: '45vh', overflowY: 'auto', padding: '4px 0 10px' },
-    '& .drawer-arrow::before': { content: '"▲"' },
-    // Laid out here rather than with its own css(): each css() is a separate
-    // cascade layer, and a later layer beats this one whatever the selector,
-    // so a row styled on its own could never be hidden from here.
-    // Room above and below the Save: pinned to the screen's bottom edge, it
-    // sat tight against the bar's top line and the phone's home indicator.
-    '& .drawer-row': { display: 'flex', alignItems: 'center', gap: '8px 12px', padding: '8px 0' },
-    [`${open} .drawer-panel`]: { display: 'block' },
-    [`${open} .drawer-arrow::before`]: { content: '"▼"' },
-    '@media (min-width: 720px)': {
-      '& .drawer-panel': { display: 'block' },
-      '& .drawer-arrow::before': { content: '"▼"' },
-      [`${open} .drawer-panel`]: { display: 'none' },
-      [`${open} .drawer-arrow::before`]: { content: '"▲"' },
-    },
-  }
-  return style as Parameters<typeof css>[0]
-}
+// Checked means "not the default": open on a phone, closed on desktop.
+const drawerOpen = `&:has(#${DRAWER_TOGGLE}:checked)`
+const drawerStyle = css({
+  position: 'sticky',
+  bottom: 0,
+  zIndex: 10,
+  background: '#FDF7F1',
+  borderTop: '1px solid #ddd',
+  boxShadow: '0 -6px 12px -10px rgba(0, 0, 0, 0.35)',
+  marginTop: '24px',
+  padding: '8px 0',
+  '& .drawer-check': { position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' },
+  '& .drawer-panel': { display: 'none', maxHeight: '45vh', overflowY: 'auto', padding: '4px 0 10px' },
+  '& .drawer-arrow::before': { content: '"▲"' },
+  // Here, not in its own css(): each css() is its own cascade layer.
+  '& .drawer-row': { display: 'flex', alignItems: 'center', gap: '8px 12px', padding: '8px 0' },
+  [`${drawerOpen} .drawer-panel`]: { display: 'block' },
+  [`${drawerOpen} .drawer-arrow::before`]: { content: '"▼"' },
+  '@media (min-width: 720px)': {
+    '& .drawer-panel': { display: 'block' },
+    '& .drawer-arrow::before': { content: '"▼"' },
+    [`${drawerOpen} .drawer-panel`]: { display: 'none' },
+    [`${drawerOpen} .drawer-arrow::before`]: { content: '"▲"' },
+  },
+} as Parameters<typeof css>[0])
 
 interface DrawerSection {
-  key: string
+  key: SectionKey
   title: string
   href: string
   total: number
@@ -777,13 +699,9 @@ function ReviewDrawer(
   return () => {
     const { batchId, sections, unchecked, leftOut, save, singular, plural } = handle.props
     const needsConfirm = unchecked > 0 || leftOut > 0
-    // The bar's button is just "Save": the count belongs to the confirmation,
-    // which spells out what goes in and how much of it is unchecked.
     const saveLabel = save > 0 ? 'Save' : 'Finish'
     const confirmLabel = save > 0 ? `Yes, save ${count(save, singular, plural)}` : 'Yes, finish'
 
-    // The one number that matters while working: what would save unchecked.
-    // Per-section progress is the checklist's job.
     const progress =
       sections.length === 0 ? 'Nothing to review' : unchecked > 0 ? `${unchecked} unchecked` : 'All checked'
 
@@ -796,7 +714,7 @@ function ReviewDrawer(
     )
 
     return (
-      <div id={SAVE_ANCHOR} mix={css(drawerStyle())}>
+      <div id={SAVE_ANCHOR} mix={drawerStyle}>
         <input
           type="checkbox"
           id={DRAWER_TOGGLE}
@@ -839,13 +757,13 @@ function ReviewDrawer(
                       ? `${section.open} left · not saved`
                       : `${section.open} of ${section.total} left`}
                 </span>
-                {/* Only while the section has cards left: once it is done the row's
-                    ✓ says so, and a ticked box beside it read as a second "done".
-                    A finished section's accept moves to its answered list. */}
+                {/* A done section's ✓ says enough; its accept moves to the answered list. */}
                 {section.open > 0 &&
                   section.bulk &&
                   (section.bulk.count > 0 || section.bulk.accepted > 0) && (
-                    <BulkAccept batchId={batchId} {...section.bulk} />
+                    <div mix={css({ flex: '1 0 100%', paddingLeft: 'calc(1em + 8px)' })}>
+                      <BulkAccept batchId={batchId} {...section.bulk} />
+                    </div>
                   )}
               </li>
             ))}
@@ -853,8 +771,6 @@ function ReviewDrawer(
         </div>
 
         <div class="drawer-row">
-          {/* One line: it is short, and wrapping broke "260 unchecked" in two
-              beside a longer Save on a 320px phone. */}
           <label
             for={DRAWER_TOGGLE}
             mix={css({
@@ -874,9 +790,7 @@ function ReviewDrawer(
             {progress}
           </label>
           {needsConfirm ? (
-            // A label dressed as the Save button: it opens the Modal below
-            // rather than submitting. The look sits on the inner span, as in
-            // Modal — DoodleCSS pads <label> from an unlayered rule.
+            // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
             <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
               <span class="doodle-border primary">{saveLabel}</span>
             </label>
@@ -921,8 +835,7 @@ function ReviewDrawer(
   }
 }
 
-// Which bulk accept, if any, a section offers. Which rows it covers is decided
-// by bulkKind and recomputed by the action, so the count shown is what it does.
+// Each section's one-tap accept; which rows it covers is bulkKind's call.
 const SECTION_BULK: Partial<Record<SectionKey, { kind: BulkKind; what: string }>> = {
   title_differs: { kind: 'subtitle', what: 'your title plus a subtitle' },
   no_year: { kind: 'sole', what: 'the only film by that name' },
@@ -935,16 +848,13 @@ function bulkFor(key: SectionKey, model: ReviewModel): DrawerSection['bulk'] {
   return { ...offer, count: model.bulk[offer.kind].length, accepted: model.accepted[offer.kind].length }
 }
 
-// A one-tap accept, on the section's own checklist row: it clears most of a
-// section in one go, so it sits with that section's progress rather than as
-// another block above a hundred cards. Its own line under the title, indented
-// to the title, so the title and count keep their row on a phone.
-//
-// It reads as a checkbox but is a submit button drawn as one (`.checkline` in
-// app.css): ticking it is the whole action, and a button does that with JS off
-// too, where a real checkbox would need a script to post on change. Once
-// ticked it stays ticked, and pressing it again unticks — the accepted rows go
-// back to the page as cards.
+function acceptedBy(key: SectionKey, model: ReviewModel): DrawerSection['bulk'] {
+  const bulk = bulkFor(key, model)
+  return bulk && bulk.accepted > 0 ? bulk : null
+}
+
+// A submit button drawn as a checkbox, so it works without JS. Pressed again
+// once ticked, it unticks and the accepted rows come back as cards.
 function BulkAccept(
   handle: Handle<{
     batchId: string
@@ -952,21 +862,14 @@ function BulkAccept(
     count: number
     accepted: number
     what: string
-    // Lined up under the drawer row's title; off where it stands alone.
-    indent?: boolean
   }>,
 ) {
   return () => {
-    const { batchId, kind, count, accepted, what, indent = true } = handle.props
+    const { batchId, kind, count, accepted, what } = handle.props
     const ticked = accepted > 0
     const n = ticked ? accepted : count
     return (
-      <form
-        method="post"
-        action={routes.profile.imports.bulk.href({ batchId })}
-        data-in-place
-        mix={css({ flex: '1 0 100%', paddingLeft: indent ? 'calc(1em + 8px)' : 0 })}
-      >
+      <form method="post" action={routes.profile.imports.bulk.href({ batchId })} data-in-place>
         <input type="hidden" name="kind" value={kind} />
         {ticked && <input type="hidden" name="undo" value="1" />}
         <button
@@ -982,60 +885,16 @@ function BulkAccept(
   }
 }
 
-interface ReasonGroup {
-  key: string
-  title: string
-  blurb: string
-  entries: ReviewRow[]
-}
-
-function groupByReason(uncertain: ReviewRow[], singular: string, plural: string): ReasonGroup[] {
-  const groups = new Map<string, ReasonGroup>()
-
-  for (const entry of uncertain) {
-    const key = entry.row.reason ?? 'other'
-    let group = groups.get(key)
-    if (!group) {
-      group = { key, entries: [], ...reasonGroup(entry.row.reason, singular, plural) }
-      groups.set(key, group)
-    }
-    group.entries.push(entry)
-  }
-
-  return [...groups.values()]
-}
-
 const REVIEW_SECTIONS = ['title_differs', 'no_year', 'year_drift'] as const
 
-// The accept a finished section is still holding, if any — see AnsweredList.
-function finishedAccept(key: SectionKey, model: ReviewModel): DrawerSection['bulk'] {
-  const open = model.sections.find((section) => section.key === key)?.open ?? 0
-  const bulk = bulkFor(key, model)
-  return open === 0 && bulk && bulk.accepted > 0 ? bulk : null
-}
-
-function isReviewSection(key: string): key is (typeof REVIEW_SECTIONS)[number] {
-  return (REVIEW_SECTIONS as readonly string[]).includes(key)
-}
-
-// A section stays on the page once all its cards are answered — its answered
-// list is where an answer gets changed — so a group can have no open cards.
-function withAnswered(
-  groups: ReasonGroup[],
-  model: ReviewModel,
-  singular: string,
-  plural: string,
-): ReasonGroup[] {
-  for (const key of REVIEW_SECTIONS) {
-    if (model.answered[key].length > 0 && !groups.some((group) => group.key === key)) {
-      groups.push({ key, entries: [], ...reasonGroup(key, singular, plural) })
-    }
-  }
-  const rank = (key: string) => {
-    const at = (REVIEW_SECTIONS as readonly string[]).indexOf(key)
-    return at === -1 ? REVIEW_SECTIONS.length : at
-  }
-  return groups.sort((a, b) => rank(a.key) - rank(b.key))
+// A section stays once all its cards are answered: its answered list is where
+// an answer gets changed.
+function reviewGroups(model: ReviewModel, singular: string, plural: string) {
+  return REVIEW_SECTIONS.map((key) => ({
+    key,
+    ...reasonGroup(key, singular, plural),
+    entries: model.uncertain.filter(({ row }) => row.reason === key),
+  })).filter((group) => group.entries.length > 0 || model.answered[group.key].length > 0)
 }
 
 export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
@@ -1045,12 +904,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
     const { singular, plural, pastParticiple, hrefs } = mediaTypeUiFor(batch.media_type as MediaType)
     const batchId = batch.id
     const answeredCount = Object.values(model.answered).reduce((sum, rows) => sum + rows.length, 0)
-    const uncertainGroups = withAnswered(
-      groupByReason(model.uncertain, singular, plural),
-      model,
-      singular,
-      plural,
-    )
+    const uncertainGroups = reviewGroups(model, singular, plural)
     const next = nextAnchors([...uncertainGroups.flatMap((group) => group.entries), ...model.notFound])
     return (
       <Document title="Review your import | On Deck">
@@ -1072,10 +926,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 {counts.leftOut > 0 && <li>{counts.leftOut} left out</li>}
               </ul>
 
-              {/* Saving is allowed with cards still open, and those rows go in
-                  as matched. Saying so only as a count left no way to find
-                  them again, and a wrong one can't be re-matched by a member
-                  after the fact — so they are named, with a way to each. */}
+              {/* Named, with a link to each, so a wrong match can still be fixed. */}
               {model.uncertain.length > 0 && (
                 <Collapsible summary={`The ${model.uncertain.length} saved as we matched them`} boxed>
                   <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 8px' })}>
@@ -1115,18 +966,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 <a href={routes.profile.importMovies.index.href()}>Import another file</a>
               </p>
 
-              {/* The other half of the pair, offered where it is obviously
-                  relevant rather than left to be found in settings. An export
-                  is a snapshot: it is right the moment it is uploaded and
-                  stale by the next film they log. The feed is the only thing
-                  that keeps it current, and this is the one moment someone has
-                  demonstrably decided they want their Letterboxd films here.
-
-                  Offered, not done for them. Importing is a single act; a
-                  connection is a standing arrangement that reads a feed and
-                  can remove rows, so it stays something they choose. The field
-                  is here because the alternative is sending them to settings
-                  to type the same thing. */}
+              {/* An export is a snapshot; the feed keeps it current. Offered, not done for them. */}
               {offerFeed && (
                 <section
                   mix={css({
@@ -1165,11 +1005,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
             </>
           ) : (
             <>
-              {/* One element around everything that can grow or shrink, so the
-                  drawer after it keeps its place among the page's children.
-                  The in-place reload matches children by position; when a
-                  whole group emptied and dropped out, the drawer's position
-                  shifted, it was rebuilt, and its open state reset. */}
+              {/* One wrapper, so the drawer keeps its position (and open state) across reloads. */}
               <div>
                 <h1>Review before saving</h1>
                 {error ? <p mix={css({ color: '#b91c1c' })}>{error}</p> : null}
@@ -1177,8 +1013,6 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   {counts.total} rows.{' '}
                   {model.alreadyLoggedIds.length > 0 &&
                     `${model.alreadyLoggedIds.length} already in your log, `}
-                  {/* Matching's own count, not yours: what you've settled is
-                      "answered", the word each section's list uses for it. */}
                   <b mix={css({ fontWeight: 400 })}>{model.confidentCount} matched cleanly</b>
                   {answeredCount > 0 && `, ${answeredCount} answered`}, {model.uncertain.length} worth a look,
                   and {model.notFound.length} we couldn't find.
@@ -1300,7 +1134,11 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       Least certain first. These save as matched unless you say otherwise.
                     </p>
                     {uncertainGroups.map((group) => (
-                      <section key={group.key} id={groupAnchor(group.key)} mix={sectionStyle}>
+                      <section
+                        key={group.key}
+                        id={groupAnchor(group.key)}
+                        mix={css({ marginBottom: '18px', scrollMarginTop: '12px' })}
+                      >
                         <h3 mix={css({ margin: '14px 0 2px', fontSize: '16px' })}>
                           {group.title}{' '}
                           <span mix={css({ color: '#888', fontSize: '13px', fontWeight: 400 })}>
@@ -1312,15 +1150,13 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                             {group.blurb}
                           </p>
                         )}
-                        {isReviewSection(group.key) && (
-                          <AnsweredList
-                            batchId={batchId}
-                            section={group.key}
-                            entries={model.answered[group.key]}
-                            pastParticiple={pastParticiple}
-                            accepted={finishedAccept(group.key, model)}
-                          />
-                        )}
+                        <AnsweredList
+                          batchId={batchId}
+                          section={group.key}
+                          entries={model.answered[group.key]}
+                          pastParticiple={pastParticiple}
+                          accepted={group.entries.length === 0 ? acceptedBy(group.key, model) : null}
+                        />
                         <div id={`import-uncertain-${group.key}`}>
                           {group.entries.map((entry) => (
                             <UncertainCard
@@ -1345,7 +1181,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 {(model.notFound.length > 0 || model.answered.not_found.length > 0) && (
                   <>
                     <hr />
-                    <h2 id={groupAnchor('not-found')} mix={css({ scrollMarginTop: '12px' })}>
+                    <h2 id={groupAnchor('not_found')} mix={css({ scrollMarginTop: '12px' })}>
                       Couldn't find{' '}
                       <span mix={css({ color: '#888', fontSize: '14px' })}>({model.notFound.length})</span>
                     </h2>
@@ -1377,7 +1213,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     section.key === 'not_found'
                       ? "Couldn't find"
                       : reasonGroup(section.key, singular, plural).title,
-                  href: `#${groupAnchor(section.key === 'not_found' ? 'not-found' : section.key)}`,
+                  href: `#${groupAnchor(section.key)}`,
                   bulk: bulkFor(section.key, model),
                 }))}
                 unchecked={model.uncertain.length}

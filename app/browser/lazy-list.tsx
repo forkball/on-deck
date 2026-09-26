@@ -18,12 +18,7 @@ export type LazyListProps = {
 // server renders every result rather than a slice. The whole set arrives in one
 // revealing more costs no extra network.
 //
-// Hides with a stylesheet it renders itself rather than by setting
-// `style.display` on the items. The list is server markup, so an in-place frame
-// reload (FrameForm, the import picker) diffs it back to what the server sent —
-// which wiped inline styles and unfolded the whole list after a single
-// decision. This entry's own state survives the reload, so the rule does too;
-// and a removed item simply lets the next one move up into view.
+// Hides with its own stylesheet, not inline styles, which an in-place reload wipes.
 export const LazyList = clientEntry<LazyListProps>(import.meta.url, function LazyList(handle) {
   // Null until the browser has run this: the server render must hide nothing,
   // or with JS off the tail would be unreachable.
@@ -34,9 +29,7 @@ export const LazyList = clientEntry<LazyListProps>(import.meta.url, function Laz
 
     return (
       <>
-        {/* Always rendered, empty until the browser takes over, so the
-            sentinel beside it keeps its place: a node appearing in front of it
-            re-created it, which re-ran its ref and looped. */}
+        {/* Always rendered, so the sentinel after it keeps its place. */}
         <style>
           {shown == null ? '' : `#${CSS.escape(listId)} > :nth-child(n + ${shown + 1}) { display: none; }`}
         </style>

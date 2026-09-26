@@ -28,6 +28,7 @@ import usersController from './actions/users/controller.tsx'
 import { loadDatabase } from './data/db.ts'
 import type { AppContext } from './middleware/context.ts'
 import { loadAuth } from './middleware/auth.ts'
+import { inPlace } from './middleware/inPlace.ts'
 import { render } from './middleware/render.tsx'
 import { sessionCookie, sessionStorage } from './middleware/session.ts'
 import { routes } from './routes.ts'
@@ -41,6 +42,7 @@ declare module 'remix/router' {
 export const router = createRouter<AppContext>({
   middleware: [
     staticFiles('./public', { index: false }),
+    inPlace(),
     render(),
     // Default max file size (2 MiB) is too small for some ratings.csv exports.
     formData({ maxFileSize: 25 * 1024 * 1024 }),

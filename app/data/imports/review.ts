@@ -38,10 +38,8 @@ export interface StagedRow {
   yearDelta: number | null
   mediaItemId: number | null
   matchedExternalId: string | null
-  // Same-titled films a no-year row could have meant, matching's own pick
-  // first — see inlineAlternates. Null means choose in the picker.
+  // A no-year row's namesakes (inlineAlternates).
   alternates: CandidateLike[] | null
-  // Which one-tap accept confirmed this row, if one did.
   acceptedBy: BulkKind | null
 }
 
@@ -81,53 +79,31 @@ export interface ReviewModel {
   duplicates: DuplicateEntry[]
   uncertain: ReviewRow[]
   notFound: ReviewRow[]
-  // Matched and not questioned. Rows someone settled by hand are counted apart
-  // (`confirmedCount`), so the saved page doesn't credit the matcher with them.
+  // Matched without help; rows settled by hand are `confirmedCount`.
   confidentCount: number
   confirmedCount: number
-  // Rows whose film is already in the log with exactly these details. Writing
-  // them would change nothing, so they are counted as unchanged, not listed,
-  // and not written — see saveBatch. Only worked out while the batch is still
-  // in review: once saved, the log holds what this batch wrote.
+  // Already logged exactly as the file has them: counted as unchanged, never written.
   alreadyLoggedIds: number[]
-  // Everything that won't reach the log, by row, so the saved page can say
-  // which films rather than only how many.
   leftOutRows: StagedRow[]
   sections: SectionProgress[]
-  // Which rows of `uncertain` each one-tap accept would clear — see bulkKind.
+  // Rows each one-tap accept would clear, and rows each has already taken.
   bulk: Record<BulkKind, number[]>
-  // Which confirmed rows each accept took, so its box stays ticked and
-  // unticking it gives back exactly these.
   accepted: Record<BulkKind, number[]>
-  // Rows of each section already answered — confirmed, repointed or dropped —
-  // so the page can keep them findable and let an answer be changed.
+  // Rows already answered in each section, so an answer can be changed.
   answered: Record<SectionKey, ReviewRow[]>
-  // The footer's arithmetic. `unchanged` is kept conflicts, rows kept by hand,
-  // and rows already logged exactly as the file has them — the last is what
-  // makes a second upload of the same export say "870 already in your log"
-  // rather than offer to save 870 again.
-  //
-  // `save` is how many rows get written, which is still not quite how much the
-  // log grows: two rows can land on one film. So the page says "saved" rather
-  // than "new" or "added".
+  // `save` is rows written, not log growth: two rows can land on one film.
   counts: { total: number; save: number; unchanged: number; leftOut: number }
 }
 
 function verdictOf(row: StagedRow): Verdict {
-  // Settled by a person, so nothing about it is in doubt any more — which is
-  // what puts a hand-picked row first when two rows land on one film. Its
-  // stored reason stays, as the record of which section it was settled in.
+  // Settled by hand, so it ranks first when two rows land on one film.
   if (row.state === 'confirmed') return { state: 'confident', reason: 'exact', yearDelta: 0 }
   const state =
     row.state === 'not_found' ? 'not_found' : row.state === 'confident' ? 'confident' : 'uncertain'
   return { state, reason: row.reason, yearDelta: row.yearDelta }
 }
 
-// The review's sections, for the drawer's checklist: how many rows each one
-// started with and how many are still open, so a finished section reads as
-// done rather than vanishing. A row belongs to the section of the reason it
-// was flagged for; a row with no reason that matching couldn't place belongs
-// to "not found", whether it is still open, was found by hand, or left out.
+// A row's section is its flag reason; unplaced rows are "not found" however settled.
 export type SectionKey = 'title_differs' | 'no_year' | 'year_drift' | 'not_found'
 
 export interface SectionProgress {
@@ -170,8 +146,7 @@ export function buildReview(
   items: Map<number, CatalogEntry>,
   existing: Map<number, ExistingEntry>,
   conflictChoice: ConflictChoice,
-  // Whether this batch has been written. After saving, the log agrees with
-  // every row by construction, so "already logged" would swallow the lot.
+  // Once saved the log matches every row, so nothing reads as already logged.
   { saved = false }: { saved?: boolean } = {},
 ): ReviewModel {
   const duplicates = findDuplicates(rows, items)
@@ -239,8 +214,6 @@ export function buildReview(
   uncertain.sort((a, b) => suspicion(verdictOf(b.row)) - suspicion(verdictOf(a.row)))
 
   const bulk: Record<BulkKind, number[]> = { year: [], subtitle: [], sole: [] }
-  // What each accept already took, so its box can stay ticked and unticking
-  // can give back exactly these.
   const accepted: Record<BulkKind, number[]> = { year: [], subtitle: [], sole: [] }
   for (const row of rows) {
     if (row.state === 'confirmed' && row.acceptedBy) accepted[row.acceptedBy].push(row.id)
@@ -261,8 +234,7 @@ export function buildReview(
   )
   const leftOut = leftOutRows.length
 
-  // Conflicts and held duplicates have their own cards, whatever section their
-  // reason would put them in.
+  // Conflicts and held duplicates have their own cards.
   const elsewhere = new Set([...conflicts.map(({ row }) => row.id), ...held])
   const answered: Record<SectionKey, ReviewRow[]> = {
     title_differs: [],

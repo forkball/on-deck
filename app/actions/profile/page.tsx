@@ -81,7 +81,7 @@ export interface ProfilePageProps {
   // on the landing page rather than something to go looking for.
   lucky: LuckyState
   // Imports still matching or waiting for review, each a way back to it.
-  waitingImports: { href: string; noun: string }[]
+  waitingImports: { href: string; noun: string; matching: boolean }[]
   displayName: string
 }
 
@@ -306,7 +306,15 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                 fontSize: '14px',
               })}
             >
-              Your {waiting.noun} import is waiting for review. <a href={waiting.href}>Continue it</a>
+              {waiting.matching ? (
+                <>
+                  Your {waiting.noun} import is still matching. <a href={waiting.href}>See progress</a>
+                </>
+              ) : (
+                <>
+                  Your {waiting.noun} import is waiting for review. <a href={waiting.href}>Continue it</a>
+                </>
+              )}
             </p>
           ))}
 

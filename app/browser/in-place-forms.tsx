@@ -2,17 +2,9 @@ import { clientEntry, ref } from 'remix/ui'
 
 import { submitInPlace } from './shared/submit-in-place.ts'
 
-// FrameForm for a whole page at once: every <form data-in-place> posts in the
-// background and the page updates where it stands, through one delegated
-// listener rather than a client entry per form. The import review renders a
-// few forms per card and hundreds of cards, and one entry each tripped the
-// runtime's update-loop guard while hydrating.
-//
-// A form inside a `<details data-close-on-submit>` folds it once the answer
-// lands — the import review's answered lines, which open to change an answer
-// and should read as answered again afterwards.
-//
-// With JS off nothing attaches and each form posts natively.
+// Every <form data-in-place> posts in place through one delegated listener (a
+// client entry per form trips the update-loop guard on long pages). A form in a
+// <details data-close-on-submit> folds it afterwards. With JS off, forms post natively.
 export const InPlaceForms = clientEntry(import.meta.url, function InPlaceForms(handle) {
   return () => (
     <span

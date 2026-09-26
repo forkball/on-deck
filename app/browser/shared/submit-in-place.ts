@@ -1,20 +1,18 @@
-// Posts in the background, then lets the caller bring the page up to date —
-// the shared half of FrameForm, InPlaceForms and the import picker.
-//
-// Anything but a clean success becomes a real navigation to wherever the server
-// sent us: a failed request, or a redirect carrying `?error=`, which a frame
-// reload would otherwise throw away along with the message.
+// Posts in the background, then lets the caller update the page. A failed request
+// or a redirect carrying ?error= becomes a real navigation so the message shows.
 export async function postInPlace(
   action: string,
   body: FormData,
   signal: AbortSignal | undefined,
   afterSuccess: () => Promise<void>,
 ): Promise<void> {
-  const response = await fetch(action, { method: 'POST', body, signal })
+  // The server answers a redirect with 204 and its target (middleware/inPlace.ts).
+  const response = await fetch(action, { method: 'POST', body, signal, headers: { 'x-in-place': '1' } })
   if (signal?.aborted) return
 
-  if (!response.ok || new URL(response.url, window.location.href).searchParams.has('error')) {
-    window.location.href = response.url || action
+  const target = response.headers.get('x-location') ?? response.url
+  if (!response.ok || new URL(target || action, window.location.href).searchParams.has('error')) {
+    window.location.href = target || action
     return
   }
 

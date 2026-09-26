@@ -58,8 +58,7 @@ export default createController(routes.profile, {
         getLuckyState(auth.identity),
         listBatches(db, auth.identity.id),
       ])
-      // An import left in review — every answer is kept as it is made — has to be
-      // findable from here, or the only way back is starting another upload.
+      // Unfinished imports, so there's a way back to one.
       const waitingImports = batches
         .filter((batch) => batch.status === 'matching' || batch.status === 'review')
         .map((batch) => ({
@@ -68,6 +67,7 @@ export default createController(routes.profile, {
               ? routes.profile.imports.review.href({ batchId: batch.id })
               : routes.profile.imports.show.href({ batchId: batch.id }),
           noun: mediaTypeUiFor(batch.media_type).attributive,
+          matching: batch.status === 'matching',
         }))
 
       // Kicked off beside the render, never awaited into it: reading the feed

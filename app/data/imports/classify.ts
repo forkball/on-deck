@@ -94,9 +94,7 @@ export function suspicion(verdict: Verdict): number {
   }
 }
 
-// Fits after the row, as a chip — only where it says more than the group
-// heading the row sits under (reasonGroup). How far out a year is varies by
-// row; "title differs" and "no year" don't.
+// A chip after the row, only where it says more than the group heading.
 export function describeReason(verdict: Verdict): string | null {
   const magnitude = Math.abs(verdict.yearDelta ?? 0)
   return verdict.reason === 'year_drift'
@@ -106,9 +104,7 @@ export function describeReason(verdict: Verdict): string | null {
     : null
 }
 
-// The heading and one-line explanation for the review's group of rows flagged
-// for `reason`. Beside describeReason so the wording for a reason lives in one
-// place.
+// Heading and blurb for a review group.
 export function reasonGroup(
   reason: MatchReason | null,
   singular: string,
@@ -144,12 +140,7 @@ export function isBulkAcceptable(verdict: Verdict): boolean {
   return verdict.reason === 'year_drift' && Math.abs(verdict.yearDelta ?? 0) <= BULK_ACCEPT_MAX_DRIFT
 }
 
-// Whether the catalog's title is the row's title with a subtitle added —
-// "Mission: Impossible" matched to "Mission: Impossible – Fallout", or a
-// Letterboxd "Birdman" matched to "Birdman: A Love Story". The subtitle has to
-// follow a real separator (a colon or a spaced dash), so "Birdman or (The
-// Unexpected Virtue of Ignorance)" doesn't count: that could as easily be a
-// different film that happens to start the same way.
+// The catalog title is the row's title plus a subtitle after a colon or spaced dash.
 export function isSubtitleOnly(rowTitle: string, matchTitle: string): boolean {
   const wanted = normalizeTitle(rowTitle)
   if (!wanted) return false
@@ -162,15 +153,13 @@ export function isSubtitleOnly(rowTitle: string, matchTitle: string): boolean {
   return false
 }
 
-// The review's two one-tap accepts, and which one (if either) covers a row.
-// Year drift within a year is the festival/re-release tail; a subtitle added
-// in the same year is the other long tail of a real export. Both leave anything
-// that could plausibly be a different film to be looked at one by one.
-//
-// The third is a no-year row whose title the catalog has only one film for:
-// nothing to tell apart, so nothing to ask. `namesakes` is how many same-titled
-// films matching kept for the row (inlineAlternates), null when it kept none.
+// Which one-tap accept, if any, covers a row: year off by at most one, a subtitle
+// added in the same year, or a no-year title the catalog has only one film for.
 export type BulkKind = 'year' | 'subtitle' | 'sole'
+
+export function parseBulkKind(value: unknown): BulkKind | null {
+  return value === 'year' || value === 'subtitle' || value === 'sole' ? value : null
+}
 
 export function bulkKind(
   verdict: Verdict,
@@ -273,14 +262,8 @@ function normalizeNote(note: string | null): string {
 // the default because it is the only direction that destroys nothing.
 export type ConflictChoice = 'keep' | 'take'
 
-// The same-titled films a no-year row could have meant, as the year buttons its
-// card offers. Every no-year card asks "which one?" the same way, so this is
-// never "no choices": one namesake is one button, and past three it is the
-// three matching ranked first, with the picker behind "Something else…" for the
-// rest. Matching's own pick leads, so the card reads "ours, or one of these".
-//
-// A single entry therefore means the catalog has exactly one film by that
-// name — which is what the "only film by that name" bulk accept relies on.
+// A no-year row's namesakes, matching's pick first, capped at three. One entry
+// means the catalog has only that film.
 export const MAX_INLINE_ALTERNATES = 3
 
 export function inlineAlternates(

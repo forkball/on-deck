@@ -195,67 +195,52 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
    dropped without a word — which is why this lives here, like the modal trigger
    and rating chip above. */
 .doodle button.linkish {
-  border: 0;
-  border-image: none;
-  background: none;
   padding: 0;
   font-size: 13px;
   color: #6b6459;
   text-decoration: underline;
-  cursor: pointer;
 }
 
 .doodle button.linkish:hover {
   color: #3c3c3c;
 }
 
-/* An icon-only control that sits inside something else — the ✕ that clears a
-   picked file, or closes the import picker. Same reason as .linkish: the
-   doodle border comes from an unlayered `.doodle button` rule, so css() can't
-   take it off. */
-.doodle button.bare {
+/* Buttons that read as text or an icon rather than a control. Unlayered, like
+   the rules above, so css() can't do this. */
+.doodle button.linkish,
+.doodle button.bare,
+.doodle button.checkline {
   border: 0;
   border-image: none;
   background: none;
-  padding: 4px 8px;
-  color: #888;
   cursor: pointer;
 }
 
-.doodle button.bare:hover:not(:disabled) {
+.doodle button.bare {
+  padding: 4px 8px;
+  color: #888;
+}
+
+.doodle button.bare:hover:not(:disabled),
+.doodle button.checkline:hover:not(:disabled) {
   color: #3c3c3c;
 }
 
-/* A button in a row of short alternatives — the year choices on an import
-   review card. Three of them at the standard padding ran 12px wider than a
-   card on a 320px phone and split across lines. */
+/* Narrower, for a row of short alternatives (the year choices on a 320px phone). */
 .doodle button.compact {
   padding: 4px 10px;
 }
 
-/* A submit drawn as a checkbox — the bulk accepts on the import review's
-   checklist. Ticking is the whole action, so it posts like any button (and
-   with JS off); the box borrows DoodleCSS's own checkbox stroke so it reads as
-   one. Unlayered for the usual reason: `.doodle button` sets the border and
-   padding from here. `.ticked` shows Doodle's checked mark; while it posts it
-   is disabled and shows the state it is heading to, so a tap flips the box at
-   once rather than after the round trip. */
+/* A submit drawn as Doodle's checkbox. While posting it shows the state it is
+   heading to. */
 .doodle button.checkline {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 0;
-  border-image: none;
-  background: none;
   padding: 2px 0;
   font-size: 13px;
   color: #6b6459;
   text-align: left;
-  cursor: pointer;
-}
-
-.doodle button.checkline:hover:not(:disabled) {
-  color: #3c3c3c;
 }
 
 .doodle .checkline-box {

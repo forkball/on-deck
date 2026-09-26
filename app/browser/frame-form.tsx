@@ -6,9 +6,7 @@ import { submitInPlace } from './shared/submit-in-place.ts'
 // the form's fields are server UI a client bundle can't import. With JS off
 // nothing attaches and the form posts natively.
 //
-// One per form, so it suits a handful of forms. A page with hundreds (the
-// import review) uses InPlaceForms instead: that many client entries hydrating
-// at once trips the runtime's update-loop guard and the page never settles.
+// One client entry per form; pages with many use InPlaceForms.
 export const FrameForm = clientEntry(import.meta.url, function FrameForm(handle) {
   return () => (
     <span

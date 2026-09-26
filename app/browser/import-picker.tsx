@@ -109,11 +109,7 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
     debounce = setTimeout(() => void load(rowId, trimmed), DEBOUNCE_MS)
   }
 
-  // Picking is the answer: it submits straight away rather than asking for a
-  // second confirmation, which is what made the first draft of this feel like
-  // two steps for one decision. It posts in the background and the page
-  // updates in place, so a long review keeps its scroll position; an error the
-  // server sends back (?error=) is a real navigation, so it gets shown.
+  // Picking answers straight away, in place.
   async function choose(candidate: Candidate) {
     if (openRowId == null || choosing) return
     choosing = true
@@ -258,9 +254,6 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
               <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 14px' })}>
                 {loading ? 'Searching…' : data ? resultsLine(data, typed) : 'No results'}
               </p>
-
-              {/* As many columns as fit: four in the desktop dialog, three
-                  on a phone, where four left each title about 65px wide. */}
               <div
                 mix={css({
                   display: 'grid',
@@ -349,8 +342,6 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                     <span mix={css({ fontSize: '13.5px', lineHeight: 1.25 })}>
                       {candidate.title} <span mix={css({ color: '#888' })}>{candidate.year ?? ''}</span>
                     </span>
-                    {/* Under the title rather than across the poster, where
-                        it didn't fit once the columns got narrow. */}
                     {candidate.externalId === data?.suggestedExternalId && (
                       <span mix={css({ fontSize: '12px', color: '#3E5C76', lineHeight: 1.25 })}>
                         Our match
@@ -364,9 +355,6 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                   </button>
                 ))}
               </div>
-
-              {/* Keys only mean something with a keyboard; on a touch screen
-                  this was a line of instructions for nothing. */}
               <p
                 mix={css({
                   fontSize: '12px',
