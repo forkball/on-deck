@@ -1,3 +1,8 @@
+export interface CastMember {
+  name: string
+  character: string | null
+}
+
 // The blob stored on media_items.metadata. Every field parses back as null when
 // absent, so widening it never needs a migration.
 export interface MediaMetadata {
@@ -8,7 +13,19 @@ export interface MediaMetadata {
   pageCount: number | null
   playtimeHours: number | null
   seasonCount: number | null
+  // TV only, from a detail lookup. showStatus is TMDB's own wording ("Returning
+  // Series", "Ended"…); the page decides how to say it.
+  episodeCount: number | null
+  lastAirYear: number | null
+  showStatus: string | null
+  networks: string[]
   creator: string | null
+  // The names `creator` joins, when a provider gives more than one. Empty
+  // otherwise, in which case `creator` is the whole answer.
+  creators: string[]
+  // Top-billed first. Movies and TV, and only once a detail lookup has landed.
+  cast: CastMember[]
+  tagline: string | null
   // The catalog page, when it can't be built from external_id — see
   // catalogPageFor, which is what reads it.
   sourceUrl: string | null
@@ -37,6 +54,15 @@ function stringArray(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === 'string')
 }
 
+function castList(value: unknown): CastMember[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return []
+    const { name, character } = entry as { name?: unknown; character?: unknown }
+    return typeof name === 'string' ? [{ name, character: stringOrNull(character) }] : []
+  })
+}
+
 function numberOrNull(value: unknown): number | null {
   return typeof value === 'number' ? value : null
 }
@@ -55,7 +81,14 @@ function emptyMetadata(): MediaMetadata {
     pageCount: null,
     playtimeHours: null,
     seasonCount: null,
+    episodeCount: null,
+    lastAirYear: null,
+    showStatus: null,
+    networks: [],
     creator: null,
+    creators: [],
+    cast: [],
+    tagline: null,
     sourceUrl: null,
     images: [],
     platforms: [],
@@ -83,7 +116,14 @@ export function parseMediaMetadata(metadata: unknown): MediaMetadata {
       pageCount: numberOrNull(parsed.pageCount),
       playtimeHours: numberOrNull(parsed.playtimeHours),
       seasonCount: numberOrNull(parsed.seasonCount),
+      episodeCount: numberOrNull(parsed.episodeCount),
+      lastAirYear: numberOrNull(parsed.lastAirYear),
+      showStatus: stringOrNull(parsed.showStatus),
+      networks: stringArray(parsed.networks),
       creator: stringOrNull(parsed.creator),
+      creators: stringArray(parsed.creators),
+      cast: castList(parsed.cast),
+      tagline: stringOrNull(parsed.tagline),
       sourceUrl: stringOrNull(parsed.sourceUrl),
       images: stringArray(parsed.images),
       platforms: stringArray(parsed.platforms),
