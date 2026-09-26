@@ -8,6 +8,7 @@ import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
 import { NotesField } from '../../ui/components/notes-field.tsx'
 import { Field } from '../../ui/shared/field.tsx'
+import { seenByLabel } from '../../ui/shared/seen-by.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
 import { StarRatingInput } from '../../ui/components/star-rating.tsx'
@@ -101,6 +102,8 @@ export function describeParams(params: GenerationParams, mediaType: MediaType): 
       modelNote: SERIES_NOTE,
     })
   }
+  // Only ever 'no_one' or 'any' — see ui/shared/seen-by.ts.
+  if (params.seenBy) lines.push({ text: `Group history: ${seenByLabel(params.seenBy)}` })
   return lines
 }
 

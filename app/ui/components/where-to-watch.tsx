@@ -39,7 +39,15 @@ export function WhereToWatch(handle: Handle<WhereToWatchProps>) {
     )
 
     return (
-      <section mix={css({ marginTop: '24px' })}>
+      // Boxed like the log box on the same page: a panel of its own, since it is
+      // about where to get the title rather than about the title.
+      <section
+        mix={css({
+          border: '1px solid #ddd',
+          borderRadius: '8px',
+          padding: '12px 16px 16px',
+        })}
+      >
         {/* The country sits with the heading it qualifies, and is changed
             from there — rather than as a line of its own between the logos
             and the link, where it read as a third thing to click. */}
