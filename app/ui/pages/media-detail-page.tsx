@@ -40,6 +40,9 @@ export interface MediaDetailPageProps {
   watch?: Omit<WhereToWatchProps, 'title' | 'returnTo'> | null
 }
 
+// Where the page drops to one column. Matches the activity feed's.
+const PHONE = '@media (max-width: 600px)'
+
 // Shared by every media type's detail route. Everything type-specific comes
 // from MEDIA_TYPE_UI.
 export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
@@ -112,146 +115,67 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 : `Updated to match the correct ${ui.itemNoun} on ${ui.catalogName}.`}
             </p>
           )}
-          <div mix={css({ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' })}>
-            {posterUrl ? (
-              <img
-                src={posterUrl}
-                alt={`${item.title} poster`}
-                mix={css({ width: '220px', borderRadius: '8px', flex: '0 0 auto' })}
-              />
-            ) : (
-              <div
-                mix={css({
-                  width: '220px',
-                  height: '330px',
-                  flex: '0 0 auto',
-                  borderRadius: '8px',
-                  border: '1px solid #ddd',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#888',
-                  textAlign: 'center',
-                  padding: '16px',
-                })}
-              >
-                No poster available
-              </div>
-            )}
-            <div mix={css({ flex: '1 1 320px' })}>
-              <h1 mix={css({ marginTop: 0 })}>
-                {item.title}
-                {years ? ` (${years})` : ''}
-              </h1>
-              {tagline && (
-                <p mix={css({ margin: '-8px 0 12px', color: '#555', fontStyle: 'italic' })}>{tagline}</p>
-              )}
-              {creator && (
-                <p mix={css({ margin: '0 0 8px', color: '#555' })}>
-                  {creators.length > 1 ? ui.creditLabelPlural : ui.creditLabel}: <strong>{creator}</strong>
-                </p>
-              )}
-              {(genres || runtime) && (
-                <p mix={css({ color: '#555', marginBottom: showFacts.length > 0 ? '4px' : undefined })}>
-                  {[genres, runtime].filter(Boolean).join(' · ')}
-                </p>
-              )}
-              {showFacts.length > 0 && (
-                <p mix={css({ color: '#555', marginTop: 0 })}>{showFacts.join(' · ')}</p>
-              )}
-              <PlatformList platforms={platforms} />
-              {overview ? (
-                <ExpandableText
-                  // Rows stored before the providers stripped jacket copy still
-                  // carry it; stripping is idempotent, so doing it again on
-                  // cleaned text changes nothing.
-                  text={mediaType === 'book' ? stripPublisherPromo(overview) : overview}
-                  id={`overview-${item.id}`}
+          {/* Two columns on a wide screen: the poster with your log under it, and
+              everything about the title beside them — so the log sits where you
+              land, not below the cast and the streaming list. A phone has one
+              column, and both wrappers step aside (display: contents) so their
+              pieces can be reordered: poster, title and credits, the synopsis,
+              your log, then the rest. One copy of each piece, in one DOM order,
+              either way. */}
+          <div
+            mix={css({
+              display: 'flex',
+              gap: '24px',
+              alignItems: 'flex-start',
+              [PHONE]: { flexDirection: 'column', alignItems: 'stretch', gap: '16px' },
+            })}
+          >
+            <div
+              mix={css({
+                flex: '0 0 220px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                [PHONE]: { display: 'contents' },
+              })}
+            >
+              {posterUrl ? (
+                <img
+                  src={posterUrl}
+                  alt={`${item.title} poster`}
+                  mix={css({ width: '220px', borderRadius: '8px', flex: '0 0 auto', [PHONE]: { order: 1 } })}
                 />
               ) : (
-                <p>No description available.</p>
-              )}
-              {cast.length > 0 && (
-                <section mix={css({ marginTop: '16px' })}>
-                  <h2 mix={css({ fontSize: '16px', margin: '0 0 6px' })}>Cast</h2>
-                  <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, color: '#555' })}>
-                    {cast.map((member) => (
-                      // Block, so DoodleCSS's "* " marker has nowhere to go —
-                      // see run-list.tsx.
-                      <li mix={css({ display: 'block', margin: '0 0 2px' })}>
-                        <strong mix={css({ color: '#333' })}>{member.name}</strong>
-                        {member.character ? ` as ${member.character}` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-              {catalogPage && (
-                <p mix={css({ margin: '12px 0 0', fontSize: '14px' })}>
-                  <a href={catalogPage.url} target="_blank" rel="noopener noreferrer">
-                    View on {catalogPage.name}
-                  </a>
-                </p>
-              )}
-              {watch && <WhereToWatch {...watch} title={item.title} returnTo={returnTo} />}
-
-              {/* Top margin matters now that the description above may end
-                  in a Read more toggle, which carries no bottom margin of
-                  its own — without this the two sit flush together. */}
-              {canRematch && (
-                <div mix={css({ marginTop: '20px', marginBottom: '16px', color: '#555' })}>
-                  {/* Held open when the last attempt failed: collapsing would hide
-                      both the error and the field it refers to, leaving the page
-                      looking like nothing happened. */}
-                  <Collapsible summary={`Wrong ${ui.itemNoun}?`} open={Boolean(rematchError)}>
-                    <form
-                      method="post"
-                      action={ui.hrefs.rematch(item.id)}
-                      mix={css({
-                        display: 'flex',
-                        gap: '8px',
-                        marginTop: '8px',
-                        flexWrap: 'wrap',
-                        alignItems: 'center',
-                      })}
-                    >
-                      <input type="hidden" name="return_to" value={returnTo} />
-                      <input
-                        type="text"
-                        name="catalog_link"
-                        placeholder={ui.rematchPlaceholder}
-                        mix={css({ flex: '1 1 240px' })}
-                      />
-                      <button type="submit">Fix match</button>
-                    </form>
-                    <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
-                      <a
-                        href={ui.catalogSearchUrl(item.title, releaseYear)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Look up "{item.title}" on {ui.catalogName}
-                      </a>
-                    </p>
-                    <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
-                      This entry is shared: fixing the match repoints it for everyone who logged this{' '}
-                      {ui.itemNoun}.
-                    </p>
-                    {rematchError && <p mix={css({ color: '#c33', margin: '8px 0 0' })}>{rematchError}</p>}
-                  </Collapsible>
+                <div
+                  mix={css({
+                    width: '220px',
+                    height: '330px',
+                    flex: '0 0 auto',
+                    borderRadius: '8px',
+                    border: '1px solid #ddd',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#888',
+                    textAlign: 'center',
+                    padding: '16px',
+                    [PHONE]: { order: 1 },
+                  })}
+                >
+                  No poster available
                 </div>
               )}
-
               <div
                 mix={css({
                   border: '1px solid #ddd',
                   borderRadius: '8px',
                   padding: '16px',
-                  marginTop: '24px',
                   display: 'flex',
+                  flexWrap: 'wrap',
                   justifyContent: 'space-between',
                   alignItems: 'flex-start',
-                  gap: '16px',
+                  gap: '12px 16px',
+                  [PHONE]: { order: 4 },
                 })}
               >
                 <div>
@@ -284,9 +208,9 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 </div>
 
                 {/* Deliberately not `fab`: the trigger belongs with the log
-                    it acts on, rather than floating over unrelated content in
-                    the viewport corner. The surrounding box is already
-                    space-between for exactly this. */}
+                      it acts on, rather than floating over unrelated content in
+                      the viewport corner. The surrounding box is already
+                      space-between for exactly this. */}
                 <Modal
                   id={`edit-${mediaType}-${item.id}`}
                   triggerLabel={interaction ? 'Edit' : 'Log'}
@@ -326,10 +250,10 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                     <FrameForm />
                   </form>
                   {/* Delete left, save right — see media-log-edit-modal.tsx.
-                      Delete only exists once something is logged, which is why
-                      Save is pushed right with a margin rather than by
-                      space-between: with nothing to delete it would otherwise
-                      slide back to the left edge. */}
+                        Delete only exists once something is logged, which is why
+                        Save is pushed right with a margin rather than by
+                        space-between: with nothing to delete it would otherwise
+                        slide back to the left edge. */}
                   <div
                     mix={css({
                       display: 'flex',
@@ -360,6 +284,147 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                     </button>
                   </div>
                 </Modal>
+              </div>
+            </div>
+            <div
+              mix={css({
+                flex: '1 1 auto',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                [PHONE]: { display: 'contents' },
+              })}
+            >
+              <div mix={css({ display: 'flex', flexDirection: 'column', gap: '8px', [PHONE]: { order: 2 } })}>
+                <h1 mix={css({ margin: '0 0 4px' })}>{item.title}</h1>
+                {tagline && <p mix={css({ margin: 0, color: '#555', fontStyle: 'italic' })}>{tagline}</p>}
+                {creator && (
+                  <p mix={css({ margin: 0, color: '#555' })}>
+                    {creators.length > 1 ? ui.creditLabelPlural : ui.creditLabel}: <strong>{creator}</strong>
+                  </p>
+                )}
+                {/* The year leads the details rather than riding in the title,
+                    where a show's "(2008–2013)" wrapped the heading. */}
+                {(years || genres || runtime) && (
+                  <p mix={css({ margin: 0, color: '#555' })}>
+                    {[years, genres, runtime].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+                {showFacts.length > 0 && (
+                  <p mix={css({ margin: 0, color: '#555' })}>{showFacts.join(' · ')}</p>
+                )}
+                <PlatformList platforms={platforms} />
+              </div>
+              <div mix={css({ '& > p': { margin: 0 }, [PHONE]: { order: 3 } })}>
+                {overview ? (
+                  <ExpandableText
+                    // Rows stored before the providers stripped jacket copy still
+                    // carry it; stripping is idempotent, so doing it again on
+                    // cleaned text changes nothing.
+                    text={mediaType === 'book' ? stripPublisherPromo(overview) : overview}
+                    id={`overview-${item.id}`}
+                  />
+                ) : (
+                  <p>No description available.</p>
+                )}
+              </div>
+              {/* Everything after the synopsis — on a phone, after your log.
+                  Spaced by its own gap, so none of the panels in it carry an
+                  outer margin: whichever comes first sits flush, in either
+                  layout. */}
+              <div
+                mix={css({ display: 'flex', flexDirection: 'column', gap: '16px', [PHONE]: { order: 5 } })}
+              >
+                {cast.length > 0 && (
+                  // Boxed like the log box and Where to watch, so the page reads
+                  // as the title's details and then a few distinct panels.
+                  <section
+                    mix={css({
+                      border: '1px solid #ddd',
+                      borderRadius: '8px',
+                      padding: '12px 16px 16px',
+                    })}
+                  >
+                    <h2 mix={css({ fontSize: '16px', margin: '0 0 8px' })}>Cast</h2>
+                    {/* Two aligned columns rather than "Name as Character" run
+                      together: in Short Stack, a bold name and its part at the
+                      same size read as one long line. The part is the lesser
+                      half, so it is smaller and lighter. */}
+                    <dl
+                      mix={css({
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(0, max-content) 1fr',
+                        gap: '4px 16px',
+                        alignItems: 'baseline',
+                        margin: 0,
+                      })}
+                    >
+                      {cast.map((member) => (
+                        <>
+                          <dt mix={css({ margin: 0, color: '#333' })}>{member.name}</dt>
+                          <dd mix={css({ margin: 0, color: '#777', fontSize: '14px' })}>
+                            {member.character ?? ''}
+                          </dd>
+                        </>
+                      ))}
+                    </dl>
+                  </section>
+                )}
+                {watch && <WhereToWatch {...watch} title={item.title} returnTo={returnTo} />}
+
+                {canRematch && (
+                  <div mix={css({ color: '#555' })}>
+                    {/* Held open when the last attempt failed: collapsing would hide
+                      both the error and the field it refers to, leaving the page
+                      looking like nothing happened. */}
+                    <Collapsible summary={`Wrong ${ui.itemNoun}?`} open={Boolean(rematchError)}>
+                      <form
+                        method="post"
+                        action={ui.hrefs.rematch(item.id)}
+                        mix={css({
+                          display: 'flex',
+                          gap: '8px',
+                          marginTop: '8px',
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                        })}
+                      >
+                        <input type="hidden" name="return_to" value={returnTo} />
+                        <input
+                          type="text"
+                          name="catalog_link"
+                          placeholder={ui.rematchPlaceholder}
+                          mix={css({ flex: '1 1 240px' })}
+                        />
+                        <button type="submit">Fix match</button>
+                      </form>
+                      <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
+                        <a
+                          href={ui.catalogSearchUrl(item.title, releaseYear)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Look up "{item.title}" on {ui.catalogName}
+                        </a>
+                      </p>
+                      <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
+                        This entry is shared: fixing the match repoints it for everyone who logged this{' '}
+                        {ui.itemNoun}.
+                      </p>
+                      {rematchError && <p mix={css({ color: '#c33', margin: '8px 0 0' })}>{rematchError}</p>}
+                    </Collapsible>
+                  </div>
+                )}
+                {/* Last: it leaves the page, so it closes it rather than
+                    sitting between the panels. */}
+                {catalogPage && (
+                  <p mix={css({ margin: 0, fontSize: '14px' })}>
+                    <a href={catalogPage.url} target="_blank" rel="noopener noreferrer">
+                      View on {catalogPage.name}
+                    </a>
+                  </p>
+                )}
               </div>
             </div>
           </div>
