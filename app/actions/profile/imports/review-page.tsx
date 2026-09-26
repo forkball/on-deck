@@ -785,9 +785,9 @@ function ReviewDrawer(
     const progress =
       sections.length === 0 ? 'Nothing to review' : unchecked > 0 ? `${unchecked} unchecked` : 'All checked'
 
-    const saveForm = (label: string) => (
+    const saveForm = (label: string, tall = false) => (
       <form method="post" action={routes.profile.imports.save.href({ batchId })}>
-        <button type="submit" class="primary">
+        <button type="submit" class={tall ? 'primary tall' : 'primary'}>
           {label}
         </button>
       </form>
@@ -876,10 +876,10 @@ function ReviewDrawer(
             // rather than submitting. The look sits on the inner span, as in
             // Modal — DoodleCSS pads <label> from an unlayered rule.
             <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
-              <span class="doodle-border primary">{saveLabel}</span>
+              <span class="doodle-border primary tall">{saveLabel}</span>
             </label>
           ) : (
-            saveForm(saveLabel)
+            saveForm(saveLabel, true)
           )}
         </div>
 
