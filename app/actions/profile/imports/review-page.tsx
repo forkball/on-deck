@@ -532,7 +532,7 @@ function AnsweredList(
           )}
           <ul mix={css({ listStyle: 'none', margin: '6px 0 0', padding: 0 })}>
             {entries.map((entry) => {
-              const { row, item } = entry
+              const { row } = entry
               const dropped = row.state === 'skipped'
               return (
                 // A block, so DoodleCSS's "* " list marker doesn't show.
@@ -556,10 +556,7 @@ function AnsweredList(
                         {dropped ? '✕' : '✓'}
                       </span>
                       <span mix={css({ flex: '1 1 auto', minWidth: 0 })}>
-                        {row.title}
-                        <span mix={css({ color: '#888' })}>
-                          {dropped ? ' · not saving' : item ? ` → ${answeredMatch(row.title, item)}` : ''}
-                        </span>
+                        <Answer entry={entry} />
                       </span>
                       <span mix={css({ color: '#6b6459', fontSize: '13px', textDecoration: 'underline' })}>
                         Change
@@ -577,6 +574,21 @@ function AnsweredList(
           </ul>
         </Collapsible>
       </div>
+    )
+  }
+}
+
+// "Title → 1994" or "Title · not saving".
+function Answer(handle: Handle<{ entry: ReviewRow }>) {
+  return () => {
+    const { row, item } = handle.props.entry
+    return (
+      <>
+        {row.title}
+        <span mix={css({ color: '#888' })}>
+          {row.state === 'skipped' ? ' · not saving' : item ? ` → ${answeredMatch(row.title, item)}` : ''}
+        </span>
+      </>
     )
   }
 }
@@ -687,16 +699,15 @@ interface DrawerSection {
 }
 
 // The drawer's one-line record of the latest answer, with its way back.
-function LastLine(handle: Handle<{ batchId: string; last: LastAction; what: string }>) {
+function LastLine(handle: Handle<{ batchId: string; last: LastAction }>) {
   return () => {
-    const { batchId, last, what } = handle.props
+    const { batchId, last } = handle.props
     const muted = css({ color: '#888' })
-    const undo = (action: string, fields: Record<string, string>, anchor?: string) => (
+    const undo = (action: string, fields: Record<string, string>) => (
       <form method="post" action={action} data-in-place>
         {Object.entries(fields).map(([name, value]) => (
           <input key={name} type="hidden" name={name} value={value} />
         ))}
-        {anchor && <input type="hidden" name="anchor" value={anchor} />}
         <button type="submit" class="linkish">
           Undo
         </button>
@@ -705,28 +716,19 @@ function LastLine(handle: Handle<{ batchId: string; last: LastAction; what: stri
 
     let mark: string, text: RemixNode, end: RemixNode
     if (last.kind === 'answered') {
-      const { row, item } = last.entry
-      const dropped = row.state === 'skipped'
-      mark = dropped ? '✕' : '✓'
-      text = (
-        <>
-          {row.title}
-          <span mix={muted}>
-            {dropped ? ' · not saving' : item ? ` → ${answeredMatch(row.title, item)}` : ' · looks right'}
-          </span>
-        </>
-      )
-      end = undo(
-        routes.profile.imports.resolve.href({ batchId, rowId: String(row.id) }),
-        { action: 'reopen' },
-        rowAnchor(row.id),
-      )
+      const { row } = last.entry
+      mark = row.state === 'skipped' ? '✕' : '✓'
+      text = <Answer entry={last.entry} />
+      end = undo(routes.profile.imports.resolve.href({ batchId, rowId: String(row.id) }), {
+        action: 'reopen',
+        anchor: rowAnchor(row.id),
+      })
     } else if (last.kind === 'accepted') {
       mark = '✓'
       text = (
         <>
           Accepted {last.count}
-          <span mix={muted}> · {what}</span>
+          <span mix={muted}> · {BULK_WHAT[last.bulk]}</span>
         </>
       )
       end = undo(routes.profile.imports.bulk.href({ batchId }), { kind: last.bulk, undo: '1' })
@@ -793,10 +795,6 @@ function ReviewDrawer(
 ) {
   return () => {
     const { batchId, last, sections, unchecked, leftOut, save, singular, plural } = handle.props
-    const lastWhat =
-      last?.kind === 'accepted'
-        ? (Object.values(SECTION_BULK).find((b) => b.kind === last.bulk)?.what ?? '')
-        : ''
     const needsConfirm = unchecked > 0 || leftOut > 0
     const saveLabel = save > 0 ? 'Save' : 'Finish'
     const confirmLabel = save > 0 ? `Yes, save ${count(save, singular, plural)}` : 'Yes, finish'
@@ -821,7 +819,7 @@ function ReviewDrawer(
           aria-label="Show the review checklist"
         />
         {/* Always present, so the drawer's children keep their positions across reloads. */}
-        <div>{last && <LastLine batchId={batchId} last={last} what={lastWhat} />}</div>
+        <div>{last && <LastLine batchId={batchId} last={last} />}</div>
 
         <div class="drawer-panel">
           <ul mix={css({ listStyle: 'none', margin: 0, padding: 0 })}>
@@ -937,16 +935,27 @@ function ReviewDrawer(
 }
 
 // Each section's one-tap accept; which rows it covers is bulkKind's call.
-const SECTION_BULK: Partial<Record<SectionKey, { kind: BulkKind; what: string }>> = {
-  title_differs: { kind: 'subtitle', what: 'your title plus a subtitle' },
-  no_year: { kind: 'sole', what: 'the only film by that name' },
-  year_drift: { kind: 'year', what: 'within a year of your file' },
+const SECTION_BULK: Partial<Record<SectionKey, BulkKind>> = {
+  title_differs: 'subtitle',
+  no_year: 'sole',
+  year_drift: 'year',
+}
+
+const BULK_WHAT: Record<BulkKind, string> = {
+  subtitle: 'your title plus a subtitle',
+  sole: 'the only film by that name',
+  year: 'within a year of your file',
 }
 
 function bulkFor(key: SectionKey, model: ReviewModel): DrawerSection['bulk'] {
-  const offer = SECTION_BULK[key]
-  if (!offer) return null
-  return { ...offer, count: model.bulk[offer.kind].length, accepted: model.accepted[offer.kind].length }
+  const kind = SECTION_BULK[key]
+  if (!kind) return null
+  return {
+    kind,
+    what: BULK_WHAT[kind],
+    count: model.bulk[kind].length,
+    accepted: model.accepted[kind].length,
+  }
 }
 
 function acceptedBy(key: SectionKey, model: ReviewModel): DrawerSection['bulk'] {
