@@ -406,27 +406,6 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                     </select>
                   </Field>
                 )}
-                {/* Hidden rather than unmounted, like the friend list, so a
-                    choice survives a trip to "Just me" and back. The server
-                    ignores it on a run with nobody else in it. */}
-                <div mix={css({ display: mode === 'group' ? 'block' : 'none' })}>
-                  <Field label="Group history">
-                    <select
-                      name="seen_by"
-                      defaultValue="no_one"
-                      mix={on('change', (event) => {
-                        seenBy = (event.target as HTMLSelectElement).value as SeenBy
-                        handle.update()
-                      })}
-                    >
-                      {SEEN_BY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                </div>
                 {seriesTypes.length > 0 && (
                   <Field label="Series">
                     <select name="series" defaultValue="">
@@ -439,6 +418,35 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                     </select>
                   </Field>
                 )}
+              </div>
+              {/* Hidden rather than unmounted, like the friend list, so a
+                  choice survives a trip to "Just me" and back. The server
+                  ignores it on a run with nobody else in it. */}
+              <div
+                mix={css({
+                  display: mode === 'group' ? 'block' : 'none',
+                  // Its own row, so it sits last whichever filters the medium
+                  // has, but no wider than a filter in the grid above.
+                  maxWidth: '320px',
+                  marginTop: '12px',
+                })}
+              >
+                <Field label="Group history">
+                  <select
+                    name="seen_by"
+                    defaultValue="no_one"
+                    mix={on('change', (event) => {
+                      seenBy = (event.target as HTMLSelectElement).value as SeenBy
+                      handle.update()
+                    })}
+                  >
+                    {SEEN_BY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
               </div>
             </details>
           </div>
