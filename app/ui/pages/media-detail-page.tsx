@@ -18,6 +18,7 @@ import { Collapsible } from '../shared/collapsible.tsx'
 import { Field } from '../shared/field.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { stripPublisherPromo } from '../../data/catalog/blurb.ts'
+import { catalogPageFor } from '../../data/catalog/links.ts'
 import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { backLinkFrom, withReturnTo } from '../backLink.ts'
 
@@ -50,6 +51,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
     // 16:9 key art in a 220px portrait slot renders as a letterbox, and the
     // first still is that same art, so nothing is lost by dropping the slot.
     const showStills = images.length > 0
+    const catalogPage = catalogPageFor(item)
     const showHref = ui.hrefs.show(item.id)
     const returnTo = from ? withReturnTo(showHref, from) : showHref
     const backLink = backLinkFrom(from)
@@ -122,6 +124,13 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 />
               ) : (
                 <p>No description available.</p>
+              )}
+              {catalogPage && (
+                <p mix={css({ margin: '12px 0 0', fontSize: '14px' })}>
+                  <a href={catalogPage.url} target="_blank" rel="noopener noreferrer">
+                    View on {catalogPage.name}
+                  </a>
+                </p>
               )}
 
               {/* Top margin matters now that the description above may end
