@@ -226,17 +226,6 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   color: #3c3c3c;
 }
 
-/* The import review's Save, pinned at the bottom of the screen: the one
-   control the whole page leads to, and at the standard 4px it was a thin
-   target beside a thumb. Inline-block because that Save is usually a <span>
-   in a <label> (it opens a confirmation), and an inline box's vertical
-   padding spills over its line instead of making it taller. */
-.doodle button.tall,
-.doodle .doodle-border.tall {
-  display: inline-block;
-  padding-block: 10px;
-}
-
 /* A button in a row of short alternatives — the year choices on an import
    review card. Three of them at the standard padding ran 12px wider than a
    card on a 320px phone and split across lines. */
