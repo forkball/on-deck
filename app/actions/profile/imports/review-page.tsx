@@ -12,7 +12,13 @@ import type {
   ReviewRow,
   SectionKey,
 } from '../../../data/imports/review.ts'
-import { normalizeTitle, reasonGroup, type BulkKind, type LogValues } from '../../../data/imports/classify.ts'
+import {
+  normalizeTitle,
+  reasonGroup,
+  type BulkKind,
+  type CandidateLike,
+  type LogValues,
+} from '../../../data/imports/classify.ts'
 import type { ImportBatch } from '../../../data/schema.ts'
 import { mediaTypeUiFor } from '../../../mediaTypes.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
@@ -142,7 +148,7 @@ function ResolveForm(
     batchId: string
     rowId: number
     action: string
-    label: string
+    label: RemixNode
     variant?: ButtonVariant
     anchor?: string
     // For `repoint`: the catalog entry to point the row at.
@@ -455,7 +461,7 @@ function UncertainCard(
                     rowId={row.id}
                     action={ours ? 'confirm' : 'repoint'}
                     externalId={ours ? undefined : choice.externalId}
-                    label={choiceLabel(choice.releaseYear)}
+                    label={<ChoiceLabel choice={choice} />}
                     variant="compact"
                     anchor={next}
                   />
@@ -600,8 +606,32 @@ function answeredMatch(title: string, item: NonNullable<ReviewRow['item']>): str
   return year ? `${item.title} ${year}` : item.title
 }
 
-function choiceLabel(year: number | null): string {
-  return year == null ? 'Undated' : String(year)
+// The year, and under it who made it (surname only, to keep three to a row).
+function ChoiceLabel(handle: Handle<{ choice: CandidateLike }>) {
+  return () => {
+    const { releaseYear, creator } = handle.props.choice
+    return (
+      <>
+        {releaseYear ?? 'Undated'}
+        {creator && (
+          <span
+            mix={css({
+              display: 'block',
+              maxWidth: '50px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontSize: '11px',
+              color: '#8d8579',
+              lineHeight: 1.2,
+            })}
+          >
+            {creator.split(' ').at(-1)}
+          </span>
+        )}
+      </>
+    )
+  }
 }
 
 function MatchedAnswers(

@@ -31,8 +31,8 @@ describe('import row alternates', { skip: skipWithoutDatabase }, () => {
   it('keeps them in the order matching gave, and reads them back', async () => {
     const [row] = await loadRows(db, batchId)
     const alternates = [
-      { externalId: '331482', title: 'Little Women', releaseYear: 2019 },
-      { externalId: '9587', title: 'Little Women', releaseYear: 1994 },
+      { externalId: '331482', title: 'Little Women', releaseYear: 2019, creator: 'Greta Gerwig' },
+      { externalId: '9587', title: 'Little Women', releaseYear: 1994, creator: 'Gillian Armstrong' },
     ]
 
     await recordMatch(db, row!.id, {
