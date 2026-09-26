@@ -408,6 +408,16 @@ function catalogDown(what: string): GenerationError {
 
 export type CatalogSearch = (mediaType: MediaType, query: string) => Promise<CatalogSearchResult[]>
 
+// What to ask the catalog for. The title, plus who made it where the provider's
+// search reads that — see searchesCreator. A bare title frequently does not find a
+// book at all: "Iron Flame" returns a 1963 laboratory index and not the novel,
+// "Bitten" a French verb-conjugation guide, "Uprooted" a humanitarian policy
+// report. With the author appended each comes back first.
+export function searchQueryFor(mediaType: MediaType, pick: Pick): string {
+  const creator = getCatalogProvider(mediaType).searchesCreator === true ? pick.creator?.trim() : undefined
+  return creator ? `${pick.title} ${creator}` : pick.title
+}
+
 // One search per pick the local catalog didn't already answer for, bounded —
 // `Promise.all` put all 18 of a filtered run's on the wire at once, and one of
 // them throwing took the whole run with it after the picks were paid for.
@@ -433,7 +443,7 @@ export async function searchForPicks(
 
   await forEachWithConcurrency(toSearch, SEARCH_CONCURRENCY, async (index) => {
     try {
-      matches[index] = await search(mediaType, picks[index].title)
+      matches[index] = await search(mediaType, searchQueryFor(mediaType, picks[index]))
     } catch (error) {
       failed++
       console.warn(
