@@ -12,6 +12,7 @@ import { routes } from '../../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI } from '../../../mediaTypes.ts'
 import { hashPassword, needsRehash, verifyPassword } from '../password.ts'
 import { LoginPage } from './page.tsx'
+import { safeReturnPath } from '../../../ui/backLink.ts'
 
 const loginSchema = f.object({
   identifier: f.field(s.defaulted(s.string(), '')),
@@ -56,17 +57,10 @@ const passwordProvider = createCredentialsAuthProvider<{ identifier: string; pas
   },
 })
 
-// Only redirect back to a same-origin relative path — `next`/`return_to`
-// come from a query param and form field respectively, both untrusted.
-function safeReturnTo(value: string | null | undefined): string | null {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return null
-  return value
-}
-
 export default createController(routes.auth.login, {
   actions: {
     index(context) {
-      const next = safeReturnTo(context.url.searchParams.get('next'))
+      const next = safeReturnPath(context.url.searchParams.get('next'))
       return context.render(<LoginPage next={next ?? undefined} />)
     },
     async action(context) {
@@ -80,7 +74,7 @@ export default createController(routes.auth.login, {
       session.set('auth', { userId: user.id })
 
       const formData = context.get(FormData)
-      const returnTo = safeReturnTo(String(formData.get('return_to') || ''))
+      const returnTo = safeReturnPath(String(formData.get('return_to') || ''))
       return redirect(returnTo || MEDIA_TYPE_UI[DEFAULT_MEDIA_TYPE].hrefs.search(), 303)
     },
   },

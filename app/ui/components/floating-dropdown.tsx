@@ -12,15 +12,20 @@ export function FloatingDropdown(
     // A trigger at the right edge of its container needs 'right', or the
     // 240px panel opens off the side of the page.
     align?: 'left' | 'right'
+    // A trigger that sits beside a heading rather than in a row of buttons:
+    // the same sketched border, drawn at half the width.
+    compact?: boolean
   }>,
 ) {
   return () => {
-    const { triggerLabel, children, align = 'left' } = handle.props
+    const { triggerLabel, children, align = 'left', compact } = handle.props
 
     return (
       <details mix={css({ position: 'relative', display: 'inline-block' })}>
         <summary
-          class="doodle-border"
+          // `compact` is sized in app.css: `.doodle-border` is unlayered, so a
+          // css() mix can't set its border width.
+          class={compact ? 'doodle-border compact' : 'doodle-border'}
           mix={css({
             cursor: 'pointer',
             listStyle: 'none',
