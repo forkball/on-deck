@@ -276,14 +276,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
 
           {/* Rendered the way other people see it on users/show-page —
               editing it lives under Settings in the nav. */}
-          {bio ? (
-            <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>
-          ) : (
-            <p mix={css({ color: '#555' })}>
-              No bio yet — <a href={routes.profile.edit.index.href()}>add one</a> for other people to read. It
-              has no effect on your recommendations.
-            </p>
-          )}
+          {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
 
           <MediaTabs
             idPrefix="profile"
