@@ -17,9 +17,11 @@ export function withReturnTo(href: string, returnTo: string): string {
   return `${href}?${RETURN_TO_PARAM}=${encodeURIComponent(returnTo)}`
 }
 
-// `from` is an untrusted query param: same-origin relative paths only, or every
-// detail page becomes an open redirect dressed up as a "back" link.
-function safeFrom(value: string | null | undefined): string | null {
+// A return-to value is untrusted — a query param or a form field — so only a
+// same-origin relative path is let through. Otherwise every "back" link and
+// every redirect after a form post is an open redirect. The one copy of this
+// rule: the login form and the where-to-watch picker redirect with it too.
+export function safeReturnPath(value: string | null | undefined): string | null {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return null
   return value
 }
@@ -46,7 +48,7 @@ const DESTINATIONS: [test: RegExp, label: string][] = [
 // would duplicate the nav; this appears only when the page was actually reached
 // from somewhere, and names that place.
 export function backLinkFrom(from: string | null | undefined): BackLink | null {
-  const href = safeFrom(from)
+  const href = safeReturnPath(from)
   if (!href) return null
 
   const path = href.split('?')[0]

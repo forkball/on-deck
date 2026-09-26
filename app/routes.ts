@@ -45,6 +45,10 @@ export const routes = route({
     followers: get('followers'),
     edit: form('edit', { formMethod: 'PUT', names: { action: 'update' } }),
     settings: post('settings'),
+    // The country the "where to watch" list is for. Its own POST rather than a
+    // field on `settings`: that form sends every setting at once, and is posted
+    // from a different page than the one this is changed on.
+    watchRegion: post('watch-region'),
     rebuild: post('rebuild/:mediaType'),
     password: form('password', { formMethod: 'PUT', names: { action: 'update' } }),
     importMovies: route('import-movies', {

@@ -64,7 +64,11 @@ does nothing on its own.
 - `app/middleware/` holds request lifecycle concerns
 - `app/data/` holds persistence and the services built on it, in subdirectories:
   - `app/data/` root: `db`, `schema`, `mediaItems`, `mediaMetadata`, `users`,
-    `follows`, `notifications`, `mediaSummary`
+    `follows`, `notifications`, `mediaSummary`, `watchProviders`, `watchRegion`.
+    `watchProviders` is streaming availability, stored apart from metadata
+    because it goes stale and is refetched weekly; `watchRegion` is the country
+    it is shown for, guessed from Accept-Language and database-free so the
+    guess is tested directly
   - `app/data/catalog/` — external metadata providers behind one `CatalogProvider`
     interface (`provider.ts` is the registry; `tmdb`/`openLibrary`/`igdb` implement it).
     `retry.ts` holds the shared GET-with-backoff the two book providers use;

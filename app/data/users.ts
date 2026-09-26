@@ -119,6 +119,10 @@ export async function updateProfileSettings(
   })
 }
 
+export async function updateWatchRegion(db: Db, userId: number, region: string): Promise<void> {
+  await db.update(users, userId, { watch_region: region })
+}
+
 export async function updateUserPassword(db: Db, userId: number, passwordHash: string): Promise<void> {
   await db.update(users, userId, { password_hash: passwordHash })
 }
