@@ -235,13 +235,8 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   padding-block: 0;
 }
 
-/* Narrower, for a row of short alternatives (the year choices on a 320px phone). */
-.doodle button.compact {
-  padding: 4px 6px;
-}
-
-/* A submit drawn as Doodle's checkbox. While posting it shows the state it is
-   heading to. */
+/* A submit drawn as Doodle's checkbox (or radio, with .radio on the box).
+   While posting it shows the state it is heading to. */
 .doodle button.checkline {
   display: inline-flex;
   align-items: center;
@@ -264,6 +259,11 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   border-width: 5px;
   border-image: url(/vendor/doodle/checkbox.svg) 6 6 6 6 stretch stretch;
   font-size: 14px;
+}
+
+.doodle .checkline-box.radio {
+  border-width: 10px;
+  border-image: url(/vendor/doodle/radio.svg) 16 16 16 16 stretch stretch;
 }
 
 .doodle button.checkline.ticked .checkline-box::after,

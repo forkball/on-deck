@@ -150,13 +150,14 @@ function ResolveForm(
     action: string
     label: RemixNode
     variant?: ButtonVariant
+    selected?: boolean
     anchor?: string
     // For `repoint`: the catalog entry to point the row at.
     externalId?: string
   }>,
 ) {
   return () => {
-    const { batchId, rowId, action, label, variant, anchor, externalId } = handle.props
+    const { batchId, rowId, action, label, variant, selected, anchor, externalId } = handle.props
 
     return (
       <form
@@ -167,7 +168,11 @@ function ResolveForm(
         <input type="hidden" name="action" value={action} />
         {anchor && <input type="hidden" name="anchor" value={anchor} />}
         {externalId && <input type="hidden" name="external_id" value={externalId} />}
-        <button type="submit" class={variant} mix={css({ fontSize: '13px' })}>
+        <button
+          type="submit"
+          class={selected ? `${variant} ticked` : variant}
+          mix={css({ fontSize: '13px' })}
+        >
           {label}
         </button>
       </form>
@@ -175,7 +180,7 @@ function ResolveForm(
   }
 }
 
-type ButtonVariant = 'primary' | 'linkish' | 'compact'
+type ButtonVariant = 'primary' | 'linkish' | 'checkline'
 
 function rowAnchor(rowId: number): string {
   return `row-${rowId}`
@@ -199,12 +204,12 @@ function PickerButton(handle: Handle<{ rowId: number; label: string; variant?: B
   }
 }
 
-function Actions(handle: Handle<{ children?: RemixNode; gap?: string }>) {
+function Actions(handle: Handle<{ children?: RemixNode }>) {
   return () => (
     <div
       mix={css({
         display: 'flex',
-        gap: handle.props.gap ?? '8px 12px',
+        gap: '8px 12px',
         flexWrap: 'wrap',
         alignItems: 'center',
         marginTop: '8px',
@@ -450,8 +455,9 @@ function UncertainCard(
         {choices ? (
           <>
             <div mix={css({ fontSize: '13px', color: '#8d8579', marginTop: '10px' })}>Which one?</div>
-            <Actions gap="6px">
-              {/* None is primary: without a year our pick is a guess. */}
+            {/* Radios, one per line: none preselected, since without a year our pick
+                is a guess. Once answered, the answer shows as selected. */}
+            <div mix={css({ display: 'grid', gap: '2px', marginTop: '4px' })}>
               {choices.map((choice) => {
                 const ours = choice.externalId === row.matchedExternalId
                 return (
@@ -462,12 +468,13 @@ function UncertainCard(
                     action={ours ? 'confirm' : 'repoint'}
                     externalId={ours ? undefined : choice.externalId}
                     label={<ChoiceLabel choice={choice} />}
-                    variant="compact"
+                    variant="checkline"
+                    selected={ours && row.state === 'confirmed'}
                     anchor={next}
                   />
                 )
               })}
-            </Actions>
+            </div>
             <Actions>
               <PickerButton rowId={row.id} label="Something else…" variant="linkish" />
               <ResolveForm
@@ -606,29 +613,17 @@ function answeredMatch(title: string, item: NonNullable<ReviewRow['item']>): str
   return year ? `${item.title} ${year}` : item.title
 }
 
-// The year, and under it who made it (surname only, to keep three to a row).
+// "◯ 1994 · Gillian Armstrong", drawn like the drawer's checkboxes but round.
 function ChoiceLabel(handle: Handle<{ choice: CandidateLike }>) {
   return () => {
     const { releaseYear, creator } = handle.props.choice
     return (
       <>
-        {releaseYear ?? 'Undated'}
-        {creator && (
-          <span
-            mix={css({
-              display: 'block',
-              maxWidth: '50px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              fontSize: '11px',
-              color: '#8d8579',
-              lineHeight: 1.2,
-            })}
-          >
-            {creator.split(' ').at(-1)}
-          </span>
-        )}
+        <span class="checkline-box radio" aria-hidden="true" />
+        <span>
+          <span mix={css({ color: '#3c3c3c' })}>{releaseYear ?? 'Undated'}</span>
+          {creator && ` · ${creator}`}
+        </span>
       </>
     )
   }
