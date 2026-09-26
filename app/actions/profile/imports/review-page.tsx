@@ -666,7 +666,7 @@ const drawerStyle = css({
   '& .drawer-panel': { display: 'none', maxHeight: '45vh', overflowY: 'auto', padding: '4px 0 10px' },
   '& .drawer-arrow::before': { content: '"▲"' },
   // Here, not in its own css(): each css() is its own cascade layer.
-  '& .drawer-row': { display: 'flex', alignItems: 'center', gap: '8px 12px', padding: '8px 0' },
+  '& .drawer-row': { display: 'flex', alignItems: 'center', gap: '8px 12px', padding: '16px 0 8px' },
   [`${drawerOpen} .drawer-panel`]: { display: 'block' },
   [`${drawerOpen} .drawer-arrow::before`]: { content: '"▼"' },
   '@media (min-width: 720px)': {
