@@ -322,8 +322,17 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                   <p>No description available.</p>
                 )}
                 {cast.length > 0 && (
-                  <section mix={css({ marginTop: '16px' })}>
-                    <h2 mix={css({ fontSize: '16px', margin: '0 0 6px' })}>Cast</h2>
+                  // Boxed like the log box and Where to watch, so the page reads
+                  // as the title's details and then a few distinct panels.
+                  <section
+                    mix={css({
+                      marginTop: '16px',
+                      border: '1px solid #ddd',
+                      borderRadius: '8px',
+                      padding: '12px 16px 16px',
+                    })}
+                  >
+                    <h2 mix={css({ fontSize: '16px', margin: '0 0 8px' })}>Cast</h2>
                     {/* Two aligned columns rather than "Name as Character" run
                       together: in Short Stack, a bold name and its part at the
                       same size read as one long line. The part is the lesser
