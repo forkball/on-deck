@@ -1,5 +1,6 @@
 import type { UserLogEntry } from '../mediaItems.ts'
-import type { ExcludedTitles, SeenByExpectation } from './picks.ts'
+import type { SeenBy } from '../../ui/shared/seen-by.ts'
+import type { ExcludedTitles } from './picks.ts'
 
 // Type-only imports, deliberately: this module holds the rule for what a run may
 // not suggest, and nothing else. Keeping it free of the database and of the
@@ -24,7 +25,7 @@ export interface ExclusionOptions {
   // finished, what most have (the default), or nothing they've finished at all.
   // Only the finished rule moves — a rejection is out whichever is chosen, and a
   // lucky run ignores this for its own stricter bar.
-  seenBy?: SeenByExpectation
+  seenBy?: SeenBy
 }
 
 // How many members have to have finished something before it is out. Infinity

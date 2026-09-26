@@ -1,4 +1,5 @@
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
+import type { SeenBy } from '../../ui/shared/seen-by.ts'
 import { describeLength, getCatalogProvider, type LengthBucket } from '../catalog/provider.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { requestStructured } from './claude.ts'
@@ -48,12 +49,6 @@ export interface ExcludedTitles {
 // Ignored unless `decade` is set too.
 export type DecadeRelation = 'before' | 'within' | 'after'
 
-// How much of a group may already have finished a pick: nobody, no more than
-// half, or any number. The form defaults to 'no_one'; absent means 'half', the
-// rule every group run had before there was a choice, so runs saved then and
-// their duplicate keys read the same.
-export type SeenByExpectation = 'no_one' | 'half' | 'any'
-
 // All hard-filter the final picks, not just hint the prompt.
 export interface RecommendationFilters {
   genre?: string
@@ -68,10 +63,28 @@ export interface RecommendationFilters {
   platform?: string
   // Books only — see BOOK_SERIES_TYPES.
   series?: string
-  // Group runs only, and never 'half' — see SeenByExpectation. Enforced by
+  // Group runs only, and never 'half' — see ui/shared/seen-by.ts. Enforced by
   // buildExclusions rather than a gate of its own.
-  seenBy?: SeenByExpectation
+  seenBy?: SeenBy
 }
+
+// Whether a lever cut this run down. Every lever does whenever it is set, but
+// seenBy is also set to widen ('any'), so the one exception is spelled here for
+// everything that asks.
+export function narrows(filters: RecommendationFilters, key: keyof RecommendationFilters): boolean {
+  return key === 'seenBy' ? filters.seenBy === 'no_one' : filters[key] != null
+}
+
+const NARROWING_KEYS: (keyof RecommendationFilters)[] = [
+  'genre',
+  'decade',
+  'length',
+  'playerType',
+  'multiplayerType',
+  'platform',
+  'series',
+  'seenBy',
+]
 
 // Built per request rather than a constant: part_of_series is asked for only when
 // the lever needs it, and structured output requires every property it declares, so
@@ -220,16 +233,7 @@ export async function requestPicks(
     : sourceTypes.length > 1
       ? ` Each person has a separate profile per type above; weigh all of them.`
       : ''
-  const hasFilters =
-    filters.genre != null ||
-    filters.decade != null ||
-    filters.length != null ||
-    filters.playerType != null ||
-    filters.multiplayerType != null ||
-    filters.platform != null ||
-    filters.series != null ||
-    // Drops more at the already-seen gate, so it wants the same slack.
-    filters.seenBy === 'no_one'
+  const hasFilters = NARROWING_KEYS.some((key) => narrows(filters, key))
   const requestedCount = hasFilters ? REQUESTED_COUNT + 6 : REQUESTED_COUNT
   const { singular } = mediaTypeUiFor(mediaType)
   const seriesRule =

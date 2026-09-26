@@ -1,6 +1,7 @@
 import { clientEntry, css, on } from 'remix/ui'
 
 import { Field, hintStyle } from '../ui/shared/field.tsx'
+import { SEEN_BY_OPTIONS, type SeenBy } from '../ui/shared/seen-by.ts'
 import { FriendPicker, radioOption, sectionLabel, type FriendOption } from './friend-picker.tsx'
 
 export type { FriendOption }
@@ -49,16 +50,6 @@ const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus:
 const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series', standalone: 'Standalone' }
 
 const PLACEHOLDER_SOURCES: string[] = []
-
-// Values match SeenByExpectation in data/recommendations/picks.ts, which this
-// module can't import. Only finished ones count toward any of them — a want-to
-// or in-progress row rules nothing out.
-const SEEN_BY_OPTIONS = [
-  { value: 'no_one', label: 'No one has logged' },
-  { value: 'half', label: "Half haven't logged" },
-  { value: 'any', label: "Doesn't matter" },
-] as const
-type SeenBy = (typeof SEEN_BY_OPTIONS)[number]['value']
 
 // The shortlist's caption, which otherwise promises a rule the group just
 // changed. Alone, the default reads the same: one person is "most of you".
@@ -121,8 +112,8 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         { label: 'You', loggedTypes: viewerLoggedTypes },
         ...(mode === 'group' ? friends.filter((friend) => selectedFriends.has(friend.id)) : []),
       ]
-      // Who is actually in it, not which radio is set: "With friends" with nobody
-      // ticked is a run for one, and the server treats it as one.
+      // Who is actually in it, not which radio is set. "With friends" with nobody
+      // ticked isn't a group run yet, and can't be submitted.
       const isGroupRun = membersInRun.length > 1
       const sourceLabel = (value: string) => sources.find((source) => source.value === value)?.label ?? value
       const blockedBy = membersInRun
@@ -139,7 +130,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       const luckyBlockedBy = membersInRun.filter((member) => !member.loggedTypes.includes(mediaType))
       // Either kind of run: both read the same picker. The button just stays
       // disabled — nothing ticked is a step not taken yet, not a mistake.
-      const noFriendsPicked = mode === 'group' && selectedFriends.size === 0
+      const noFriendsPicked = mode === 'group' && !isGroupRun
       const disabled =
         submitting ||
         noFriendsPicked ||
@@ -441,8 +432,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
               {/* Hidden rather than unmounted, like the friend list, so a
                   choice survives a trip to "Just me" and back, or unticking
-                  everyone. The server ignores it on a run with nobody else in
-                  it. */}
+                  everyone. */}
               <section
                 mix={[settingsSection, sectionDivider, css({ display: isGroupRun ? 'block' : 'none' })]}
               >

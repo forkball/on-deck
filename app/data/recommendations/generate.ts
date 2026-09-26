@@ -28,6 +28,7 @@ import {
   type Candidate,
 } from './matching.ts'
 import {
+  narrows,
   requestPicks,
   toTasteSummary,
   type MemberProfile,
@@ -60,18 +61,11 @@ const FILTER_LABELS: [keyof RecommendationFilters, string][] = [
   ['seenBy', 'already-seen'],
 ]
 
-// Every lever but one is narrowing whenever it is set. seenBy is also set to
-// widen ('any'), and advice to loosen that would send somebody to a control
-// already as loose as it goes.
-function narrowedBy(filters: RecommendationFilters, key: keyof RecommendationFilters): boolean {
-  return key === 'seenBy' ? filters.seenBy === 'no_one' : filters[key] != null
-}
-
 // Exported for its own test: the levers are read off a shape that grows, and copy
 // that forgets one sends somebody looking for a filter it never mentions.
 export function nothingLeftMessage(filters: RecommendationFilters, mediaType: MediaType): string {
   const noun = mediaTypeUiFor(mediaType).plural
-  const set = FILTER_LABELS.filter(([key]) => narrowedBy(filters, key)).map(([, label]) => label)
+  const set = FILTER_LABELS.filter(([key]) => narrows(filters, key)).map(([, label]) => label)
 
   if (set.length === 0) {
     return `Nothing came back that we could confirm this time. Try generating again.`

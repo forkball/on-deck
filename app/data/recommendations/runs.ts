@@ -16,7 +16,8 @@ import {
   type UserMediaInteraction,
 } from '../schema.ts'
 import { displayLabel } from '../users.ts'
-import type { DecadeRelation, RecommendationFilters, SeenByExpectation } from './picks.ts'
+import type { SeenBy } from '../../ui/shared/seen-by.ts'
+import type { DecadeRelation, RecommendationFilters } from './picks.ts'
 import type { RunTimings } from './timings.ts'
 
 export const MAX_RUNS_PER_USER = 3
@@ -74,7 +75,7 @@ export interface GenerationParams {
   multiplayerType?: string
   platform?: string
   series?: string
-  seenBy?: SeenByExpectation
+  seenBy?: SeenBy
   sourceTypes: MediaType[]
 }
 

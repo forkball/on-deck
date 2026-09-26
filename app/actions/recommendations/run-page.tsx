@@ -3,12 +3,12 @@ import { css } from 'remix/ui'
 
 import type { GenerationParams, RecommendationRunDetail } from '../../data/recommendations/runs.ts'
 import type { MediaType } from '../../data/mediaItems.ts'
-import type { SeenByExpectation } from '../../data/recommendations/picks.ts'
 import { Toast } from '../../ui/components/toast.tsx'
 import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
 import { NotesField } from '../../ui/components/notes-field.tsx'
 import { Field } from '../../ui/shared/field.tsx'
+import { seenByLabel } from '../../ui/shared/seen-by.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
 import { StarRatingInput } from '../../ui/components/star-rating.tsx'
@@ -57,14 +57,6 @@ const SERIES_NOTE =
   "Applied from the model's own answer for each pick. No catalogue the app reads records " +
   'whether a work belongs to a series.'
 
-// Absent is 'half' and isn't listed: it is how runs from before the choice read,
-// and 'half' is stored as absent so it keys the same as them.
-const SEEN_BY_LABELS: Record<SeenByExpectation, string> = {
-  no_one: 'no one',
-  half: 'up to half the group',
-  any: "doesn't matter",
-}
-
 export function describeParams(params: GenerationParams, mediaType: MediaType): ParamLine[] {
   const lines: ParamLine[] = [
     { text: `Based on: ${params.sourceTypes.map((type) => SOURCE_LABELS[type]).join(', ')}` },
@@ -110,7 +102,8 @@ export function describeParams(params: GenerationParams, mediaType: MediaType): 
       modelNote: SERIES_NOTE,
     })
   }
-  if (params.seenBy) lines.push({ text: `Already seen by: ${SEEN_BY_LABELS[params.seenBy]}` })
+  // Only ever 'no_one' or 'any' — see ui/shared/seen-by.ts.
+  if (params.seenBy) lines.push({ text: `Group history: ${seenByLabel(params.seenBy)}` })
   return lines
 }
 
