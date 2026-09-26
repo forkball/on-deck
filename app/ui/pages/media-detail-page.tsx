@@ -53,6 +53,11 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
       cast,
       tagline,
       runtimeMinutes,
+      seasonCount,
+      episodeCount,
+      lastAirYear,
+      showStatus,
+      networks,
       images,
       platforms,
       tags,
@@ -60,6 +65,16 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
     // Only a movie's is the length of the thing itself — a show's is one episode.
     const runtime = mediaType === 'movie' ? formatRuntime(runtimeMinutes) : null
     const genres = tags.map((t) => t.replace(/^./, (c) => c.toUpperCase())).join(', ')
+    const years = mediaType === 'tv' ? showYears(releaseYear, lastAirYear, showStatus) : releaseYear
+    const showFacts =
+      mediaType === 'tv'
+        ? [
+            countOf(seasonCount, 'season'),
+            countOf(episodeCount, 'episode'),
+            networks.join(', '),
+            showStatus && (SHOW_STATUS_LABELS[showStatus] ?? showStatus),
+          ].filter(Boolean)
+        : []
     // A medium with stills shows them instead of a poster, having none to show:
     // 16:9 key art in a 220px portrait slot renders as a letterbox, and the
     // first still is that same art, so nothing is lost by dropping the slot.
@@ -114,7 +129,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
             <div mix={css({ flex: '1 1 320px' })}>
               <h1 mix={css({ marginTop: 0 })}>
                 {item.title}
-                {releaseYear ? ` (${releaseYear})` : ''}
+                {years ? ` (${years})` : ''}
               </h1>
               {tagline && (
                 <p mix={css({ margin: '-8px 0 12px', color: '#555', fontStyle: 'italic' })}>{tagline}</p>
@@ -125,7 +140,12 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 </p>
               )}
               {(genres || runtime) && (
-                <p mix={css({ color: '#555' })}>{[genres, runtime].filter(Boolean).join(' · ')}</p>
+                <p mix={css({ color: '#555', marginBottom: showFacts.length > 0 ? '4px' : undefined })}>
+                  {[genres, runtime].filter(Boolean).join(' · ')}
+                </p>
+              )}
+              {showFacts.length > 0 && (
+                <p mix={css({ color: '#555', marginTop: 0 })}>{showFacts.join(' · ')}</p>
               )}
               <PlatformList platforms={platforms} />
               {overview ? (
@@ -350,4 +370,30 @@ function formatRuntime(minutes: number | null): string | null {
   const rest = minutes % 60
   if (hours === 0) return `${rest}m`
   return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`
+}
+
+// TMDB's status, said the way someone deciding whether to start a show asks it.
+// Anything it adds later is shown as it comes.
+const SHOW_STATUS_LABELS: Record<string, string> = {
+  'Returning Series': 'Still airing',
+  'In Production': 'In production',
+  Ended: 'Ended',
+  Canceled: 'Canceled',
+  Planned: 'Announced',
+  Pilot: 'Pilot',
+}
+
+// "2008–2013" for a run that is over, "2019–" for one that isn't, and the one
+// year when that is all there is to say. Open-ended only on TMDB's say-so: a
+// show with no status and an old last air date is not "still going".
+function showYears(first: number | null, last: number | null, status: string | null): string | null {
+  if (!first) return null
+  if (status === 'Returning Series' || status === 'In Production') return `${first}–`
+  if ((status === 'Ended' || status === 'Canceled') && last && last > first) return `${first}–${last}`
+  return String(first)
+}
+
+function countOf(count: number | null, noun: string): string | null {
+  if (!count || count <= 0) return null
+  return `${count} ${noun}${count === 1 ? '' : 's'}`
 }

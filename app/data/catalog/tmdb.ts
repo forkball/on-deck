@@ -61,12 +61,18 @@ export interface TmdbSearchResult {
   pageCount?: number | null
   playtimeHours?: number | null
   seasonCount?: number | null
+  // The rest of a show's shape, from its detail lookup: how much of it there is,
+  // whether more is coming, and who aired it.
+  episodeCount?: number | null
+  lastAirYear?: number | null
+  showStatus?: string | null
+  networks?: string[]
   creator?: string | null
   // Every name behind `creator`, which joins them. Kept as a list for the page to
   // count — "Directors" for the Wachowskis — while every other reader keeps
-  // taking the one string. Only movies fill it.
+  // taking the one string. Movies and TV fill it.
   creators?: string[]
-  // Top-billed first. Only a movie's detail lookup fills it; search has no credits.
+  // Top-billed first. Only a detail lookup fills it; search has no credits.
   cast?: CastMember[]
   tagline?: string | null
   // The item's page on its catalog, for a provider whose page can't be built from
@@ -202,7 +208,7 @@ function directorsOf(r: TmdbMovieDetailResponse): string[] {
   return [...new Set(names)]
 }
 
-function castOf(r: TmdbMovieDetailResponse): CastMember[] {
+function movieCastOf(r: TmdbMovieDetailResponse): CastMember[] {
   return (r.credits?.cast ?? [])
     .filter((member): member is { name: string; character?: string | null } => Boolean(member.name))
     .slice(0, CAST_LIMIT)
@@ -240,7 +246,7 @@ export async function getMovieById(externalId: string): Promise<TmdbSearchResult
     runtimeMinutes: r.runtime ?? null,
     creator: directors.length > 0 ? directors.join(', ') : null,
     creators: directors,
-    cast: castOf(r),
+    cast: movieCastOf(r),
     tagline: r.tagline?.trim() || null,
   }
 }
@@ -259,6 +265,45 @@ interface TmdbTvDetailResponse {
   last_episode_to_air: { runtime: number | null } | null
   created_by: { name?: string }[]
   number_of_seasons: number | null
+  number_of_episodes?: number | null
+  last_air_date?: string | null
+  // "Returning Series", "Ended", "Canceled", "In Production", "Planned", "Pilot".
+  status?: string | null
+  tagline?: string | null
+  networks?: { name?: string }[]
+  // The whole run, where plain `credits` is only the latest season — which for a
+  // long show leaves out the leads it started with.
+  aggregate_credits?: {
+    cast?: {
+      name?: string
+      total_episode_count?: number
+      roles?: { character?: string | null; episode_count?: number }[]
+    }[]
+  }
+}
+
+function namesOf(entries: { name?: string }[] | undefined): string[] {
+  return [
+    ...new Set((entries ?? []).map((entry) => entry.name).filter((name): name is string => Boolean(name))),
+  ]
+}
+
+function yearOf(date: string | null | undefined): number | null {
+  return date ? Number(date.slice(0, 4)) || null : null
+}
+
+// Most episodes first, which is what "main cast" means for a show: TMDB's own
+// order here follows billing on whichever season was entered last. An actor who
+// played several parts is credited with the one they played most.
+function tvCastOf(r: TmdbTvDetailResponse): CastMember[] {
+  return (r.aggregate_credits?.cast ?? [])
+    .filter((member) => Boolean(member.name))
+    .toSorted((a, b) => (b.total_episode_count ?? 0) - (a.total_episode_count ?? 0))
+    .slice(0, CAST_LIMIT)
+    .map((member) => {
+      const role = (member.roles ?? []).toSorted((a, b) => (b.episode_count ?? 0) - (a.episode_count ?? 0))[0]
+      return { name: member.name!, character: role?.character?.trim() || null }
+    })
 }
 
 export async function getTvShowById(externalId: string): Promise<TmdbSearchResult | null> {
@@ -269,6 +314,7 @@ export async function getTvShowById(externalId: string): Promise<TmdbSearchResul
 
   const url = new URL(`${TMDB_API_BASE}/tv/${encodeURIComponent(externalId)}`)
   url.searchParams.set('api_key', apiKey)
+  url.searchParams.set('append_to_response', 'aggregate_credits')
 
   const response = await fetch(url)
   if (response.status === 404) return null
@@ -277,18 +323,26 @@ export async function getTvShowById(externalId: string): Promise<TmdbSearchResul
   }
 
   const r = (await response.json()) as TmdbTvDetailResponse
+  const creators = namesOf(r.created_by)
 
   return {
     externalId: String(r.id),
     title: r.name,
-    releaseYear: r.first_air_date ? Number(r.first_air_date.slice(0, 4)) : null,
+    releaseYear: yearOf(r.first_air_date),
     tags: r.genres.map((g) => g.name.toLowerCase()),
     posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
     popularity: r.popularity,
     overview: r.overview?.trim() || null,
     runtimeMinutes: r.episode_run_time[0] ?? r.last_episode_to_air?.runtime ?? null,
     seasonCount: r.number_of_seasons ?? null,
-    creator: r.created_by?.[0]?.name ?? null,
+    episodeCount: r.number_of_episodes ?? null,
+    lastAirYear: yearOf(r.last_air_date),
+    showStatus: r.status?.trim() || null,
+    networks: namesOf(r.networks),
+    creator: creators.length > 0 ? creators.join(', ') : null,
+    creators,
+    cast: tvCastOf(r),
+    tagline: r.tagline?.trim() || null,
   }
 }
 

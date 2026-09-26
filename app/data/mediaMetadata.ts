@@ -13,6 +13,12 @@ export interface MediaMetadata {
   pageCount: number | null
   playtimeHours: number | null
   seasonCount: number | null
+  // TV only, from a detail lookup. showStatus is TMDB's own wording ("Returning
+  // Series", "Ended"…); the page decides how to say it.
+  episodeCount: number | null
+  lastAirYear: number | null
+  showStatus: string | null
+  networks: string[]
   creator: string | null
   // The names `creator` joins, when a provider gives more than one. Empty
   // otherwise, in which case `creator` is the whole answer.
@@ -75,6 +81,10 @@ function emptyMetadata(): MediaMetadata {
     pageCount: null,
     playtimeHours: null,
     seasonCount: null,
+    episodeCount: null,
+    lastAirYear: null,
+    showStatus: null,
+    networks: [],
     creator: null,
     creators: [],
     cast: [],
@@ -106,6 +116,10 @@ export function parseMediaMetadata(metadata: unknown): MediaMetadata {
       pageCount: numberOrNull(parsed.pageCount),
       playtimeHours: numberOrNull(parsed.playtimeHours),
       seasonCount: numberOrNull(parsed.seasonCount),
+      episodeCount: numberOrNull(parsed.episodeCount),
+      lastAirYear: numberOrNull(parsed.lastAirYear),
+      showStatus: stringOrNull(parsed.showStatus),
+      networks: stringArray(parsed.networks),
       creator: stringOrNull(parsed.creator),
       creators: stringArray(parsed.creators),
       cast: castList(parsed.cast),
