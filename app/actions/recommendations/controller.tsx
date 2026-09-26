@@ -117,8 +117,8 @@ function finishedHref(job: GenerationJob): string | null {
   return null
 }
 
-// Worded as the forms word it (NO_FRIENDS_PICKED in friend-picker.tsx), which
-// server code may not import — see AGENTS.md.
+// The forms keep their button disabled instead, so only a hand-built request
+// ever reads this.
 const NO_FRIENDS_PICKED_ERROR = 'Tick at least one friend, or switch to "Just me".'
 
 // Both actions refuse for the same reason in the same words — an empty log gives
