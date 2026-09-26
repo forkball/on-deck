@@ -69,6 +69,9 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
       cast,
       tagline,
       runtimeMinutes,
+      pageCount,
+      playtimeHours,
+      series,
       seasonCount,
       episodeCount,
       lastAirYear,
@@ -79,7 +82,18 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
       tags,
     } = parseMediaMetadata(item.metadata)
     // Only a movie's is the length of the thing itself — a show's is one episode.
-    const runtime = mediaType === 'movie' ? formatRuntime(runtimeMinutes) : null
+    // How long it takes, in each medium's own unit. Only a movie's runtime is
+    // the length of the thing itself — a show's is one episode — and pages and
+    // time-to-beat are only ever filled for books and games.
+    const length =
+      (mediaType === 'movie' ? formatRuntime(runtimeMinutes) : null) ??
+      countOf(pageCount, 'page') ??
+      formatPlaytime(playtimeHours)
+    // IGDB lists a game's collection and franchise separately, often under the
+    // same name — and often the game's own, which says nothing on its own page.
+    // Books never have one: Google Books has no series to give, which is why
+    // recommendations ask the model instead.
+    const seriesNames = [...new Set(series)].filter((name) => name.toLowerCase() !== item.title.toLowerCase())
     const genres = tags.map((t) => t.replace(/^./, (c) => c.toUpperCase())).join(', ')
     const years = yearSpan(releaseYear, lastAirYear, showStatus)
     // No type check needed: only a show's detail lookup fills any of these, so
@@ -306,10 +320,13 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 )}
                 {/* The year leads the details rather than riding in the title,
                     where a show's "(2008–2013)" wrapped the heading. */}
-                {(years || genres || runtime) && (
+                {(years || genres || length) && (
                   <p mix={css({ margin: 0, color: '#555' })}>
-                    {[years, genres, runtime].filter(Boolean).join(' · ')}
+                    {[years, genres, length].filter(Boolean).join(' · ')}
                   </p>
+                )}
+                {seriesNames.length > 0 && (
+                  <p mix={css({ margin: 0, color: '#555' })}>Part of {seriesNames.join(' / ')}</p>
                 )}
                 {showFacts.length > 0 && (
                   <p mix={css({ margin: 0, color: '#555' })}>{showFacts.join(' · ')}</p>
@@ -470,6 +487,15 @@ function yearSpan(first: number | null, last: number | null, status: string | nu
   if (status === 'Returning Series' || status === 'In Production') return `${first}–`
   if ((status === 'Ended' || status === 'Canceled') && last && last > first) return `${first}–${last}`
   return String(first)
+}
+
+// IGDB's time-to-beat, which is an average: "about 52 hours", or "under an
+// hour" for the rare game that short.
+function formatPlaytime(hours: number | null): string | null {
+  if (!hours || hours <= 0) return null
+  if (hours < 1) return 'under an hour to beat'
+  const rounded = Math.round(hours)
+  return `about ${rounded} hour${rounded === 1 ? '' : 's'} to beat`
 }
 
 function countOf(count: number | null, noun: string): string | null {
