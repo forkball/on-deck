@@ -17,41 +17,50 @@ export type LazyListProps = {
 // With JS off nothing hides anything and the full list shows, which is why the
 // server renders every result rather than a slice. The whole set arrives in one
 // revealing more costs no extra network.
+//
+// Hides with its own stylesheet, not inline styles, which an in-place reload wipes.
 export const LazyList = clientEntry<LazyListProps>(import.meta.url, function LazyList(handle) {
+  // Null until the browser has run this: the server render must hide nothing,
+  // or with JS off the tail would be unreachable.
+  let shown: number | null = null
+
   return () => {
     const { listId, initial, step } = handle.props
 
     return (
-      <div
-        mix={[
-          // Needs a little height so it can actually intersect the viewport.
-          css({ height: '1px' }),
-          ref((node, signal) => {
-            const list = document.getElementById(listId)
-            if (!list) return
+      <>
+        {/* Always rendered, so the sentinel after it keeps its place. */}
+        <style>
+          {shown == null ? '' : `#${CSS.escape(listId)} > :nth-child(n + ${shown + 1}) { display: none; }`}
+        </style>
+        <div
+          mix={[
+            // Needs a little height so it can actually intersect the viewport.
+            css({ height: '1px' }),
+            ref((node, signal) => {
+              const list = document.getElementById(listId)
+              if (!list || list.children.length <= initial) return
 
-            const items = Array.from(list.children) as HTMLElement[]
-            if (items.length <= initial) return
-
-            let shown = initial
-            const apply = () => {
-              for (const [index, item] of items.entries()) {
-                item.style.display = index < shown ? '' : 'none'
+              if (shown == null) {
+                shown = initial
+                handle.update()
               }
-            }
-            apply()
 
-            const observer = new IntersectionObserver((entries) => {
-              if (!entries.some((entry) => entry.isIntersecting)) return
-              shown += step
-              apply()
-              if (shown >= items.length) observer.disconnect()
-            })
-            observer.observe(node)
-            signal.addEventListener('abort', () => observer.disconnect())
-          }),
-        ]}
-      />
+              const observer = new IntersectionObserver((entries) => {
+                if (shown == null || !entries.some((entry) => entry.isIntersecting)) return
+                if (shown >= list.children.length) {
+                  observer.disconnect()
+                  return
+                }
+                shown += step
+                handle.update()
+              })
+              observer.observe(node)
+              signal.addEventListener('abort', () => observer.disconnect())
+            }),
+          ]}
+        />
+      </>
     )
   }
 })

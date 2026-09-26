@@ -6,7 +6,11 @@ import {
   classifyMatch,
   conflictFields,
   describeReason,
+  bulkKind,
+  inlineAlternates,
   isBulkAcceptable,
+  isSubtitleOnly,
+  reasonGroup,
   suspicion,
   type CandidateLike,
   type DuplicateRow,
@@ -97,6 +101,48 @@ describe('isBulkAcceptable', () => {
   })
 })
 
+describe('bulkKind', () => {
+  const noYear = classifyMatch({ title: 'Heat', year: null }, film('Heat', 1995))
+
+  it('clears a no-year row that has only one film by that name', () => {
+    assert.equal(bulkKind(noYear, 'Heat', film('Heat', 1995), 1), 'sole')
+  })
+
+  it('leaves a no-year row with namesakes to be answered', () => {
+    assert.equal(bulkKind(noYear, 'Heat', film('Heat', 1995), 2), null)
+  })
+
+  // Staged before namesakes were kept: nothing says it is the only one.
+  it('does not assume a row with no namesakes recorded is the only one', () => {
+    assert.equal(bulkKind(noYear, 'Heat', film('Heat', 1995), null), null)
+  })
+})
+
+describe('isSubtitleOnly', () => {
+  it('takes a subtitle after a colon or a spaced dash', () => {
+    assert.ok(isSubtitleOnly('Birdman', 'Birdman: A Love Story'))
+    assert.ok(isSubtitleOnly('Paris, Texas', 'Paris, Texas – Restored'))
+  })
+
+  it('finds the separator after a colon inside the title itself', () => {
+    assert.ok(isSubtitleOnly('Mission: Impossible', 'Mission: Impossible – Fallout'))
+  })
+
+  it('ignores case and punctuation in the part that has to agree', () => {
+    assert.ok(isSubtitleOnly('wall-e', 'WALL·E: The Director’s Cut'))
+  })
+
+  // Could as easily be a different film that starts the same way.
+  it('does not count words run on without a separator', () => {
+    assert.ok(!isSubtitleOnly('Birdman', 'Birdman or (The Unexpected Virtue of Ignorance)'))
+    assert.ok(!isSubtitleOnly('Alien', 'Aliens'))
+  })
+
+  it('needs something after the separator', () => {
+    assert.ok(!isSubtitleOnly('Heat', 'Heat:'))
+  })
+})
+
 function dupe(
   id: number,
   title: string,
@@ -161,6 +207,26 @@ describe('describeReason', () => {
   it('says nothing about a confident match', () => {
     assert.equal(describeReason(classifyMatch({ title: 'Heat', year: 1995 }, film('Heat', 1995))), null)
   })
+
+  // The group heading already says these; a chip repeating it on every card
+  // is noise.
+  it('leaves reasons its group heading names to the heading', () => {
+    assert.equal(describeReason(classifyMatch({ title: 'Heat', year: null }, film('Heat', 1995))), null)
+    assert.equal(
+      describeReason(classifyMatch({ title: 'Birdman', year: 2014 }, film('Birdman or…', 2014))),
+      null,
+    )
+  })
+})
+
+describe('reasonGroup', () => {
+  it('uses the media noun it is given', () => {
+    assert.match(reasonGroup('no_year', 'book', 'books').blurb, /no year for these books/)
+  })
+
+  it('has a fallback for a reason without its own group', () => {
+    assert.equal(reasonGroup(null, 'movie', 'movies').title, 'Worth checking')
+  })
 })
 
 const logged: LogValues = {
@@ -193,5 +259,52 @@ describe('conflictFields', () => {
 
   it('ignores whitespace-only note changes', () => {
     assert.deepEqual(conflictFields(logged, { ...logged, notes: '  still the best shootout  ' }), [])
+  })
+})
+
+describe('inlineAlternates', () => {
+  const row = { title: 'Little Women', year: null }
+  const noYear = classifyMatch(row, film('Little Women', 2019, 'lw19'))
+
+  it('offers the namesakes of a no-year row, our pick first', () => {
+    const results = [film('Little Women', 1994, 'lw94'), film('Little Women', 2019, 'lw19')]
+    const alternates = inlineAlternates(row, noYear, film('Little Women', 2019, 'lw19'), results)
+    assert.deepEqual(
+      alternates?.map((a) => a.externalId),
+      ['lw19', 'lw94'],
+    )
+  })
+
+  it('leaves out results that only contain the title', () => {
+    const results = [film('Little Women', 1994, 'lw94'), film('Little Women: LA Story', 2016, 'la')]
+    const alternates = inlineAlternates(row, noYear, film('Little Women', 2019, 'lw19'), results)
+    assert.deepEqual(
+      alternates?.map((a) => a.externalId),
+      ['lw19', 'lw94'],
+    )
+  })
+
+  // Every no-year card asks the same way, so one namesake is one button —
+  // and a list of one is what marks it as the only film by that name.
+  it('offers the lone namesake on its own', () => {
+    const results = [film('Little Women: LA Story', 2016, 'la')]
+    assert.deepEqual(
+      inlineAlternates(row, noYear, film('Little Women', 2019, 'lw19'), results)?.map((a) => a.externalId),
+      ['lw19'],
+    )
+  })
+
+  it('keeps our pick and the next two of a long list, leaving the rest to the picker', () => {
+    const results = [1933, 1949, 1994, 2018].map((year) => film('Little Women', year, `lw${year}`))
+    assert.deepEqual(
+      inlineAlternates(row, noYear, film('Little Women', 2019, 'lw19'), results)?.map((a) => a.externalId),
+      ['lw19', 'lw1933', 'lw1949'],
+    )
+  })
+
+  it('only applies to rows flagged for having no year', () => {
+    const drift = classifyMatch({ title: 'Nosferatu', year: 2025 }, film('Nosferatu', 2024, 'n24'))
+    const results = [film('Nosferatu', 2024, 'n24'), film('Nosferatu', 1922, 'n22')]
+    assert.equal(inlineAlternates({ title: 'Nosferatu', year: 2025 }, drift, results[0]!, results), null)
   })
 })

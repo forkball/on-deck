@@ -16,7 +16,13 @@ import {
   type ImportBatch,
   type ImportRow,
 } from '../schema.ts'
-import type { ConflictChoice, RowState } from './classify.ts'
+import {
+  parseBulkKind,
+  type BulkKind,
+  type CandidateLike,
+  type ConflictChoice,
+  type RowState,
+} from './classify.ts'
 import {
   buildReview,
   type CatalogEntry,
@@ -48,49 +54,54 @@ export async function createBatch(
   const id = crypto.randomUUID()
   const now = Date.now()
 
-  await db.create(importBatches, {
-    id,
-    user_id: userId,
-    media_type: mediaType,
-    source,
-    status: 'matching',
-    total_rows: rows.length,
-    matched_rows: 0,
-    conflict_choice: 'keep',
-    created_at: now,
-    updated_at: now,
-  })
-
-  // One statement rather than a create() per row: a 400-row export is 400 round
-  // trips to Supabase otherwise, which is most of the time the upload spends.
-  if (rows.length > 0) {
-    const COLUMNS = 12
-    const values: unknown[] = []
-    const tuples = rows.map((row, i) => {
-      const base = i * COLUMNS
-      values.push(
-        id,
-        row.rowIndex,
-        row.title,
-        row.year,
-        row.rating,
-        row.notes ?? null,
-        row.consumedAt,
-        row.logStatus ?? 'consumed',
-        row.author ?? null,
-        row.isbn ?? null,
-        now,
-        now,
-      )
-      return `(${Array.from({ length: COLUMNS }, (_, n) => `$${base + n + 1}`).join(', ')})`
-    })
-
-    await pool.query(
-      `insert into import_rows
-         (batch_id, row_index, raw_title, raw_year, rating, notes, consumed_at, log_status, author, isbn, created_at, updated_at)
-       values ${tuples.join(', ')}`,
-      values,
+  // Batch and rows in one transaction, so the worker can never claim a batch
+  // whose rows aren't in yet — it would match nothing and send it to review.
+  const client = await pool.connect()
+  try {
+    await client.query('begin')
+    await client.query(
+      `insert into import_batches
+         (id, user_id, media_type, source, status, total_rows, matched_rows, conflict_choice, created_at, updated_at)
+       values ($1, $2, $3, $4, 'matching', $5, 0, 'keep', $6, $6)`,
+      [id, userId, mediaType, source, rows.length, now],
     )
+
+    // One statement for all rows: a create() per row is a round trip each.
+    if (rows.length > 0) {
+      const COLUMNS = 12
+      const values: unknown[] = []
+      const tuples = rows.map((row, i) => {
+        const base = i * COLUMNS
+        values.push(
+          id,
+          row.rowIndex,
+          row.title,
+          row.year,
+          row.rating,
+          row.notes ?? null,
+          row.consumedAt,
+          row.logStatus ?? 'consumed',
+          row.author ?? null,
+          row.isbn ?? null,
+          now,
+          now,
+        )
+        return `(${Array.from({ length: COLUMNS }, (_, n) => `$${base + n + 1}`).join(', ')})`
+      })
+
+      await client.query(
+        `insert into import_rows
+           (batch_id, row_index, raw_title, raw_year, rating, notes, consumed_at, log_status, author, isbn, created_at, updated_at)
+         values ${tuples.join(', ')}`,
+        values,
+      )
+    }
+    await client.query('commit')
+  } catch (error) {
+    await client.query('rollback')
+    throw error
+  } finally {
+    client.release()
   }
 
   return id
@@ -138,9 +149,12 @@ export async function recordMatch(
     yearDelta: number | null
     externalId: string | null
     mediaItemId: number | null
+    alternates?: CandidateLike[] | null
   },
 ): Promise<void> {
   await db.update(importRows, rowId, {
+    // node-postgres sends a bare array as a Postgres array, which jsonb rejects.
+    alternates: result.alternates ? JSON.stringify(result.alternates) : null,
     state: result.state,
     reason: result.reason ?? undefined,
     year_delta: result.yearDelta,
@@ -198,7 +212,24 @@ function toStagedRow(row: ImportRow): StagedRow {
     reason: (row.reason ?? null) as StagedRow['reason'],
     yearDelta: row.year_delta ?? null,
     mediaItemId: row.media_item_id ?? null,
+    matchedExternalId: row.matched_external_id ?? null,
+    alternates: readAlternates(row.alternates),
+    acceptedBy: parseBulkKind(row.accepted_by),
   }
+}
+
+// Anything but a non-empty array reads as none.
+function readAlternates(value: unknown): CandidateLike[] | null {
+  if (!Array.isArray(value)) return null
+  const alternates = value.filter(
+    (entry): entry is CandidateLike =>
+      typeof entry === 'object' &&
+      entry !== null &&
+      typeof entry.externalId === 'string' &&
+      typeof entry.title === 'string' &&
+      (entry.releaseYear === null || typeof entry.releaseYear === 'number'),
+  )
+  return alternates.length === value.length && alternates.length > 0 ? alternates : null
 }
 
 function toCatalogEntry(item: { id: number; title: string; metadata: unknown }): CatalogEntry {
@@ -245,7 +276,12 @@ export async function loadReview(
     ]),
   )
 
-  return { rows, model: buildReview(staged, itemMap, existing, batch.conflict_choice as ConflictChoice) }
+  return {
+    rows,
+    model: buildReview(staged, itemMap, existing, batch.conflict_choice as ConflictChoice, {
+      saved: batch.status === 'done',
+    }),
+  }
 }
 
 async function ownedRow(db: Db, batch: ImportBatch, rowId: number): Promise<ImportRow | null> {
@@ -253,33 +289,20 @@ async function ownedRow(db: Db, batch: ImportBatch, rowId: number): Promise<Impo
   return row ?? null
 }
 
-// Marks an uncertain match as read and correct. It was already going to save —
-// this only clears it off the page.
-export async function confirmRow(db: Db, batch: ImportBatch, rowId: number): Promise<boolean> {
+// A decision on one row by hand. It also takes the row out of any bulk accept,
+// so unticking that accept leaves it alone.
+async function settleRow(db: Db, batch: ImportBatch, rowId: number, state: RowState): Promise<boolean> {
   const row = await ownedRow(db, batch, rowId)
   if (!row) return false
 
-  await db.update(importRows, row.id, { state: 'confirmed', updated_at: Date.now() })
+  await db.update(importRows, row.id, { state, accepted_by: undefined, updated_at: Date.now() })
   return true
 }
 
-// Resolves a conflict in favour of the log. Distinct from skipping, which is
-// how a row is thrown away — this one is a row that was already there.
-export async function keepRow(db: Db, batch: ImportBatch, rowId: number): Promise<boolean> {
-  const row = await ownedRow(db, batch, rowId)
-  if (!row) return false
-
-  await db.update(importRows, row.id, { state: 'kept', updated_at: Date.now() })
-  return true
-}
-
-export async function skipRow(db: Db, batch: ImportBatch, rowId: number): Promise<boolean> {
-  const row = await ownedRow(db, batch, rowId)
-  if (!row) return false
-
-  await db.update(importRows, row.id, { state: 'skipped', updated_at: Date.now() })
-  return true
-}
+export const confirmRow = (db: Db, batch: ImportBatch, rowId: number) =>
+  settleRow(db, batch, rowId, 'confirmed')
+export const keepRow = (db: Db, batch: ImportBatch, rowId: number) => settleRow(db, batch, rowId, 'kept')
+export const skipRow = (db: Db, batch: ImportBatch, rowId: number) => settleRow(db, batch, rowId, 'skipped')
 
 export type RepointResult = { ok: true } | { ok: false; error: string }
 
@@ -308,8 +331,10 @@ export async function repointRow(
   await db.update(importRows, row.id, {
     // Confirmed rather than re-classified: a person picking a film off the
     // shelf is better evidence than the year arithmetic that flagged it.
+    // The reason stays: it records which review section the row was settled
+    // in. verdictOf treats a confirmed row as settled whatever it says.
     state: 'confirmed',
-    reason: undefined,
+    accepted_by: undefined,
     year_delta: null,
     matched_external_id: item.external_id,
     media_item_id: item.id,
@@ -319,18 +344,28 @@ export async function repointRow(
   return { ok: true }
 }
 
-// The long tail of a large import, cleared in one click. Bounded to the rows
-// the page offered — anything wider would sweep up matches nobody vouched for.
-export async function acceptBulk(db: Db, batch: ImportBatch, rowIds: number[]): Promise<number> {
-  if (rowIds.length === 0) return 0
-
+// A section's one-tap accept. Each row records which accept took it, so
+// unticking gives back exactly those.
+export async function acceptBulk(
+  db: Db,
+  batch: ImportBatch,
+  kind: BulkKind,
+  rowIds: number[],
+): Promise<void> {
+  if (rowIds.length === 0) return
   await db.updateMany(
     importRows,
-    { state: 'confirmed', updated_at: Date.now() },
+    { state: 'confirmed', accepted_by: kind, updated_at: Date.now() },
     { where: and(eq('batch_id', batch.id), inList('id', rowIds)) },
   )
+}
 
-  return rowIds.length
+export async function unacceptBulk(db: Db, batch: ImportBatch, kind: BulkKind): Promise<void> {
+  await db.updateMany(
+    importRows,
+    { state: 'uncertain', accepted_by: undefined, updated_at: Date.now() },
+    { where: and(eq('batch_id', batch.id), eq('state', 'confirmed'), eq('accepted_by', kind)) },
+  )
 }
 
 export async function setConflictChoice(db: Db, batchId: string, choice: ConflictChoice): Promise<void> {
@@ -357,6 +392,19 @@ export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult>
     held.add(verdict.kind === 'different_films' ? verdict.move.id : verdict.drop.id)
   }
 
+  // Already in the log exactly as this file has them: nothing to write. Marked
+  // kept — the state for "decided in favour of the log" — so the saved page,
+  // which reads the batch back once the log agrees with every row, still
+  // counts them as unchanged rather than as saved.
+  const alreadyLogged = new Set(model.alreadyLoggedIds)
+  if (alreadyLogged.size > 0) {
+    await db.updateMany(
+      importRows,
+      { state: 'kept', updated_at: Date.now() },
+      { where: and(eq('batch_id', batch.id), inList('id', model.alreadyLoggedIds)) },
+    )
+  }
+
   const writable: ImportRow[] = []
 
   for (const row of rows) {
@@ -368,7 +416,7 @@ export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult>
     )
       continue
     if (row.media_item_id == null) continue
-    if (held.has(row.id)) continue
+    if (held.has(row.id) || alreadyLogged.has(row.id)) continue
     // A conflict is only written when the batch says take it, or this row was
     // confirmed by hand — which beats the batch default.
     if (conflicted.has(row.id) && batch.conflict_choice === 'keep' && row.state !== 'confirmed') continue

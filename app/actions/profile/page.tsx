@@ -80,6 +80,8 @@ export interface ProfilePageProps {
   // Today's one-click pick, shown above the tabs so it is the same thing here as
   // on the landing page rather than something to go looking for.
   lucky: LuckyState
+  // Imports still matching or waiting for review, each a way back to it.
+  waitingImports: { href: string; noun: string; matching: boolean }[]
   displayName: string
 }
 
@@ -254,6 +256,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       rebuilt,
       rebuildError,
       lucky,
+      waitingImports,
       displayName,
     } = handle.props
     const profileHref = routes.profile.index.href()
@@ -289,6 +292,31 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
               {followersCount} follower{followersCount === 1 ? '' : 's'}
             </a>
           </p>
+
+          {waitingImports.map((waiting) => (
+            <p
+              key={waiting.href}
+              mix={css({
+                border: '1px solid #d9cfbe',
+                borderLeft: '4px solid #3E5C76',
+                borderRadius: '8px',
+                background: '#fbf4ea',
+                padding: '10px 14px',
+                margin: '0 0 16px',
+                fontSize: '14px',
+              })}
+            >
+              {waiting.matching ? (
+                <>
+                  Your {waiting.noun} import is still matching. <a href={waiting.href}>See progress</a>
+                </>
+              ) : (
+                <>
+                  Your {waiting.noun} import is waiting for review. <a href={waiting.href}>Continue it</a>
+                </>
+              )}
+            </p>
+          ))}
 
           {/* Rendered the way other people see it on users/show-page —
               editing it lives behind the pencil above. */}

@@ -36,7 +36,8 @@
   border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
 }
 
-.doodle button.primary {
+.doodle button.primary,
+.doodle .doodle-border.primary {
   border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
 }
 
@@ -194,16 +195,75 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
    dropped without a word — which is why this lives here, like the modal trigger
    and rating chip above. */
 .doodle button.linkish {
-  border: 0;
-  border-image: none;
-  background: none;
   padding: 0;
   font-size: 13px;
   color: #6b6459;
   text-decoration: underline;
-  cursor: pointer;
 }
 
 .doodle button.linkish:hover {
   color: #3c3c3c;
+}
+
+/* Buttons that read as text or an icon rather than a control. Unlayered, like
+   the rules above, so css() can't do this. */
+.doodle button.linkish,
+.doodle button.bare,
+.doodle button.checkline {
+  border: 0;
+  border-image: none;
+  background: none;
+  cursor: pointer;
+}
+
+.doodle button.bare {
+  padding: 4px 8px;
+  color: #888;
+}
+
+.doodle button.bare:hover:not(:disabled),
+.doodle button.checkline:hover:not(:disabled) {
+  color: #3c3c3c;
+}
+
+/* Narrower, for a row of short alternatives (the year choices on a 320px phone). */
+.doodle button.compact {
+  padding: 4px 10px;
+}
+
+/* A submit drawn as Doodle's checkbox. While posting it shows the state it is
+   heading to. */
+.doodle button.checkline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 13px;
+  color: #6b6459;
+  text-align: left;
+}
+
+.doodle .checkline-box {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 5px;
+  border-image: url(/vendor/doodle/checkbox.svg) 6 6 6 6 stretch stretch;
+  font-size: 14px;
+}
+
+.doodle button.checkline.ticked .checkline-box::after,
+.doodle button.checkline:disabled .checkline-box::after {
+  content: '*';
+  font-size: 1.2em;
+  margin-bottom: -0.3em;
+}
+
+.doodle button.checkline.ticked:disabled .checkline-box::after {
+  content: none;
 }

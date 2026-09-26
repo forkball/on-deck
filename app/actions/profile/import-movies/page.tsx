@@ -22,7 +22,7 @@ export interface LetterboxdImportPageProps {
 // Only true when the feed is switched on, and it is what explains why an upload
 // is still worth doing once it is: the feed can't reach back past ~50 films.
 const BACKFILL_LEAD =
-  'The feed only carries your fifty most recent films, so your back catalogue comes across as a file. '
+  'The feed only reaches your fifty most recent films, so your back catalogue comes as a file. '
 
 export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) {
   return () => {
@@ -51,24 +51,15 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
             </div>
           )}
 
-          {syncAvailable && (
-            <p mix={css({ fontSize: '13px', color: '#888' })}>
-              Keeping up with new films is a separate thing, and it's already handled elsewhere:{' '}
-              <a href={routes.profile.edit.index.href()}>connect your Letterboxd account in settings</a> and
-              new entries arrive on their own. This page is for the history that predates it.
-            </p>
-          )}
-
           <p mix={css({ color: '#555' })}>
             {syncAvailable && BACKFILL_LEAD}
-            Export your data from Letterboxd (Settings → Data → Export) and upload the resulting{' '}
-            <code>.zip</code>, unopened — ratings and reviews live in separate files inside, and both come
-            across in one import.
+            Export your data from Letterboxd (Settings → Data → Export) and upload the <code>.zip</code>{' '}
+            unopened — ratings and reviews both come across in one import.
           </p>
 
-          <p mix={css({ color: '#555' })}>
-            Exporting from Letterboxd's app is unreliable — if the export doesn't come through, open
-            letterboxd.com in a mobile browser or on a desktop computer instead and export from there.
+          <p mix={css({ fontSize: '13px', color: '#888' })}>
+            Letterboxd's app doesn't always deliver the export. If it doesn't arrive, export from
+            letterboxd.com in a browser instead.
           </p>
 
           <LetterboxdImportForm
@@ -80,6 +71,14 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
           <p mix={css({ fontSize: '13px', color: '#3E5C76' })}>
             Nothing is saved until you've seen what we matched.
           </p>
+
+          {syncAvailable && (
+            <p mix={css({ fontSize: '13px', color: '#888' })}>
+              New films are handled separately:{' '}
+              <a href={routes.profile.edit.index.href()}>connect your Letterboxd account in settings</a> and
+              they arrive on their own.
+            </p>
+          )}
         </main>
       </Document>
     )

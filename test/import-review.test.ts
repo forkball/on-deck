@@ -27,6 +27,9 @@ function row(partial: Partial<StagedRow> = {}): StagedRow {
     reason: 'exact',
     yearDelta: 0,
     mediaItemId: 1,
+    matchedExternalId: null,
+    alternates: null,
+    acceptedBy: null,
     ...partial,
   }
 }
@@ -102,7 +105,105 @@ describe('buildReview bucketing', () => {
       'keep',
     )
 
-    assert.equal(model.bulkAcceptable, 1)
+    assert.deepEqual(model.bulk, { year: [1], subtitle: [], sole: [] })
+  })
+
+  it('keeps answered rows under their section, so an answer can be changed', () => {
+    const rows = [
+      row({ id: 1, state: 'confirmed', reason: 'year_drift', yearDelta: 1, mediaItemId: 1 }),
+      row({ id: 2, state: 'skipped', reason: 'no_year', year: null, mediaItemId: 2 }),
+      row({ id: 3, state: 'skipped', reason: null, mediaItemId: null }),
+      row({ id: 4, state: 'uncertain', reason: 'year_drift', yearDelta: 1, mediaItemId: 3 }),
+      row({ id: 5, state: 'confident', reason: 'exact', mediaItemId: 4 }),
+    ]
+    const model = buildReview(
+      rows,
+      catalog(
+        entry(1, 'Kwaidan', 1965),
+        entry(2, 'Suspiria', 1977),
+        entry(3, 'Ran', 1985),
+        entry(4, 'Heat', 1995),
+      ),
+      logged(),
+      'keep',
+    )
+
+    const ids = (key: keyof typeof model.answered) => model.answered[key].map(({ row }) => row.id)
+    assert.deepEqual(ids('year_drift'), [1])
+    assert.deepEqual(ids('no_year'), [2])
+    assert.deepEqual(ids('not_found'), [3])
+    assert.deepEqual(ids('title_differs'), [])
+    assert.equal(model.answered.year_drift[0]?.item?.title, 'Kwaidan')
+  })
+
+  it('lists what each accept took, and not rows confirmed by hand', () => {
+    const rows = [
+      row({
+        id: 1,
+        state: 'confirmed',
+        reason: 'year_drift',
+        yearDelta: 1,
+        mediaItemId: 1,
+        acceptedBy: 'year',
+      }),
+      row({ id: 2, state: 'confirmed', reason: 'year_drift', yearDelta: 1, mediaItemId: 2 }),
+      row({ id: 3, state: 'uncertain', reason: 'year_drift', yearDelta: 1, mediaItemId: 3 }),
+    ]
+    const model = buildReview(
+      rows,
+      catalog(entry(1, 'Kwaidan', 1965), entry(2, 'Ran', 1985), entry(3, 'Ikiru', 1952)),
+      logged(),
+      'keep',
+    )
+
+    assert.deepEqual(model.accepted, { year: [1], subtitle: [], sole: [] })
+    // The one still open is offered as usual beside it.
+    assert.deepEqual(model.bulk.year, [3])
+  })
+
+  it('offers a subtitle added in the same year as a one-tap accept', () => {
+    const rows = [
+      row({
+        id: 1,
+        title: 'Birdman',
+        year: 2014,
+        state: 'uncertain',
+        reason: 'title_differs',
+        yearDelta: 0,
+        mediaItemId: 1,
+      }),
+      row({
+        id: 2,
+        title: 'Dune',
+        year: 2021,
+        state: 'uncertain',
+        reason: 'title_differs',
+        yearDelta: 3,
+        mediaItemId: 2,
+      }),
+      row({
+        id: 3,
+        title: 'Solyaris',
+        year: 1972,
+        state: 'uncertain',
+        reason: 'title_differs',
+        yearDelta: 0,
+        mediaItemId: 3,
+      }),
+    ]
+    const model = buildReview(
+      rows,
+      catalog(
+        entry(1, 'Birdman: A Love Story', 2014),
+        entry(2, 'Dune: Part Two', 2024),
+        entry(3, 'Solaris', 1972),
+      ),
+      logged(),
+      'keep',
+    )
+
+    // Not the one years out, and not a title that is simply different.
+    assert.deepEqual(model.bulk, { year: [], subtitle: [1], sole: [] })
   })
 })
 
@@ -139,7 +240,36 @@ describe('buildReview conflicts', () => {
 
     // The whole reason a re-import of an unchanged export is not 400 decisions.
     assert.equal(model.conflicts.length, 0)
+    // And not 400 saves either: it is already there, so it is unchanged.
+    assert.deepEqual(model.alreadyLoggedIds, [same.id])
+    assert.deepEqual(model.counts, { total: 1, save: 0, unchanged: 1, leftOut: 0 })
+  })
+
+  it('does not ask again about a guess the log already holds', () => {
+    const guess = row({
+      state: 'uncertain',
+      reason: 'no_year',
+      year: null,
+      rating: existing.rating,
+      notes: existing.notes,
+      consumedAt: existing.consumedAt,
+    })
+    const model = buildReview([guess], catalog(entry(1, 'Heat', 1995)), logged(existing), 'keep')
+
+    assert.equal(model.uncertain.length, 0)
+    assert.deepEqual(model.counts, { total: 1, save: 0, unchanged: 1, leftOut: 0 })
+  })
+
+  it('counts what it wrote once the batch is saved, not what the log now agrees with', () => {
+    // After saving, the log matches every written row by construction.
+    const same = row({ rating: existing.rating, notes: existing.notes, consumedAt: existing.consumedAt })
+    const model = buildReview([same], catalog(entry(1, 'Heat', 1995)), logged(existing), 'keep', {
+      saved: true,
+    })
+
+    assert.deepEqual(model.alreadyLoggedIds, [])
     assert.equal(model.confidentCount, 1)
+    assert.deepEqual(model.counts, { total: 1, save: 1, unchanged: 0, leftOut: 0 })
   })
 
   it('turns kept conflicts into updates when the import is taken', () => {
@@ -217,6 +347,38 @@ describe('buildReview duplicates', () => {
     assert.equal(model.counts.save, 1)
   })
 
+  // A person settled this one, so it is the one to keep and the other moves —
+  // however far out it was when it was first flagged.
+  it('keeps the row someone settled by hand when two land on one film', () => {
+    const rows = [
+      row({
+        id: 5,
+        title: 'Solaris',
+        year: 1943,
+        state: 'confirmed',
+        reason: 'year_drift',
+        yearDelta: 29,
+        mediaItemId: 7,
+      }),
+      row({
+        id: 6,
+        title: 'Solaris',
+        year: 1971,
+        state: 'uncertain',
+        reason: 'year_drift',
+        yearDelta: 1,
+        mediaItemId: 7,
+      }),
+    ]
+    const model = buildReview(rows, catalog(entry(7, 'Solaris', 1972)), logged(), 'keep')
+
+    const { verdict } = model.duplicates[0]
+    assert.equal(verdict.kind, 'different_films')
+    if (verdict.kind !== 'different_films') return
+    assert.equal(verdict.anchor.id, 5)
+    assert.equal(verdict.move.id, 6)
+  })
+
   it('reads the same title and year as one film logged twice', () => {
     const rows = [
       row({ id: 12, title: 'Drive', year: 2011, consumedAt: 1_700_000_000_000, mediaItemId: 9 }),
@@ -254,5 +416,63 @@ describe('buildReview duplicates', () => {
 
     assert.equal(model.duplicates.length, 0)
     assert.equal(model.counts.leftOut, 1)
+  })
+})
+
+describe('buildReview what the saved page reports', () => {
+  it('counts rows settled by hand apart from clean matches', () => {
+    const model = buildReview(
+      [row({ mediaItemId: 1 }), row({ state: 'confirmed', reason: 'no_year', mediaItemId: 2 })],
+      catalog(entry(1, 'Heat', 1995), entry(2, 'Dune', 2021)),
+      new Map(),
+      'keep',
+    )
+
+    assert.equal(model.confidentCount, 1)
+    assert.equal(model.confirmedCount, 1)
+    assert.equal(model.counts.save, 2)
+  })
+
+  it('names every row that stays out of the log', () => {
+    const missing = row({ state: 'not_found', mediaItemId: null })
+    const skipped = row({ state: 'skipped' })
+    const model = buildReview([row(), missing, skipped], catalog(entry(1, 'Heat', 1995)), new Map(), 'keep')
+
+    assert.deepEqual(
+      model.leftOutRows.map((r) => r.id),
+      [missing.id, skipped.id],
+    )
+    assert.equal(model.counts.leftOut, 2)
+  })
+})
+
+describe('buildReview sections', () => {
+  it('counts what each section started with and what is still open', () => {
+    const rows = [
+      row({ id: 1, state: 'uncertain', reason: 'no_year', year: null, mediaItemId: 1 }),
+      row({ id: 2, state: 'confirmed', reason: 'no_year', year: null, mediaItemId: 2 }),
+      row({ id: 3, state: 'confirmed', reason: 'year_drift', yearDelta: 1, mediaItemId: 3 }),
+      row({ id: 4, state: 'not_found', reason: null, mediaItemId: null }),
+      row({ id: 5, state: 'skipped', reason: null, mediaItemId: null }),
+      row({ id: 6, mediaItemId: 6 }),
+    ]
+    const model = buildReview(
+      rows,
+      catalog(
+        entry(1, 'Heat', 1995),
+        entry(2, 'Dune', 2021),
+        entry(3, 'Nosferatu', 2024),
+        entry(6, 'Drive', 2011),
+      ),
+      logged(),
+      'keep',
+    )
+
+    // Year drift is finished but still listed, so the checklist can tick it.
+    assert.deepEqual(model.sections, [
+      { key: 'no_year', total: 2, open: 1 },
+      { key: 'year_drift', total: 1, open: 0 },
+      { key: 'not_found', total: 2, open: 1 },
+    ])
   })
 })

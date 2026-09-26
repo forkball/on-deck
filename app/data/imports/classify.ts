@@ -94,19 +94,40 @@ export function suspicion(verdict: Verdict): number {
   }
 }
 
-// Fits after the row, as a chip.
+// A chip after the row, only where it says more than the group heading.
 export function describeReason(verdict: Verdict): string | null {
   const magnitude = Math.abs(verdict.yearDelta ?? 0)
+  return verdict.reason === 'year_drift'
+    ? magnitude === 1
+      ? 'Year off by 1'
+      : `Year off by ${magnitude}`
+    : null
+}
 
-  switch (verdict.reason) {
+// Heading and blurb for a review group.
+export function reasonGroup(
+  reason: MatchReason | null,
+  singular: string,
+  plural: string,
+): { title: string; blurb: string } {
+  switch (reason) {
     case 'title_differs':
-      return 'Title differs'
+      return {
+        title: 'Different title',
+        blurb: `The catalog's title isn't the one in your file — often a subtitle, or a different ${singular}.`,
+      }
     case 'no_year':
-      return 'No year in your CSV'
+      return {
+        title: 'No year in your file',
+        blurb: `Your file gives no year for these ${plural}, and some names belong to more than one. Pick the one you meant.`,
+      }
     case 'year_drift':
-      return magnitude === 1 ? 'Year off by 1' : `Year off by ${magnitude}`
+      return {
+        title: "Year doesn't match",
+        blurb: 'A year or so out is usually a festival or re-release date; further out may be a remake.',
+      }
     default:
-      return null
+      return { title: 'Worth checking', blurb: '' }
   }
 }
 
@@ -117,6 +138,46 @@ export const BULK_ACCEPT_MAX_DRIFT = 1
 
 export function isBulkAcceptable(verdict: Verdict): boolean {
   return verdict.reason === 'year_drift' && Math.abs(verdict.yearDelta ?? 0) <= BULK_ACCEPT_MAX_DRIFT
+}
+
+// The catalog title is the row's title plus a subtitle after a colon or spaced dash.
+export function isSubtitleOnly(rowTitle: string, matchTitle: string): boolean {
+  const wanted = normalizeTitle(rowTitle)
+  if (!wanted) return false
+
+  for (const separator of matchTitle.matchAll(/\s*(?::|\s[-–—])\s+/g)) {
+    const before = matchTitle.slice(0, separator.index)
+    const after = matchTitle.slice(separator.index + separator[0].length)
+    if (normalizeTitle(before) === wanted && after.trim()) return true
+  }
+  return false
+}
+
+// Which one-tap accept, if any, covers a row: year off by at most one, a subtitle
+// added in the same year, or a no-year title the catalog has only one film for.
+export type BulkKind = 'year' | 'subtitle' | 'sole'
+
+export function parseBulkKind(value: unknown): BulkKind | null {
+  return value === 'year' || value === 'subtitle' || value === 'sole' ? value : null
+}
+
+export function bulkKind(
+  verdict: Verdict,
+  rowTitle: string,
+  match: CandidateLike | null,
+  namesakes: number | null = null,
+): BulkKind | null {
+  if (isBulkAcceptable(verdict)) return 'year'
+  if (verdict.reason === 'no_year' && namesakes === 1) return 'sole'
+  if (
+    verdict.reason === 'title_differs' &&
+    verdict.yearDelta === 0 &&
+    match &&
+    isSubtitleOnly(rowTitle, match.title)
+  ) {
+    return 'subtitle'
+  }
+  return null
 }
 
 export interface DuplicateRow {
@@ -200,3 +261,28 @@ function normalizeNote(note: string | null): string {
 // What a conflicting row does when the person hasn't said otherwise. `keep` is
 // the default because it is the only direction that destroys nothing.
 export type ConflictChoice = 'keep' | 'take'
+
+// A no-year row's namesakes, matching's pick first, capped at three. One entry
+// means the catalog has only that film.
+export const MAX_INLINE_ALTERNATES = 3
+
+export function inlineAlternates(
+  row: RowLike,
+  verdict: Verdict,
+  chosen: CandidateLike | null,
+  results: CandidateLike[],
+): CandidateLike[] | null {
+  if (verdict.reason !== 'no_year' || !chosen) return null
+
+  const wanted = normalizeTitle(row.title)
+  const seen = new Set<string>()
+  const namesakes: CandidateLike[] = []
+
+  for (const result of [chosen, ...results]) {
+    if (seen.has(result.externalId) || normalizeTitle(result.title) !== wanted) continue
+    seen.add(result.externalId)
+    namesakes.push({ externalId: result.externalId, title: result.title, releaseYear: result.releaseYear })
+  }
+
+  return namesakes.slice(0, MAX_INLINE_ALTERNATES)
+}
