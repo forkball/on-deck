@@ -85,6 +85,9 @@ interface IgdbImage {
 interface IgdbGame {
   id: number
   name?: string
+  // The game's page on igdb.com. Carried because the page is addressed by slug,
+  // which external_id (the numeric id) can't be turned back into.
+  url?: string
   first_release_date?: number
   summary?: string | null
   cover?: IgdbImage
@@ -193,7 +196,7 @@ async function igdbQuery<T>(endpoint: string, body: string): Promise<T[]> {
 }
 
 const GAME_FIELDS =
-  'fields name,first_release_date,summary,total_rating_count,cover.url,screenshots.url,genres.name,game_modes.name,' +
+  'fields name,url,first_release_date,summary,total_rating_count,cover.url,screenshots.url,genres.name,game_modes.name,' +
   'involved_companies.developer,involved_companies.company.name,platforms.name,platforms.abbreviation,' +
   // Free: search and by-id share this clause, so the series arrives with every hit
   // and costs no extra request. Google Books has no equivalent, which is why books
@@ -252,6 +255,7 @@ function toResult(game: IgdbGame, hoursToBeat: number | null): CatalogSearchResu
     pageCount: null,
     playtimeHours: hoursToBeat,
     creator: developerOf(game),
+    sourceUrl: pageUrlOf(game),
     series: [...(game.collections ?? []), ...(game.franchises ?? [])]
       .map((entry) => entry.name)
       .filter((name): name is string => Boolean(name)),
@@ -261,6 +265,12 @@ function toResult(game: IgdbGame, hoursToBeat: number | null): CatalogSearchResu
       .map((platform) => platform.abbreviation || platform.name)
       .filter((name): name is string => Boolean(name)),
   }
+}
+
+// Only an igdb.com address is kept: it is rendered as a link, so anything else
+// the field ever held would be a link to somewhere we didn't mean to send people.
+function pageUrlOf(game: IgdbGame): string | null {
+  return game.url && /^https:\/\/www\.igdb\.com\/games\/[a-z0-9-]+$/i.test(game.url) ? game.url : null
 }
 
 function developerOf(game: IgdbGame): string | null {

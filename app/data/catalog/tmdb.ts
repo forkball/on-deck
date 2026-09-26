@@ -60,6 +60,9 @@ export interface TmdbSearchResult {
   playtimeHours?: number | null
   seasonCount?: number | null
   creator?: string | null
+  // The item's page on its catalog, for a provider whose page can't be built from
+  // externalId alone — see catalogPageFor. Only IGDB sets it.
+  sourceUrl?: string | null
   // The series, franchise or collection a provider says this belongs to, when it
   // says. IGDB fills it from collections and franchises; TMDB has
   // belongs_to_collection on its detail record and doesn't yet; Google Books has
