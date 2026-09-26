@@ -100,7 +100,10 @@ const GROUP_STYLE = css({
   },
   '& .chevron': { display: 'inline-block', transition: 'transform 120ms ease' },
   '& > details[open] > summary .chevron': { transform: 'rotate(90deg)' },
-  '& .meta': { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '6px' },
+  // The title line — chevron, who, what, and (folded) the count — is one flex
+  // run, so the count sits right beside the rest of the title rather than
+  // wrapping onto the date's line.
+  '& .title': { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '6px' },
   '& .when': { color: '#888', fontSize: '12px' },
   '& .count': {
     padding: '1px 8px',
@@ -112,14 +115,14 @@ const GROUP_STYLE = css({
   '& > details[open] > summary .count': { display: 'none' },
   // On a phone the label starts at the left edge, the way the rows under it do,
   // with just the trailing rule, and the date range drops to its own line under
-  // who and what — lined up with the name, past the chevron.
+  // the title — lined up with the name, past the chevron.
   '@media (max-width: 600px)': {
     '& > details > summary': { alignItems: 'flex-start' },
     '& > details > summary::before': { display: 'none' },
-    // Level with the first line rather than centred between the two.
+    // Level with the title line rather than centred between the two.
     '& > details > summary::after': { marginTop: '0.7em' },
     '& > details > summary > span': { flexDirection: 'column', alignItems: 'flex-start', rowGap: '2px' },
-    '& .meta': { paddingLeft: '1.1em' },
+    '& .when': { paddingLeft: '1.1em' },
     '& .dot': { display: 'none' },
   },
 })
@@ -152,18 +155,16 @@ function FeedGroup(handle: Handle<{ items: FeedItem[] }>) {
         <details open>
           <summary>
             <span>
-              <span>
+              <span class="title">
                 <span class="chevron" aria-hidden="true">
                   ▸
                 </span>{' '}
                 <strong>{who}</strong> {what}
-              </span>
-              <span class="meta">
-                <span class="when">
-                  <span class="dot">· </span>
-                  {when}
-                </span>
                 <span class="count">{items.length} entries</span>
+              </span>
+              <span class="when">
+                <span class="dot">· </span>
+                {when}
               </span>
             </span>
           </summary>
