@@ -10,7 +10,6 @@ import {
   recordProfileRebuild,
   timeUntil,
 } from '../../data/recommendations/dailyLimit.ts'
-import { getLuckyState } from '../../data/recommendations/lucky.ts'
 import {
   parseProfileLogLimit,
   profileSettingsFor,
@@ -54,10 +53,7 @@ export default createController(routes.profile, {
 
       const followingCount = await countFollowing(db, auth.identity.id)
       const followersCount = await countFollowers(db, auth.identity.id)
-      const [rebuildAllowance, lucky] = await Promise.all([
-        getProfileRebuildAllowance(db, auth.identity),
-        getLuckyState(auth.identity),
-      ])
+      const rebuildAllowance = await getProfileRebuildAllowance(db, auth.identity)
 
       // Kicked off beside the render, never awaited into it: reading the feed
       // and looking up any film new to the catalog is seconds of network, and
@@ -82,7 +78,6 @@ export default createController(routes.profile, {
           rebuildsLeft={rebuildAllowance.unlimited ? null : rebuildAllowance.remaining}
           rebuilt={context.url.searchParams.get('rebuilt') === '1'}
           rebuildError={context.url.searchParams.get('rebuildError') ?? undefined}
-          lucky={lucky}
           displayName={displayLabel(auth.identity)}
         />,
       )

@@ -6,7 +6,7 @@ import type { FeedCursor, FeedItem } from '../data/feed.ts'
 import type { LuckyState } from '../data/recommendations/lucky.ts'
 import { luckyRecommendationsHref, routes } from '../routes.ts'
 import { Document } from '../ui/components/document.tsx'
-import { LUCKY_CARD_BOX, LUCKY_PICK_LABEL, LuckyPickCard } from '../ui/components/lucky-pick-card.tsx'
+import { LUCKY_CARD_BOX, LUCKY_PICK_LABEL, LuckyPickCard } from './lucky-pick-card.tsx'
 import { Nav } from '../ui/components/nav.tsx'
 import { FEED_LIST_ID, FeedList } from './activity-feed.tsx'
 
