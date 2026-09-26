@@ -7,6 +7,13 @@ export interface Pick {
   title: string
   year: number
   reason: string
+  // Only asked for when the series lever is set, and absent on picks carried in a
+  // checkpoint written before it was — see matchesSeries, which reads nothing as
+  // "no answer given" rather than as standalone.
+  part_of_series?: boolean
+  // The series this belongs to, empty for a standalone. Asked for on every run, to
+  // keep one series from taking several of the eight slots — see seriesKey.
+  series_name?: string
 }
 
 export interface TasteSummary {
@@ -57,25 +64,36 @@ export interface RecommendationFilters {
   series?: string
 }
 
-const PICKS_SCHEMA = {
-  type: 'object' as const,
-  additionalProperties: false,
-  properties: {
-    picks: {
-      type: 'array' as const,
-      items: {
-        type: 'object' as const,
-        additionalProperties: false,
-        properties: {
-          title: { type: 'string' as const },
-          year: { type: 'number' as const },
-          reason: { type: 'string' as const },
+// Built per request rather than a constant: part_of_series is asked for only when
+// the lever needs it, and structured output requires every property it declares, so
+// a field that is sometimes wanted can't just be optional in one fixed schema.
+function picksSchema(withSeries: boolean) {
+  const properties = {
+    title: { type: 'string' as const },
+    year: { type: 'number' as const },
+    reason: { type: 'string' as const },
+    // A string rather than a nullable one: structured output takes a single type
+    // per property, and "" is a clearer "no series" than a magic word would be.
+    series_name: { type: 'string' as const },
+    ...(withSeries ? { part_of_series: { type: 'boolean' as const } } : {}),
+  }
+
+  return {
+    type: 'object' as const,
+    additionalProperties: false,
+    properties: {
+      picks: {
+        type: 'array' as const,
+        items: {
+          type: 'object' as const,
+          additionalProperties: false,
+          properties,
+          required: Object.keys(properties),
         },
-        required: ['title', 'year', 'reason'],
       },
     },
-  },
-  required: ['picks'],
+    required: ['picks'],
+  }
 }
 
 // Enough over TARGET_COUNT to survive the gates dropping some, and no more: a
@@ -116,7 +134,15 @@ export function describeSeen(seen: string[], noun: string, subject: string | nul
 
 function buildFilterInstructions(filters: RecommendationFilters, noun: string, mediaType: MediaType): string {
   const clauses: string[] = []
-  if (filters.genre) clauses.push(`Only suggest ${noun} in the "${filters.genre}" genre.`)
+  if (filters.genre) {
+    clauses.push(
+      `Only suggest ${noun} in the "${filters.genre}" genre. This one is checked: each pick is looked up and ` +
+        `discarded unless the catalog itself files it under "${filters.genre}", so a ${noun} from another genre ` +
+        `that merely contains ${filters.genre} will not survive. Where this genre and the taste profile barely ` +
+        `overlap, the genre wins — suggest the "${filters.genre}" ${noun} this reader is most likely to enjoy, ` +
+        `rather than the ${noun} closest to their profile that gestures at "${filters.genre}".`,
+    )
+  }
   if (filters.decade != null) {
     if (filters.decadeRelation === 'before') {
       clauses.push(`Only suggest ${noun} originally released before ${filters.decade}.`)
@@ -141,7 +167,23 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string, m
   if (filters.platform) clauses.push(`Only suggest ${noun} playable on ${filters.platform}.`)
   if (filters.series === 'series') clauses.push(`Only suggest ${noun} that are part of a series.`)
   if (filters.series === 'standalone') clauses.push(`Only suggest standalone ${noun}, not part of a series.`)
+  // Nothing in any book catalog answers this, so the model is asked to label its own
+  // picks and is held to the labels — see matchesSeries.
+  if (filters.series != null) {
+    clauses.push(
+      `Set "part_of_series" on every pick: true if it belongs to a series, false if it stands alone. ` +
+        `Answer for the work itself, not for whether the author wrote other books.`,
+    )
+  }
   return clauses.length > 0 ? ` ${clauses.join(' ')}` : ''
+}
+
+// The picks, plus what was said to get them. The caller keeps both — see
+// transcripts.ts for why they aren't simply logged.
+export interface PicksResult {
+  picks: Pick[]
+  prompt: string
+  response: string
 }
 
 export async function requestPicks(
@@ -150,7 +192,7 @@ export async function requestPicks(
   filters: RecommendationFilters = {},
   mediaType: MediaType = 'movie',
   sourceTypes: MediaType[] = ['movie'],
-): Promise<Pick[]> {
+): Promise<PicksResult> {
   const isGroup = profiles.length > 1
   const subject = isGroup ? null : profiles[0].label
   const noun = mediaTypeUiFor(mediaType).plural
@@ -172,7 +214,16 @@ export async function requestPicks(
     filters.platform != null ||
     filters.series != null
   const requestedCount = hasFilters ? REQUESTED_COUNT + 6 : REQUESTED_COUNT
-  const filterInstructions = buildFilterInstructions(filters, noun, mediaType) + sourceInstructions
+  const { singular } = mediaTypeUiFor(mediaType)
+  const seriesRule =
+    ` Set "series_name" on each pick: the series it belongs to, or "" if it stands alone.` +
+    (filters.series === 'standalone'
+      ? ''
+      : ` Suggest at most one ${singular} per series — the one someone new to that series should start with — ` +
+        `so the list is that many different ${noun} rather than half of one shelf.`)
+
+  const filterInstructions =
+    buildFilterInstructions(filters, noun, mediaType) + sourceInstructions + seriesRule
 
   const prompt = isGroup
     ? `Group of ${profiles.length} people, each with their own ${noun} taste profile:\n${JSON.stringify(profiles, null, 2)}\n\n` +
@@ -195,31 +246,36 @@ export async function requestPicks(
   // call wants .stream() and get_final_message(), not a bigger ceiling.
   const maxTokens = Math.min(6000 + 3000 * profiles.length + (hasFilters ? 4000 : 0), 32000)
 
-  const { picks } = await requestStructured<{ picks: Pick[] }>('picks.model', {
-    model: 'claude-sonnet-5',
-    max_tokens: maxTokens,
-    output_config: {
-      effort: 'medium',
-      format: { type: 'json_schema', schema: PICKS_SCHEMA },
-    },
-    messages: [
-      {
-        role: 'user',
-        content:
-          prompt +
-          describeSeen(excluded.seen, noun, subject) +
-          (excluded.rejected.length > 0
-            ? subject
-              ? `\n\n${subject} has explicitly ruled these out as not interesting — never suggest them, and treat ` +
-                `them as a signal about what to steer away from more broadly: ` +
-                `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
-              : `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
-                `as a signal about what to steer away from more broadly: ` +
-                `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
-            : ''),
-      },
-    ],
-  })
+  const content =
+    prompt +
+    describeSeen(excluded.seen, noun, subject) +
+    (excluded.rejected.length > 0
+      ? subject
+        ? `\n\n${subject} has explicitly ruled these out as not interesting — never suggest them, and treat ` +
+          `them as a signal about what to steer away from more broadly: ` +
+          `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
+        : `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
+          `as a signal about what to steer away from more broadly: ` +
+          `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
+      : '')
 
-  return picks
+  let response = ''
+
+  const { picks } = await requestStructured<{ picks: Pick[] }>(
+    'picks.model',
+    {
+      model: 'claude-sonnet-5',
+      max_tokens: maxTokens,
+      output_config: {
+        effort: 'medium',
+        format: { type: 'json_schema', schema: picksSchema(filters.series != null) },
+      },
+      messages: [{ role: 'user', content }],
+    },
+    (raw) => {
+      response = raw
+    },
+  )
+
+  return { picks, prompt: content, response }
 }

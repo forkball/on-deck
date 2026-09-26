@@ -40,6 +40,7 @@ function buildMetadata(
     // would replace a set we already had.
     images: result.images?.length ? result.images : (prev?.images ?? []),
     platforms: result.platforms?.length ? result.platforms : (prev?.platforms ?? []),
+    series: result.series?.length ? result.series : (prev?.series ?? []),
     tags: result.tags?.length ? result.tags : (prev?.tags ?? []),
   }
 }

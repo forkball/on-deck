@@ -9,6 +9,11 @@ const GOOGLE_BOOKS_BASE = 'https://www.googleapis.com/books/v1'
 // Science Fiction / General"), so genres are derived the same way Open
 // Library's free-form subjects are: an entry matches if any needle appears
 // anywhere in the category string.
+//
+// On the by-id record only, though. A search hit carries the top level and
+// nothing under it — "Fiction" for Dune, which matches no needle below — so a
+// hit with no genre tag says nothing about the book. filterByGenre in
+// matching.ts is what pays for the difference, and only when the lever is set.
 const GENRE_MATCHERS: [genre: string, needles: string[]][] = [
   ['graphic novel', ['graphic novel', 'comic', 'manga']],
   ['science fiction', ['science fiction']],
@@ -30,6 +35,11 @@ const GENRE_MATCHERS: [genre: string, needles: string[]][] = [
 
 export const BOOK_GENRES: string[] = GENRE_MATCHERS.map(([genre]) => genre).sort()
 
+// Asked of the model in the pick prompt and left at that: volumeInfo.seriesInfo
+// is in the API's own discovery schema but is no longer returned for any volume,
+// by search or by id. A tag derived from its absence called every book in the
+// catalog standalone, Dune included, so the tags below carry no series entry and
+// nothing here re-checks the model's answer.
 export const BOOK_SERIES_TYPES: string[] = ['series', 'standalone']
 
 const TAG_LIMIT = 4
@@ -59,10 +69,6 @@ interface GoogleBooksVolume {
     categories?: string[]
     ratingsCount?: number
     imageLinks?: { thumbnail?: string; smallThumbnail?: string }
-    // Undocumented in the public reference but present in the API's own
-    // discovery schema, and how "part of a series" is derived below — Google
-    // Books has nothing else for it (no separate series/standalone flag).
-    seriesInfo?: { volumeSeries?: unknown[] }
   }
 }
 
@@ -94,13 +100,11 @@ function toResult(volume: GoogleBooksVolume): CatalogSearchResult {
   const info = volume.volumeInfo ?? {}
   const title = info.subtitle ? `${info.title}: ${info.subtitle}` : (info.title ?? 'Untitled')
 
-  const seriesTag = (info.seriesInfo?.volumeSeries?.length ?? 0) > 0 ? 'series' : 'standalone'
-
   return {
     externalId: volume.id,
     title,
     releaseYear: info.publishedDate ? Number(info.publishedDate.slice(0, 4)) || null : null,
-    tags: [...deriveGenres(info.categories), seriesTag],
+    tags: deriveGenres(info.categories),
     posterUrl: toHttps(info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail),
     popularity: info.ratingsCount ?? 0,
     overview: info.description ? cleanDescription(info.description) : null,
@@ -195,9 +199,23 @@ export async function getBookById(externalId: string): Promise<CatalogSearchResu
 // anchor on, so it's restricted to the observed id shape.
 const BARE_ID = /^[A-Za-z0-9_-]{10,15}$/
 
+// What Google serves today: the id is the last path segment, after a slug of the
+// title, and there is no `id=` anywhere in it —
+// google.ca/books/edition/Iron_Flame/xIS9EAAAQBAJ. Anyone copying a link out of
+// the address bar in 2026 gets this form, and only this form; the `?id=` shape
+// below is what books.google.com and play.google.com still emit. Both are
+// accepted, since old links keep working and pasted links come from everywhere.
+//
+// The slug is skipped rather than matched: it is the title, so it carries
+// apostrophes, accents and non-Latin scripts, and `_` when Google omits it.
+const EDITION_PATH = /\/books\/edition\/[^/]*\/([A-Za-z0-9_-]{10,15})/
+
 export function parseGoogleBooksId(input: string): string | null {
   const trimmed = input.trim()
   if (BARE_ID.test(trimmed)) return trimmed
+
+  const path = trimmed.match(EDITION_PATH)
+  if (path) return path[1]
 
   const match = trimmed.match(/[?&]id=([A-Za-z0-9_-]{6,})/)
   return match ? match[1] : null

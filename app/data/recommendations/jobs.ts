@@ -1,12 +1,21 @@
 import { lt } from 'remix/data-table'
 
 import { pool, type Db } from '../db.ts'
+import type { MediaType } from '../mediaItems.ts'
+import { genreMissNeedsLookup } from './matching.ts'
 import { recommendationJobs, type RecommendationJob } from '../schema.ts'
 import type { RunTimings } from './timings.ts'
 
 // In the database, not process memory: the POST and the poll that follows it can
 // land on different machines.
-export type GenerationPhase = 'profiles' | 'picks' | 'matching' | 'lengths' | 'verifying' | 'saving'
+export type GenerationPhase =
+  | 'profiles'
+  | 'picks'
+  | 'matching'
+  | 'genres'
+  | 'lengths'
+  | 'verifying'
+  | 'saving'
 
 // One per real await in generateRecommendations — adding a stage there means
 // adding it here too.
@@ -14,6 +23,7 @@ export const PHASE_LABELS: Record<GenerationPhase, string> = {
   profiles: 'Reading what everyone has logged…',
   picks: 'Choosing picks…',
   matching: 'Looking each one up…',
+  genres: 'Checking genres…',
   lengths: 'Checking lengths…',
   verifying: 'Making sure they match…',
   saving: 'Saving your picks…',
@@ -23,6 +33,7 @@ export const PHASE_ORDER: GenerationPhase[] = [
   'profiles',
   'picks',
   'matching',
+  'genres',
   'lengths',
   'verifying',
   'saving',
@@ -34,11 +45,14 @@ export interface GenerationJob {
   userId: number
   status: JobStatus
   queuedAhead?: number
-  // Only the stages this run will hit — the length check runs only when that
-  // lever is set.
+  // Only the stages this run will hit — the genre and length checks each run
+  // only when their lever is set, and the genre one only when it costs lookups.
   phases: GenerationPhase[]
   phase: GenerationPhase
   runId?: number
+  // Set in run_id's place when the catalog wouldn't answer and the model's picks
+  // were kept unconfirmed.
+  unconfirmedRunId?: number
   prunedOldestRun?: boolean
   error?: string
   startedAt: number
@@ -64,6 +78,7 @@ function toJob(row: RecommendationJob): GenerationJob {
     phases: parsePhases(row.phases),
     phase: (row.phase in PHASE_LABELS ? row.phase : 'profiles') as GenerationPhase,
     runId: row.run_id ?? undefined,
+    unconfirmedRunId: row.unconfirmed_run_id ?? undefined,
     prunedOldestRun: row.pruned_oldest_run === 1,
     error: row.error ?? undefined,
     startedAt: Number(row.created_at),
@@ -83,6 +98,28 @@ export interface JobParams {
   lucky?: boolean
 }
 
+// The stages a run with these params will actually reach, in order.
+//
+// Read from the params rather than passed alongside them: a caller computing this
+// and a run entering the stages are two statements of one fact, and the run is the
+// one that can't be wrong. generateRecommendations asks this too, so a stage it
+// enters is a stage the progress list already holds — a phase missing from that
+// list reads as a bar that has stalled.
+//
+// The genre check is a stage only where it costs a round of lookups. Everywhere
+// else the genre is read off the search hit inside `matching`, which is already
+// its own stage.
+export function phasesFor(params: {
+  mediaType: string
+  filters: { genre?: unknown; length?: unknown }
+}): GenerationPhase[] {
+  const skipped = new Set<GenerationPhase>()
+  if (params.filters.genre == null || !genreMissNeedsLookup(params.mediaType as MediaType))
+    skipped.add('genres')
+  if (params.filters.length == null) skipped.add('lengths')
+  return PHASE_ORDER.filter((phase) => !skipped.has(phase))
+}
+
 // `active_job` when the user already has one queued or running.
 export type EnqueueJobResult = { ok: true; jobId: string } | { ok: false; reason: 'active_job' }
 
@@ -90,17 +127,12 @@ export type EnqueueJobResult = { ok: true; jobId: string } | { ok: false; reason
 // index (see the 20260816120000 migration) is what makes one-per-user hold under
 // concurrent requests — reading first and inserting after leaves a window two
 // requests can both pass through.
-export async function enqueueJob(
-  db: Db,
-  userId: number,
-  params: JobParams,
-  options: { withLengthCheck: boolean },
-): Promise<EnqueueJobResult> {
+export async function enqueueJob(db: Db, userId: number, params: JobParams): Promise<EnqueueJobResult> {
   await sweep(db)
 
   const id = crypto.randomUUID()
   const now = Date.now()
-  const phases = options.withLengthCheck ? PHASE_ORDER : PHASE_ORDER.filter((phase) => phase !== 'lengths')
+  const phases = phasesFor(params)
 
   const { rows } = await pool.query<{ id: string }>(
     `insert into recommendation_jobs
@@ -143,15 +175,21 @@ export async function saveCheckpoint(db: Db, jobId: string, checkpoint: unknown)
   )
 }
 
-export async function completeJob(
-  db: Db,
-  jobId: string,
-  runId: number,
-  prunedOldestRun: boolean,
-): Promise<void> {
+// What a finished job points at. A run, or — when the catalog wouldn't answer and
+// the model's own picks were kept instead — an unconfirmed one.
+export type JobTarget =
+  | { kind: 'run'; runId: number; prunedOldestRun: boolean }
+  | { kind: 'unconfirmed'; unconfirmedRunId: number }
+
+export async function completeJob(db: Db, jobId: string, target: JobTarget): Promise<void> {
+  const columns =
+    target.kind === 'run'
+      ? { run_id: target.runId, pruned_oldest_run: target.prunedOldestRun ? 1 : 0 }
+      : { unconfirmed_run_id: target.unconfirmedRunId }
+
   await db.updateMany(
     recommendationJobs,
-    { status: 'done', run_id: runId, pruned_oldest_run: prunedOldestRun ? 1 : 0, updated_at: Date.now() },
+    { status: 'done', ...columns, updated_at: Date.now() },
     { where: { id: jobId } },
   )
 }
@@ -194,7 +232,9 @@ export async function getJob(db: Db, jobId: string, userId: number): Promise<Gen
 // bound on how long a stage may legitimately take.
 export const CLAIM_STALE_MS = 3 * 60 * 1000
 
-const MAX_ATTEMPTS = 3
+// Shared with the worker, which spends them on a catalog that won't answer before
+// it gives up and keeps what the model said.
+export const MAX_ATTEMPTS = 3
 
 // A null claim is deliberately not stale — `claimed_at is not null`, never
 // coalesce(claimed_at, 0). During a rolling deploy that would let a new-release

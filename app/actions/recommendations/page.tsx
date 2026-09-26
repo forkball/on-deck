@@ -17,10 +17,15 @@ import { routes } from '../../routes.ts'
 import { Document } from '../../ui/components/document.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { RunList } from '../../ui/components/run-list.tsx'
-import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import type { UnconfirmedRunDetail } from '../../data/recommendations/unconfirmed.ts'
+import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, mediaTypeUiFor, type ActiveMediaType } from '../../mediaTypes.ts'
 
 export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
+  // Runs the catalog couldn't answer for, kept so an outage doesn't throw away
+  // what the model said. Their own section, because they aren't runs: nothing in
+  // them can be logged, rated or opened.
+  unconfirmedRuns: UnconfirmedRunDetail[]
   // Past lucky draws — shown in their own section rather than mixed into `runs`.
   luckyRuns: RecommendationRunSummary[]
   runsFromOthers: RecommendationRunSummary[]
@@ -79,6 +84,32 @@ function RunsSection(handle: Handle<{ title: string; caption: string; runs: Reco
   }
 }
 
+// Kept quiet on purpose: a list of things nothing could confirm sits below the
+// real runs, says how many it holds and what it is, and stays out of the way.
+function UnconfirmedSection(handle: Handle<{ runs: UnconfirmedRunDetail[] }>) {
+  return () => (
+    <section mix={css({ marginTop: '40px' })}>
+      <h2>Unconfirmed</h2>
+      <p mix={sectionCaption}>
+        Runs the catalog couldn't be reached for. The model's picks were kept, but nothing has checked them.
+      </p>
+      <ul mix={css({ listStyle: 'none', margin: 0, padding: 0 })}>
+        {handle.props.runs.map((run) => (
+          <li key={run.id} mix={css({ padding: '8px 0', borderBottom: '1px solid #eee' })}>
+            <a href={routes.recommendations.unconfirmed.href({ unconfirmedId: String(run.id) })}>
+              {run.picks.length} {mediaTypeUiFor(run.mediaType).plural}
+            </a>
+            <span mix={css({ color: '#888', fontSize: '13px' })}>
+              {' — '}
+              {new Date(run.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 // Shown when the same levers already produced a run whose picks are all still
 // unlogged. Not a hard block — the button is right there.
 function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<RecommendationsPageProps['duplicate']> }>) {
@@ -103,16 +134,13 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
           {new Date(duplicate.createdAt).toLocaleDateString()}, and you haven't logged anything from it yet.
           Generating again will replace it with a different set of picks.
         </p>
-        <div mix={css({ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' })}>
-          <a href={href}>Show me that one →</a>
-          <form method="post" action={routes.recommendations.generate.href()}>
-            {duplicate.fields.map(([name, value], index) => (
-              <input key={`${name}-${index}`} type="hidden" name={name} value={value} />
-            ))}
-            <input type="hidden" name="force" value="1" />
-            <button type="submit">Generate a new one anyway</button>
-          </form>
-        </div>
+        <form method="post" action={routes.recommendations.generate.href()}>
+          {duplicate.fields.map(([name, value], index) => (
+            <input key={`${name}-${index}`} type="hidden" name={name} value={value} />
+          ))}
+          <input type="hidden" name="force" value="1" />
+          <button type="submit">Generate a new one anyway</button>
+        </form>
       </div>
     )
   }
@@ -137,6 +165,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
     const {
       runs,
+      unconfirmedRuns,
       luckyRuns,
       runsFromOthers,
       friends,
@@ -228,6 +257,8 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
               runs={runsFromOthers}
             />
           )}
+
+          {unconfirmedRuns.length > 0 && <UnconfirmedSection runs={unconfirmedRuns} />}
 
           {luckyRuns.length > 0 && (
             <RunsSection

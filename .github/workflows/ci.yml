@@ -1,5 +1,10 @@
-# Checks and deploy share a file because `needs:` cannot reach across
+# Verify and deploy share a file because `needs:` cannot reach across
 # workflows, and a deploy that does not wait for its checks is not a gate.
+#
+# Branch protection matches a required check by name, as a string. Rename this
+# job without updating the rule and the old name never reports again, leaving
+# every pull request waiting on a check that cannot arrive — so update the rule
+# in the same sitting, not afterwards.
 
 name: CI
 on:
@@ -8,7 +13,7 @@ on:
     branches: [main]
 
 jobs:
-  checks:
+  verify:
     runs-on: ubuntu-latest
     services:
       # Without DATABASE_URL, 12 of 28 test files skip themselves and the run
@@ -39,7 +44,7 @@ jobs:
       - run: npm test
 
   deploy:
-    needs: checks
+    needs: verify
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     concurrency: deploy-group

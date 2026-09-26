@@ -12,6 +12,8 @@ import { Document } from '../../ui/components/document.tsx'
 import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
 import { StarRatingInput } from '../../ui/components/star-rating.tsx'
 import { StatusSelect } from '../../ui/components/status-select.tsx'
+import { decadeComesFromPick, genreMissNeedsLookup } from '../../data/recommendations/matching.ts'
+import { ModelProvided } from './model-provided.tsx'
 import { Nav } from '../../ui/components/nav.tsx'
 import { PlatformList } from '../../ui/components/platform-list.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
@@ -34,9 +36,36 @@ const PLAYER_TYPE_LABELS: Record<string, string> = {
 const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus: 'Versus' }
 const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series', standalone: 'Standalone' }
 
-function describeParams(params: GenerationParams, mediaType: MediaType): string[] {
-  const lines: string[] = [`Based on: ${params.sourceTypes.map((type) => SOURCE_LABELS[type]).join(', ')}`]
-  if (params.genre) lines.push(`Genre: ${params.genre.replace(/^./, (c) => c.toUpperCase())}`)
+// A line of the run's summary. `modelNote` is set when the lever was applied from
+// the model's own answer rather than checked against the catalog, which is true of
+// exactly two of them and only for books.
+export interface ParamLine {
+  text: string
+  modelNote?: string
+}
+
+const BOOK_GENRE_NOTE =
+  "Checked against Google Books' categories wherever it has them. It has none at all for " +
+  "many older works, and those were kept on the model's word rather than thrown away."
+
+const BOOK_YEAR_NOTE =
+  'Applied from the year the model gave for each book. Google Books dates editions, ' +
+  'not works — its record for Dune says 2005 — so there is no catalogue year to check this against.'
+
+const SERIES_NOTE =
+  "Applied from the model's own answer for each pick. No catalogue the app reads records " +
+  'whether a work belongs to a series.'
+
+export function describeParams(params: GenerationParams, mediaType: MediaType): ParamLine[] {
+  const lines: ParamLine[] = [
+    { text: `Based on: ${params.sourceTypes.map((type) => SOURCE_LABELS[type]).join(', ')}` },
+  ]
+  if (params.genre) {
+    lines.push({
+      text: `Genre: ${params.genre.replace(/^./, (c) => c.toUpperCase())}`,
+      modelNote: genreMissNeedsLookup(mediaType) ? BOOK_GENRE_NOTE : undefined,
+    })
+  }
   if (params.decade != null) {
     const label =
       params.decadeRelation === 'before'
@@ -44,23 +73,34 @@ function describeParams(params: GenerationParams, mediaType: MediaType): string[
         : params.decadeRelation === 'after'
           ? `After ${params.decade + 9}`
           : `${params.decade}s`
-    lines.push(`Decade: ${label}`)
+    // Asked, not restated: the note claims what the filter did, so it reads the
+    // same predicate the filter read.
+    lines.push({
+      text: `Decade: ${label}`,
+      modelNote: decadeComesFromPick(mediaType) ? BOOK_YEAR_NOTE : undefined,
+    })
   }
   if (params.length) {
     const label = getCatalogProvider(mediaType).lengthOptions.find(
       (option) => option.value === params.length,
     )?.label
-    if (label) lines.push(`Length: ${label}`)
+    if (label) lines.push({ text: `Length: ${label}` })
   }
-  if (params.playerType)
-    lines.push(`Player type: ${PLAYER_TYPE_LABELS[params.playerType] ?? params.playerType}`)
+  if (params.playerType) {
+    lines.push({ text: `Player type: ${PLAYER_TYPE_LABELS[params.playerType] ?? params.playerType}` })
+  }
   if (params.multiplayerType) {
-    lines.push(
-      `Multiplayer type: ${MULTIPLAYER_TYPE_LABELS[params.multiplayerType] ?? params.multiplayerType}`,
-    )
+    lines.push({
+      text: `Multiplayer type: ${MULTIPLAYER_TYPE_LABELS[params.multiplayerType] ?? params.multiplayerType}`,
+    })
   }
-  if (params.platform) lines.push(`Platform: ${params.platform}`)
-  if (params.series) lines.push(`Series: ${SERIES_TYPE_LABELS[params.series] ?? params.series}`)
+  if (params.platform) lines.push({ text: `Platform: ${params.platform}` })
+  if (params.series) {
+    lines.push({
+      text: `Series: ${SERIES_TYPE_LABELS[params.series] ?? params.series}`,
+      modelNote: SERIES_NOTE,
+    })
+  }
   return lines
 }
 
@@ -102,7 +142,18 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
             {date}
             {run.name && ` — Recommendations for ${forLabel}`}
           </p>
-          <p mix={css({ color: '#888', fontSize: '13px' })}>{paramLines.join(' · ')}</p>
+          <p mix={css({ color: '#888', fontSize: '13px' })}>
+            {paramLines.map((line, index) => (
+              <span key={line.text}>
+                {index > 0 && ' · '}
+                {line.modelNote ? (
+                  <ModelProvided note={line.modelNote}>{line.text}</ModelProvided>
+                ) : (
+                  line.text
+                )}
+              </span>
+            ))}
+          </p>
 
           <ul
             mix={css({
@@ -195,7 +246,11 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                     {/* Empty for everything but games, so no other type
                         renders a gap here. */}
                     <PlatformList platforms={platforms} />
-                    <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: '#555' })}>{reason}</p>
+                    <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: '#555' })}>
+                      <ModelProvided note="Written by the model from the taste profile this run was built on — not a description from the catalogue.">
+                        {reason}
+                      </ModelProvided>
+                    </p>
                   </div>
                   {/* Right-hand column, so the control lines up down the list
                       regardless of how long each title and reason runs. The

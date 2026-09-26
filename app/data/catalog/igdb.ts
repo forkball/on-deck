@@ -93,6 +93,12 @@ interface IgdbGame {
   game_modes?: { name: string }[]
   involved_companies?: { developer?: boolean; company?: { name?: string } }[]
   platforms?: { name?: string; abbreviation?: string }[]
+  // IGDB's two groupings, both carried because they answer different halves of "is
+  // this the same series": a collection is the numbered line (Portal), a franchise
+  // the umbrella over several (The Legend of Zelda, whose games sit in different
+  // collections). Either overlapping is enough to call two games the same series.
+  collections?: { name?: string }[]
+  franchises?: { name?: string }[]
   total_rating_count?: number
 }
 
@@ -188,7 +194,11 @@ async function igdbQuery<T>(endpoint: string, body: string): Promise<T[]> {
 
 const GAME_FIELDS =
   'fields name,first_release_date,summary,total_rating_count,cover.url,screenshots.url,genres.name,game_modes.name,' +
-  'involved_companies.developer,involved_companies.company.name,platforms.name,platforms.abbreviation;'
+  'involved_companies.developer,involved_companies.company.name,platforms.name,platforms.abbreviation,' +
+  // Free: search and by-id share this clause, so the series arrives with every hit
+  // and costs no extra request. Google Books has no equivalent, which is why books
+  // ask the model instead.
+  'collections.name,franchises.name;'
 
 // IGDB's game_modes vocabulary (/v4/game_modes) has no "versus" mode, and its
 // plain "Multiplayer" means "more than one player", not "competitive" — It Takes
@@ -242,6 +252,9 @@ function toResult(game: IgdbGame, hoursToBeat: number | null): CatalogSearchResu
     pageCount: null,
     playtimeHours: hoursToBeat,
     creator: developerOf(game),
+    series: [...(game.collections ?? []), ...(game.franchises ?? [])]
+      .map((entry) => entry.name)
+      .filter((name): name is string => Boolean(name)),
     images: stills,
     // Abbreviations — the full names ("PC (Microsoft Windows)") don't fit a card.
     platforms: (game.platforms ?? [])

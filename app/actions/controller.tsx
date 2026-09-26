@@ -5,7 +5,7 @@ import { redirect } from 'remix/response/redirect'
 
 import { assetServer } from '../assets.ts'
 import type { Db } from '../data/db.ts'
-import { loadFeedPage, type FeedCursor, type FeedRowCursor } from '../data/feed.ts'
+import { loadGroupedFeedPage, type FeedCursor, type FeedRowCursor } from '../data/feed.ts'
 import { countFollowing } from '../data/follows.ts'
 import { getLuckyState } from '../data/recommendations/lucky.ts'
 import type { User } from '../data/schema.ts'
@@ -21,7 +21,7 @@ const FEED_PAGE = 10
 async function loadDashboard(db: Db, user: User): Promise<HomeDashboard> {
   // Unfiltered by media type on purpose — the recommendations index is the
   // per-type view, and this one answers "what has happened lately".
-  const [lucky, page] = await Promise.all([getLuckyState(user), loadFeedPage(db, user.id, FEED_PAGE)])
+  const [lucky, page] = await Promise.all([getLuckyState(user), loadGroupedFeedPage(db, user.id, FEED_PAGE)])
 
   return {
     displayName: displayLabel(user),
@@ -58,7 +58,7 @@ function parseFeedCursor(raw: string | null): FeedCursor | undefined {
   if (typeof parsed !== 'object' || parsed === null) return undefined
 
   const cursor: FeedCursor = {}
-  for (const key of ['log', 'runs', 'runsFromOthers'] as const) {
+  for (const key of ['log', 'runsFromOthers'] as const) {
     // Left absent when the slot is missing or malformed, which reads as "start
     // this source from the newest" — see FeedCursor.
     const slot = parseRowCursor((parsed as Record<string, unknown>)[key])
@@ -90,7 +90,7 @@ export default createController(routes, {
       if (!auth.ok) return new Response('Unauthorized', { status: 401 })
 
       const db = context.get(Database)
-      const page = await loadFeedPage(
+      const page = await loadGroupedFeedPage(
         db,
         auth.identity.id,
         FEED_PAGE,

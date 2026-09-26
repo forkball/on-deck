@@ -2,12 +2,13 @@ import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
 
 import { db, pool } from '../app/data/db.ts'
-import { loadFeedPage, type FeedCursor, type FeedItem } from '../app/data/feed.ts'
+import { loadFeedPage, loadGroupedFeedPage, type FeedCursor, type FeedItem } from '../app/data/feed.ts'
+import { groupKeyOf } from '../app/data/feedGroups.ts'
 import { followUser } from '../app/data/follows.ts'
 import { saveRun } from '../app/data/recommendations/runs.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 
-// The home page's activity feed: three lists merged into one, paged as a whole.
+// The home page's activity feed: two lists merged into one, paged as a whole.
 //
 // The paging is what these are really about. Each source keeps its own cursor
 // and only advances it as far as the rows that actually made the page, so the
@@ -98,7 +99,8 @@ describe('activity feed', { skip: skipWithoutDatabase }, () => {
   it('merges runs and logged activity into one list, newest first', async () => {
     const { items } = await loadFeedPage(db, viewer, 20)
 
-    assert.equal(items.length, 10)
+    // The friend's six log rows and two runs; the viewer's own two runs are out.
+    assert.equal(items.length, 8)
     assert.ok(
       items.some((item) => item.kind === 'run'),
       'expected runs in the feed',
@@ -116,16 +118,12 @@ describe('activity feed', { skip: skipWithoutDatabase }, () => {
     )
   })
 
-  it('says who generated a run, and says nothing for your own', async () => {
+  it('leaves out runs you generated, and says who generated the rest', async () => {
     const { items } = await loadFeedPage(db, viewer, 20)
     const runs = items.filter((item) => item.kind === 'run')
 
-    const mine = runs.filter((item) => item.kind === 'run' && item.run.owner === null)
-    const theirs = runs.filter((item) => item.kind === 'run' && item.run.owner !== null)
-
-    assert.equal(mine.length, 2)
-    assert.equal(theirs.length, 2)
-    for (const item of theirs) {
+    assert.equal(runs.length, 2)
+    for (const item of runs) {
       assert.ok(item.kind === 'run' && item.run.owner)
       assert.match(item.run.owner.label, /^feedpage-friend-/)
     }
@@ -163,5 +161,28 @@ describe('activity feed', { skip: skipWithoutDatabase }, () => {
       assert.ok(titles.includes(expected), `${expected} was dropped at a page boundary`)
     }
     assert.equal(new Set(paged.map(key)).size, paged.length, 'a tied row was served twice')
+  })
+
+  it('runs a page on to the end of the group it stops in, and resumes after it', async () => {
+    // A burst of the friend's rows newer than everything above: an import.
+    const burst = Date.now() + 10_000
+    for (let i = 0; i < 7; i++) await log(friend, await newItem(`Burst ${i}`), burst - i)
+
+    // Earlier tests leave more of the friend's rows right behind it, so the run
+    // is measured off the whole feed rather than assumed to be the seven.
+    const whole = await loadFeedPage(db, viewer, 50)
+    const runLength = whole.items.findIndex((item) => groupKeyOf(item) !== `log:${friend}`)
+    assert.ok(runLength >= 7)
+
+    const first = await loadGroupedFeedPage(db, viewer, 3)
+    assert.equal(first.items.length, runLength, 'the page should take the whole run, not stop at its limit')
+    assert.ok(first.cursor)
+
+    // Picks up with what came after the burst, exactly where the plain feed does.
+    const next = await loadGroupedFeedPage(db, viewer, 3, first.cursor)
+    assert.deepEqual(
+      [...first.items, ...next.items].map(key),
+      whole.items.slice(0, first.items.length + next.items.length).map(key),
+    )
   })
 })

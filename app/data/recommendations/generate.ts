@@ -10,14 +10,19 @@ import { createNotification } from '../notifications.ts'
 import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
 import { recordRunAgainstDailyLimit, runCostFor } from './dailyLimit.ts'
+import { GenerationError } from './errors.ts'
 import { buildExclusions } from './exclusions.ts'
-import type { GenerationPhase } from './jobs.ts'
+import { phasesFor, type GenerationPhase } from './jobs.ts'
 import {
+  chooseMatch,
+  decadeYear,
+  filterByGenre,
   filterByLength,
   matchesDecade,
+  matchesSeries,
   resolveFromCatalog,
   searchForPicks,
-  titlesLikelyMatch,
+  seriesKeysFor,
   verifyPicksAgainstOverviews,
   withOverviews,
   type Candidate,
@@ -37,9 +42,39 @@ import {
   type GenerationParams,
   type RecommendationResult,
 } from './runs.ts'
-import { emptyDrops, logPickTally } from './tally.ts'
+import { emptyDrops, logPickTally, type PickTally } from './tally.ts'
+import { finishTranscript, startTranscript } from './transcripts.ts'
 import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
+
+// Which levers a run was narrowed by, in the words the form used for them, so the
+// advice names the thing there is a control for.
+const FILTER_LABELS: [keyof RecommendationFilters, string][] = [
+  ['genre', 'genre'],
+  ['decade', 'decade'],
+  ['length', 'length'],
+  ['playerType', 'player type'],
+  ['multiplayerType', 'multiplayer type'],
+  ['platform', 'platform'],
+  ['series', 'series'],
+]
+
+// Exported for its own test: the levers are read off a shape that grows, and copy
+// that forgets one sends somebody looking for a filter it never mentions.
+export function nothingLeftMessage(filters: RecommendationFilters, mediaType: MediaType): string {
+  const noun = mediaTypeUiFor(mediaType).plural
+  const set = FILTER_LABELS.filter(([key]) => filters[key] != null).map(([, label]) => label)
+
+  if (set.length === 0) {
+    return `Nothing came back that we could confirm this time. Try generating again.`
+  }
+
+  const list = set.length === 1 ? set[0] : `${set.slice(0, -1).join(', ')} and ${set[set.length - 1]}`
+  return (
+    `No ${noun} made it through the ${list} ${set.length === 1 ? 'filter' : 'filters'}. ` +
+    `Try widening ${set.length === 1 ? 'it' : 'them'} and generating again.`
+  )
+}
 
 // Exported so the page can say how many a run comes back with rather than
 // restating the number in copy that would then drift from it.
@@ -63,12 +98,16 @@ export interface GenerateOptions {
   // group has logged, and charged to its own once-a-day cap rather than the
   // general allowance. Same queue, same stages, same tables.
   lucky?: boolean
+  // The job this run is being made for, recorded on its transcript so a run can be
+  // traced back from the queue.
+  jobId?: string
 }
 
-export interface GenerateRecommendationsOutcome {
-  runId: number
-  prunedOldestRun: boolean
-}
+// A run, or the model's own answer kept when nothing could confirm it. Callers
+// have to look at which, because the two land on different pages.
+export type GenerateRecommendationsOutcome =
+  | { kind: 'run'; runId: number; prunedOldestRun: boolean }
+  | { kind: 'unconfirmed'; unconfirmedRunId: number }
 
 export interface MissingSourceLogs {
   userId: number
@@ -182,11 +221,28 @@ export async function generateRecommendations(
   const { titles: excluded, externalIds: excludedExternalIds } = buildExclusions(exclusionLogs, { lucky })
 
   let picks: Pick[]
+  // Null on a resumed run: the model was asked on the attempt before this one, and
+  // that attempt kept its own transcript.
+  let transcriptId: number | null = null
   if (checkpoint.picks?.length) {
     picks = checkpoint.picks
   } else {
     enterPhase('picks')
-    picks = await requestPicks(profiles, excluded, filters, mediaType, profileTypes)
+    const asked = await requestPicks(profiles, excluded, filters, mediaType, profileTypes)
+    picks = asked.picks
+    // Before anything is done with the answer, so a run that dies in the stages
+    // below still leaves what was asked and what came back.
+    transcriptId = await startTranscript(db, {
+      userId: requestingUserId,
+      jobId: options.jobId,
+      mediaType,
+      filters,
+      prompt: asked.prompt,
+      response: asked.response,
+    }).catch((error) => {
+      console.warn('[generation] transcript could not be started:', error)
+      return null
+    })
     checkpoint = { ...checkpoint, picks }
     onCheckpoint(checkpoint)
   }
@@ -200,6 +256,15 @@ export async function generateRecommendations(
   // over-request slack has to reach it.
   const shortlist: Candidate[] = []
   const seenExternalIds = new Set<string>()
+  // One per series, placed by the catalog wherever it says and by the model where no
+  // catalog does — see seriesKeysFor. The model is asked for this on every run and
+  // mostly obliges, but it returned A Court of Thorns and Roses beside A Court of
+  // Mist and Fury, and Fourth Wing beside Iron Flame, in a single run of eight.
+  //
+  // A series is only spent by a pick that survives to the shortlist, since the add
+  // below sits after every other gate: a sibling dropped as already-logged leaves
+  // its series free for the next entry from it.
+  const seenSeries = new Set<string>()
   const drops = emptyDrops()
 
   for (const [i, pick] of picks.entries()) {
@@ -209,11 +274,11 @@ export async function generateRecommendations(
       continue
     }
 
-    const match =
-      matches.find((m) => m.releaseYear === pick.year) ??
-      [...matches].sort(
-        (a, b) => Math.abs((a.releaseYear ?? 0) - pick.year) - Math.abs((b.releaseYear ?? 0) - pick.year),
-      )[0]
+    const match = chooseMatch(pick, matches)
+    if (!match) {
+      drops.titleMismatch++
+      continue
+    }
 
     if (excludedExternalIds.has(match.externalId)) {
       drops.alreadyLogged++
@@ -223,35 +288,52 @@ export async function generateRecommendations(
       drops.duplicate++
       continue
     }
-    if (!titlesLikelyMatch(pick.title, match.title)) {
-      drops.titleMismatch++
+    const series = seriesKeysFor(pick, match)
+    // The first of a series is the one kept, and the picks arrive ranked, so that is
+    // the one the model thought was the better entry point.
+    if (series.some((key) => seenSeries.has(key))) {
+      drops.sameSeries++
       continue
     }
+    // Genre is checked after this loop, not in it: for books the search hit
+    // can't answer it. `series` is checked against the pick's own label, since no
+    // catalog carries the answer — see matchesSeries.
     if (
-      (filters.genre && !match.tags.includes(filters.genre)) ||
-      (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade, filters.decadeRelation)) ||
+      (filters.decade != null &&
+        !matchesDecade(decadeYear(mediaType, pick, match), filters.decade, filters.decadeRelation)) ||
       (filters.playerType && !match.tags.includes(filters.playerType)) ||
       (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) ||
       // Platforms are their own field, not tags, and compare by family.
       (filters.platform && !platformFamilies(match.platforms ?? []).includes(filters.platform)) ||
-      (filters.series && !match.tags.includes(filters.series))
+      (filters.series && !matchesSeries(pick, filters.series))
     ) {
       drops.filtered++
       continue
     }
 
     seenExternalIds.add(match.externalId)
+    for (const key of series) seenSeries.add(key)
     shortlist.push({ pick, match })
   }
 
   let candidates: Candidate[] = shortlist
+  if (filters.genre) {
+    // The same function the job's phase list was built from, so a stage entered
+    // here is a stage that list holds.
+    if (phasesFor({ mediaType, filters }).includes('genres')) enterPhase('genres')
+    const inGenre = await filterByGenre(candidates, mediaType, filters.genre)
+    drops.genre = candidates.length - inGenre.length
+    candidates = inGenre
+  }
   if (filters.length) {
     enterPhase('lengths')
-    candidates = await filterByLength(shortlist, mediaType, filters.length)
-    drops.length = shortlist.length - candidates.length
+    const atLength = await filterByLength(candidates, mediaType, filters.length)
+    drops.length = candidates.length - atLength.length
+    candidates = atLength
   }
 
   let results: RecommendationResult[]
+  let tally: PickTally | null = null
 
   if (checkpoint.verified?.length) {
     const ids = checkpoint.verified.map((entry) => entry.mediaItemId)
@@ -289,12 +371,29 @@ export async function generateRecommendations(
 
     // Only on this path — a resumed run skipped verification, and a tally
     // missing a stage reads as though everything was counted.
-    logPickTally({
+    tally = {
       requested: picks.length,
       kept: results.length,
       surplus: verified.length - results.length,
       dropped: drops,
-    })
+    }
+    logPickTally(tally)
+  }
+
+  // A run with nothing in it is not a run. Saving one spends the day's allowance,
+  // takes one of the three slots a person keeps, prunes the oldest real run to make
+  // room for it, and notifies them that their recommendations are ready — all for a
+  // page with nothing on it. Every gate between the picks and here is a filter they
+  // set, so the useful answer is which one to loosen, not an empty list.
+  //
+  // Thrown rather than returned: failJob puts a GenerationError's message in front
+  // of whoever is waiting, and the job lands as failed rather than as a completed
+  // run that isn't one.
+  if (results.length === 0) {
+    // Before the throw: an empty run is the case most worth being able to read
+    // afterwards, and it leaves no run row to hang the numbers off.
+    if (transcriptId != null && tally) await finishTranscript(db, transcriptId, { tally })
+    throw new GenerationError(nothingLeftMessage(filters, mediaType))
   }
 
   const runId = await track('run.save', () =>
@@ -337,7 +436,11 @@ export async function generateRecommendations(
     track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType, { lucky })),
   ])
 
-  return { runId, prunedOldestRun }
+  // Off the critical path deliberately: nobody's run should fail over its own
+  // record of itself, which is why finishTranscript swallows its errors.
+  if (transcriptId != null && tally) await finishTranscript(db, transcriptId, { runId, tally })
+
+  return { kind: 'run', runId, prunedOldestRun }
 }
 
 // Mutual follows only — the picker requires one direction, this requires the
