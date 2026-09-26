@@ -14,6 +14,9 @@ export interface Pick {
   // The series this belongs to, empty for a standalone. Asked for on every run, to
   // keep one series from taking several of the eight slots — see seriesKey.
   series_name?: string
+  // Who made it, asked for only where the catalog's search reads it — see
+  // searchesCreator. A title alone often does not find a book at all.
+  creator?: string
 }
 
 export interface TasteSummary {
@@ -67,7 +70,7 @@ export interface RecommendationFilters {
 // Built per request rather than a constant: part_of_series is asked for only when
 // the lever needs it, and structured output requires every property it declares, so
 // a field that is sometimes wanted can't just be optional in one fixed schema.
-function picksSchema(withSeries: boolean) {
+function picksSchema(options: { series: boolean; creator: boolean }) {
   const properties = {
     title: { type: 'string' as const },
     year: { type: 'number' as const },
@@ -75,7 +78,8 @@ function picksSchema(withSeries: boolean) {
     // A string rather than a nullable one: structured output takes a single type
     // per property, and "" is a clearer "no series" than a magic word would be.
     series_name: { type: 'string' as const },
-    ...(withSeries ? { part_of_series: { type: 'boolean' as const } } : {}),
+    ...(options.creator ? { creator: { type: 'string' as const } } : {}),
+    ...(options.series ? { part_of_series: { type: 'boolean' as const } } : {}),
   }
 
   return {
@@ -215,6 +219,14 @@ export async function requestPicks(
     filters.series != null
   const requestedCount = hasFilters ? REQUESTED_COUNT + 6 : REQUESTED_COUNT
   const { singular } = mediaTypeUiFor(mediaType)
+  // Asked for only where it is used. Google Books' search reads it and often cannot
+  // find the book without it; TMDB's and IGDB's match titles only — see
+  // searchesCreator.
+  const searchesCreator = getCatalogProvider(mediaType).searchesCreator === true
+  const creatorRule = searchesCreator
+    ? ` Set "creator" on each pick: who wrote it, as the cover would say. It is used to look the ${singular} ` +
+      `up, so give the name rather than a description of them.`
+    : ''
   const seriesRule =
     ` Set "series_name" on each pick: the series it belongs to, or "" if it stands alone.` +
     (filters.series === 'standalone'
@@ -223,7 +235,7 @@ export async function requestPicks(
         `so the list is that many different ${noun} rather than half of one shelf.`)
 
   const filterInstructions =
-    buildFilterInstructions(filters, noun, mediaType) + sourceInstructions + seriesRule
+    buildFilterInstructions(filters, noun, mediaType) + sourceInstructions + seriesRule + creatorRule
 
   const prompt = isGroup
     ? `Group of ${profiles.length} people, each with their own ${noun} taste profile:\n${JSON.stringify(profiles, null, 2)}\n\n` +
@@ -268,7 +280,10 @@ export async function requestPicks(
       max_tokens: maxTokens,
       output_config: {
         effort: 'medium',
-        format: { type: 'json_schema', schema: picksSchema(filters.series != null) },
+        format: {
+          type: 'json_schema',
+          schema: picksSchema({ series: filters.series != null, creator: searchesCreator }),
+        },
       },
       messages: [{ role: 'user', content }],
     },

@@ -56,6 +56,17 @@ export interface CatalogProvider {
   // Platform *families*, not raw names — see GAME_PLATFORMS.
   platforms?: string[]
   seriesTypes?: string[]
+  // Whether this provider's search reads more than a title, so a pick's author or
+  // director is worth adding to the query.
+  //
+  // Google Books queries full text, and a bare title is often not enough to find
+  // the book at all: "Iron Flame" returns a 1963 Oak Ridge lab index and not the
+  // novel, "Bitten" returns a French verb-conjugation guide, "Uprooted" a report on
+  // humanitarian policy. With the author appended each one comes back first.
+  //
+  // TMDB and IGDB match titles only, and the extra words actively hurt: "Dune Denis
+  // Villeneuve" finds a making-of documentary, and "Portal 2 Valve" finds nothing.
+  searchesCreator?: boolean
   parseExternalId(input: string): string | null
   matchHint: string
   lookupFailedError: string
@@ -115,6 +126,7 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
       parseOpenLibraryWorkId(externalId) ? getWorkById(externalId) : getBookById(externalId),
     genres: BOOK_GENRES,
     seriesTypes: BOOK_SERIES_TYPES,
+    searchesCreator: true,
     parseExternalId: parseGoogleBooksId,
     matchHint: 'Paste a Google Books link or volume id.',
     lookupFailedError: "Couldn't find that on Google Books — check the link.",

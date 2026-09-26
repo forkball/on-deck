@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 
 import {
   applyVerdicts,
+  searchQueryFor,
   chooseMatch,
   seriesKey,
   seriesKeysFor,
@@ -715,6 +716,28 @@ describe('withOverviews', () => {
     )
 
     assert.equal(returned[0].match.overview, 'a plot')
+  })
+})
+
+describe('searchQueryFor', () => {
+  const pick = (title: string, creator?: string) => ({ title, year: 2023, reason: '', creator })
+
+  // "Iron Flame" alone returns a 1963 laboratory index and not the novel; the
+  // volume with a cover, a blurb and its genres is not in those results at all.
+  it('adds the author for a catalog whose search reads one', () => {
+    assert.equal(searchQueryFor('book', pick('Iron Flame', 'Rebecca Yarros')), 'Iron Flame Rebecca Yarros')
+  })
+
+  // TMDB and IGDB match titles: "Dune Denis Villeneuve" finds a making-of, and
+  // "Portal 2 Valve" finds nothing at all.
+  it('leaves a title alone for catalogs that match titles', () => {
+    assert.equal(searchQueryFor('movie', pick('Dune', 'Denis Villeneuve')), 'Dune')
+    assert.equal(searchQueryFor('game', pick('Portal 2', 'Valve')), 'Portal 2')
+  })
+
+  it('falls back to the title when the model named nobody', () => {
+    assert.equal(searchQueryFor('book', pick('Iron Flame')), 'Iron Flame')
+    assert.equal(searchQueryFor('book', pick('Iron Flame', '   ')), 'Iron Flame')
   })
 })
 
