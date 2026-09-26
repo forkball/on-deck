@@ -31,6 +31,7 @@ import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType, type ActiveMediaType } from '../../mediaTypes.ts'
 import { RETURN_TO_PARAM } from '../../ui/backLink.ts'
+import { SEEN_BY_OPTIONS } from '../../ui/shared/seen-by.ts'
 import { LUCKY_PAGE_ORIGIN } from '../../browser/draw-lucky-form.tsx'
 import { GeneratingPage } from './generating-page.tsx'
 import { getUnconfirmedRun, listUnconfirmedRuns } from '../../data/recommendations/unconfirmed.ts'
@@ -53,6 +54,7 @@ const generateSchema = f.object({
   multiplayer_type: f.field(s.defaulted(s.string(), '')),
   platform: f.field(s.defaulted(s.string(), '')),
   series: f.field(s.defaulted(s.string(), '')),
+  seen_by: f.field(s.defaulted(s.string(), '')),
   name: f.field(s.defaulted(s.string(), '')),
 })
 
@@ -115,6 +117,22 @@ function finishedHref(job: GenerationJob): string | null {
   }
   return null
 }
+
+// The friend ids a run request names. `mode` decides whether the checkboxes
+// count at all: the shared form keeps every friend checkbox mounted and only
+// hides them, so a selection made and then switched away from is still in the
+// request.
+function requestedFriendIds(formData: FormData): number[] {
+  if (formData.get('mode') !== 'group') return []
+  return formData
+    .getAll('friend_ids')
+    .map((value) => Number(value))
+    .filter((id) => Number.isInteger(id))
+}
+
+// "With friends" and nobody else is refused rather than run for one. The forms
+// keep their button disabled instead, so only a hand-built request reads this.
+const NO_FRIENDS_PICKED_ERROR = 'Tick at least one friend, or switch to "Just me".'
 
 // Both actions refuse for the same reason in the same words — an empty log gives
 // the profile nothing to work from, whichever kind of run asked for it.
@@ -202,13 +220,16 @@ export default createController(routes.recommendations, {
         return new Response('Invalid request', { status: 400 })
       }
 
-      const friendIds =
-        parsed.value.mode === 'group'
-          ? formData
-              .getAll('friend_ids')
-              .map((value) => Number(value))
-              .filter((id) => Number.isInteger(id))
-          : []
+      const friendIds = requestedFriendIds(formData)
+      if (parsed.value.mode === 'group' && friendIds.length === 0) {
+        const mediaType = parseMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
+        return context.render(
+          await indexPage(context.get(Database), auth.identity, mediaType, {
+            error: NO_FRIENDS_PICKED_ERROR,
+          }),
+          { status: 400 },
+        )
+      }
 
       const filters: RecommendationFilters = {}
       if (parsed.value.genre) filters.genre = parsed.value.genre
@@ -232,6 +253,13 @@ export default createController(routes.recommendations, {
       if (parsed.value.multiplayer_type) filters.multiplayerType = parsed.value.multiplayer_type
       if (parsed.value.platform) filters.platform = parsed.value.platform
       if (parsed.value.series) filters.series = parsed.value.series
+      // A group question: alone, "no one" and "half" are the same rule, and "any"
+      // would be asking for things already watched. 'half' stays unset — see
+      // ui/shared/seen-by.ts.
+      // Missing or unrecognised means what the form defaults to.
+      const seenBy =
+        SEEN_BY_OPTIONS.find((option) => option.value === parsed.value.seen_by)?.value ?? 'no_one'
+      if (friendIds.length > 0 && seenBy !== 'half') filters.seenBy = seenBy
 
       const sourceTypes = formData
         .getAll('source')
@@ -315,6 +343,7 @@ export default createController(routes.recommendations, {
                   ['multiplayer_type', filters.multiplayerType ?? ''],
                   ['platform', filters.platform ?? ''],
                   ['series', filters.series ?? ''],
+                  ['seen_by', filters.seenBy ?? ''],
                   ...sourceTypes.map((type) => ['source', type] as [string, string]),
                   ...friendIds.map((id) => ['friend_ids', String(id)] as [string, string]),
                 ],
@@ -362,29 +391,23 @@ export default createController(routes.recommendations, {
 
       const mediaType = parseMediaType(formData.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
 
-      // `mode` decides whether the checkboxes count at all, the same way it does
-      // in `generate`: the shared form keeps every friend checkbox mounted and
-      // only hides them, so a selection made and then switched away from is
-      // still in the request.
-      //
-      // What survives that is narrowed to people this account actually follows.
-      // The picker only offers those, so it costs nothing in the normal case —
-      // it stops a hand-posted id pulling a stranger's taste into a run and
-      // notifying them about it.
-      const requested = new Set(
-        formData.get('mode') === 'group'
-          ? formData
-              .getAll('friend_ids')
-              .map((value) => Number(value))
-              .filter((id) => Number.isInteger(id))
-          : [],
-      )
+      // Narrowed to people this account actually follows. The picker only
+      // offers those, so it costs nothing in the normal case — it stops a
+      // hand-posted id pulling a stranger's taste into a run and notifying them
+      // about it.
+      const requested = new Set(requestedFriendIds(formData))
       const friendIds =
         requested.size === 0
           ? []
           : (await listFollowedUsers(db, auth.identity.id))
               .map((friend) => friend.id)
               .filter((id) => requested.has(id))
+
+      // After the narrowing, so a group of nobody but strangers is refused too
+      // rather than quietly drawn for one.
+      if (formData.get('mode') === 'group' && friendIds.length === 0) {
+        return context.render(await renderFailure(mediaType, NO_FRIENDS_PICKED_ERROR), { status: 400 })
+      }
 
       const memberIds = [auth.identity.id, ...friendIds]
 
