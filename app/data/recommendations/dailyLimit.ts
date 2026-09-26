@@ -2,6 +2,7 @@ import { and, eq, gte, lt } from 'remix/data-table'
 
 import type { Db } from '../db.ts'
 import { profileRebuildUsage, recommendationRunUsage, type User } from '../schema.ts'
+import { count } from '../../ui/shared/count.ts'
 
 export const RUNS_PER_DAY = 5
 
@@ -88,8 +89,8 @@ export async function recordProfileRebuild(db: Db, userId: number): Promise<void
 // nearly everyone reading it.
 export function timeUntil(timestamp: number, now: number = Date.now()): string {
   const minutes = Math.max(1, Math.ceil((timestamp - now) / 60_000))
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`
+  if (minutes < 60) return count(minutes, 'minute', 'minutes')
 
   const hours = Math.ceil(minutes / 60)
-  return `${hours} hour${hours === 1 ? '' : 's'}`
+  return count(hours, 'hour', 'hours')
 }
