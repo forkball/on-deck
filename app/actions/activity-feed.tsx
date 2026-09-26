@@ -114,6 +114,11 @@ const GROUP_STYLE = css({
     '& > details > summary': { alignItems: 'flex-start' },
     '& .rule': { display: 'none' },
     '& .when': { marginLeft: 0, flexBasis: '100%', paddingLeft: '1.1em' },
+    // The title itself only needs its content's width, so on its own it
+    // wouldn't give marginLeft: auto below anything to push against — this is
+    // what puts the rest of that first line's width at the count's disposal.
+    '& .title': { flexBasis: '100%' },
+    '& .count': { marginLeft: 'auto' },
   },
 })
 
