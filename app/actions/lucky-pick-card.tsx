@@ -1,11 +1,11 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
-import type { LuckyPick } from '../../data/recommendations/lucky.ts'
-import { mediaTypeUiFor } from '../../mediaTypes.ts'
-import { routes } from '../../routes.ts'
-import { withReturnTo } from '../backLink.ts'
+import { parseMediaMetadata } from '../data/mediaMetadata.ts'
+import type { LuckyPick } from '../data/recommendations/lucky.ts'
+import { mediaTypeUiFor } from '../mediaTypes.ts'
+import { routes } from '../routes.ts'
+import { withReturnTo } from '../ui/backLink.ts'
 
 // What the day's pick is called, wherever it is named. Exported because the
 // home page heads its own column with it (see showLabel) and two copies of the
@@ -21,9 +21,8 @@ export const LUCKY_CARD_BOX = {
   padding: '16px',
 } as const
 
-// The day's pick, rendered the same on the landing page and the profile. It
-// lives in ui/components rather than beside one of them because both show it
-// and neither owns it — see AGENTS.md.
+// The day's pick as the landing page shows it. Lives beside home-page, its
+// only user.
 export interface LuckyPickCardProps {
   pick: LuckyPick
   // Where the "back" link on the run page should return to. Each place this
