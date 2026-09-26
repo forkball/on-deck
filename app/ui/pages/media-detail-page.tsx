@@ -297,19 +297,18 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
               })}
             >
               <div mix={css({ display: 'flex', flexDirection: 'column', gap: '8px', [PHONE]: { order: 2 } })}>
-                <h1 mix={css({ margin: '0 0 4px' })}>
-                  {item.title}
-                  {years ? ` (${years})` : ''}
-                </h1>
+                <h1 mix={css({ margin: '0 0 4px' })}>{item.title}</h1>
                 {tagline && <p mix={css({ margin: 0, color: '#555', fontStyle: 'italic' })}>{tagline}</p>}
                 {creator && (
                   <p mix={css({ margin: 0, color: '#555' })}>
                     {creators.length > 1 ? ui.creditLabelPlural : ui.creditLabel}: <strong>{creator}</strong>
                   </p>
                 )}
-                {(genres || runtime) && (
+                {/* The year leads the details rather than riding in the title,
+                    where a show's "(2008–2013)" wrapped the heading. */}
+                {(years || genres || runtime) && (
                   <p mix={css({ margin: 0, color: '#555' })}>
-                    {[genres, runtime].filter(Boolean).join(' · ')}
+                    {[years, genres, runtime].filter(Boolean).join(' · ')}
                   </p>
                 )}
                 {showFacts.length > 0 && (
