@@ -10,6 +10,10 @@ const CHARS_PER_LINE = 80
 // same as tabsStyle in media-tabs.tsx.
 type CSSStyle = Parameters<typeof css>[0]
 
+// Descriptions arrive with their paragraph breaks as newlines; without this
+// they collapse and a multi-paragraph synopsis renders as one block.
+const paragraphStyle = { whiteSpace: 'pre-line' } as const
+
 function clampStyle(id: string, maxLines: number): CSSStyle {
   const style: Record<string, unknown> = {
     '& input[type="checkbox"]': {
@@ -20,6 +24,7 @@ function clampStyle(id: string, maxLines: number): CSSStyle {
       pointerEvents: 'none',
     },
     '& .clamped': {
+      ...paragraphStyle,
       display: '-webkit-box',
       WebkitLineClamp: String(maxLines),
       WebkitBoxOrient: 'vertical',
@@ -54,7 +59,7 @@ export function ExpandableText(handle: Handle<ExpandableTextProps>) {
 
     // Short enough that a toggle would be noise — render it plainly.
     if (text.length <= CHARS_PER_LINE * maxLines) {
-      return <p>{text}</p>
+      return <p mix={css(paragraphStyle)}>{text}</p>
     }
 
     const toggle = css({
