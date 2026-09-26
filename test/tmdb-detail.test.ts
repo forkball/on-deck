@@ -33,13 +33,21 @@ const MATRIX = {
   },
 }
 
-describe('getMovieById', () => {
+// Answers every TMDB request in the enclosing describe with `answer`, and keeps
+// the last URL asked for. Registers its own hooks, so a block only says what
+// TMDB should reply.
+function stubTmdb(answer: () => Response): { requested: URL | null } {
+  const seen: { requested: URL | null } = { requested: null }
   const realFetch = globalThis.fetch
   const realKey = process.env.TMDB_API_KEY
 
   beforeEach(() => {
     process.env.TMDB_API_KEY = 'test'
-    globalThis.fetch = (async () => Response.json(MATRIX)) as typeof fetch
+    seen.requested = null
+    globalThis.fetch = (async (input: URL) => {
+      seen.requested = input
+      return answer()
+    }) as typeof fetch
   })
 
   afterEach(() => {
@@ -47,6 +55,12 @@ describe('getMovieById', () => {
     if (realKey === undefined) delete process.env.TMDB_API_KEY
     else process.env.TMDB_API_KEY = realKey
   })
+
+  return seen
+}
+
+describe('getMovieById', () => {
+  stubTmdb(() => Response.json(MATRIX))
 
   it('credits every director, not only the first', async () => {
     const result = await getMovieById('603')
@@ -127,27 +141,11 @@ const BREAKING_BAD = {
 }
 
 describe('getTvShowById', () => {
-  const realFetch = globalThis.fetch
-  const realKey = process.env.TMDB_API_KEY
-  let requested: URL | null = null
-
-  beforeEach(() => {
-    process.env.TMDB_API_KEY = 'test'
-    globalThis.fetch = (async (input: URL) => {
-      requested = input
-      return Response.json(BREAKING_BAD)
-    }) as typeof fetch
-  })
-
-  afterEach(() => {
-    globalThis.fetch = realFetch
-    if (realKey === undefined) delete process.env.TMDB_API_KEY
-    else process.env.TMDB_API_KEY = realKey
-  })
+  const tmdb = stubTmdb(() => Response.json(BREAKING_BAD))
 
   it("asks for the whole run's cast, not the latest season's", async () => {
     await getTvShowById('1396')
-    assert.equal(requested?.searchParams.get('append_to_response'), 'aggregate_credits')
+    assert.equal(tmdb.requested?.searchParams.get('append_to_response'), 'aggregate_credits')
   })
 
   it('orders the cast by episodes, crediting each actor with their main part', async () => {

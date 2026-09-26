@@ -65,16 +65,15 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
     // Only a movie's is the length of the thing itself — a show's is one episode.
     const runtime = mediaType === 'movie' ? formatRuntime(runtimeMinutes) : null
     const genres = tags.map((t) => t.replace(/^./, (c) => c.toUpperCase())).join(', ')
-    const years = mediaType === 'tv' ? showYears(releaseYear, lastAirYear, showStatus) : releaseYear
-    const showFacts =
-      mediaType === 'tv'
-        ? [
-            countOf(seasonCount, 'season'),
-            countOf(episodeCount, 'episode'),
-            networks.join(', '),
-            showStatus && (SHOW_STATUS_LABELS[showStatus] ?? showStatus),
-          ].filter(Boolean)
-        : []
+    const years = yearSpan(releaseYear, lastAirYear, showStatus)
+    // No type check needed: only a show's detail lookup fills any of these, so
+    // every other medium comes out empty on its own.
+    const showFacts = [
+      countOf(seasonCount, 'season'),
+      countOf(episodeCount, 'episode'),
+      networks.join(', '),
+      showStatus && (SHOW_STATUS_LABELS[showStatus] ?? showStatus),
+    ].filter(Boolean)
     // A medium with stills shows them instead of a poster, having none to show:
     // 16:9 key art in a 220px portrait slot renders as a letterbox, and the
     // first still is that same art, so nothing is lost by dropping the slot.
@@ -136,7 +135,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
               )}
               {creator && (
                 <p mix={css({ margin: '0 0 8px', color: '#555' })}>
-                  {creators.length > 1 ? `${ui.creditLabel}s` : ui.creditLabel}: <strong>{creator}</strong>
+                  {creators.length > 1 ? ui.creditLabelPlural : ui.creditLabel}: <strong>{creator}</strong>
                 </p>
               )}
               {(genres || runtime) && (
@@ -384,9 +383,10 @@ const SHOW_STATUS_LABELS: Record<string, string> = {
 }
 
 // "2008–2013" for a run that is over, "2019–" for one that isn't, and the one
-// year when that is all there is to say. Open-ended only on TMDB's say-so: a
-// show with no status and an old last air date is not "still going".
-function showYears(first: number | null, last: number | null, status: string | null): string | null {
+// year when that is all there is to say — which is every medium but TV, since
+// only a show has a status. Open-ended only on TMDB's say-so: a show with no
+// status and an old last air date is not "still going".
+function yearSpan(first: number | null, last: number | null, status: string | null): string | null {
   if (!first) return null
   if (status === 'Returning Series' || status === 'In Production') return `${first}–`
   if ((status === 'Ended' || status === 'Canceled') && last && last > first) return `${first}–${last}`
