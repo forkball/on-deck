@@ -85,6 +85,8 @@ function formatFileSize(bytes: number): string {
 //
 // The dropzone is a <label> wrapping a hidden file input; drag/drop re-homes the
 // dropped file onto the input via a DataTransfer, so native submission works.
+// It only says "Choose file": a phone has nothing to drag from,
+// and on desktop the box still takes a drop without having to advertise it.
 export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
   import.meta.url,
   function LetterboxdImportForm(handle) {
@@ -169,9 +171,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
             <span mix={css({ display: 'block', marginBottom: space[1] })}>
               <FileUploadIcon />
             </span>
-            <span mix={css({ fontSize: '14px' })}>
-              Drag and drop file here or <span mix={css({ textDecoration: 'underline' })}>Choose file</span>
-            </span>
+            <span mix={css({ fontSize: '14px', textDecoration: 'underline' })}>Choose file</span>
             <input
               type="file"
               name={fieldName}
@@ -237,18 +237,9 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
               {!submitting && (
                 <button
                   type="button"
+                  class="bare"
                   aria-label="Remove file"
-                  mix={[
-                    css({
-                      flex: '0 0 auto',
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '16px',
-                      cursor: 'pointer',
-                      color: '#888',
-                    }),
-                    on('click', clearFile),
-                  ]}
+                  mix={[css({ flex: '0 0 auto', fontSize: '16px' }), on('click', clearFile)]}
                 >
                   ✕
                 </button>

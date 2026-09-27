@@ -3,6 +3,7 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
+import { listBatches } from '../../data/imports/batches.ts'
 import { letterboxdSyncAvailableTo } from '../../data/imports/letterboxdFeed.ts'
 import { syncLetterboxdInBackground } from '../../data/imports/letterboxdSync.ts'
 import {
@@ -53,7 +54,21 @@ export default createController(routes.profile, {
 
       const followingCount = await countFollowing(db, auth.identity.id)
       const followersCount = await countFollowers(db, auth.identity.id)
-      const rebuildAllowance = await getProfileRebuildAllowance(db, auth.identity)
+      const [rebuildAllowance, batches] = await Promise.all([
+        getProfileRebuildAllowance(db, auth.identity),
+        listBatches(db, auth.identity.id),
+      ])
+      // Unfinished imports, so there's a way back to one.
+      const waitingImports = batches
+        .filter((batch) => batch.status === 'matching' || batch.status === 'review')
+        .map((batch) => ({
+          href:
+            batch.status === 'review'
+              ? routes.profile.imports.review.href({ batchId: batch.id })
+              : routes.profile.imports.show.href({ batchId: batch.id }),
+          noun: mediaTypeUiFor(batch.media_type).attributive,
+          matching: batch.status === 'matching',
+        }))
 
       // Kicked off beside the render, never awaited into it: reading the feed
       // and looking up any film new to the catalog is seconds of network, and
@@ -78,6 +93,7 @@ export default createController(routes.profile, {
           rebuildsLeft={rebuildAllowance.unlimited ? null : rebuildAllowance.remaining}
           rebuilt={context.url.searchParams.get('rebuilt') === '1'}
           rebuildError={context.url.searchParams.get('rebuildError') ?? undefined}
+          waitingImports={waitingImports}
           displayName={displayLabel(auth.identity)}
         />,
       )

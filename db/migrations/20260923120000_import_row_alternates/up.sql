@@ -1,0 +1,18 @@
+-- The other films a row could have meant, kept from matching so the review page
+-- can offer them as a choice on the card.
+--
+-- A row with no year gives matching nothing to tell same-named films apart
+-- ("Little Women", "Suspiria"), so it guesses and the card asks. The question
+-- is "which one?", but answering it meant opening the picker, which searches
+-- the catalog again for results matching already had. Storing the handful of
+-- same-titled results turns that into one tap per row, with no extra catalog
+-- traffic on page view.
+--
+-- Set for every no-year row: up to three same-titled films, one when the
+-- catalog has only that one — see inlineAlternates. Null for other rows, and
+-- for every row staged before this column existed, whose cards fall back to a
+-- single button for matching's own pick.
+--
+-- Shape: [{ "externalId": "…", "title": "…", "releaseYear": 1994 | null }],
+-- matching's own pick first.
+alter table import_rows add column alternates jsonb;

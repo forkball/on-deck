@@ -10,12 +10,14 @@ import {
   keepRow,
   loadBatch,
   loadReview,
+  loadRows,
   repointRow,
   saveBatch,
   setConflictChoice,
   skipRow,
+  unacceptBulk,
 } from '../../../data/imports/batches.ts'
-import { isBulkAcceptable } from '../../../data/imports/classify.ts'
+import { parseBulkKind } from '../../../data/imports/classify.ts'
 import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
 import type { ImportBatch, User } from '../../../data/schema.ts'
@@ -55,9 +57,14 @@ export function offersFeed(batch: ImportBatch, identity: User): boolean {
   )
 }
 
-function backToReview(batch: ImportBatch, error?: string): Response {
+// Where a no-JS post lands, so a long review doesn't restart at the top.
+const ANCHOR = /^(row-\d+|import-save)$/
+
+function backToReview(batch: ImportBatch, error?: string, anchor?: string): Response {
   const href = routes.profile.imports.review.href({ batchId: batch.id })
-  return redirect(error ? `${href}?error=${encodeURIComponent(error)}` : href, 303)
+  const query = error ? `?error=${encodeURIComponent(error)}` : ''
+  const fragment = anchor && ANCHOR.test(anchor) ? `#${anchor}` : ''
+  return redirect(`${href}${query}${fragment}`, 303)
 }
 
 export default createController(routes.profile.imports, {
@@ -136,7 +143,7 @@ export default createController(routes.profile.imports, {
       if (!found.ok) return found.response
       const { batch } = found
 
-      const { rows } = await loadReview(context.get(Database), batch)
+      const rows = await loadRows(context.get(Database), batch.id)
       const row = rows.find((candidate) => candidate.id === Number(context.params.rowId))
       if (!row) return new Response('Not found', { status: 404 })
 
@@ -181,6 +188,7 @@ export default createController(routes.profile.imports, {
       const formData = context.get(FormData)
       const rowId = Number(context.params.rowId)
       const action = String(formData.get('action') ?? '')
+      const anchor = String(formData.get('anchor') ?? '')
 
       if (action === 'confirm' || action === 'take') {
         await confirmRow(db, batch, rowId)
@@ -193,30 +201,30 @@ export default createController(routes.profile.imports, {
         if (!externalId) return backToReview(batch, 'Choose a film first.')
 
         const outcome = await repointRow(db, batch, rowId, externalId)
-        if (!outcome.ok) return backToReview(batch, outcome.error)
+        if (!outcome.ok) return backToReview(batch, outcome.error, anchor)
       }
 
-      return backToReview(batch)
+      return backToReview(batch, undefined, anchor)
     },
 
-    // The one bulk accept the page offers. Which rows qualify is recomputed
-    // here rather than taken from the form: the button says "the remaining N
-    // off-by-one matches", and that has to be what it does.
     async bulk(context: ImportBatchContext) {
       const found = await findBatch(context)
       if (!found.ok) return found.response
       const { batch } = found
 
       const db = context.get(Database)
-      const { model } = await loadReview(db, batch)
+      const form = context.get(FormData)
+      const kind = parseBulkKind(form.get('kind'))
+      if (!kind) return backToReview(batch)
 
-      const rowIds = model.uncertain
-        .filter(({ row }) =>
-          isBulkAcceptable({ state: 'uncertain', reason: row.reason, yearDelta: row.yearDelta }),
-        )
-        .map(({ row }) => row.id)
-
-      await acceptBulk(db, batch, rowIds)
+      // A toggle: ticked, the same press gives back the rows that accept took.
+      if (form.get('undo') === '1') {
+        await unacceptBulk(db, batch, kind)
+      } else {
+        // Recomputed rather than read from the form, so it takes what the page offered.
+        const { model } = await loadReview(db, batch)
+        await acceptBulk(db, batch, kind, model.bulk[kind])
+      }
       return backToReview(batch)
     },
 

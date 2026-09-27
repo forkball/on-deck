@@ -10,6 +10,7 @@ import type { Db } from '../db.ts'
 import type { MediaType } from '../mediaItems.ts'
 import type { ImportBatch } from '../schema.ts'
 import { finishMatching, loadRows, recordMatch, setMatchedCount, touchClaim } from './batches.ts'
+import { inlineAlternates } from './classify.ts'
 import { runBounded } from './csv.ts'
 import { resolveBatch, type MatchInput } from './resolve.ts'
 
@@ -91,9 +92,13 @@ export async function matchBatch(db: Db, batch: ImportBatch): Promise<void> {
 
   await touchClaim(db, batch.id)
 
+  const inputById = new Map(inputs.map((input) => [input.rowId, input]))
+
   for (const outcome of outcomes) {
     const externalId = outcome.chosen?.externalId ?? null
+    const input = inputById.get(outcome.rowId)
     await recordMatch(db, outcome.rowId, {
+      alternates: input ? inlineAlternates(input, outcome.verdict, outcome.chosen, input.results) : null,
       state: outcome.verdict.state,
       reason: outcome.verdict.reason,
       yearDelta: outcome.verdict.yearDelta,
