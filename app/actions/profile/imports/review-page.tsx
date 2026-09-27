@@ -484,7 +484,7 @@ function UncertainCard(
                 batchId={batchId}
                 rowId={row.id}
                 action="skip"
-                label="Don't save"
+                label="Leave out"
                 variant="linkish"
                 anchor={next}
               />
@@ -594,7 +594,7 @@ function AnsweredList(
   }
 }
 
-// "Title → 1994", "Title → 1994 · as last time" or "Title · not saving".
+// "Title → 1994", "Title → 1994 · as last time" or "Title · left out".
 function Answer(handle: Handle<{ entry: ReviewRow }>) {
   return () => {
     const { row, item } = handle.props.entry
@@ -602,7 +602,7 @@ function Answer(handle: Handle<{ entry: ReviewRow }>) {
       <>
         {row.title}
         <span mix={css({ color: '#888' })}>
-          {row.state === 'skipped' ? ' · not saving' : item ? ` → ${answeredMatch(row.title, item)}` : ''}
+          {row.state === 'skipped' ? ' · left out' : item ? ` → ${answeredMatch(row.title, item)}` : ''}
           {row.remembered && ' · as last time'}
         </span>
       </>
@@ -664,7 +664,7 @@ function MatchedAnswers(
             batchId={batchId}
             rowId={row.id}
             action="skip"
-            label="Don't save"
+            label="Leave out"
             variant="linkish"
             anchor={next}
           />
@@ -1301,7 +1301,8 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       <span mix={css({ color: '#888', fontSize: '14px' })}>({model.uncertain.length})</span>
                     </h2>
                     <p mix={css({ fontSize: '13px', color: '#888', marginBottom: '10px' })}>
-                      Least certain first. These save as matched unless you say otherwise.
+                      Least certain first. These save as matched unless you say otherwise. Leave out keeps one
+                      out of your log; your file isn't changed.
                     </p>
                     {uncertainGroups.map((group) => (
                       <section
