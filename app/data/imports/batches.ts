@@ -18,8 +18,10 @@ import {
 } from '../schema.ts'
 import {
   answerKey,
+  isReviewReason,
   parseBulkKind,
   REMEMBERED,
+  REVIEW_REASONS,
   type BulkKind,
   type CandidateLike,
   type ConflictChoice,
@@ -58,53 +60,40 @@ export async function createBatch(
 
   // Batch and rows in one transaction, so the worker can never claim a batch
   // whose rows aren't in yet — it would match nothing and send it to review.
-  const client = await pool.connect()
-  try {
-    await client.query('begin')
-    await client.query(
-      `insert into import_batches
-         (id, user_id, media_type, source, status, total_rows, matched_rows, conflict_choice, created_at, updated_at)
-       values ($1, $2, $3, $4, 'matching', $5, 0, 'keep', $6, $6)`,
-      [id, userId, mediaType, source, rows.length, now],
-    )
-
+  await db.transaction(async (tx) => {
+    await tx.create(importBatches, {
+      id,
+      user_id: userId,
+      media_type: mediaType,
+      source,
+      status: 'matching',
+      total_rows: rows.length,
+      matched_rows: 0,
+      conflict_choice: 'keep',
+      created_at: now,
+      updated_at: now,
+    })
     // One statement for all rows: a create() per row is a round trip each.
     if (rows.length > 0) {
-      const COLUMNS = 12
-      const values: unknown[] = []
-      const tuples = rows.map((row, i) => {
-        const base = i * COLUMNS
-        values.push(
-          id,
-          row.rowIndex,
-          row.title,
-          row.year,
-          row.rating,
-          row.notes ?? null,
-          row.consumedAt,
-          row.logStatus ?? 'consumed',
-          row.author ?? null,
-          row.isbn ?? null,
-          now,
-          now,
-        )
-        return `(${Array.from({ length: COLUMNS }, (_, n) => `$${base + n + 1}`).join(', ')})`
-      })
-
-      await client.query(
-        `insert into import_rows
-           (batch_id, row_index, raw_title, raw_year, rating, notes, consumed_at, log_status, author, isbn, created_at, updated_at)
-         values ${tuples.join(', ')}`,
-        values,
+      await tx.createMany(
+        importRows,
+        rows.map((row) => ({
+          batch_id: id,
+          row_index: row.rowIndex,
+          raw_title: row.title,
+          raw_year: row.year,
+          rating: row.rating,
+          notes: row.notes ?? null,
+          consumed_at: row.consumedAt,
+          log_status: row.logStatus ?? 'consumed',
+          author: row.author ?? null,
+          isbn: row.isbn ?? null,
+          created_at: now,
+          updated_at: now,
+        })),
       )
     }
-    await client.query('commit')
-  } catch (error) {
-    await client.query('rollback')
-    throw error
-  } finally {
-    client.release()
-  }
+  })
 
   return id
 }
@@ -142,6 +131,11 @@ export async function touchClaim(db: Db, batchId: string): Promise<void> {
   await db.update(importBatches, batchId, { claimed_at: now, updated_at: now })
 }
 
+// node-postgres sends a bare array as a Postgres array, which jsonb rejects.
+function toJsonb(value: unknown): string | null {
+  return value == null ? null : JSON.stringify(value)
+}
+
 export async function recordMatch(
   db: Db,
   rowId: number,
@@ -155,8 +149,7 @@ export async function recordMatch(
   },
 ): Promise<void> {
   await db.update(importRows, rowId, {
-    // node-postgres sends a bare array as a Postgres array, which jsonb rejects.
-    alternates: result.alternates ? JSON.stringify(result.alternates) : null,
+    alternates: toJsonb(result.alternates),
     state: result.state,
     reason: result.reason ?? undefined,
     year_delta: result.yearDelta,
@@ -166,64 +159,42 @@ export async function recordMatch(
   })
 }
 
-// The member's answers from their saved imports of this media type, keyed by
-// answerKey, latest winning. Only questions a review asked (not conflicts), and
-// only where the film is still in the catalog.
+// The member's answers from their saved imports of this media type: each
+// question's row id, keyed by answerKey, latest winning. Only questions a review
+// asked (not conflicts), and only where the film is still in the catalog.
 export async function loadPastAnswers(
   db: Db,
   userId: number,
   mediaType: MediaType,
-): Promise<Map<string, ImportRow>> {
-  const batches = await db.findMany(importBatches, {
-    where: and(eq('user_id', userId), eq('media_type', mediaType), eq('status', 'done')),
-  })
-  if (batches.length === 0) return new Map()
-
-  const rows = (
-    await db.findMany(importRows, {
-      where: and(
-        inList(
-          'batch_id',
-          batches.map((batch) => batch.id),
-        ),
-        eq('state', 'confirmed'),
-      ),
-      orderBy: ['updated_at', 'asc'],
-    })
-  ).filter(
-    (row) =>
-      row.media_item_id != null &&
-      (row.reason == null ||
-        row.reason === 'title_differs' ||
-        row.reason === 'no_year' ||
-        row.reason === 'year_drift'),
+): Promise<Map<string, number>> {
+  const { rows } = await pool.query<{ id: number; raw_title: string; raw_year: number | null }>(
+    `select r.id, r.raw_title, r.raw_year
+       from import_rows r
+       join import_batches b on b.id = r.batch_id
+       join media_items m on m.id = r.media_item_id
+      where b.user_id = $1 and b.media_type = $2 and b.status = 'done'
+        and r.state = 'confirmed' and (r.reason is null or r.reason = any($3))
+      order by r.updated_at`,
+    [userId, mediaType, REVIEW_REASONS],
   )
-  const ids = [...new Set(rows.map((row) => row.media_item_id!))]
-  const live =
-    ids.length === 0
-      ? new Set<number>()
-      : new Set((await db.findMany(mediaItems, { where: inList('id', ids) })).map((item) => item.id))
-
-  const answers = new Map<string, ImportRow>()
-  for (const row of rows) {
-    if (live.has(row.media_item_id!)) answers.set(answerKey(row.raw_title, row.raw_year ?? null), row)
-  }
-  return answers
+  return new Map(rows.map((row) => [answerKey(row.raw_title, row.raw_year), row.id]))
 }
 
-// Settles a row the way the member answered it last time. Kept in its review
-// section, so it can still be changed.
-export async function rememberRow(db: Db, rowId: number, answer: ImportRow): Promise<void> {
-  await db.update(importRows, rowId, {
-    state: 'confirmed',
-    reason: answer.reason ?? undefined,
-    year_delta: answer.year_delta ?? null,
-    matched_external_id: answer.matched_external_id ?? undefined,
-    media_item_id: answer.media_item_id,
-    alternates: answer.alternates == null ? null : JSON.stringify(answer.alternates),
-    accepted_by: REMEMBERED,
-    updated_at: Date.now(),
-  })
+// Settles rows the way the member answered them last time, in one statement:
+// each copies its past row's match. Kept in their review section, so they can
+// still be changed.
+export async function rememberRows(db: Db, pairs: { rowId: number; pastId: number }[]): Promise<void> {
+  if (pairs.length === 0) return
+  await pool.query(
+    `update import_rows r
+        set state = 'confirmed', reason = p.reason, year_delta = p.year_delta,
+            matched_external_id = p.matched_external_id, media_item_id = p.media_item_id,
+            alternates = p.alternates, accepted_by = $3, updated_at = $4
+       from unnest($1::int[], $2::int[]) as m(id, past_id)
+       join import_rows p on p.id = m.past_id
+      where r.id = m.id`,
+    [pairs.map((pair) => pair.rowId), pairs.map((pair) => pair.pastId), REMEMBERED, Date.now()],
+  )
 }
 
 export async function setMatchedCount(db: Db, batchId: string, matched: number): Promise<void> {
@@ -295,16 +266,16 @@ function readPreviousMatch(value: unknown): PreviousMatch | null {
 
 // Anything but a non-empty array reads as none.
 function readAlternates(value: unknown): CandidateLike[] | null {
-  if (!Array.isArray(value)) return null
-  const alternates = value.filter(
-    (entry): entry is CandidateLike =>
+  if (!Array.isArray(value) || value.length === 0) return null
+  const valid = value.every(
+    (entry) =>
       typeof entry === 'object' &&
       entry !== null &&
       typeof entry.externalId === 'string' &&
       typeof entry.title === 'string' &&
       (entry.releaseYear === null || typeof entry.releaseYear === 'number'),
   )
-  return alternates.length === value.length && alternates.length > 0 ? alternates : null
+  return valid ? (value as CandidateLike[]) : null
 }
 
 function toCatalogEntry(item: { id: number; title: string; metadata: unknown }): CatalogEntry {
@@ -381,28 +352,24 @@ export async function reopenRow(db: Db, batch: ImportBatch, rowId: number): Prom
   const row = await ownedRow(db, batch, rowId)
   if (!row || (row.state !== 'confirmed' && row.state !== 'skipped')) return false
 
-  const now = Date.now()
-  if (row.reason === 'title_differs' || row.reason === 'no_year' || row.reason === 'year_drift') {
+  const reopened = { accepted_by: undefined, previous_match: null, updated_at: Date.now() }
+  if (isReviewReason(row.reason)) {
     const previous = readPreviousMatch(row.previous_match)
     await db.update(importRows, row.id, {
+      ...reopened,
       state: 'uncertain',
-      accepted_by: undefined,
-      previous_match: null,
       ...(previous && {
         media_item_id: previous.mediaItemId,
         matched_external_id: previous.externalId ?? undefined,
         year_delta: previous.yearDelta,
       }),
-      updated_at: now,
     })
   } else if (row.reason == null) {
     await db.update(importRows, row.id, {
+      ...reopened,
       state: 'not_found',
       media_item_id: null,
       matched_external_id: undefined,
-      accepted_by: undefined,
-      previous_match: null,
-      updated_at: now,
     })
   } else {
     return false
@@ -596,11 +563,21 @@ export async function hasImportedLibrary(db: Db, userId: number, mediaType: Medi
 
 // One unfinished import at a time, so a second upload can't quietly orphan the
 // batch someone is halfway through reviewing.
+const UNFINISHED = ['matching', 'review']
+
 export async function activeBatch(db: Db, userId: number, mediaType: MediaType): Promise<ImportBatch | null> {
   const batch = await db.findOne(importBatches, {
-    where: and(eq('user_id', userId), eq('media_type', mediaType), inList('status', ['matching', 'review'])),
+    where: and(eq('user_id', userId), eq('media_type', mediaType), inList('status', UNFINISHED)),
   })
   return batch ?? null
+}
+
+// Every import still matching or waiting for review, newest first.
+export async function activeBatches(db: Db, userId: number): Promise<ImportBatch[]> {
+  return db.findMany(importBatches, {
+    where: and(eq('user_id', userId), inList('status', UNFINISHED)),
+    orderBy: ['created_at', 'desc'],
+  })
 }
 
 export { toStagedRow }

@@ -13,6 +13,7 @@ import type {
   SectionKey,
 } from '../../../data/imports/review.ts'
 import {
+  REVIEW_REASONS,
   normalizeTitle,
   reasonGroup,
   type BulkKind,
@@ -613,9 +614,12 @@ function Answer(handle: Handle<{ entry: ReviewRow }>) {
 
 // The year alone when the title is the file's own, else the catalog title too.
 function answeredMatch(title: string, item: NonNullable<ReviewRow['item']>): string {
-  const year = item.releaseYear == null ? '' : String(item.releaseYear)
-  if (normalizeTitle(item.title) === normalizeTitle(title)) return year || item.title
-  return year ? `${item.title} ${year}` : item.title
+  return [catalogTitle(title, item), item.releaseYear].filter((part) => part != null).join(' ')
+}
+
+// The catalog's title, unless it is the row's own and the year says it all.
+function catalogTitle(title: string, item: NonNullable<ReviewRow['item']>): string | null {
+  return item.releaseYear != null && normalizeTitle(item.title) === normalizeTitle(title) ? null : item.title
 }
 
 // "◯ 1994 · Gillian Armstrong", drawn like the drawer's checkboxes but round.
@@ -640,7 +644,7 @@ function MatchedAnswers(
   return () => {
     const { batchId, row, item, next } = handle.props
     // "Matched to 1969" when the title is the row's own.
-    const sameTitle = item?.releaseYear != null && normalizeTitle(item.title) === normalizeTitle(row.title)
+    const sameTitle = item != null && catalogTitle(row.title, item) == null
 
     return (
       <>
@@ -843,9 +847,9 @@ function ReviewDrawer(
       (section) => section.open > 0 && section.bulk && section.bulk.count > 0 && section.bulk.accepted === 0,
     ).length
 
-    const saveForm = (label: string, cls = 'primary') => (
+    const saveForm = (label: string) => (
       <form method="post" action={routes.profile.imports.save.href({ batchId })}>
-        <button type="submit" class={cls}>
+        <button type="submit" class="primary">
           {label}
         </button>
       </form>
@@ -940,7 +944,7 @@ function ReviewDrawer(
               </span>
             </label>
           ) : (
-            saveForm(saveLabel, 'primary')
+            saveForm(saveLabel)
           )}
         </div>
 
@@ -1041,12 +1045,10 @@ function BulkAccept(
   }
 }
 
-const REVIEW_SECTIONS = ['title_differs', 'no_year', 'year_drift'] as const
-
 // A section stays once all its cards are answered: its answered list is where
 // an answer gets changed.
 function reviewGroups(model: ReviewModel, singular: string, plural: string) {
-  return REVIEW_SECTIONS.map((key) => ({
+  return REVIEW_REASONS.map((key) => ({
     key,
     ...reasonGroup(key, singular, plural),
     entries: backFirst(
@@ -1066,20 +1068,9 @@ function backFirst(entries: ReviewRow[], last: LastAction | null): ReviewRow[] {
 export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
   return () => {
     const { displayName, batch, model, saved, offerFeed, reviewsOnly, error } = handle.props
-    const { counts } = model
+    const { counts, header } = model
     const { singular, plural, pastParticiple, hrefs } = mediaTypeUiFor(batch.media_type as MediaType)
     const batchId = batch.id
-    // Each row counted once: a remembered answer is counted as that, even when
-    // it lands on a film already logged.
-    const answeredRows = Object.values(model.answered).flat()
-    const alreadyLogged = new Set(model.alreadyLoggedIds)
-    const rememberedCount = answeredRows.filter(({ row }) => row.remembered).length
-    const answeredCount = answeredRows.filter(
-      ({ row }) => !row.remembered && !alreadyLogged.has(row.id),
-    ).length
-    const alreadyCount =
-      alreadyLogged.size -
-      answeredRows.filter(({ row }) => row.remembered && alreadyLogged.has(row.id)).length
     const uncertainGroups = reviewGroups(model, singular, plural)
     const notFound = backFirst(model.notFound, model.last)
     const next = nextAnchors([...uncertainGroups.flatMap((group) => group.entries), ...notFound])
@@ -1187,10 +1178,11 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 <h1>Review before saving</h1>
                 {error ? <p mix={css({ color: '#b91c1c' })}>{error}</p> : null}
                 <p mix={css({ fontSize: '15px', margin: '0 0 4px' })}>
-                  {counts.total} rows. {alreadyCount > 0 && `${alreadyCount} already in your log, `}
+                  {counts.total} rows.{' '}
+                  {header.alreadyLogged > 0 && `${header.alreadyLogged} already in your log, `}
                   <b mix={css({ fontWeight: 400 })}>{model.confidentCount} matched cleanly</b>
-                  {answeredCount > 0 && `, ${answeredCount} answered`}
-                  {rememberedCount > 0 && `, ${rememberedCount} answered as last time`},{' '}
+                  {header.answered > 0 && `, ${header.answered} answered`}
+                  {header.remembered > 0 && `, ${header.remembered} answered as last time`},{' '}
                   {model.uncertain.length} worth a look, and {model.notFound.length} we couldn't find.
                 </p>
                 {reviewsOnly && (

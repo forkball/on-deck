@@ -5,9 +5,11 @@
 // bucketing rules are the part worth testing, and none of them need a database.
 
 import {
+  REVIEW_REASONS,
   classifyDuplicate,
   conflictFields,
   bulkKind,
+  isReviewReason,
   suspicion,
   type BulkKind,
   type CandidateLike,
@@ -17,6 +19,7 @@ import {
   type DuplicateVerdict,
   type LogValues,
   type MatchReason,
+  type ReviewReason,
   type RowState,
   type Verdict,
 } from './classify.ts'
@@ -99,6 +102,9 @@ export interface ReviewModel {
   // Rows already answered in each section, so an answer can be changed.
   answered: Record<SectionKey, ReviewRow[]>
   last: LastAction | null
+  // The page's summary line, each row counted once: a remembered answer counts
+  // as that even when it lands on a film already logged.
+  header: { alreadyLogged: number; answered: number; remembered: number }
   // `save` is rows written, not log growth: two rows can land on one film.
   counts: { total: number; save: number; unchanged: number; leftOut: number }
 }
@@ -112,7 +118,7 @@ function verdictOf(row: StagedRow): Verdict {
 }
 
 // A row's section is its flag reason; unplaced rows are "not found" however settled.
-export type SectionKey = 'title_differs' | 'no_year' | 'year_drift' | 'not_found'
+export type SectionKey = ReviewReason | 'not_found'
 
 export interface SectionProgress {
   key: SectionKey
@@ -120,11 +126,10 @@ export interface SectionProgress {
   open: number
 }
 
-const SECTION_ORDER: SectionKey[] = ['title_differs', 'no_year', 'year_drift', 'not_found']
+const SECTION_ORDER: SectionKey[] = [...REVIEW_REASONS, 'not_found']
 
 function sectionOf(row: StagedRow): SectionKey | null {
-  if (row.reason === 'title_differs' || row.reason === 'no_year' || row.reason === 'year_drift')
-    return row.reason
+  if (isReviewReason(row.reason)) return row.reason
   if (
     row.reason == null &&
     (row.state === 'not_found' || row.state === 'confirmed' || row.state === 'skipped')
@@ -228,8 +233,7 @@ export function buildReview(
     if (row.state === 'confirmed' && row.acceptedBy) accepted[row.acceptedBy].push(row.id)
   }
   for (const { row, item } of uncertain) {
-    const match = item ? { externalId: '', title: item.title, releaseYear: item.releaseYear } : null
-    const kind = bulkKind(verdictOf(row), row.title, match, row.alternates?.length ?? null)
+    const kind = bulkKind(verdictOf(row), row.title, item?.title ?? null, row.alternates?.length ?? null)
     if (kind) bulk[kind].push(row.id)
   }
 
@@ -259,6 +263,17 @@ export function buildReview(
     answered[key].push({ row, item })
   }
 
+  const alreadyLogged = new Set(alreadyLoggedIds)
+  const header = { alreadyLogged: alreadyLogged.size, answered: 0, remembered: 0 }
+  for (const { row } of Object.values(answered).flat()) {
+    if (row.remembered) {
+      header.remembered++
+      if (alreadyLogged.has(row.id)) header.alreadyLogged--
+    } else if (!alreadyLogged.has(row.id)) {
+      header.answered++
+    }
+  }
+
   const totals = new Map<SectionKey, number>()
   for (const row of rows) {
     const key = sectionOf(row)
@@ -286,6 +301,7 @@ export function buildReview(
     accepted,
     answered,
     last: saved ? null : lastAction(rows, since, answered),
+    header,
     counts: { total: rows.length, save, unchanged, leftOut },
   }
 }

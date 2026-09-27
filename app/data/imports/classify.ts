@@ -4,6 +4,17 @@
 
 export type MatchReason = 'exact' | 'year_drift' | 'no_year' | 'title_differs'
 
+// The reasons review asks a question about, in page order; each is a section.
+export const REVIEW_REASONS = ['title_differs', 'no_year', 'year_drift'] as const
+export type ReviewReason = (typeof REVIEW_REASONS)[number]
+
+export function isReviewReason(reason: unknown): reason is ReviewReason {
+  return REVIEW_REASONS.includes(reason as ReviewReason)
+}
+
+// A subtitle follows a colon or a spaced dash.
+const SUBTITLE_SEPARATOR = /\s*(?::|\s[-–—])\s+/g
+
 // pending is the state a row is written in before matching reaches it.
 // confident/uncertain/not_found are what matching leaves behind; the rest are
 // what review writes over them. `kept` is a conflict decided in favour of the
@@ -137,7 +148,7 @@ export function isSubtitleOnly(rowTitle: string, matchTitle: string): boolean {
   const wanted = normalizeTitle(rowTitle)
   if (!wanted) return false
 
-  for (const separator of matchTitle.matchAll(/\s*(?::|\s[-–—])\s+/g)) {
+  for (const separator of matchTitle.matchAll(SUBTITLE_SEPARATOR)) {
     const before = matchTitle.slice(0, separator.index)
     const after = matchTitle.slice(separator.index + separator[0].length)
     if (normalizeTitle(before) === wanted && after.trim()) return true
@@ -156,7 +167,7 @@ export function parseBulkKind(value: unknown): BulkKind | null {
 export function bulkKind(
   verdict: Verdict,
   rowTitle: string,
-  match: CandidateLike | null,
+  matchTitle: string | null,
   namesakes: number | null = null,
 ): BulkKind | null {
   if (isBulkAcceptable(verdict)) return 'year'
@@ -164,8 +175,8 @@ export function bulkKind(
   if (
     verdict.reason === 'title_differs' &&
     verdict.yearDelta === 0 &&
-    match &&
-    isSubtitleOnly(rowTitle, match.title)
+    matchTitle != null &&
+    isSubtitleOnly(rowTitle, matchTitle)
   ) {
     return 'subtitle'
   }
@@ -273,7 +284,13 @@ export function inlineAlternates(
   for (const result of [chosen, ...results]) {
     if (seen.has(result.externalId) || normalizeTitle(result.title) !== wanted) continue
     seen.add(result.externalId)
-    namesakes.push({ externalId: result.externalId, title: result.title, releaseYear: result.releaseYear })
+    namesakes.push({
+      externalId: result.externalId,
+      title: result.title,
+      releaseYear: result.releaseYear,
+      // Books and games carry it in search results; addCreators fetches the rest.
+      creator: result.creator ?? null,
+    })
   }
 
   return namesakes.slice(0, MAX_INLINE_ALTERNATES)
@@ -289,14 +306,24 @@ export function answerKey(title: string, year: number | null): string {
 
 // What "Find it" searches for, tightest first; the first with results is shown.
 // Each step drops something exports add that catalogs often don't: the year,
-// a bracketed aside, a subtitle, accents and "&".
-export function looserQueries(title: string, year: number | null): string[] {
+// a bracketed aside, a subtitle, accents and "&". `step` says which the shown
+// results came from, so the picker can say so.
+export type QueryStep = 'year' | 'title' | 'simplified'
+
+export function looserQueries(title: string, year: number | null): { query: string; step: QueryStep }[] {
   const bare = title.replace(/\s*[([][^)\]]*[)\]]/g, '').trim() || title
-  const main = bare.split(/\s*(?::|\s[-–—])\s+/)[0]!.trim() || bare
+  const main = bare.split(SUBTITLE_SEPARATOR)[0]!.trim() || bare
   const plain = main
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/\s*&\s*/g, ' and ')
-  const queries = [year == null ? title : `${title} ${year}`, title, bare, main, plain]
-  return [...new Set(queries.map((query) => query.trim()))].filter((query) => query.length >= 2)
+  const steps: { query: string; step: QueryStep }[] = [
+    ...(year == null ? [] : [{ query: `${title} ${year}`, step: 'year' as const }]),
+    { query: title, step: 'title' },
+    ...[bare, main, plain].map((query) => ({ query, step: 'simplified' as const })),
+  ]
+  const seen = new Set<string>()
+  return steps
+    .map(({ query, step }) => ({ query: query.trim(), step }))
+    .filter(({ query }) => query.length >= 2 && !seen.has(query) && seen.add(query))
 }

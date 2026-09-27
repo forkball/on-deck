@@ -26,6 +26,8 @@ type PickerData = {
   title: string
   year: number | null
   query: string
+  // How the shown results were searched for: see looserQueries.
+  step: 'typed' | 'year' | 'title' | 'simplified'
   suggestedExternalId: string | null
   candidates: Candidate[]
 }
@@ -35,13 +37,17 @@ type PickerData = {
 const DEBOUNCE_MS = 250
 const MIN_QUERY = 2
 
-// When "Find it" had to loosen the row's title to find anything, it says so.
-function resultsLine(data: PickerData, typed: boolean): string {
+const STEP_NOTES: Record<PickerData['step'], string | null> = {
+  typed: null,
+  year: "searched with your row's year",
+  title: null,
+  simplified: 'simplified the title',
+}
+
+function resultsLine(data: PickerData): string {
   const results = count(data.candidates.length, 'result', 'results')
-  if (typed) return results
-  if (data.year != null && data.query === `${data.title} ${data.year}`)
-    return `${results} · searched with your row's year`
-  return data.query === data.title ? results : `${results} · simplified the title`
+  const note = STEP_NOTES[data.step]
+  return note ? `${results} · ${note}` : results
 }
 
 // One picker for the whole page rather than one modal per row: a 400-row import
@@ -51,9 +57,6 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
   let data: PickerData | null = null
   let loading = false
   let query = ''
-  // Whether the results on screen came from the row's own title and year or
-  // from something typed — only the first may say it used the row's year.
-  let typed = false
   let choosing = false
 
   let debounce: ReturnType<typeof setTimeout> | undefined
@@ -89,7 +92,6 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
       if (!response.ok) throw new Error(String(response.status))
 
       data = (await response.json()) as PickerData
-      typed = search !== undefined
       if (search === undefined) query = data.query
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
@@ -256,7 +258,7 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                 ]}
               />
               <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 14px' })}>
-                {loading ? 'Searching…' : data ? resultsLine(data, typed) : 'No results'}
+                {loading ? 'Searching…' : data ? resultsLine(data) : 'No results'}
               </p>
               <div
                 mix={css({

@@ -475,6 +475,38 @@ describe('buildReview what the saved page reports', () => {
     assert.equal(model.counts.save, 2)
   })
 
+  // The summary line counts each row once: a remembered answer that lands on a
+  // film already logged is "answered as last time", not also "already in your log".
+  it('counts a remembered answer once in the header', () => {
+    const already: ExistingEntry = {
+      mediaItemId: 1,
+      rating: null,
+      disliked: null,
+      consumedAt: null,
+      notes: null,
+    }
+    const model = buildReview(
+      [
+        row({
+          id: 1,
+          state: 'confirmed',
+          reason: 'no_year',
+          mediaItemId: 1,
+          rating: null,
+          consumedAt: null,
+          remembered: true,
+        }),
+        row({ id: 2, state: 'confirmed', reason: 'no_year', mediaItemId: 2, remembered: true }),
+        row({ id: 3, state: 'confirmed', reason: 'year_drift', mediaItemId: 3 }),
+      ],
+      catalog(entry(1, 'Heat', 1995), entry(2, 'Dune', 2021), entry(3, 'Ran', 1985)),
+      logged(already),
+      'keep',
+    )
+
+    assert.deepEqual(model.header, { alreadyLogged: 0, answered: 1, remembered: 2 })
+  })
+
   it('names every row that stays out of the log', () => {
     const missing = row({ state: 'not_found', mediaItemId: null })
     const skipped = row({ state: 'skipped' })

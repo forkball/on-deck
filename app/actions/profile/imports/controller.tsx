@@ -150,12 +150,14 @@ export default createController(routes.profile.imports, {
 
       const provider = getCatalogProvider(batch.media_type as MediaType)
       const typed = context.url.searchParams.get('q')?.trim()
-      const queries = typed ? [typed] : looserQueries(row.raw_title, row.raw_year ?? null)
+      const queries = typed
+        ? [{ query: typed, step: 'typed' as const }]
+        : looserQueries(row.raw_title, row.raw_year ?? null)
 
-      let query = queries[0]!
+      let searched = queries[0]!
       let results: CatalogSearchResult[] = []
-      for (query of queries) {
-        results = await provider.search(query)
+      for (searched of queries) {
+        results = await provider.search(searched.query)
         if (results.length > 0) break
       }
 
@@ -172,7 +174,8 @@ export default createController(routes.profile.imports, {
         rowIndex: row.row_index,
         title: row.raw_title,
         year: row.raw_year ?? null,
-        query,
+        query: searched.query,
+        step: searched.step,
         suggestedExternalId: row.matched_external_id ?? null,
         candidates: results.slice(0, 8).map((result) => ({
           externalId: result.externalId,
