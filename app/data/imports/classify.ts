@@ -288,3 +288,25 @@ export function inlineAlternates(
 
   return namesakes.slice(0, MAX_INLINE_ALTERNATES)
 }
+
+// Written to accepted_by for a row settled by the member's answer in an earlier
+// saved import, keyed by answerKey, so re-uploading an export asks nothing twice.
+export const REMEMBERED = 'remembered'
+
+export function answerKey(title: string, year: number | null): string {
+  return `${normalizeTitle(title)}|${year ?? ''}`
+}
+
+// What "Find it" searches for, tightest first; the first with results is shown.
+// Each step drops something exports add that catalogs often don't: the year,
+// a bracketed aside, a subtitle, accents and "&".
+export function looserQueries(title: string, year: number | null): string[] {
+  const bare = title.replace(/\s*[([][^)\]]*[)\]]/g, '').trim() || title
+  const main = bare.split(/\s*(?::|\s[-–—])\s+/)[0]!.trim() || bare
+  const plain = main
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s*&\s*/g, ' and ')
+  const queries = [year == null ? title : `${title} ${year}`, title, bare, main, plain]
+  return [...new Set(queries.map((query) => query.trim()))].filter((query) => query.length >= 2)
+}

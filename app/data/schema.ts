@@ -306,7 +306,7 @@ export const importRows = table({
     // inlineAlternates in app/data/imports/classify.ts.
     alternates: c.json().nullable(),
     // Which one-tap accept confirmed the row, so unticking it can put back
-    // exactly those. See the migration.
+    // exactly those, or `remembered` (a past import's answer). See the migration.
     accepted_by: c.text(),
     // The match before a repoint, restored by undo. See the migration.
     previous_match: c.json().nullable(),

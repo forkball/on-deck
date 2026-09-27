@@ -3,7 +3,7 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { getCatalogProvider } from '../../../data/catalog/provider.ts'
+import { getCatalogProvider, type CatalogSearchResult } from '../../../data/catalog/provider.ts'
 import {
   acceptBulk,
   confirmRow,
@@ -18,7 +18,7 @@ import {
   skipRow,
   unacceptBulk,
 } from '../../../data/imports/batches.ts'
-import { parseBulkKind } from '../../../data/imports/classify.ts'
+import { looserQueries, parseBulkKind } from '../../../data/imports/classify.ts'
 import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
 import type { ImportBatch, User } from '../../../data/schema.ts'
@@ -150,9 +150,14 @@ export default createController(routes.profile.imports, {
 
       const provider = getCatalogProvider(batch.media_type as MediaType)
       const typed = context.url.searchParams.get('q')?.trim()
-      const query = typed || [row.raw_title, row.raw_year].filter(Boolean).join(' ')
+      const queries = typed ? [typed] : looserQueries(row.raw_title, row.raw_year ?? null)
 
-      const results = await provider.search(query)
+      let query = queries[0]!
+      let results: CatalogSearchResult[] = []
+      for (query of queries) {
+        results = await provider.search(query)
+        if (results.length > 0) break
+      }
 
       // Which catalog entries other rows already use, so the picker can say so
       // rather than let someone silently recreate the duplicate they opened it

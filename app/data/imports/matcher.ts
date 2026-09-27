@@ -9,8 +9,16 @@ import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from 
 import type { Db } from '../db.ts'
 import type { MediaType } from '../mediaItems.ts'
 import type { ImportBatch } from '../schema.ts'
-import { finishMatching, loadRows, recordMatch, setMatchedCount, touchClaim } from './batches.ts'
-import { inlineAlternates, type CandidateLike } from './classify.ts'
+import {
+  finishMatching,
+  loadPastAnswers,
+  loadRows,
+  recordMatch,
+  rememberRow,
+  setMatchedCount,
+  touchClaim,
+} from './batches.ts'
+import { answerKey, inlineAlternates, type CandidateLike } from './classify.ts'
 import { runBounded } from './csv.ts'
 import { resolveBatch, type MatchInput } from './resolve.ts'
 
@@ -43,7 +51,16 @@ export async function matchBatch(db: Db, batch: ImportBatch): Promise<void> {
   const provider = getCatalogProvider(mediaType)
 
   const rows = await loadRows(db, batch.id)
-  const pending = rows.filter((row) => row.state === 'pending')
+  const past = await loadPastAnswers(db, batch.user_id, mediaType)
+
+  // A row answered in an earlier import is settled the same way, without a search.
+  const pending = []
+  for (const row of rows) {
+    if (row.state !== 'pending') continue
+    const answer = past.get(answerKey(row.raw_title, row.raw_year ?? null))
+    if (answer) await rememberRow(db, row.id, answer)
+    else pending.push(row)
+  }
 
   const inputs: MatchInput[] = []
   // Keyed by external id so the full catalog result survives resolution —

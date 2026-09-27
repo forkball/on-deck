@@ -35,9 +35,13 @@ type PickerData = {
 const DEBOUNCE_MS = 250
 const MIN_QUERY = 2
 
+// When "Find it" had to loosen the row's title to find anything, it says so.
 function resultsLine(data: PickerData, typed: boolean): string {
   const results = count(data.candidates.length, 'result', 'results')
-  return !typed && data.year != null ? `${results} · searched with your row's year` : results
+  if (typed) return results
+  if (data.year != null && data.query === `${data.title} ${data.year}`)
+    return `${results} · searched with your row's year`
+  return data.query === data.title ? results : `${results} · simplified the title`
 }
 
 // One picker for the whole page rather than one modal per row: a 400-row import
