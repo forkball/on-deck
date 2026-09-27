@@ -408,7 +408,7 @@ function UncertainCard(
 ) {
   return () => {
     const { batchId, entry, pastParticiple, next } = handle.props
-    const { row, item, chip } = entry
+    const { row, item } = entry
     // No-year rows ask "which one?": the namesakes matching kept, else its own pick.
     const choices =
       row.reason !== 'no_year'
@@ -420,42 +420,20 @@ function UncertainCard(
 
     return (
       <Card attention id={rowAnchor(row.id)}>
-        <div
-          mix={css({
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'baseline',
-            columnGap: '10px',
-            rowGap: '2px',
-          })}
-        >
-          <span mix={css({ flex: '1 1 auto', minWidth: 0 })}>
+        {/* The title on the left, the rating on the right; the date gets the full width. */}
+        <div mix={css({ display: 'flex', alignItems: 'flex-start', gap: '10px' })}>
+          <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
             {row.title} {/* The no-year section's heading already says it. */}
             <span mix={css({ color: '#888' })}>
               {row.reason === 'no_year' ? null : (row.year ?? 'no year')}
             </span>
-          </span>
-          {chip ? (
-            <span
-              mix={css({
-                fontSize: '11.5px',
-                padding: '1px 8px',
-                borderRadius: '999px',
-                border: '1px solid #d9cfbe',
-                color: '#7a6f5d',
-                background: '#f6efe3',
-                whiteSpace: 'nowrap',
-              })}
-            >
-              {chip}
-            </span>
-          ) : null}
-        </div>
-        <div mix={css({ color: '#888', fontSize: '13px' })}>
-          <Rated values={row} />
-          <div mix={css({ marginTop: '4px' })}>
-            {pastParticiple} {formatDate(row.consumedAt)}
           </div>
+          <div mix={css({ flex: 'none', color: '#888', fontSize: '13px', paddingTop: '2px' })}>
+            <Rated values={row} />
+          </div>
+        </div>
+        <div mix={css({ color: '#888', fontSize: '13px', marginTop: '4px' })}>
+          {pastParticiple} {formatDate(row.consumedAt)}
         </div>
 
         {choices ? (

@@ -62,7 +62,6 @@ describe('buildReview bucketing', () => {
     const model = buildReview(rows, catalog(entry(1, 'The Thing', 2011)), logged(), 'keep')
 
     assert.equal(model.uncertain.length, 1)
-    assert.equal(model.uncertain[0].chip, 'Year off by 29')
     // Save by default: doing nothing still logs it.
     assert.equal(model.counts.save, 1)
     assert.equal(model.counts.leftOut, 0)

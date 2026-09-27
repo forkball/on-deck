@@ -96,16 +96,6 @@ export function suspicion(verdict: Verdict): number {
   }
 }
 
-// A chip after the row, only where it says more than the group heading.
-export function describeReason(verdict: Verdict): string | null {
-  const magnitude = Math.abs(verdict.yearDelta ?? 0)
-  return verdict.reason === 'year_drift'
-    ? magnitude === 1
-      ? 'Year off by 1'
-      : `Year off by ${magnitude}`
-    : null
-}
-
 // Heading and blurb for a review group.
 export function reasonGroup(
   reason: MatchReason | null,

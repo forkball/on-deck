@@ -7,7 +7,6 @@ import {
   classifyDuplicate,
   classifyMatch,
   conflictFields,
-  describeReason,
   bulkKind,
   inlineAlternates,
   isBulkAcceptable,
@@ -191,33 +190,6 @@ describe('classifyDuplicate', () => {
     // One entry per film means the later viewing is the live one.
     assert.equal(verdict.keep.id, 210)
     assert.equal(verdict.drop.id, 12)
-  })
-})
-
-describe('describeReason', () => {
-  it('names the gap without a stray plural', () => {
-    assert.equal(
-      describeReason(classifyMatch({ title: 'Kwaidan', year: 1964 }, film('Kwaidan', 1965))),
-      'Year off by 1',
-    )
-    assert.equal(
-      describeReason(classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011))),
-      'Year off by 29',
-    )
-  })
-
-  it('says nothing about a confident match', () => {
-    assert.equal(describeReason(classifyMatch({ title: 'Heat', year: 1995 }, film('Heat', 1995))), null)
-  })
-
-  // The group heading already says these; a chip repeating it on every card
-  // is noise.
-  it('leaves reasons its group heading names to the heading', () => {
-    assert.equal(describeReason(classifyMatch({ title: 'Heat', year: null }, film('Heat', 1995))), null)
-    assert.equal(
-      describeReason(classifyMatch({ title: 'Birdman', year: 2014 }, film('Birdman or…', 2014))),
-      null,
-    )
   })
 })
 

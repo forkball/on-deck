@@ -7,7 +7,6 @@
 import {
   classifyDuplicate,
   conflictFields,
-  describeReason,
   bulkKind,
   suspicion,
   type BulkKind,
@@ -67,7 +66,6 @@ export interface ExistingEntry extends LogValues {
 export interface ReviewRow {
   row: StagedRow
   item: CatalogEntry | null
-  chip: string | null
 }
 
 export interface ConflictEntry {
@@ -186,7 +184,7 @@ export function buildReview(
     if (held.has(row.id)) continue
 
     if (row.state === 'not_found') {
-      notFound.push({ row, item: null, chip: null })
+      notFound.push({ row, item: null })
       continue
     }
 
@@ -212,7 +210,7 @@ export function buildReview(
     }
 
     if (row.state === 'uncertain') {
-      uncertain.push({ row, item, chip: describeReason(verdictOf(row)) })
+      uncertain.push({ row, item })
     } else if (row.state === 'confirmed') {
       confirmedCount++
     } else {
@@ -258,7 +256,7 @@ export function buildReview(
     const key = sectionOf(row)
     if (!key) continue
     const item = row.mediaItemId == null ? null : (items.get(row.mediaItemId) ?? null)
-    answered[key].push({ row, item, chip: row.state === 'confirmed' ? null : describeReason(verdictOf(row)) })
+    answered[key].push({ row, item })
   }
 
   const totals = new Map<SectionKey, number>()
