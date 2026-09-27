@@ -10,7 +10,7 @@ import type { Db } from '../db.ts'
 import type { MediaType } from '../mediaItems.ts'
 import type { ImportBatch } from '../schema.ts'
 import { finishMatching, loadRows, recordMatch, setMatchedCount, touchClaim } from './batches.ts'
-import { inlineAlternates } from './classify.ts'
+import { inlineAlternates, type CandidateLike } from './classify.ts'
 import { runBounded } from './csv.ts'
 import { resolveBatch, type MatchInput } from './resolve.ts'
 
@@ -93,12 +93,20 @@ export async function matchBatch(db: Db, batch: ImportBatch): Promise<void> {
   await touchClaim(db, batch.id)
 
   const inputById = new Map(inputs.map((input) => [input.rowId, input]))
+  const alternates = new Map<number, CandidateLike[] | null>()
+  for (const outcome of outcomes) {
+    const input = inputById.get(outcome.rowId)
+    alternates.set(
+      outcome.rowId,
+      input ? inlineAlternates(input, outcome.verdict, outcome.chosen, input.results) : null,
+    )
+  }
+  await addCreators(provider, [...alternates.values()])
 
   for (const outcome of outcomes) {
     const externalId = outcome.chosen?.externalId ?? null
-    const input = inputById.get(outcome.rowId)
     await recordMatch(db, outcome.rowId, {
-      alternates: input ? inlineAlternates(input, outcome.verdict, outcome.chosen, input.results) : null,
+      alternates: alternates.get(outcome.rowId) ?? null,
       state: outcome.verdict.state,
       reason: outcome.verdict.reason,
       yearDelta: outcome.verdict.yearDelta,
@@ -109,4 +117,30 @@ export async function matchBatch(db: Db, batch: ImportBatch): Promise<void> {
 
   await setMatchedCount(db, batch.id, rows.length)
   await finishMatching(db, batch.id)
+}
+
+// Fills in who made each namesake a no-year card offers as a choice, so "1994"
+// can read "1994 · Armstrong". Search results don't carry it (TMDB's search has
+// no director), so each is looked up by id: only where there is a choice to make,
+// once per film. A failed lookup leaves the year on its own.
+export async function addCreators(
+  provider: { getById(externalId: string): Promise<CatalogSearchResult | null> },
+  lists: (CandidateLike[] | null)[],
+): Promise<void> {
+  const wanted = new Map<string, CandidateLike[]>()
+  for (const list of lists) {
+    if (!list || list.length < 2) continue
+    for (const candidate of list) {
+      if (candidate.creator) continue
+      wanted.set(candidate.externalId, [...(wanted.get(candidate.externalId) ?? []), candidate])
+    }
+  }
+
+  await runBounded([...wanted.keys()], CONCURRENCY, async (externalId) => {
+    const creator = await provider.getById(externalId).then(
+      (detail) => detail?.creator ?? null,
+      () => null,
+    )
+    if (creator) for (const candidate of wanted.get(externalId)!) candidate.creator = creator
+  })
 }

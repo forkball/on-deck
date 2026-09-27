@@ -616,13 +616,17 @@ function answeredMatch(title: string, item: NonNullable<ReviewRow['item']>): str
   return year ? `${item.title} ${year}` : item.title
 }
 
-// "◯ 1994", drawn like the drawer's checkboxes but round.
+// "◯ 1994 · Gillian Armstrong", drawn like the drawer's checkboxes but round.
 function ChoiceLabel(handle: Handle<{ choice: CandidateLike }>) {
   return () => {
+    const { releaseYear, creator } = handle.props.choice
     return (
       <>
         <span class="checkline-box radio" aria-hidden="true" />
-        <span mix={css({ color: '#3c3c3c' })}>{handle.props.choice.releaseYear ?? 'Undated'}</span>
+        <span>
+          <span mix={css({ color: '#3c3c3c' })}>{releaseYear ?? 'Undated'}</span>
+          {creator && ` · ${creator}`}
+        </span>
       </>
     )
   }

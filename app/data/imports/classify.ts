@@ -15,6 +15,8 @@ export interface CandidateLike {
   externalId: string
   title: string
   releaseYear: number | null
+  // Director or author, when known; tells namesakes apart.
+  creator?: string | null
 }
 
 export interface RowLike {
