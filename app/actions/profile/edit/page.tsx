@@ -135,9 +135,6 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
             The form keeps its own narrower measure — inputs 640px wide read
             worse, and that was what the narrower <main> was really for. */}
         <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <p mix={css({ margin: '0 0 16px' })}>
-            <a href={routes.profile.index.href()}>← Back to your profile</a>
-          </p>
           <h1>Settings</h1>
 
           <Tabs
