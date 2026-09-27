@@ -48,49 +48,54 @@ export async function createBatch(
   const id = crypto.randomUUID()
   const now = Date.now()
 
-  await db.create(importBatches, {
-    id,
-    user_id: userId,
-    media_type: mediaType,
-    source,
-    status: 'matching',
-    total_rows: rows.length,
-    matched_rows: 0,
-    conflict_choice: 'keep',
-    created_at: now,
-    updated_at: now,
-  })
-
-  // One statement rather than a create() per row: a 400-row export is 400 round
-  // trips to Supabase otherwise, which is most of the time the upload spends.
-  if (rows.length > 0) {
-    const COLUMNS = 12
-    const values: unknown[] = []
-    const tuples = rows.map((row, i) => {
-      const base = i * COLUMNS
-      values.push(
-        id,
-        row.rowIndex,
-        row.title,
-        row.year,
-        row.rating,
-        row.notes ?? null,
-        row.consumedAt,
-        row.logStatus ?? 'consumed',
-        row.author ?? null,
-        row.isbn ?? null,
-        now,
-        now,
-      )
-      return `(${Array.from({ length: COLUMNS }, (_, n) => `$${base + n + 1}`).join(', ')})`
-    })
-
-    await pool.query(
-      `insert into import_rows
-         (batch_id, row_index, raw_title, raw_year, rating, notes, consumed_at, log_status, author, isbn, created_at, updated_at)
-       values ${tuples.join(', ')}`,
-      values,
+  // Batch and rows in one transaction, so the worker can never claim a batch
+  // whose rows aren't in yet — it would match nothing and send it to review.
+  const client = await pool.connect()
+  try {
+    await client.query('begin')
+    await client.query(
+      `insert into import_batches
+         (id, user_id, media_type, source, status, total_rows, matched_rows, conflict_choice, created_at, updated_at)
+       values ($1, $2, $3, $4, 'matching', $5, 0, 'keep', $6, $6)`,
+      [id, userId, mediaType, source, rows.length, now],
     )
+
+    // One statement for all rows: a create() per row is a round trip each.
+    if (rows.length > 0) {
+      const COLUMNS = 12
+      const values: unknown[] = []
+      const tuples = rows.map((row, i) => {
+        const base = i * COLUMNS
+        values.push(
+          id,
+          row.rowIndex,
+          row.title,
+          row.year,
+          row.rating,
+          row.notes ?? null,
+          row.consumedAt,
+          row.logStatus ?? 'consumed',
+          row.author ?? null,
+          row.isbn ?? null,
+          now,
+          now,
+        )
+        return `(${Array.from({ length: COLUMNS }, (_, n) => `$${base + n + 1}`).join(', ')})`
+      })
+
+      await client.query(
+        `insert into import_rows
+           (batch_id, row_index, raw_title, raw_year, rating, notes, consumed_at, log_status, author, isbn, created_at, updated_at)
+         values ${tuples.join(', ')}`,
+        values,
+      )
+    }
+    await client.query('commit')
+  } catch (error) {
+    await client.query('rollback')
+    throw error
+  } finally {
+    client.release()
   }
 
   return id
