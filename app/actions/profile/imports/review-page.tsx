@@ -204,19 +204,28 @@ function PickerButton(handle: Handle<{ rowId: number; label: string; variant?: B
   }
 }
 
-function Actions(handle: Handle<{ children?: RemixNode }>) {
+// `fill`: on a phone the buttons share the card's width, and the last child
+// (a text link) takes its own line under them.
+const fillOnPhone = css({
+  '@media (max-width: 719px)': {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    '& > form:not(:last-child) button': { width: '100%' },
+    '& > :last-child': { gridColumn: '1 / -1' },
+  },
+})
+
+const actionsStyle = css({
+  display: 'flex',
+  gap: '8px 12px',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  marginTop: '8px',
+})
+
+function Actions(handle: Handle<{ fill?: boolean; children?: RemixNode }>) {
   return () => (
-    <div
-      mix={css({
-        display: 'flex',
-        gap: '8px 12px',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        marginTop: '8px',
-      })}
-    >
-      {handle.props.children}
-    </div>
+    <div mix={handle.props.fill ? [actionsStyle, fillOnPhone] : actionsStyle}>{handle.props.children}</div>
   )
 }
 
@@ -645,7 +654,7 @@ function MatchedAnswers(
           </span>
         </div>
 
-        <Actions>
+        <Actions fill>
           <ResolveForm
             batchId={batchId}
             rowId={row.id}
@@ -926,10 +935,12 @@ function ReviewDrawer(
           {needsConfirm ? (
             // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
             <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
-              <span class="doodle-border primary slim">{saveLabel}</span>
+              <span class="doodle-border primary" mix={css({ display: 'inline-block' })}>
+                {saveLabel}
+              </span>
             </label>
           ) : (
-            saveForm(saveLabel, 'primary slim')
+            saveForm(saveLabel, 'primary')
           )}
         </div>
 

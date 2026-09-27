@@ -79,12 +79,14 @@
 
 /* Same box, too, or they match in colour and still stand at different
    heights. DoodleCSS leaves a real <button> on the browser's default padding
-   (~1px 6px) while each impostor carried its own 4px 14px, so a trigger
-   already stood ~6px taller before anything else. Declared in one place
-   rather than per component, which is what makes "all buttons" true. */
+   (~1px 6px) while each impostor carried its own, so a trigger stood taller
+   before anything else. Declared in one place rather than per component,
+   which is what makes "all buttons" true. No block padding: the hand-drawn
+   border is 10px a side already, so a button is 40px — one 20px line inside
+   it — the height the import review's pinned Save set. */
 .doodle button,
 .doodle .doodle-border {
-  padding: 4px 14px;
+  padding: 0 14px;
 }
 
 /* The floating-action variant is deliberately larger. Listed after the rule
@@ -95,23 +97,21 @@
   padding: 14px 22px;
 }
 
-/* The other half of a form row. A <select> carried no vertical padding at all
-   and a text <input> only the browser's ~1px, so the "Filter" button beside the
-   status dropdown stood 9px taller than it. Only the block padding is stated
-   here: a select's inline padding is DoodleCSS's caret allowance
-   (`padding-right: 1.5em`) and an input's is the browser's, and neither has
-   anything to do with the height.
+/* The other half of a form row: a <select> or text <input> beside a button
+   takes no block padding either, so the row stands at one height. Only the
+   block padding is stated: a select's inline padding is DoodleCSS's caret
+   allowance (`padding-right: 1.5em`) and an input's is the browser's.
 
-   A <textarea> takes the same block padding — it stacks with these inputs in
-   the same forms (notes, bio), and on 2px its first line sat tighter to the
-   border than theirs. It is deliberately left out of the line-height rule
-   below: that number exists to make one-line controls agree on a height a
-   textarea doesn't share, and a textarea holds prose, which reads better on
-   the font's own roomier line spacing. */
-.doodle select,
-.doodle textarea,
-.doodle input:not([type='checkbox']):not([type='radio']) {
+   A <textarea> keeps 4px: it holds prose, not one line, and on no padding its
+   first line sits against the border. It is also left out of the line-height
+   rule below, which exists to make one-line controls agree on a height. */
+.doodle textarea {
   padding-block: 4px;
+}
+
+.doodle select,
+.doodle input:not([type='checkbox']):not([type='radio']) {
+  padding-block: 0;
 }
 
 /* Padding gets them to the same height while Short Stack is rendering, but the
@@ -227,12 +227,6 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 .doodle button.bare:hover:not(:disabled),
 .doodle button.checkline:hover:not(:disabled) {
   color: #3c3c3c;
-}
-
-/* Thinner, for the Save pinned in the import review's bottom bar. */
-.doodle button.slim,
-.doodle .doodle-border.slim {
-  padding-block: 0;
 }
 
 /* A submit drawn as Doodle's checkbox (or radio, with .radio on the box).
