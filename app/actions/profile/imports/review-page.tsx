@@ -420,20 +420,32 @@ function UncertainCard(
 
     return (
       <Card attention id={rowAnchor(row.id)}>
-        {/* The title on the left, the rating on the right; the date gets the full width. */}
-        <div mix={css({ display: 'flex', alignItems: 'flex-start', gap: '10px' })}>
-          <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
-            {row.title} {/* The no-year section's heading already says it. */}
-            <span mix={css({ color: '#888' })}>
-              {row.reason === 'no_year' ? null : (row.year ?? 'no year')}
-            </span>
-          </div>
-          <div mix={css({ flex: 'none', color: '#888', fontSize: '13px', paddingTop: '2px' })}>
-            <Rated values={row} />
-          </div>
+        <div>
+          {row.title} {/* The no-year section's heading already says it. */}
+          <span mix={css({ color: '#888' })}>
+            {row.reason === 'no_year' ? null : (row.year ?? 'no year')}
+          </span>
         </div>
-        <div mix={css({ color: '#888', fontSize: '13px', marginTop: '4px' })}>
-          {pastParticiple} {formatDate(row.consumedAt)}
+        {/* What the file logged, together: rating and date, wrapping as one. */}
+        <div
+          mix={css({
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            columnGap: '10px',
+            rowGap: '4px',
+            margin: '8px 0 0',
+            padding: '6px 10px',
+            background: '#f5ede1',
+            borderRadius: '6px',
+            color: '#888',
+            fontSize: '13px',
+          })}
+        >
+          <Rated values={row} />
+          <span>
+            {pastParticiple} {formatDate(row.consumedAt)}
+          </span>
         </div>
 
         {choices ? (
