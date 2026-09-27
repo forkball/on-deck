@@ -30,6 +30,7 @@ function row(partial: Partial<StagedRow> = {}): StagedRow {
     matchedExternalId: null,
     alternates: null,
     acceptedBy: null,
+    updatedAt: 0,
     ...partial,
   }
 }
@@ -106,6 +107,47 @@ describe('buildReview bucketing', () => {
     )
 
     assert.deepEqual(model.bulk, { year: [1], subtitle: [], sole: [] })
+  })
+
+  it('names the last change made by hand, for the undo line', () => {
+    const items = catalog(entry(1, 'Kwaidan', 1965), entry(2, 'Ran', 1985), entry(3, 'Ikiru', 1952))
+    const last = (rows: ReturnType<typeof row>[]) =>
+      buildReview(rows, items, logged(), 'keep', { since: 100 }).last
+
+    // Matching's own writes don't count.
+    assert.equal(last([row({ id: 1, state: 'uncertain', reason: 'year_drift', updatedAt: 90 })]), null)
+
+    const answered = last([
+      row({ id: 1, state: 'confirmed', reason: 'year_drift', mediaItemId: 1, updatedAt: 120 }),
+      row({ id: 2, state: 'skipped', reason: 'year_drift', mediaItemId: 2, updatedAt: 110 }),
+    ])
+    assert.equal(answered?.kind === 'answered' && answered.entry.row.id, 1)
+
+    const accepted = last([
+      row({
+        id: 1,
+        state: 'confirmed',
+        reason: 'year_drift',
+        mediaItemId: 1,
+        acceptedBy: 'year',
+        updatedAt: 130,
+      }),
+      row({
+        id: 2,
+        state: 'confirmed',
+        reason: 'year_drift',
+        mediaItemId: 2,
+        acceptedBy: 'year',
+        updatedAt: 130,
+      }),
+    ])
+    assert.deepEqual(accepted, { kind: 'accepted', bulk: 'year', count: 2 })
+
+    const back = last([
+      row({ id: 3, state: 'uncertain', reason: 'no_year', year: null, mediaItemId: 3, updatedAt: 140 }),
+    ])
+    assert.equal(back?.kind === 'back' && back.rows[0]?.id, 3)
+    assert.equal(back?.kind === 'back' && back.section, 'no_year')
   })
 
   it('keeps answered rows under their section, so an answer can be changed', () => {

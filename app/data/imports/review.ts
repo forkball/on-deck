@@ -41,7 +41,14 @@ export interface StagedRow {
   // A no-year row's namesakes (inlineAlternates).
   alternates: CandidateLike[] | null
   acceptedBy: BulkKind | null
+  updatedAt: number
 }
+
+// The last thing done on the review, for the drawer's Undo line.
+export type LastAction =
+  | { kind: 'answered'; entry: ReviewRow }
+  | { kind: 'accepted'; bulk: BulkKind; count: number }
+  | { kind: 'back'; rows: StagedRow[]; section: SectionKey }
 
 export interface CatalogEntry {
   id: number
@@ -91,6 +98,7 @@ export interface ReviewModel {
   accepted: Record<BulkKind, number[]>
   // Rows already answered in each section, so an answer can be changed.
   answered: Record<SectionKey, ReviewRow[]>
+  last: LastAction | null
   // `save` is rows written, not log growth: two rows can land on one film.
   counts: { total: number; save: number; unchanged: number; leftOut: number }
 }
@@ -147,7 +155,8 @@ export function buildReview(
   existing: Map<number, ExistingEntry>,
   conflictChoice: ConflictChoice,
   // Once saved the log matches every row, so nothing reads as already logged.
-  { saved = false }: { saved?: boolean } = {},
+  // `since`: when matching finished; rows changed after it were changed by hand.
+  { saved = false, since = Infinity }: { saved?: boolean; since?: number } = {},
 ): ReviewModel {
   const duplicates = findDuplicates(rows, items)
   const held = heldBack(duplicates)
@@ -276,6 +285,7 @@ export function buildReview(
     bulk,
     accepted,
     answered,
+    last: saved ? null : lastAction(rows, since, answered),
     counts: { total: rows.length, save, unchanged, leftOut },
   }
 }
@@ -321,4 +331,30 @@ function toDuplicateRow(row: StagedRow): DuplicateRow {
     consumedAt: row.consumedAt,
     verdict: verdictOf(row),
   }
+}
+
+// Whatever the latest change touched: one row answered, a bulk accept (its rows
+// share a timestamp), or rows put back to be answered again.
+function lastAction(
+  rows: StagedRow[],
+  since: number,
+  answered: Record<SectionKey, ReviewRow[]>,
+): LastAction | null {
+  let latest = since
+  for (const row of rows) if (row.updatedAt > latest) latest = row.updatedAt
+  if (latest === since) return null
+  const touched = rows.filter((row) => row.updatedAt === latest)
+  const [first] = touched
+  const section = sectionOf(first!)
+  if (!section) return null
+
+  const kind = first!.acceptedBy
+  if (kind && touched.every((row) => row.state === 'confirmed' && row.acceptedBy === kind)) {
+    return { kind: 'accepted', bulk: kind, count: touched.length }
+  }
+  if (touched.every((row) => row.state === 'uncertain' || row.state === 'not_found')) {
+    return { kind: 'back', rows: touched, section }
+  }
+  const entry = touched.length === 1 ? answered[section].find(({ row }) => row.id === first!.id) : undefined
+  return entry ? { kind: 'answered', entry } : null
 }
