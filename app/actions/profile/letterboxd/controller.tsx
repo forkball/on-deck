@@ -16,6 +16,7 @@ import {
 import { users, type User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
+import { count } from '../../../ui/shared/count.ts'
 
 // Hiding the form isn't enough: these routes stay mapped, so a POST would
 // still connect an account the gate is meant to have closed. 404 rather than
@@ -46,10 +47,6 @@ const requireLetterboxdSync: Middleware = async (context, next) => {
 function back(params = ''): Response {
   const query = params ? `?tab=connections&${params}` : '?tab=connections'
   return redirect(`${routes.profile.edit.index.href()}${query}`, 303)
-}
-
-function count(n: number, one: string, many: string): string {
-  return `${n} ${n === 1 ? one : many}`
 }
 
 // What a member gets back for pressing Sync now. Counts rather than a bare

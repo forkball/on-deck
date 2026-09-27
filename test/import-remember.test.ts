@@ -10,7 +10,7 @@ import {
   loadReview,
   loadRows,
   recordMatch,
-  rememberRow,
+  rememberRows,
   reopenRow,
 } from '../app/data/imports/batches.ts'
 import { answerKey } from '../app/data/imports/classify.ts'
@@ -110,7 +110,6 @@ describe('remembering past import answers', { skip: skipWithoutDatabase }, () =>
   it('keeps only answered questions from saved imports whose film still exists', async () => {
     const answers = await loadPastAnswers(db, userId, 'movie')
     assert.deepEqual([...answers.keys()], [answerKey('Little Women', null)])
-    assert.equal(answers.get(answerKey('Little Women', null))?.media_item_id, littleWomen)
   })
 
   it('settles a new row the same way, in its section, and Change reopens it', async () => {
@@ -119,7 +118,7 @@ describe('remembering past import answers', { skip: skipWithoutDatabase }, () =>
       { rowIndex: 2, title: 'little women', year: null, rating: 4, consumedAt: null },
     ])
     const [row] = await loadRows(db, batchId)
-    await rememberRow(db, row!.id, answers.get(answerKey(row!.raw_title, null))!)
+    await rememberRows(db, [{ rowId: row!.id, pastId: answers.get(answerKey(row!.raw_title, null))! }])
     await finishMatching(db, batchId)
 
     const batch = (await loadBatch(db, batchId, userId))!

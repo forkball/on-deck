@@ -13,6 +13,7 @@ import type {
   SectionKey,
 } from '../../../data/imports/review.ts'
 import {
+  REVIEW_REASONS,
   normalizeTitle,
   reasonGroup,
   type BulkKind,
@@ -204,19 +205,28 @@ function PickerButton(handle: Handle<{ rowId: number; label: string; variant?: B
   }
 }
 
-function Actions(handle: Handle<{ children?: RemixNode }>) {
+// `fill`: on a phone the buttons share the card's width, and the last child
+// (a text link) takes its own line under them.
+const fillOnPhone = css({
+  '@media (max-width: 719px)': {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    '& > form:not(:last-child) button': { width: '100%' },
+    '& > :last-child': { gridColumn: '1 / -1' },
+  },
+})
+
+const actionsStyle = css({
+  display: 'flex',
+  gap: '8px 12px',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  marginTop: '8px',
+})
+
+function Actions(handle: Handle<{ fill?: boolean; children?: RemixNode }>) {
   return () => (
-    <div
-      mix={css({
-        display: 'flex',
-        gap: '8px 12px',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        marginTop: '8px',
-      })}
-    >
-      {handle.props.children}
-    </div>
+    <div mix={handle.props.fill ? [actionsStyle, fillOnPhone] : actionsStyle}>{handle.props.children}</div>
   )
 }
 
@@ -408,7 +418,7 @@ function UncertainCard(
 ) {
   return () => {
     const { batchId, entry, pastParticiple, next } = handle.props
-    const { row, item, chip } = entry
+    const { row, item } = entry
     // No-year rows ask "which one?": the namesakes matching kept, else its own pick.
     const choices =
       row.reason !== 'no_year'
@@ -420,47 +430,39 @@ function UncertainCard(
 
     return (
       <Card attention id={rowAnchor(row.id)}>
+        <div>
+          {row.title} {/* The no-year section's heading already says it. */}
+          <span mix={css({ color: '#888' })}>
+            {row.reason === 'no_year' ? null : (row.year ?? 'no year')}
+          </span>
+        </div>
+        {/* What the file logged, together: rating and date, wrapping as one. */}
         <div
           mix={css({
             display: 'flex',
             flexWrap: 'wrap',
-            alignItems: 'baseline',
+            alignItems: 'center',
             columnGap: '10px',
-            rowGap: '2px',
+            rowGap: '4px',
+            margin: '8px 0 0',
+            padding: '6px 10px',
+            background: '#f5ede1',
+            borderRadius: '6px',
+            color: '#888',
+            fontSize: '13px',
           })}
         >
-          <span mix={css({ flex: '1 1 auto', minWidth: 0 })}>
-            {row.title} <span mix={css({ color: '#888' })}>{row.year ?? 'no year'}</span>
-          </span>
-          {chip ? (
-            <span
-              mix={css({
-                fontSize: '11.5px',
-                padding: '1px 8px',
-                borderRadius: '999px',
-                border: '1px solid #d9cfbe',
-                color: '#7a6f5d',
-                background: '#f6efe3',
-                whiteSpace: 'nowrap',
-              })}
-            >
-              {chip}
-            </span>
-          ) : null}
-        </div>
-        <div mix={css({ color: '#888', fontSize: '13px' })}>
           <Rated values={row} />
-          <div mix={css({ marginTop: '4px' })}>
+          <span>
             {pastParticiple} {formatDate(row.consumedAt)}
-          </div>
+          </span>
         </div>
 
         {choices ? (
           <>
-            <div mix={css({ fontSize: '13px', color: '#8d8579', marginTop: '10px' })}>Which one?</div>
             {/* Radios, one per line: none preselected, since without a year our pick
                 is a guess. Once answered, the answer shows as selected. */}
-            <div mix={css({ display: 'grid', gap: '2px', marginTop: '4px' })}>
+            <div mix={css({ display: 'grid', gap: '2px', marginTop: '10px' })}>
               {choices.map((choice) => {
                 const ours = choice.externalId === row.matchedExternalId
                 return (
@@ -612,9 +614,12 @@ function Answer(handle: Handle<{ entry: ReviewRow }>) {
 
 // The year alone when the title is the file's own, else the catalog title too.
 function answeredMatch(title: string, item: NonNullable<ReviewRow['item']>): string {
-  const year = item.releaseYear == null ? '' : String(item.releaseYear)
-  if (normalizeTitle(item.title) === normalizeTitle(title)) return year || item.title
-  return year ? `${item.title} ${year}` : item.title
+  return [catalogTitle(title, item), item.releaseYear].filter((part) => part != null).join(' ')
+}
+
+// The catalog's title, unless it is the row's own and the year says it all.
+function catalogTitle(title: string, item: NonNullable<ReviewRow['item']>): string | null {
+  return item.releaseYear != null && normalizeTitle(item.title) === normalizeTitle(title) ? null : item.title
 }
 
 // "◯ 1994 · Gillian Armstrong", drawn like the drawer's checkboxes but round.
@@ -638,6 +643,8 @@ function MatchedAnswers(
 ) {
   return () => {
     const { batchId, row, item, next } = handle.props
+    // "Matched to 1969" when the title is the row's own.
+    const sameTitle = item != null && catalogTitle(row.title, item) == null
 
     return (
       <>
@@ -645,12 +652,13 @@ function MatchedAnswers(
           <Poster url={item?.posterUrl ?? null} size={32} />
           <span mix={css({ fontSize: '14px', minWidth: 0 })}>
             <span mix={css({ color: '#8d8579', fontSize: '12px' })}>Matched to </span>
-            {item?.title ?? 'nothing'} <span mix={css({ color: '#888' })}>{item?.releaseYear ?? ''}</span>
+            {sameTitle ? null : `${item?.title ?? 'nothing'} `}
+            <span mix={css({ color: sameTitle ? 'inherit' : '#888' })}>{item?.releaseYear ?? ''}</span>
             {item?.creator ? <span mix={css({ color: '#888' })}> · {item.creator}</span> : null}
           </span>
         </div>
 
-        <Actions>
+        <Actions fill>
           <ResolveForm
             batchId={batchId}
             rowId={row.id}
@@ -839,9 +847,9 @@ function ReviewDrawer(
       (section) => section.open > 0 && section.bulk && section.bulk.count > 0 && section.bulk.accepted === 0,
     ).length
 
-    const saveForm = (label: string, cls = 'primary') => (
+    const saveForm = (label: string) => (
       <form method="post" action={routes.profile.imports.save.href({ batchId })}>
-        <button type="submit" class={cls}>
+        <button type="submit" class="primary">
           {label}
         </button>
       </form>
@@ -931,10 +939,12 @@ function ReviewDrawer(
           {needsConfirm ? (
             // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
             <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
-              <span class="doodle-border primary slim">{saveLabel}</span>
+              <span class="doodle-border primary" mix={css({ display: 'inline-block' })}>
+                {saveLabel}
+              </span>
             </label>
           ) : (
-            saveForm(saveLabel, 'primary slim')
+            saveForm(saveLabel)
           )}
         </div>
 
@@ -1035,12 +1045,10 @@ function BulkAccept(
   }
 }
 
-const REVIEW_SECTIONS = ['title_differs', 'no_year', 'year_drift'] as const
-
 // A section stays once all its cards are answered: its answered list is where
 // an answer gets changed.
 function reviewGroups(model: ReviewModel, singular: string, plural: string) {
-  return REVIEW_SECTIONS.map((key) => ({
+  return REVIEW_REASONS.map((key) => ({
     key,
     ...reasonGroup(key, singular, plural),
     entries: backFirst(
@@ -1060,20 +1068,9 @@ function backFirst(entries: ReviewRow[], last: LastAction | null): ReviewRow[] {
 export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
   return () => {
     const { displayName, batch, model, saved, offerFeed, reviewsOnly, error } = handle.props
-    const { counts } = model
+    const { counts, header } = model
     const { singular, plural, pastParticiple, hrefs } = mediaTypeUiFor(batch.media_type as MediaType)
     const batchId = batch.id
-    // Each row counted once: a remembered answer is counted as that, even when
-    // it lands on a film already logged.
-    const answeredRows = Object.values(model.answered).flat()
-    const alreadyLogged = new Set(model.alreadyLoggedIds)
-    const rememberedCount = answeredRows.filter(({ row }) => row.remembered).length
-    const answeredCount = answeredRows.filter(
-      ({ row }) => !row.remembered && !alreadyLogged.has(row.id),
-    ).length
-    const alreadyCount =
-      alreadyLogged.size -
-      answeredRows.filter(({ row }) => row.remembered && alreadyLogged.has(row.id)).length
     const uncertainGroups = reviewGroups(model, singular, plural)
     const notFound = backFirst(model.notFound, model.last)
     const next = nextAnchors([...uncertainGroups.flatMap((group) => group.entries), ...notFound])
@@ -1181,10 +1178,11 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 <h1>Review before saving</h1>
                 {error ? <p mix={css({ color: '#b91c1c' })}>{error}</p> : null}
                 <p mix={css({ fontSize: '15px', margin: '0 0 4px' })}>
-                  {counts.total} rows. {alreadyCount > 0 && `${alreadyCount} already in your log, `}
+                  {counts.total} rows.{' '}
+                  {header.alreadyLogged > 0 && `${header.alreadyLogged} already in your log, `}
                   <b mix={css({ fontWeight: 400 })}>{model.confidentCount} matched cleanly</b>
-                  {answeredCount > 0 && `, ${answeredCount} answered`}
-                  {rememberedCount > 0 && `, ${rememberedCount} answered as last time`},{' '}
+                  {header.answered > 0 && `, ${header.answered} answered`}
+                  {header.remembered > 0 && `, ${header.remembered} answered as last time`},{' '}
                   {model.uncertain.length} worth a look, and {model.notFound.length} we couldn't find.
                 </p>
                 {reviewsOnly && (
@@ -1204,10 +1202,11 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     if you want your full history.
                   </p>
                 )}
-                <p mix={css({ fontSize: '13px', color: ACCENT, marginBottom: '20px' })}>
-                  Everything saves unless you say otherwise — except the decisions below, which would change
-                  or drop something you already have.
-                </p>
+                {(model.conflicts.length > 0 || model.duplicates.length > 0) && (
+                  <p mix={css({ fontSize: '13px', color: ACCENT, marginBottom: '20px' })}>
+                    The decisions below would change or drop something you already have.
+                  </p>
+                )}
 
                 {model.conflicts.length > 0 && (
                   <Flag title="Already in your log" count={model.conflicts.length}>

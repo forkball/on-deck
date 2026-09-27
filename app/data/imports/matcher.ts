@@ -14,7 +14,7 @@ import {
   loadPastAnswers,
   loadRows,
   recordMatch,
-  rememberRow,
+  rememberRows,
   setMatchedCount,
   touchClaim,
 } from './batches.ts'
@@ -55,12 +55,14 @@ export async function matchBatch(db: Db, batch: ImportBatch): Promise<void> {
 
   // A row answered in an earlier import is settled the same way, without a search.
   const pending = []
+  const remembered = []
   for (const row of rows) {
     if (row.state !== 'pending') continue
-    const answer = past.get(answerKey(row.raw_title, row.raw_year ?? null))
-    if (answer) await rememberRow(db, row.id, answer)
-    else pending.push(row)
+    const pastId = past.get(answerKey(row.raw_title, row.raw_year ?? null))
+    if (pastId == null) pending.push(row)
+    else remembered.push({ rowId: row.id, pastId })
   }
+  await rememberRows(db, remembered)
 
   const inputs: MatchInput[] = []
   // Keyed by external id so the full catalog result survives resolution —
@@ -149,7 +151,9 @@ export async function addCreators(
     if (!list || list.length < 2) continue
     for (const candidate of list) {
       if (candidate.creator) continue
-      wanted.set(candidate.externalId, [...(wanted.get(candidate.externalId) ?? []), candidate])
+      const same = wanted.get(candidate.externalId)
+      if (same) same.push(candidate)
+      else wanted.set(candidate.externalId, [candidate])
     }
   }
 

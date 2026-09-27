@@ -7,7 +7,6 @@ import {
   classifyDuplicate,
   classifyMatch,
   conflictFields,
-  describeReason,
   bulkKind,
   inlineAlternates,
   isBulkAcceptable,
@@ -107,16 +106,16 @@ describe('bulkKind', () => {
   const noYear = classifyMatch({ title: 'Heat', year: null }, film('Heat', 1995))
 
   it('clears a no-year row that has only one film by that name', () => {
-    assert.equal(bulkKind(noYear, 'Heat', film('Heat', 1995), 1), 'sole')
+    assert.equal(bulkKind(noYear, 'Heat', 'Heat', 1), 'sole')
   })
 
   it('leaves a no-year row with namesakes to be answered', () => {
-    assert.equal(bulkKind(noYear, 'Heat', film('Heat', 1995), 2), null)
+    assert.equal(bulkKind(noYear, 'Heat', 'Heat', 2), null)
   })
 
   // Staged before namesakes were kept: nothing says it is the only one.
   it('does not assume a row with no namesakes recorded is the only one', () => {
-    assert.equal(bulkKind(noYear, 'Heat', film('Heat', 1995), null), null)
+    assert.equal(bulkKind(noYear, 'Heat', 'Heat', null), null)
   })
 })
 
@@ -191,33 +190,6 @@ describe('classifyDuplicate', () => {
     // One entry per film means the later viewing is the live one.
     assert.equal(verdict.keep.id, 210)
     assert.equal(verdict.drop.id, 12)
-  })
-})
-
-describe('describeReason', () => {
-  it('names the gap without a stray plural', () => {
-    assert.equal(
-      describeReason(classifyMatch({ title: 'Kwaidan', year: 1964 }, film('Kwaidan', 1965))),
-      'Year off by 1',
-    )
-    assert.equal(
-      describeReason(classifyMatch({ title: 'The Thing', year: 1982 }, film('The Thing', 2011))),
-      'Year off by 29',
-    )
-  })
-
-  it('says nothing about a confident match', () => {
-    assert.equal(describeReason(classifyMatch({ title: 'Heat', year: 1995 }, film('Heat', 1995))), null)
-  })
-
-  // The group heading already says these; a chip repeating it on every card
-  // is noise.
-  it('leaves reasons its group heading names to the heading', () => {
-    assert.equal(describeReason(classifyMatch({ title: 'Heat', year: null }, film('Heat', 1995))), null)
-    assert.equal(
-      describeReason(classifyMatch({ title: 'Birdman', year: 2014 }, film('Birdman or…', 2014))),
-      null,
-    )
   })
 })
 
@@ -314,17 +286,20 @@ describe('inlineAlternates', () => {
 describe('looserQueries', () => {
   it('drops the year, then asides, a subtitle, accents and "&", tightest first', () => {
     assert.deepEqual(looserQueries('Amélie & Co (Director’s Cut): Part One', 2001), [
-      'Amélie & Co (Director’s Cut): Part One 2001',
-      'Amélie & Co (Director’s Cut): Part One',
-      'Amélie & Co: Part One',
-      'Amélie & Co',
-      'Amelie and Co',
+      { query: 'Amélie & Co (Director’s Cut): Part One 2001', step: 'year' },
+      { query: 'Amélie & Co (Director’s Cut): Part One', step: 'title' },
+      { query: 'Amélie & Co: Part One', step: 'simplified' },
+      { query: 'Amélie & Co', step: 'simplified' },
+      { query: 'Amelie and Co', step: 'simplified' },
     ])
   })
 
   it('skips steps that change nothing', () => {
-    assert.deepEqual(looserQueries('Heat', null), ['Heat'])
-    assert.deepEqual(looserQueries('Heat', 1995), ['Heat 1995', 'Heat'])
+    assert.deepEqual(looserQueries('Heat', null), [{ query: 'Heat', step: 'title' }])
+    assert.deepEqual(looserQueries('Heat', 1995), [
+      { query: 'Heat 1995', step: 'year' },
+      { query: 'Heat', step: 'title' },
+    ])
   })
 })
 
