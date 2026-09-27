@@ -58,10 +58,14 @@ export default createController(routes.profile, {
         getProfileRebuildAllowance(db, auth.identity),
         activeBatches(db, auth.identity.id),
       ])
-      // Unfinished imports, so there's a way back to one. The show route sends
-      // a batch in review on to its review page.
+      // Unfinished imports, so there's a way back to one. Linked straight to the
+      // review page: client navigation follows the show route's redirect but
+      // leaves its URL in the address bar.
       const waitingImports = batches.map((batch) => ({
-        href: routes.profile.imports.show.href({ batchId: batch.id }),
+        href:
+          batch.status === 'review'
+            ? routes.profile.imports.review.href({ batchId: batch.id })
+            : routes.profile.imports.show.href({ batchId: batch.id }),
         noun: mediaTypeUiFor(batch.media_type).attributive,
         matching: batch.status === 'matching',
       }))
