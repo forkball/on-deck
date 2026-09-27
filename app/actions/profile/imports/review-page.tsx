@@ -430,7 +430,10 @@ function UncertainCard(
           })}
         >
           <span mix={css({ flex: '1 1 auto', minWidth: 0 })}>
-            {row.title} <span mix={css({ color: '#888' })}>{row.year ?? 'no year'}</span>
+            {row.title} {/* The no-year section's heading already says it. */}
+            <span mix={css({ color: '#888' })}>
+              {row.reason === 'no_year' ? null : (row.year ?? 'no year')}
+            </span>
           </span>
           {chip ? (
             <span
@@ -457,10 +460,9 @@ function UncertainCard(
 
         {choices ? (
           <>
-            <div mix={css({ fontSize: '13px', color: '#8d8579', marginTop: '10px' })}>Which one?</div>
             {/* Radios, one per line: none preselected, since without a year our pick
                 is a guess. Once answered, the answer shows as selected. */}
-            <div mix={css({ display: 'grid', gap: '2px', marginTop: '4px' })}>
+            <div mix={css({ display: 'grid', gap: '2px', marginTop: '10px' })}>
               {choices.map((choice) => {
                 const ours = choice.externalId === row.matchedExternalId
                 return (
@@ -638,6 +640,8 @@ function MatchedAnswers(
 ) {
   return () => {
     const { batchId, row, item, next } = handle.props
+    // "Matched to 1969" when the title is the row's own.
+    const sameTitle = item?.releaseYear != null && normalizeTitle(item.title) === normalizeTitle(row.title)
 
     return (
       <>
@@ -645,7 +649,8 @@ function MatchedAnswers(
           <Poster url={item?.posterUrl ?? null} size={32} />
           <span mix={css({ fontSize: '14px', minWidth: 0 })}>
             <span mix={css({ color: '#8d8579', fontSize: '12px' })}>Matched to </span>
-            {item?.title ?? 'nothing'} <span mix={css({ color: '#888' })}>{item?.releaseYear ?? ''}</span>
+            {sameTitle ? null : `${item?.title ?? 'nothing'} `}
+            <span mix={css({ color: sameTitle ? 'inherit' : '#888' })}>{item?.releaseYear ?? ''}</span>
             {item?.creator ? <span mix={css({ color: '#888' })}> · {item.creator}</span> : null}
           </span>
         </div>
@@ -1204,10 +1209,11 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     if you want your full history.
                   </p>
                 )}
-                <p mix={css({ fontSize: '13px', color: ACCENT, marginBottom: '20px' })}>
-                  Everything saves unless you say otherwise — except the decisions below, which would change
-                  or drop something you already have.
-                </p>
+                {(model.conflicts.length > 0 || model.duplicates.length > 0) && (
+                  <p mix={css({ fontSize: '13px', color: ACCENT, marginBottom: '20px' })}>
+                    The decisions below would change or drop something you already have.
+                  </p>
+                )}
 
                 {model.conflicts.length > 0 && (
                   <Flag title="Already in your log" count={model.conflicts.length}>
