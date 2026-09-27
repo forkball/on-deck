@@ -7,6 +7,7 @@ import { LazyList } from '../../../browser/lazy-list.tsx'
 import type {
   ConflictEntry,
   DuplicateEntry,
+  LastAction,
   ReviewModel,
   ReviewRow,
   SectionKey,
@@ -726,9 +727,93 @@ interface DrawerSection {
   bulk: { kind: BulkKind; count: number; accepted: number; what: string } | null
 }
 
+// The drawer's one-line record of the latest answer, with its way back.
+function LastLine(handle: Handle<{ batchId: string; last: LastAction }>) {
+  return () => {
+    const { batchId, last } = handle.props
+    const muted = css({ color: '#888' })
+    const undo = (action: string, fields: Record<string, string>) => (
+      <form method="post" action={action} data-in-place>
+        {Object.entries(fields).map(([name, value]) => (
+          <input key={name} type="hidden" name={name} value={value} />
+        ))}
+        <button type="submit" class="linkish">
+          Undo
+        </button>
+      </form>
+    )
+
+    let mark: string, text: RemixNode, end: RemixNode
+    if (last.kind === 'answered') {
+      const { row } = last.entry
+      mark = row.state === 'skipped' ? '✕' : '✓'
+      text = <Answer entry={last.entry} />
+      end = undo(routes.profile.imports.resolve.href({ batchId, rowId: String(row.id) }), {
+        action: 'reopen',
+        anchor: rowAnchor(row.id),
+      })
+    } else if (last.kind === 'accepted') {
+      mark = '✓'
+      text = (
+        <>
+          Accepted {last.count}
+          <span mix={muted}> · {BULK_WHAT[last.bulk]}</span>
+        </>
+      )
+      end = undo(routes.profile.imports.bulk.href({ batchId }), { kind: last.bulk, undo: '1' })
+    } else {
+      mark = '↩'
+      const [only] = last.rows
+      const one = last.rows.length === 1
+      text = (
+        <>
+          {one ? only!.title : last.rows.length}
+          <span mix={muted}> {one ? 'is' : 'are'} back</span>
+        </>
+      )
+      end = (
+        <a href={`#${one ? rowAnchor(only!.id) : groupAnchor(last.section)}`} class="linkish">
+          Show {one ? 'it' : 'them'}
+        </a>
+      )
+    }
+
+    return (
+      <div
+        mix={css({
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: '8px',
+          fontSize: '13px',
+          color: '#555',
+          padding: '8px 0 6px',
+          borderBottom: '1px solid #eee4d6',
+        })}
+      >
+        <span aria-hidden="true" mix={css({ width: '1em', color: mark === '✓' ? '#15803d' : '#a8a097' })}>
+          {mark}
+        </span>
+        <span
+          mix={css({
+            flex: '1 1 auto',
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          })}
+        >
+          {text}
+        </span>
+        {end}
+      </div>
+    )
+  }
+}
+
 function ReviewDrawer(
   handle: Handle<{
     batchId: string
+    last: LastAction | null
     sections: DrawerSection[]
     unchecked: number
     leftOut: number
@@ -738,7 +823,7 @@ function ReviewDrawer(
   }>,
 ) {
   return () => {
-    const { batchId, sections, unchecked, leftOut, save, singular, plural } = handle.props
+    const { batchId, last, sections, unchecked, leftOut, save, singular, plural } = handle.props
     const needsConfirm = unchecked > 0 || leftOut > 0
     const saveLabel = save > 0 ? 'Save' : 'Finish'
     const confirmLabel = save > 0 ? `Yes, save ${count(save, singular, plural)}` : 'Yes, finish'
@@ -765,6 +850,8 @@ function ReviewDrawer(
           class="drawer-check"
           aria-label="Show the review checklist"
         />
+        {/* Always present, so the drawer's children keep their positions across reloads. */}
+        <div>{last && <LastLine batchId={batchId} last={last} />}</div>
 
         <div class="drawer-panel">
           <ul mix={css({ listStyle: 'none', margin: 0, padding: 0 })}>
@@ -951,8 +1038,18 @@ function reviewGroups(model: ReviewModel, singular: string, plural: string) {
   return REVIEW_SECTIONS.map((key) => ({
     key,
     ...reasonGroup(key, singular, plural),
-    entries: model.uncertain.filter(({ row }) => row.reason === key),
+    entries: backFirst(
+      model.uncertain.filter(({ row }) => row.reason === key),
+      model.last,
+    ),
   })).filter((group) => group.entries.length > 0 || model.answered[group.key].length > 0)
+}
+
+// A card that was just put back leads its section, so "Show it" always finds it.
+function backFirst(entries: ReviewRow[], last: LastAction | null): ReviewRow[] {
+  if (last?.kind !== 'back') return entries
+  const back = new Set(last.rows.map((row) => row.id))
+  return [...entries.filter(({ row }) => back.has(row.id)), ...entries.filter(({ row }) => !back.has(row.id))]
 }
 
 export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
@@ -963,7 +1060,8 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
     const batchId = batch.id
     const answeredCount = Object.values(model.answered).reduce((sum, rows) => sum + rows.length, 0)
     const uncertainGroups = reviewGroups(model, singular, plural)
-    const next = nextAnchors([...uncertainGroups.flatMap((group) => group.entries), ...model.notFound])
+    const notFound = backFirst(model.notFound, model.last)
+    const next = nextAnchors([...uncertainGroups.flatMap((group) => group.entries), ...notFound])
     return (
       <Document title="Review your import | On Deck">
         <Nav authed={true} displayName={displayName} />
@@ -1254,7 +1352,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       pastParticiple={pastParticiple}
                     />
                     <div id="import-not-found">
-                      {model.notFound.map(({ row }) => (
+                      {notFound.map(({ row }) => (
                         <NotFoundCard key={row.id} batchId={batchId} row={row} next={next.get(row.id)} />
                       ))}
                     </div>
@@ -1265,6 +1363,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
 
               <ReviewDrawer
                 batchId={batchId}
+                last={model.last}
                 sections={model.sections.map((section) => ({
                   ...section,
                   title:

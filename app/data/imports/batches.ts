@@ -215,7 +215,19 @@ function toStagedRow(row: ImportRow): StagedRow {
     matchedExternalId: row.matched_external_id ?? null,
     alternates: readAlternates(row.alternates),
     acceptedBy: parseBulkKind(row.accepted_by),
+    updatedAt: row.updated_at,
   }
+}
+
+interface PreviousMatch {
+  mediaItemId: number | null
+  externalId: string | null
+  yearDelta: number | null
+}
+
+// Written only by pointRowAt, so it is trusted as that shape.
+function readPreviousMatch(value: unknown): PreviousMatch | null {
+  return value && typeof value === 'object' ? (value as PreviousMatch) : null
 }
 
 // Anything but a non-empty array reads as none.
@@ -280,6 +292,7 @@ export async function loadReview(
     rows,
     model: buildReview(staged, itemMap, existing, batch.conflict_choice as ConflictChoice, {
       saved: batch.status === 'done',
+      since: batch.updated_at,
     }),
   }
 }
@@ -296,6 +309,41 @@ async function settleRow(db: Db, batch: ImportBatch, rowId: number, state: RowSt
   if (!row) return false
 
   await db.update(importRows, row.id, { state, accepted_by: undefined, updated_at: Date.now() })
+  return true
+}
+
+// Undo for one answer: the row is a question again. A found "couldn't find"
+// row goes back to not found.
+export async function reopenRow(db: Db, batch: ImportBatch, rowId: number): Promise<boolean> {
+  const row = await ownedRow(db, batch, rowId)
+  if (!row || (row.state !== 'confirmed' && row.state !== 'skipped')) return false
+
+  const now = Date.now()
+  if (row.reason === 'title_differs' || row.reason === 'no_year' || row.reason === 'year_drift') {
+    const previous = readPreviousMatch(row.previous_match)
+    await db.update(importRows, row.id, {
+      state: 'uncertain',
+      accepted_by: undefined,
+      previous_match: null,
+      ...(previous && {
+        media_item_id: previous.mediaItemId,
+        matched_external_id: previous.externalId ?? undefined,
+        year_delta: previous.yearDelta,
+      }),
+      updated_at: now,
+    })
+  } else if (row.reason == null) {
+    await db.update(importRows, row.id, {
+      state: 'not_found',
+      media_item_id: null,
+      matched_external_id: undefined,
+      accepted_by: undefined,
+      previous_match: null,
+      updated_at: now,
+    })
+  } else {
+    return false
+  }
   return true
 }
 
@@ -327,7 +375,23 @@ export async function repointRow(
   if (!detail) return { ok: false, error: provider.lookupFailedError }
 
   const item = await upsertCatalogItem(db, mediaType, detail, true)
+  await pointRowAt(db, row, item)
+  return { ok: true }
+}
+
+// The write half of repointRow. Keeps the match it replaces (the first one
+// only), so undo can put it back.
+export async function pointRowAt(
+  db: Db,
+  row: ImportRow,
+  item: { id: number; external_id: string },
+): Promise<void> {
   await db.update(importRows, row.id, {
+    previous_match: row.previous_match ?? {
+      mediaItemId: row.media_item_id ?? null,
+      externalId: row.matched_external_id ?? null,
+      yearDelta: row.year_delta ?? null,
+    },
     // Confirmed rather than re-classified: a person picking a film off the
     // shelf is better evidence than the year arithmetic that flagged it.
     // The reason stays: it records which review section the row was settled
@@ -339,8 +403,6 @@ export async function repointRow(
     media_item_id: item.id,
     updated_at: Date.now(),
   })
-
-  return { ok: true }
 }
 
 // A section's one-tap accept. Each row records which accept took it, so
