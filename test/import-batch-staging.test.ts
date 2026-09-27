@@ -5,11 +5,9 @@ import { db, pool } from '../app/data/db.ts'
 import { createBatch, loadBatch, loadRows } from '../app/data/imports/batches.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 
-// A batch is written before its rows, and a worker polling in the gap used to
-// claim it empty and send it to review with every row pending. createBatch
-// now holds the claim while the rows go in; what can be checked from outside
-// is that it lets go afterwards, or no worker would pick the batch up until the
-// claim went stale.
+// The batch and its rows are written in one transaction: a worker polling in
+// between used to claim the batch empty and send it to review with every row
+// pending. From outside, the batch arrives whole, unclaimed and ready to match.
 describe('staging an import batch', { skip: skipWithoutDatabase }, () => {
   let userId: number
   let batchId: string
