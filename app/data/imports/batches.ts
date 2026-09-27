@@ -219,16 +219,15 @@ function toStagedRow(row: ImportRow): StagedRow {
   }
 }
 
-function readPreviousMatch(
-  value: unknown,
-): { mediaItemId: number | null; externalId: string | null; yearDelta: number | null } | null {
-  if (typeof value !== 'object' || value === null) return null
-  const { mediaItemId = null, externalId = null, yearDelta = null } = value as Record<string, unknown>
-  return {
-    mediaItemId: typeof mediaItemId === 'number' ? mediaItemId : null,
-    externalId: typeof externalId === 'string' ? externalId : null,
-    yearDelta: typeof yearDelta === 'number' ? yearDelta : null,
-  }
+interface PreviousMatch {
+  mediaItemId: number | null
+  externalId: string | null
+  yearDelta: number | null
+}
+
+// Written only by pointRowAt, so it is trusted as that shape.
+function readPreviousMatch(value: unknown): PreviousMatch | null {
+  return value && typeof value === 'object' ? (value as PreviousMatch) : null
 }
 
 // Anything but a non-empty array reads as none.
