@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
+  answerKey,
+  looserQueries,
   classifyDuplicate,
   classifyMatch,
   conflictFields,
@@ -306,5 +308,30 @@ describe('inlineAlternates', () => {
     const drift = classifyMatch({ title: 'Nosferatu', year: 2025 }, film('Nosferatu', 2024, 'n24'))
     const results = [film('Nosferatu', 2024, 'n24'), film('Nosferatu', 1922, 'n22')]
     assert.equal(inlineAlternates({ title: 'Nosferatu', year: 2025 }, drift, results[0]!, results), null)
+  })
+})
+
+describe('looserQueries', () => {
+  it('drops the year, then asides, a subtitle, accents and "&", tightest first', () => {
+    assert.deepEqual(looserQueries('Amélie & Co (Director’s Cut): Part One', 2001), [
+      'Amélie & Co (Director’s Cut): Part One 2001',
+      'Amélie & Co (Director’s Cut): Part One',
+      'Amélie & Co: Part One',
+      'Amélie & Co',
+      'Amelie and Co',
+    ])
+  })
+
+  it('skips steps that change nothing', () => {
+    assert.deepEqual(looserQueries('Heat', null), ['Heat'])
+    assert.deepEqual(looserQueries('Heat', 1995), ['Heat 1995', 'Heat'])
+  })
+})
+
+describe('answerKey', () => {
+  it('matches titles the way matching does, and keeps the year apart', () => {
+    assert.equal(answerKey('WALL·E', 2008), answerKey('wall-e', 2008))
+    assert.notEqual(answerKey('Crash', 1996), answerKey('Crash', 2004))
+    assert.notEqual(answerKey('Crash', null), answerKey('Crash', 2004))
   })
 })

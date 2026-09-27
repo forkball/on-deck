@@ -41,6 +41,8 @@ export interface StagedRow {
   // A no-year row's namesakes (inlineAlternates).
   alternates: CandidateLike[] | null
   acceptedBy: BulkKind | null
+  // Settled by the member's answer in an earlier import.
+  remembered: boolean
   updatedAt: number
 }
 

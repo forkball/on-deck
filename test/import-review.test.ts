@@ -30,6 +30,7 @@ function row(partial: Partial<StagedRow> = {}): StagedRow {
     matchedExternalId: null,
     alternates: null,
     acceptedBy: null,
+    remembered: false,
     updatedAt: 0,
     ...partial,
   }

@@ -17,7 +17,9 @@ import {
   type ImportRow,
 } from '../schema.ts'
 import {
+  answerKey,
   parseBulkKind,
+  REMEMBERED,
   type BulkKind,
   type CandidateLike,
   type ConflictChoice,
@@ -164,6 +166,66 @@ export async function recordMatch(
   })
 }
 
+// The member's answers from their saved imports of this media type, keyed by
+// answerKey, latest winning. Only questions a review asked (not conflicts), and
+// only where the film is still in the catalog.
+export async function loadPastAnswers(
+  db: Db,
+  userId: number,
+  mediaType: MediaType,
+): Promise<Map<string, ImportRow>> {
+  const batches = await db.findMany(importBatches, {
+    where: and(eq('user_id', userId), eq('media_type', mediaType), eq('status', 'done')),
+  })
+  if (batches.length === 0) return new Map()
+
+  const rows = (
+    await db.findMany(importRows, {
+      where: and(
+        inList(
+          'batch_id',
+          batches.map((batch) => batch.id),
+        ),
+        eq('state', 'confirmed'),
+      ),
+      orderBy: ['updated_at', 'asc'],
+    })
+  ).filter(
+    (row) =>
+      row.media_item_id != null &&
+      (row.reason == null ||
+        row.reason === 'title_differs' ||
+        row.reason === 'no_year' ||
+        row.reason === 'year_drift'),
+  )
+  const ids = [...new Set(rows.map((row) => row.media_item_id!))]
+  const live =
+    ids.length === 0
+      ? new Set<number>()
+      : new Set((await db.findMany(mediaItems, { where: inList('id', ids) })).map((item) => item.id))
+
+  const answers = new Map<string, ImportRow>()
+  for (const row of rows) {
+    if (live.has(row.media_item_id!)) answers.set(answerKey(row.raw_title, row.raw_year ?? null), row)
+  }
+  return answers
+}
+
+// Settles a row the way the member answered it last time. Kept in its review
+// section, so it can still be changed.
+export async function rememberRow(db: Db, rowId: number, answer: ImportRow): Promise<void> {
+  await db.update(importRows, rowId, {
+    state: 'confirmed',
+    reason: answer.reason ?? undefined,
+    year_delta: answer.year_delta ?? null,
+    matched_external_id: answer.matched_external_id ?? undefined,
+    media_item_id: answer.media_item_id,
+    alternates: answer.alternates == null ? null : JSON.stringify(answer.alternates),
+    accepted_by: REMEMBERED,
+    updated_at: Date.now(),
+  })
+}
+
 export async function setMatchedCount(db: Db, batchId: string, matched: number): Promise<void> {
   await db.update(importBatches, batchId, {
     matched_rows: matched,
@@ -215,6 +277,7 @@ function toStagedRow(row: ImportRow): StagedRow {
     matchedExternalId: row.matched_external_id ?? null,
     alternates: readAlternates(row.alternates),
     acceptedBy: parseBulkKind(row.accepted_by),
+    remembered: row.accepted_by === REMEMBERED,
     updatedAt: row.updated_at,
   }
 }

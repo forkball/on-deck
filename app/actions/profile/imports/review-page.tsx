@@ -594,7 +594,7 @@ function AnsweredList(
   }
 }
 
-// "Title → 1994" or "Title · not saving".
+// "Title → 1994", "Title → 1994 · as last time" or "Title · not saving".
 function Answer(handle: Handle<{ entry: ReviewRow }>) {
   return () => {
     const { row, item } = handle.props.entry
@@ -603,6 +603,7 @@ function Answer(handle: Handle<{ entry: ReviewRow }>) {
         {row.title}
         <span mix={css({ color: '#888' })}>
           {row.state === 'skipped' ? ' · not saving' : item ? ` → ${answeredMatch(row.title, item)}` : ''}
+          {row.remembered && ' · as last time'}
         </span>
       </>
     )
@@ -1062,7 +1063,17 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
     const { counts } = model
     const { singular, plural, pastParticiple, hrefs } = mediaTypeUiFor(batch.media_type as MediaType)
     const batchId = batch.id
-    const answeredCount = Object.values(model.answered).reduce((sum, rows) => sum + rows.length, 0)
+    // Each row counted once: a remembered answer is counted as that, even when
+    // it lands on a film already logged.
+    const answeredRows = Object.values(model.answered).flat()
+    const alreadyLogged = new Set(model.alreadyLoggedIds)
+    const rememberedCount = answeredRows.filter(({ row }) => row.remembered).length
+    const answeredCount = answeredRows.filter(
+      ({ row }) => !row.remembered && !alreadyLogged.has(row.id),
+    ).length
+    const alreadyCount =
+      alreadyLogged.size -
+      answeredRows.filter(({ row }) => row.remembered && alreadyLogged.has(row.id)).length
     const uncertainGroups = reviewGroups(model, singular, plural)
     const notFound = backFirst(model.notFound, model.last)
     const next = nextAnchors([...uncertainGroups.flatMap((group) => group.entries), ...notFound])
@@ -1170,12 +1181,11 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 <h1>Review before saving</h1>
                 {error ? <p mix={css({ color: '#b91c1c' })}>{error}</p> : null}
                 <p mix={css({ fontSize: '15px', margin: '0 0 4px' })}>
-                  {counts.total} rows.{' '}
-                  {model.alreadyLoggedIds.length > 0 &&
-                    `${model.alreadyLoggedIds.length} already in your log, `}
+                  {counts.total} rows. {alreadyCount > 0 && `${alreadyCount} already in your log, `}
                   <b mix={css({ fontWeight: 400 })}>{model.confidentCount} matched cleanly</b>
-                  {answeredCount > 0 && `, ${answeredCount} answered`}, {model.uncertain.length} worth a look,
-                  and {model.notFound.length} we couldn't find.
+                  {answeredCount > 0 && `, ${answeredCount} answered`}
+                  {rememberedCount > 0 && `, ${rememberedCount} answered as last time`},{' '}
+                  {model.uncertain.length} worth a look, and {model.notFound.length} we couldn't find.
                 </p>
                 {reviewsOnly && (
                   <p
