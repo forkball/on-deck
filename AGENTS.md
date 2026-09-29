@@ -64,7 +64,12 @@ does nothing on its own.
 - `app/middleware/` holds request lifecycle concerns
 - `app/data/` holds persistence and the services built on it, in subdirectories:
   - `app/data/` root: `db`, `schema`, `mediaItems`, `mediaMetadata`, `users`,
-    `follows`, `notifications`, `mediaSummary`, `watchProviders`, `watchRegion`.
+    `follows`, `notifications`, `mediaSummary`, `watchProviders`, `watchRegion`,
+    `titles`. `titles` is how a title is compared — one rule for the
+    recommendation matcher, the importers, IGDB's relevance ranking and the
+    backfill script, which each used to carry their own and disagree. It imports
+    nothing, deliberately: that is what lets a script use it without dragging in
+    the database pool.
     `watchProviders` is streaming availability, stored apart from metadata
     because it goes stale and is refetched weekly; `watchRegion` is the country
     it is shown for, guessed from Accept-Language and database-free so the

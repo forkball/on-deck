@@ -1,4 +1,5 @@
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
+import { normalizeTitle } from '../titles.ts'
 
 // `search` cannot be combined with `sort` — that pairing 406s — so relevance
 // ranking happens here rather than in the query.
@@ -305,9 +306,10 @@ export async function searchGames(query: string): Promise<CatalogSearchResult[]>
 
   // IGDB's relevance puts "Elden Ring Nightreign" above "Elden Ring", and it
   // won't sort a search server-side. Exact title first, then rating count.
-  const wanted = normalize(query)
+  const wanted = normalizeTitle(query)
   const ranked = [...games].sort((a, b) => {
-    const exact = Number(normalize(b.name ?? '') === wanted) - Number(normalize(a.name ?? '') === wanted)
+    const exact =
+      Number(normalizeTitle(b.name ?? '') === wanted) - Number(normalizeTitle(a.name ?? '') === wanted)
     if (exact !== 0) return exact
     return (b.total_rating_count ?? 0) - (a.total_rating_count ?? 0)
   })
@@ -338,13 +340,6 @@ export async function getGameById(externalId: string): Promise<CatalogSearchResu
   } catch {
     return null
   }
-}
-
-function normalize(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
 }
 
 export function slugifyTitle(title: string): string {

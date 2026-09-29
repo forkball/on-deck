@@ -6,6 +6,7 @@ import {
   type LengthBucket,
 } from '../catalog/provider.ts'
 import { pool } from '../db.ts'
+import { normalizeTitle, NORMALIZED_TITLE_SQL, withoutSubtitle } from '../titles.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { requestStructured } from './claude.ts'
@@ -97,30 +98,6 @@ export function decadeYear(mediaType: MediaType, pick: Pick, match: CatalogSearc
   return decadeComesFromPick(mediaType) ? pick.year : match.releaseYear
 }
 
-// normalizeTitle for the database to run, in one place — resolveFromCatalog needs it
-// in a select list and in a filter, and the two must agree with each other as well as
-// with the TypeScript. test/catalog-shortcut.test.ts is what holds all three together.
-const NORMALIZED_TITLE_SQL =
-  "btrim(regexp_replace(regexp_replace(replace(lower(title), '&', ' and '), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g'))"
-
-function normalizeTitle(title: string): string {
-  return (
-    title
-      .toLowerCase()
-      // "&" reads as the word, not as punctuation to drop: publishers print "The
-      // Wrath & the Dawn" and "The Wrath and the Dawn" for one book, and deleting the
-      // symbol makes those two different titles — which cost a run its edition, the
-      // only outright match left being an anniversary printing eleven years late.
-      //
-      // resolveFromCatalog's SQL spells this same normalisation for the database to
-      // run. The two have to move together.
-      .replace(/&/g, ' and ')
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-  )
-}
-
 function levenshteinDistance(a: string, b: string): number {
   const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0))
   for (let i = 0; i <= a.length; i++) dp[i][0] = i
@@ -137,13 +114,6 @@ function levenshteinDistance(a: string, b: string): number {
 // Lenient on purpose — verifyPicksAgainstOverviews is what catches a
 // same-title-same-year-different-film.
 const TITLE_SIMILARITY_THRESHOLD = 0.5
-
-// Strips at the separator rather than allowing a prefix match: "Foundation" is a
-// prefix of "Foundation and Empire", a different novel.
-function withoutSubtitle(title: string): string {
-  const [main] = title.split(/\s*[:–—]\s*/)
-  return normalizeTitle(main ?? title)
-}
 
 // The half of sameness that needs no distance: the same title, or the same title
 // with a subtitle on one side or the other. Named so chooseMatch can prefer these

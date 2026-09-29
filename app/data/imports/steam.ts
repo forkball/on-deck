@@ -1,5 +1,6 @@
 import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
 import { runBounded } from './csv.ts'
+import { normalizeTitle } from '../titles.ts'
 import { IGDB_MAX_CONCURRENCY } from '../catalog/igdb.ts'
 import type { Db } from '../db.ts'
 import { logInteraction, type LogInteractionInput } from '../mediaItems.ts'
@@ -118,18 +119,11 @@ function searchVariants(steamName: string): string[] {
   const withoutYear = steamName.replace(TRAILING_PARENTHETICAL, '').trim()
   if (withoutYear && withoutYear !== steamName) variants.push(withoutYear)
 
+  // Trademark symbols and punctuation differ constantly between the two catalogues
+  // ("Sid Meier's Civilization® VI"), which is what the shared rule levels out.
   const normalized = normalizeTitle(withoutYear)
   const base = normalized.replace(EDITION_SUFFIX, '').trim()
   if (base && base !== normalized) variants.push(base)
 
   return variants
-}
-
-// Trademark symbols and punctuation differ constantly between the two catalogues
-// ("Sid Meier's Civilization® VI"), so compare on letters and digits only.
-function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
 }

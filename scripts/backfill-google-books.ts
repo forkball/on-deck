@@ -29,6 +29,7 @@ import { rematchMediaItem } from '../app/data/mediaItems.ts'
 import { getBookById, searchGoogleBooksOnly } from '../app/data/catalog/googleBooks.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from '../app/data/catalog/tmdb.ts'
 import { runBounded } from '../app/data/imports/csv.ts'
+import { normalizeTitle, withoutSubtitle } from '../app/data/titles.ts'
 
 types.setTypeParser(types.builtins.INT8, (value) => parseInt(value, 10))
 types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value))
@@ -64,17 +65,9 @@ async function throttleGoogleBooks(): Promise<void> {
   }
 }
 
-// Same title-similarity check app/data/recommendations/matching.ts uses,
-// copied rather than imported — that module pulls in the app's live db pool
-// and the Claude client at import time, neither of which this script wants.
-function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
+// The title rules themselves come from app/data/titles.ts, which imports nothing —
+// unlike app/data/recommendations/matching.ts, whose module scope builds the app's db
+// pool and the Claude client. The similarity check below stays local for that reason.
 function levenshteinDistance(a: string, b: string): number {
   const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0))
   for (let i = 0; i <= a.length; i++) dp[i][0] = i
@@ -89,16 +82,6 @@ function levenshteinDistance(a: string, b: string): number {
 }
 
 const TITLE_SIMILARITY_THRESHOLD = 0.5
-
-// Google's book titles often carry a marketing subtitle Open Library's don't
-// ("Night Shift" vs "Night Shift: INCLUDES THE STORY OF 'THE BOOGEYMAN'...")
-// — stripped at the first colon before falling back to Levenshtein, same as
-// matching.ts's withoutSubtitle. Missing this dropped 51 of 93 mismatches in
-// an earlier dry run down to a formatting difference, not a wrong book.
-function withoutSubtitle(title: string): string {
-  const [main] = title.split(/\s*[:–—]\s*/)
-  return normalizeTitle(main ?? title)
-}
 
 function titlesLikelyMatch(a: string, b: string): boolean {
   const na = normalizeTitle(a)

@@ -1,6 +1,7 @@
 // How sure we are that a CSV row landed on the right catalog entry, and what to
 // tell someone about it. Deliberately free of the database and the catalog: the
 // rules are the part worth testing, and they only need the row and the result.
+import { normalizeTitle } from '../titles.ts'
 
 export type MatchReason = 'exact' | 'year_drift' | 'no_year' | 'title_differs'
 
@@ -41,16 +42,6 @@ export interface Verdict {
   // Signed, so "matched 30 years later" and "30 years earlier" stay
   // distinguishable; the copy only uses its magnitude.
   yearDelta: number | null
-}
-
-// Trademark symbols, punctuation and spacing differ constantly between an
-// export and a catalog ("WALL·E" / "WALL-E"), so titles compare on letters and
-// digits only. Same normalization the Steam importer settled on.
-export function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
 }
 
 // `results` is the whole result set the match came from, not just the winner:
