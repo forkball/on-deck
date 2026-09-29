@@ -53,12 +53,20 @@ export function platformFamilies(platforms: string[]): string[] {
   ]
 }
 
+// IGDB's own genre names, lowercased, because that is what a game's tags are compared
+// against — provider.genres feeds the form's dropdown and the value it submits is
+// matched against `genres.name` from the API. A spelling that IGDB never returns is a
+// filter that can only answer nothing: "hack and slash/beat em up" was written here
+// without the apostrophe IGDB uses, so choosing it kept 0 of 3 games that carry the
+// genre (Devil May Cry 5, Bayonetta, Hades).
+//
+// test/catalog-genres.test.ts checks this list against the live API.
 export const GAME_GENRES: string[] = [
   'adventure',
   'arcade',
   'card & board game',
   'fighting',
-  'hack and slash/beat em up',
+  "hack and slash/beat 'em up",
   'indie',
   'moba',
   'music',
