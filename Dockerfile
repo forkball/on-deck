@@ -20,4 +20,10 @@ EXPOSE 8080
 # release_command in fly.toml. The app runs on more than one machine, so
 # migrating from here meant every machine racing to apply the same migration
 # on every boot (and on every cold-start wake, given min_machines_running=0).
-CMD ["npm", "start"]
+#
+# Node directly rather than `npm start`: npm would otherwise sit as the parent
+# for the machine's whole life, costing 40–60 MB on a 256 MB VM where a single
+# password hash needs 64 MB (see app/actions/auth/password.ts). It also lets
+# Fly's SIGTERM reach the server's shutdown handler directly instead of going
+# through npm. Keep this in step with the `start` script.
+CMD ["node", "--env-file-if-exists=.env", "--import", "remix/node-tsx", "server.ts"]

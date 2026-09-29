@@ -35,7 +35,11 @@ primary_region = "iad"
   # 1 keeps a machine always running (required since auto-stop is off).
   min_machines_running = 1
 
+# Swap is what lets a signup or login survive on 256 MB: scrypt claims 64 MB
+# per password hash (app/actions/auth/password.ts), and without swap the
+# kernel OOM-kills the server rather than paging anything out.
 [[vm]]
   memory = "256mb"
+  swap_size_mb = 512
   cpu_kind = "shared"
   cpus = 1
