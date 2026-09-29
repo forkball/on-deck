@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 
 import {
   applyVerdicts,
+  searchQueryFor,
   chooseMatch,
   seriesKey,
   seriesKeysFor,
@@ -146,22 +147,31 @@ describe('chooseMatch', () => {
   // Toddlers" near the pick's year, and the book itself further down. Choosing by
   // year first picked the toddlers book and then dropped the pick for not being it.
   it('picks the right book before the right year', () => {
-    const chosen = chooseMatch(pick('Bitten', 2001), [
-      hit('No Biting: Policy and Practice', 2001),
-      hit('Bitten', 2010),
-    ])
+    const chosen = chooseMatch(
+      pick('Bitten', 2001),
+      [hit('No Biting: Policy and Practice', 2001), hit('Bitten', 2010)],
+      'book',
+    )
 
     assert.equal(chosen?.title, 'Bitten')
   })
 
   it('picks the edition matching the year, among hits that are the book', () => {
-    const chosen = chooseMatch(pick('Outlander', 1991), [hit('Outlander', 2004), hit('Outlander', 1991)])
+    const chosen = chooseMatch(
+      pick('Outlander', 1991),
+      [hit('Outlander', 2004), hit('Outlander', 1991)],
+      'book',
+    )
 
     assert.equal(chosen?.releaseYear, 1991)
   })
 
   it('falls to the nearest year when no edition matches exactly', () => {
-    const chosen = chooseMatch(pick('Outlander', 1991), [hit('Outlander', 2015), hit('Outlander', 1994)])
+    const chosen = chooseMatch(
+      pick('Outlander', 1991),
+      [hit('Outlander', 2015), hit('Outlander', 1994)],
+      'book',
+    )
 
     assert.equal(chosen?.releaseYear, 1994)
   })
@@ -172,22 +182,24 @@ describe('chooseMatch', () => {
   // as good as this rule gets: it is the sibling case below that the named tier is
   // actually for.
   it('cannot tell a collectors pressing from the book on title alone', () => {
-    const chosen = chooseMatch(pick('Iron Flame', 2023), [
-      hit('Iron Flame: Limited Special Edition - Sprayed Edges', 2023),
-      hit('Iron Flame', 2024),
-    ])
+    const chosen = chooseMatch(
+      pick('Iron Flame', 2023),
+      [hit('Iron Flame: Limited Special Edition - Sprayed Edges', 2023), hit('Iron Flame', 2024)],
+      'book',
+    )
 
     assert.equal(chosen?.title, 'Iron Flame: Limited Special Edition - Sprayed Edges')
   })
 
   // Searching "A Court of Thorns and Roses" returns "A Court of Mist and Fury",
-  // 0.69 similar — past the 0.5 the fuzzy check asks for, and a different book. It
+  // 0.59 similar — past the 0.5 the fuzzy check asks for, and a different book. It
   // stops being eligible while the book itself is on the list.
   it('prefers the book over a sibling that only passes the fuzzy check', () => {
-    const chosen = chooseMatch(pick('A Court of Thorns and Roses', 2015), [
-      hit('A Court of Mist and Fury', 2016),
-      hit('A Court of Thorns and Roses', 2019),
-    ])
+    const chosen = chooseMatch(
+      pick('A Court of Thorns and Roses', 2015),
+      [hit('A Court of Mist and Fury', 2016), hit('A Court of Thorns and Roses', 2019)],
+      'book',
+    )
 
     assert.equal(chosen?.title, 'A Court of Thorns and Roses')
   })
@@ -195,41 +207,113 @@ describe('chooseMatch', () => {
   // Unchanged behaviour, kept because it is the property the named tier rests on:
   // a subtitle is not a different book.
   it('takes a subtitle as the same book, since publishers add them freely', () => {
-    const chosen = chooseMatch(pick('The Night Circus', 2011), [
-      hit('The Night Circus: A Novel', 2011),
-      hit('The Night Circus Companion', 2013),
-    ])
+    const chosen = chooseMatch(
+      pick('The Night Circus', 2011),
+      [hit('The Night Circus: A Novel', 2011), hit('The Night Circus Companion', 2013)],
+      'book',
+    )
 
     assert.equal(chosen?.title, 'The Night Circus: A Novel')
   })
 
   it('breaks a year tie on the edition people actually have', () => {
-    const chosen = chooseMatch(pick('Graceling', 2008), [hit('Graceling', 2008), hit('Graceling', 2008, 48)])
+    const chosen = chooseMatch(
+      pick('Graceling', 2008),
+      [hit('Graceling', 2008), hit('Graceling', 2008, 48)],
+      'book',
+    )
 
     assert.equal(chosen?.popularity, 48)
   })
 
   it('counts a pick that carries the subtitle as named, not merely fuzzy', () => {
-    const chosen = chooseMatch(pick('Iron Flame: Empyrean Book 2', 2023), [
-      hit('Iron Flame. Limited Special Edition - Sprayed Edges', 2023),
-      hit('Iron Flame', 2024),
-    ])
+    const chosen = chooseMatch(
+      pick('Iron Flame: Empyrean Book 2', 2023),
+      [hit('Iron Flame. Limited Special Edition - Sprayed Edges', 2023), hit('Iron Flame', 2024)],
+      'book',
+    )
 
     assert.equal(chosen?.title, 'Iron Flame')
   })
 
   it('still falls back to a fuzzy match when nothing carries the plain title', () => {
-    const chosen = chooseMatch(pick('WALL-E', 2008), [hit('Wall E', 2008)])
+    const chosen = chooseMatch(pick('WALL-E', 2008), [hit('Wall E', 2008)], 'book')
 
     assert.equal(chosen?.title, 'Wall E')
   })
 
+  // Three of one run's eight picks were Google Books stubs — a catalogue entry with
+  // no cover, no description and no page count — chosen over editions that had all
+  // three, because a stub is often filed under the original year while the readable
+  // edition is a later reprint. A book's catalog year is its pressing, so it does
+  // not get to outrank having something to show.
+  it('prefers an edition that carries something, for a medium whose year is a pressing', () => {
+    const stub = hit('Iron Flame', 2023)
+    const real = { ...hit('Iron Flame', 2024), overview: 'a plot', posterUrl: 'cover.jpg' }
+    const chosen = chooseMatch(pick('Iron Flame', 2023), [stub, real], 'book')
+
+    assert.equal(chosen?.releaseYear, 2024)
+  })
+
+  // A film's year is the film. A remake with a description may not displace the one
+  // that was asked for.
+  it('keeps the year first where it identifies the work', () => {
+    const asked = hit('Dune', 1984)
+    const remake = { ...hit('Dune', 2021), overview: 'a plot', posterUrl: 'cover.jpg' }
+    const chosen = chooseMatch(pick('Dune', 1984), [asked, remake], 'movie')
+
+    assert.equal(chosen?.releaseYear, 1984)
+  })
+
+  it('reads an ampersand as the word, since publishers print it both ways', () => {
+    const chosen = chooseMatch(
+      pick('The Wrath & the Dawn', 2015),
+      [hit('The Wrath and the Dawn', 2016), hit('The Wrath & the Dawn: Anniversary Edition', 2026)],
+      'book',
+    )
+
+    assert.equal(chosen?.title, 'The Wrath and the Dawn')
+  })
+
+  // A page count belongs to the printing: The Denial of Death is 646 pages in one
+  // edition and 352 in another. A run asking for 250–500 should get the printing
+  // that answers it rather than losing the book to the one that doesn't.
+  it('takes an edition the run asked for over one it did not', () => {
+    const chosen = chooseMatch(
+      pick('The Denial of Death', 1973),
+      [
+        { ...hit('The Denial of Death', 1973), pageCount: 646, overview: 'a plot', posterUrl: 'c.jpg' },
+        { ...hit('The Denial of Death', 1997), pageCount: 352, overview: 'a plot', posterUrl: 'c.jpg' },
+      ],
+      'book',
+      (match) => (match.pageCount ?? 0) >= 250 && (match.pageCount ?? 0) <= 500,
+    )
+
+    assert.equal(chosen?.pageCount, 352)
+  })
+
+  // A film has one entry rather than printings, so the preference must not be able
+  // to pull a remake ahead of the film that was asked for.
+  it('will not let a preference outrank the year where the year is the work', () => {
+    const chosen = chooseMatch(
+      pick('Dune', 1984),
+      [hit('Dune', 1984), { ...hit('Dune', 2021), runtimeMinutes: 155 }],
+      'movie',
+      (match) => match.runtimeMinutes != null,
+    )
+
+    assert.equal(chosen?.releaseYear, 1984)
+  })
+
   it('answers null when no hit is the book at all', () => {
-    assert.equal(chooseMatch(pick('Written in Red', 2013), [hit('Writing Red: An Anthology', 2013)]), null)
+    assert.equal(
+      chooseMatch(pick('Written in Red', 2013), [hit('Writing Red: An Anthology', 2013)], 'book'),
+      null,
+    )
   })
 
   it('answers null for no hits', () => {
-    assert.equal(chooseMatch(pick('Bitten', 2001), []), null)
+    assert.equal(chooseMatch(pick('Bitten', 2001), [], 'book'), null)
   })
 })
 
@@ -682,6 +766,28 @@ describe('withOverviews', () => {
     )
 
     assert.equal(returned[0].match.overview, 'a plot')
+  })
+})
+
+describe('searchQueryFor', () => {
+  const pick = (title: string, creator?: string) => ({ title, year: 2023, reason: '', creator })
+
+  // "Iron Flame" alone returns a 1963 laboratory index and not the novel; the
+  // volume with a cover, a blurb and its genres is not in those results at all.
+  it('adds the author for a catalog whose search reads one', () => {
+    assert.equal(searchQueryFor('book', pick('Iron Flame', 'Rebecca Yarros')), 'Iron Flame Rebecca Yarros')
+  })
+
+  // TMDB and IGDB match titles: "Dune Denis Villeneuve" finds a making-of, and
+  // "Portal 2 Valve" finds nothing at all.
+  it('leaves a title alone for catalogs that match titles', () => {
+    assert.equal(searchQueryFor('movie', pick('Dune', 'Denis Villeneuve')), 'Dune')
+    assert.equal(searchQueryFor('game', pick('Portal 2', 'Valve')), 'Portal 2')
+  })
+
+  it('falls back to the title when the model named nobody', () => {
+    assert.equal(searchQueryFor('book', pick('Iron Flame')), 'Iron Flame')
+    assert.equal(searchQueryFor('book', pick('Iron Flame', '   ')), 'Iron Flame')
   })
 })
 

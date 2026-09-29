@@ -56,6 +56,17 @@ export interface CatalogProvider {
   // Platform *families*, not raw names — see GAME_PLATFORMS.
   platforms?: string[]
   seriesTypes?: string[]
+  // Whether this provider's search reads more than a title, so a pick's author or
+  // director is worth adding to the query.
+  //
+  // Google Books queries full text, and a bare title is often not enough to find
+  // the book at all: "Iron Flame" returns a 1963 Oak Ridge lab index and not the
+  // novel, "Bitten" returns a French verb-conjugation guide, "Uprooted" a report on
+  // humanitarian policy. With the author appended each one comes back first.
+  //
+  // TMDB and IGDB match titles only, and the extra words actively hurt: "Dune Denis
+  // Villeneuve" finds a making-of documentary, and "Portal 2 Valve" finds nothing.
+  searchesCreator?: boolean
   parseExternalId(input: string): string | null
   matchHint: string
   lookupFailedError: string
@@ -71,6 +82,25 @@ export interface CatalogProvider {
 
 // Fits after "Only suggest books with …". Null when the medium doesn't offer the
 // bucket, in which case there is nothing truthful to ask for.
+// What to ask a catalog for, given what we know about the work. The title, plus who
+// made it where the provider's search reads that.
+//
+// One builder for the recommendation pipeline and the importers both: they ask the
+// same catalogs the same question, and until this they disagreed about how. The
+// importer appended an author whenever the CSV happened to carry one, which was
+// books only by accident of which parser fills the column.
+export function catalogSearchQuery(type: MediaType, title: string, creator?: string | null): string {
+  const named = searchReadsCreator(type) ? creator?.trim() : undefined
+  return named ? `${title} ${named}` : title
+}
+
+// Whether the provider's search reads more than a title — see searchesCreator.
+// Exported because the picks prompt asks the model for a creator only where one
+// will be used.
+export function searchReadsCreator(type: MediaType): boolean {
+  return getCatalogProvider(type).searchesCreator === true
+}
+
 export function describeLength(provider: CatalogProvider, length: LengthBucket): string | null {
   return provider.lengthOptions.find((option) => option.value === length)?.phrase ?? null
 }
@@ -115,6 +145,7 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
       parseOpenLibraryWorkId(externalId) ? getWorkById(externalId) : getBookById(externalId),
     genres: BOOK_GENRES,
     seriesTypes: BOOK_SERIES_TYPES,
+    searchesCreator: true,
     parseExternalId: parseGoogleBooksId,
     matchHint: 'Paste a Google Books link or volume id.',
     lookupFailedError: "Couldn't find that on Google Books — check the link.",

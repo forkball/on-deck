@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
+import { catalogSearchQuery } from '../app/data/catalog/provider.ts'
 import { parseGoogleBooksId } from '../app/data/catalog/googleBooks.ts'
 
 // What someone actually pastes. Google has changed this URL shape at least once,
@@ -46,5 +47,24 @@ describe('parseGoogleBooksId', () => {
     assert.equal(parseGoogleBooksId('https://www.google.com/books/edition/Iron_Flame'), null)
     assert.equal(parseGoogleBooksId('Iron Flame'), null)
     assert.equal(parseGoogleBooksId(''), null)
+  })
+})
+
+// Shared by the recommendation pipeline and the CSV importers, which ask the same
+// catalogs the same question and used to disagree about how.
+describe('catalogSearchQuery', () => {
+  it('names the author for a catalog whose search reads one', () => {
+    assert.equal(catalogSearchQuery('book', 'Iron Flame', 'Rebecca Yarros'), 'Iron Flame Rebecca Yarros')
+  })
+
+  it('leaves titles alone for catalogs that match titles', () => {
+    assert.equal(catalogSearchQuery('movie', 'Dune', 'Denis Villeneuve'), 'Dune')
+    assert.equal(catalogSearchQuery('game', 'Portal 2', 'Valve'), 'Portal 2')
+  })
+
+  it('takes a missing or blank creator as no creator', () => {
+    assert.equal(catalogSearchQuery('book', 'Iron Flame'), 'Iron Flame')
+    assert.equal(catalogSearchQuery('book', 'Iron Flame', null), 'Iron Flame')
+    assert.equal(catalogSearchQuery('book', 'Iron Flame', '  '), 'Iron Flame')
   })
 })

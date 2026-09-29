@@ -1,5 +1,10 @@
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
-import { getCatalogProvider, type CatalogSearchResult, type LengthBucket } from '../catalog/provider.ts'
+import {
+  catalogSearchQuery,
+  getCatalogProvider,
+  type CatalogSearchResult,
+  type LengthBucket,
+} from '../catalog/provider.ts'
 import { pool } from '../db.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import type { MediaType } from '../mediaItems.ts'
@@ -92,12 +97,28 @@ export function decadeYear(mediaType: MediaType, pick: Pick, match: CatalogSearc
   return decadeComesFromPick(mediaType) ? pick.year : match.releaseYear
 }
 
+// normalizeTitle for the database to run, in one place — resolveFromCatalog needs it
+// in a select list and in a filter, and the two must agree with each other as well as
+// with the TypeScript. test/catalog-shortcut.test.ts is what holds all three together.
+const NORMALIZED_TITLE_SQL =
+  "btrim(regexp_replace(regexp_replace(replace(lower(title), '&', ' and '), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g'))"
+
 function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return (
+    title
+      .toLowerCase()
+      // "&" reads as the word, not as punctuation to drop: publishers print "The
+      // Wrath & the Dawn" and "The Wrath and the Dawn" for one book, and deleting the
+      // symbol makes those two different titles — which cost a run its edition, the
+      // only outright match left being an anniversary printing eleven years late.
+      //
+      // resolveFromCatalog's SQL spells this same normalisation for the database to
+      // run. The two have to move together.
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  )
 }
 
 function levenshteinDistance(a: string, b: string): number {
@@ -157,15 +178,12 @@ export function titlesLikelyMatch(pickTitle: string, foundTitle: string): boolea
 // a run that spends four of its eight slots on two series is the complaint whatever
 // was filtered.
 function normalizeSeries(name: string): string | null {
-  // The ampersand before normalising, or "Thorns & Roses" and "Thorns and Roses"
-  // come out as different keys and the series is counted twice.
-  //
-  // Then the words around the name that get added or dropped freely between one
+  // The words around the name that get added or dropped freely between one
   // entry and its sibling: "The Empyrean", "Empyrean series", "The Empyrean
   // Trilogy" and "Empyrean Book 2" are one series, and a key that treats them as
   // four misses the duplicate it exists to catch. Catalogs vary the same way —
   // IGDB has both "Portal" and "The Legend of Zelda" as written.
-  const key = normalizeTitle(name.replace(/&/g, ' and '))
+  const key = normalizeTitle(name)
     .replace(/^the /, '')
     .replace(/(?: (?:series|trilogy|saga|cycle|duology|quartet|collection|franchise|books?|\d+))+$/, '')
     .trim()
@@ -199,7 +217,8 @@ export function seriesKeysFor(pick: Pick, match: CatalogSearchResult): string[] 
 
 // Which hit a pick is about, out of everything the search returned.
 //
-// Title first, then year. The other way round let the year choose a hit that was
+// Title first, then what makes an edition worth having, with the year leading only
+// where it identifies the work — see the sort below. The other way round let the year choose a hit that was
 // never the book: asked for "Bitten" (2001), nearest-year picked "No Biting:
 // Policy and Practice for Toddlers", and "Kushiel's Dart" picked "Rapport". Both
 // were then dropped as title mismatches — losing the pick altogether, while the
@@ -208,7 +227,22 @@ export function seriesKeysFor(pick: Pick, match: CatalogSearchResult): string[] 
 //
 // Null means no hit is this book, which is a different thing from a hit being the
 // wrong edition, and is counted as such by the caller.
-export function chooseMatch(pick: Pick, matches: CatalogSearchResult[]): CatalogSearchResult | null {
+export function chooseMatch(
+  pick: Pick,
+  matches: CatalogSearchResult[],
+  mediaType: MediaType,
+  // An edition the run has a reason to want. The length lever is the case: a book's
+  // page count belongs to the printing, not to the book, and the printings of one
+  // work disagree wildly — The Denial of Death is 646 pages in one and 352 in
+  // another. Choosing a printing that answers the question the run asked is more
+  // truthful than dropping the work because a different printing didn't. Of ten
+  // out-of-band picks in one run, five had an in-band edition sitting in the same
+  // result list.
+  //
+  // Read with care on an Open Library hit: its page count is number_of_pages_median,
+  // an average over editions rather than one printing's own.
+  prefer?: (match: CatalogSearchResult) => boolean,
+): CatalogSearchResult | null {
   const sameWork = matches.filter((match) => titlesLikelyMatch(pick.title, match.title))
   if (sameWork.length === 0) return null
 
@@ -228,15 +262,34 @@ export function chooseMatch(pick: Pick, matches: CatalogSearchResult[]): Catalog
 
   const distance = (match: CatalogSearchResult) => Math.abs((match.releaseYear ?? 0) - pick.year)
 
+  // Google Books carries bibliographic stubs — a catalogue entry with no digitised
+  // copy, so no cover, no description, no page count. Three of one run's eight picks
+  // were stubs. A description is not only what the page shows: it is what
+  // verifyPicksAgainstOverviews reads, so a stub tends to be dropped as unverified
+  // after being chosen over an edition that would have passed. The overview leads the
+  // cover because that is the one the pipeline itself needs.
+  const described = (match: CatalogSearchResult) => (match.overview ? 0 : 1)
+  const illustrated = (match: CatalogSearchResult) => (match.posterUrl ? 0 : 1)
+  const preferred = (match: CatalogSearchResult) => (prefer?.(match) ? 0 : 1)
+
+  // The medium decides one thing: what leads. Where the catalog's year is the work's
+  // it identifies the work and nothing may outrank it — `prefer` included, which
+  // could only pull a remake ahead of the film that was asked for. Where it is the
+  // year of a pressing (see decadeComesFromPick) it identifies nothing, and leading
+  // with it is what picked the stubs: a stub is usually filed under the year the book
+  // was written while the edition someone can read is a later reprint.
+  //
+  // When `distance` leads, the `distance` term further down is always 0, so a film's
+  // ordering is exactly what it was before any of this.
+  const leads = decadeComesFromPick(mediaType) ? preferred : distance
+
   return [...editions].sort(
     (a, b) =>
-      // Nearest the pick's year: the work's year for a film, the closest pressing to
-      // it for a book.
-      distance(a) - distance(b) ||
-      // Then the edition people actually have, and then the plainest title, which is
-      // how "Iron Flame" wins over "Iron Flame: The Fiery Sequel to the Sunday Times
-      // Bestseller and TikTok Sensation Fourth Wing".
+      leads(a) - leads(b) ||
+      described(a) - described(b) ||
+      illustrated(a) - illustrated(b) ||
       b.popularity - a.popularity ||
+      distance(a) - distance(b) ||
       a.title.length - b.title.length,
   )[0]
 }
@@ -383,6 +436,12 @@ function catalogDown(what: string): GenerationError {
 
 export type CatalogSearch = (mediaType: MediaType, query: string) => Promise<CatalogSearchResult[]>
 
+// What to ask the catalog for, for a pick. The rule itself is catalogSearchQuery,
+// shared with the importers, which ask the same catalogs the same question.
+export function searchQueryFor(mediaType: MediaType, pick: Pick): string {
+  return catalogSearchQuery(mediaType, pick.title, pick.creator)
+}
+
 // One search per pick the local catalog didn't already answer for, bounded —
 // `Promise.all` put all 18 of a filtered run's on the wire at once, and one of
 // them throwing took the whole run with it after the picks were paid for.
@@ -408,7 +467,7 @@ export async function searchForPicks(
 
   await forEachWithConcurrency(toSearch, SEARCH_CONCURRENCY, async (index) => {
     try {
-      matches[index] = await search(mediaType, picks[index].title)
+      matches[index] = await search(mediaType, searchQueryFor(mediaType, picks[index]))
     } catch (error) {
       failed++
       console.warn(
@@ -598,6 +657,17 @@ export function filterByGenre(
   )
 }
 
+// The length lever as a predicate, for the two places that ask it: filterByLength,
+// which drops what doesn't match, and chooseMatch, which prefers an edition that
+// does. Spelled once so the two can't come to disagree about the same lever.
+export function matchesLengthFor(
+  mediaType: MediaType,
+  length: LengthBucket,
+): (match: CatalogSearchResult) => boolean {
+  const provider = getCatalogProvider(mediaType)
+  return (match) => provider.matchesLength(match, length)
+}
+
 // Whether the by-id lookup can be skipped.
 export function hasLengthDimension(mediaType: MediaType, result: CatalogSearchResult): boolean {
   if (mediaType === 'book') return result.pageCount != null
@@ -625,7 +695,7 @@ export function filterByLength(
     mediaType,
     {
       answered: (match) => hasLengthDimension(mediaType, match),
-      matches: (match) => provider.matchesLength(match, length),
+      matches: matchesLengthFor(mediaType, length),
       what: 'length',
     },
     lookup,
@@ -668,10 +738,10 @@ export async function resolveFromCatalog(
       normalized: string
     }>(
       `select id, external_id, title, metadata, popularity_score,
-            btrim(regexp_replace(regexp_replace(lower(title), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g')) as normalized
+            ${NORMALIZED_TITLE_SQL} as normalized
        from media_items
       where type = $1
-        and btrim(regexp_replace(regexp_replace(lower(title), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g')) = any($2)`,
+        and ${NORMALIZED_TITLE_SQL} = any($2)`,
       [mediaType, wanted],
     ),
   )
