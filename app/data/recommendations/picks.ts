@@ -234,13 +234,19 @@ export interface PicksResult {
   response: string
 }
 
-export async function requestPicks(
+// The whole message the picks call sends, built from the profiles and the levers.
+//
+// Exported because nothing used to check that a lever reached the prompt at all: the
+// clauses were assembled inside the request and only a live call could show what was
+// sent. A filter that never made it into the text would look exactly like a model
+// ignoring it. test/picks-prompt.test.ts walks every lever the form can set.
+export function buildPicksPrompt(
   profiles: MemberProfile[] | MultiSourceMemberProfile[],
   excluded: ExcludedTitles,
   filters: RecommendationFilters = {},
   mediaType: MediaType = 'movie',
   sourceTypes: MediaType[] = ['movie'],
-): Promise<PicksResult> {
+): { content: string; requestedCount: number; hasFilters: boolean; searchesCreator: boolean } {
   const isGroup = profiles.length > 1
   const subject = isGroup ? null : profiles[0].label
   const noun = mediaTypeUiFor(mediaType).plural
@@ -291,25 +297,45 @@ export async function requestPicks(
       `this taste profile.${filterInstructions} For each, give your best-guess release year (used only to ` +
       `disambiguate remakes/same-titled entries) and a one-sentence reason tied to ${subject}'s profile.`
 
+  return {
+    content:
+      prompt +
+      describeSeen(excluded.seen, noun, subject) +
+      (excluded.rejected.length > 0
+        ? subject
+          ? `\n\n${subject} has explicitly ruled these out as not interesting — never suggest them, and treat ` +
+            `them as a signal about what to steer away from more broadly: ` +
+            `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
+          : `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
+            `as a signal about what to steer away from more broadly: ` +
+            `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
+        : ''),
+    requestedCount,
+    hasFilters,
+    searchesCreator,
+  }
+}
+
+export async function requestPicks(
+  profiles: MemberProfile[] | MultiSourceMemberProfile[],
+  excluded: ExcludedTitles,
+  filters: RecommendationFilters = {},
+  mediaType: MediaType = 'movie',
+  sourceTypes: MediaType[] = ['movie'],
+): Promise<PicksResult> {
+  const { content, requestedCount, hasFilters, searchesCreator } = buildPicksPrompt(
+    profiles,
+    excluded,
+    filters,
+    mediaType,
+    sourceTypes,
+  )
   // Scales per person because the reasoning does — a run that exhausts its budget
   // thinking comes back with no picks at all.
   //
   // Capped where a non-streaming request stops being comfortable: past this a
   // call wants .stream() and get_final_message(), not a bigger ceiling.
   const maxTokens = Math.min(6000 + 3000 * profiles.length + (hasFilters ? 4000 : 0), 32000)
-
-  const content =
-    prompt +
-    describeSeen(excluded.seen, noun, subject) +
-    (excluded.rejected.length > 0
-      ? subject
-        ? `\n\n${subject} has explicitly ruled these out as not interesting — never suggest them, and treat ` +
-          `them as a signal about what to steer away from more broadly: ` +
-          `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
-        : `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
-          `as a signal about what to steer away from more broadly: ` +
-          `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
-      : '')
 
   let response = ''
 
