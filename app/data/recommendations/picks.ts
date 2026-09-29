@@ -167,10 +167,11 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string, m
   if (filters.genre) {
     clauses.push(
       `Only suggest ${noun} in the "${filters.genre}" genre. This one is checked: each pick is looked up and ` +
-        `discarded unless the catalog itself files it under "${filters.genre}", so a ${noun} from another genre ` +
-        `that merely contains ${filters.genre} will not survive. Where this genre and the taste profile barely ` +
-        `overlap, the genre wins — suggest the "${filters.genre}" ${noun} this reader is most likely to enjoy, ` +
-        `rather than the ${noun} closest to their profile that gestures at "${filters.genre}".`,
+        `discarded unless the catalog itself files it under "${filters.genre}", so a ${singularNoun(mediaType)} ` +
+        `from another genre that merely contains ${filters.genre} will not survive. Where this genre and the ` +
+        `taste profile barely overlap, the genre wins — suggest the "${filters.genre}" ${noun} this reader is ` +
+        `most likely to enjoy, rather than the ${singularNoun(mediaType)} closest to their profile that gestures ` +
+        `at "${filters.genre}".`,
     )
   }
   if (filters.decade != null) {
