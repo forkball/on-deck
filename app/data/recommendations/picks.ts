@@ -1,6 +1,11 @@
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import type { SeenBy } from '../../ui/shared/seen-by.ts'
-import { describeLength, getCatalogProvider, type LengthBucket } from '../catalog/provider.ts'
+import {
+  describeLength,
+  getCatalogProvider,
+  searchReadsCreator,
+  type LengthBucket,
+} from '../catalog/provider.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { requestStructured } from './claude.ts'
 
@@ -92,7 +97,7 @@ const NARROWING_KEYS: (keyof RecommendationFilters)[] = [
 // Built per request rather than a constant: part_of_series is asked for only when
 // the lever needs it, and structured output requires every property it declares, so
 // a field that is sometimes wanted can't just be optional in one fixed schema.
-function picksSchema(options: { series: boolean; creator: boolean }) {
+function picksSchema(options: { partOfSeries: boolean; creator: boolean }) {
   const properties = {
     title: { type: 'string' as const },
     year: { type: 'number' as const },
@@ -101,7 +106,7 @@ function picksSchema(options: { series: boolean; creator: boolean }) {
     // per property, and "" is a clearer "no series" than a magic word would be.
     series_name: { type: 'string' as const },
     ...(options.creator ? { creator: { type: 'string' as const } } : {}),
-    ...(options.series ? { part_of_series: { type: 'boolean' as const } } : {}),
+    ...(options.partOfSeries ? { part_of_series: { type: 'boolean' as const } } : {}),
   }
 
   return {
@@ -158,19 +163,20 @@ export function describeSeen(seen: string[], noun: string, subject: string | nul
         `have already worked through.`
 }
 
-function singularNoun(mediaType: MediaType): string {
-  return mediaTypeUiFor(mediaType).singular
-}
-
-function buildFilterInstructions(filters: RecommendationFilters, noun: string, mediaType: MediaType): string {
+function buildFilterInstructions(
+  filters: RecommendationFilters,
+  noun: string,
+  singular: string,
+  mediaType: MediaType,
+): string {
   const clauses: string[] = []
   if (filters.genre) {
     clauses.push(
       `Only suggest ${noun} in the "${filters.genre}" genre. This one is checked: each pick is looked up and ` +
-        `discarded unless the catalog itself files it under "${filters.genre}", so a ${singularNoun(mediaType)} ` +
+        `discarded unless the catalog itself files it under "${filters.genre}", so a ${singular} ` +
         `from another genre that merely contains ${filters.genre} will not survive. Where this genre and the ` +
         `taste profile barely overlap, the genre wins — suggest the "${filters.genre}" ${noun} this reader is ` +
-        `most likely to enjoy, rather than the ${singularNoun(mediaType)} closest to their profile that gestures ` +
+        `most likely to enjoy, rather than the ${singular} closest to their profile that gestures ` +
         `at "${filters.genre}".`,
     )
   }
@@ -188,9 +194,8 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string, m
     const phrase = describeLength(getCatalogProvider(mediaType), filters.length)
     if (phrase) {
       clauses.push(
-        `Only suggest ${noun} with ${phrase}. This is checked against the catalog too, so one outside that ` +
-          `range is discarded — and a ${singularNoun(mediaType)} that only just misses it will not survive, so ` +
-          `pick ones comfortably inside.`,
+        `Only suggest ${noun} with ${phrase}. This is checked against the catalog too, so a ${singular} ` +
+          `outside that range is discarded.`,
       )
     }
   }
@@ -254,7 +259,7 @@ export async function requestPicks(
   // Asked for only where it is used. Google Books' search reads it and often cannot
   // find the book without it; TMDB's and IGDB's match titles only — see
   // searchesCreator.
-  const searchesCreator = getCatalogProvider(mediaType).searchesCreator === true
+  const searchesCreator = searchReadsCreator(mediaType)
   const creatorRule = searchesCreator
     ? ` Set "creator" on each pick: who wrote it, as the cover would say. It is used to look the ${singular} ` +
       `up, so give the name rather than a description of them.`
@@ -267,7 +272,10 @@ export async function requestPicks(
         `so the list is that many different ${noun} rather than half of one shelf.`)
 
   const filterInstructions =
-    buildFilterInstructions(filters, noun, mediaType) + sourceInstructions + seriesRule + creatorRule
+    buildFilterInstructions(filters, noun, singular, mediaType) +
+    sourceInstructions +
+    seriesRule +
+    creatorRule
 
   const prompt = isGroup
     ? `Group of ${profiles.length} people, each with their own ${noun} taste profile:\n${JSON.stringify(profiles, null, 2)}\n\n` +
@@ -314,7 +322,7 @@ export async function requestPicks(
         effort: 'medium',
         format: {
           type: 'json_schema',
-          schema: picksSchema({ series: filters.series != null, creator: searchesCreator }),
+          schema: picksSchema({ partOfSeries: filters.series != null, creator: searchesCreator }),
         },
       },
       messages: [{ role: 'user', content }],

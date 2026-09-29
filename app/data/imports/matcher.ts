@@ -5,7 +5,12 @@
 // round trips — tens of seconds, which is survivable in a request but loses the
 // whole import to any timeout, and gives the person nothing to come back to.
 
-import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
+import {
+  catalogSearchQuery,
+  getCatalogProvider,
+  upsertCatalogItem,
+  type CatalogSearchResult,
+} from '../catalog/provider.ts'
 import type { Db } from '../db.ts'
 import type { MediaType } from '../mediaItems.ts'
 import type { ImportBatch } from '../schema.ts'
@@ -29,10 +34,6 @@ const CONCURRENCY = 8
 // How often the row counter and the claim heartbeat are written. Per row would
 // be a write per search; per batch would let a live import look dead.
 const PROGRESS_STRIDE = 10
-
-function searchQuery(title: string, author: string | null | undefined): string {
-  return author ? `${title} ${author}` : title
-}
 
 // A failed lookup lands the row in "couldn't find" rather than failing the import.
 async function searchQuietly(
@@ -84,7 +85,7 @@ export async function matchBatch(db: Db, batch: ImportBatch): Promise<void> {
     }
 
     if (results.length === 0) {
-      results = await searchQuietly(provider, searchQuery(row.raw_title, row.author))
+      results = await searchQuietly(provider, catalogSearchQuery(mediaType, row.raw_title, row.author))
     }
 
     for (const result of results) details.set(result.externalId, result)

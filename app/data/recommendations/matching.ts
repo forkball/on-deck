@@ -1,5 +1,10 @@
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
-import { getCatalogProvider, type CatalogSearchResult, type LengthBucket } from '../catalog/provider.ts'
+import {
+  catalogSearchQuery,
+  getCatalogProvider,
+  type CatalogSearchResult,
+  type LengthBucket,
+} from '../catalog/provider.ts'
 import { pool } from '../db.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import type { MediaType } from '../mediaItems.ts'
@@ -91,6 +96,12 @@ export function decadeComesFromPick(mediaType: MediaType): boolean {
 export function decadeYear(mediaType: MediaType, pick: Pick, match: CatalogSearchResult): number | null {
   return decadeComesFromPick(mediaType) ? pick.year : match.releaseYear
 }
+
+// normalizeTitle for the database to run, in one place — resolveFromCatalog needs it
+// in a select list and in a filter, and the two must agree with each other as well as
+// with the TypeScript. test/catalog-shortcut.test.ts is what holds all three together.
+const NORMALIZED_TITLE_SQL =
+  "btrim(regexp_replace(regexp_replace(replace(lower(title), '&', ' and '), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g'))"
 
 function normalizeTitle(title: string): string {
   return (
@@ -206,7 +217,8 @@ export function seriesKeysFor(pick: Pick, match: CatalogSearchResult): string[] 
 
 // Which hit a pick is about, out of everything the search returned.
 //
-// Title first, then year. The other way round let the year choose a hit that was
+// Title first, then what makes an edition worth having, with the year leading only
+// where it identifies the work — see the sort below. The other way round let the year choose a hit that was
 // never the book: asked for "Bitten" (2001), nearest-year picked "No Biting:
 // Policy and Practice for Toddlers", and "Kushiel's Dart" picked "Rapport". Both
 // were then dropped as title mismatches — losing the pick altogether, while the
@@ -218,7 +230,7 @@ export function seriesKeysFor(pick: Pick, match: CatalogSearchResult): string[] 
 export function chooseMatch(
   pick: Pick,
   matches: CatalogSearchResult[],
-  mediaType: MediaType = 'movie',
+  mediaType: MediaType,
   // An edition the run has a reason to want. The length lever is the case: a book's
   // page count belongs to the printing, not to the book, and the printings of one
   // work disagree wildly — The Denial of Death is 646 pages in one and 352 in
@@ -226,6 +238,9 @@ export function chooseMatch(
   // truthful than dropping the work because a different printing didn't. Of ten
   // out-of-band picks in one run, five had an in-band edition sitting in the same
   // result list.
+  //
+  // Read with care on an Open Library hit: its page count is number_of_pages_median,
+  // an average over editions rather than one printing's own.
   prefer?: (match: CatalogSearchResult) => boolean,
 ): CatalogSearchResult | null {
   const sameWork = matches.filter((match) => titlesLikelyMatch(pick.title, match.title))
@@ -249,32 +264,33 @@ export function chooseMatch(
 
   // Google Books carries bibliographic stubs — a catalogue entry with no digitised
   // copy, so no cover, no description, no page count. Three of one run's eight picks
-  // were stubs, and a description is not only what the page shows: it is what
+  // were stubs. A description is not only what the page shows: it is what
   // verifyPicksAgainstOverviews reads, so a stub tends to be dropped as unverified
-  // after being chosen over an edition that would have passed.
-  const carries = (match: CatalogSearchResult) => (match.overview ? 2 : 0) + (match.posterUrl ? 1 : 0)
+  // after being chosen over an edition that would have passed. The overview leads the
+  // cover because that is the one the pipeline itself needs.
+  const described = (match: CatalogSearchResult) => (match.overview ? 0 : 1)
+  const illustrated = (match: CatalogSearchResult) => (match.posterUrl ? 0 : 1)
+  const preferred = (match: CatalogSearchResult) => (prefer?.(match) ? 0 : 1)
 
-  // Where the catalog's year is the work's, it identifies the work and nothing may
-  // outrank it — a remake is a different film. Where it is the year of a pressing,
-  // as it is for a book (see decadeComesFromPick), it identifies nothing, and
-  // sorting by it first is what picked the stubs: a stub is often filed under the
-  // original year while the edition people can actually read is a later reprint.
-  const yearIdentifiesTheWork = !decadeComesFromPick(mediaType)
-  const wanted = (match: CatalogSearchResult) => (prefer?.(match) ? 0 : 1)
+  // The medium decides one thing: what leads. Where the catalog's year is the work's
+  // it identifies the work and nothing may outrank it — `prefer` included, which
+  // could only pull a remake ahead of the film that was asked for. Where it is the
+  // year of a pressing (see decadeComesFromPick) it identifies nothing, and leading
+  // with it is what picked the stubs: a stub is usually filed under the year the book
+  // was written while the edition someone can read is a later reprint.
+  //
+  // When `distance` leads, the `distance` term further down is always 0, so a film's
+  // ordering is exactly what it was before any of this.
+  const leads = decadeComesFromPick(mediaType) ? preferred : distance
 
-  return [...editions].sort((a, b) =>
-    yearIdentifiesTheWork
-      ? // A film has one entry, not printings, so `prefer` is left out of this
-        // branch: it could only pull a remake ahead of the film that was asked for.
-        distance(a) - distance(b) ||
-        carries(b) - carries(a) ||
-        b.popularity - a.popularity ||
-        a.title.length - b.title.length
-      : wanted(a) - wanted(b) ||
-        carries(b) - carries(a) ||
-        b.popularity - a.popularity ||
-        distance(a) - distance(b) ||
-        a.title.length - b.title.length,
+  return [...editions].sort(
+    (a, b) =>
+      leads(a) - leads(b) ||
+      described(a) - described(b) ||
+      illustrated(a) - illustrated(b) ||
+      b.popularity - a.popularity ||
+      distance(a) - distance(b) ||
+      a.title.length - b.title.length,
   )[0]
 }
 
@@ -420,14 +436,10 @@ function catalogDown(what: string): GenerationError {
 
 export type CatalogSearch = (mediaType: MediaType, query: string) => Promise<CatalogSearchResult[]>
 
-// What to ask the catalog for. The title, plus who made it where the provider's
-// search reads that — see searchesCreator. A bare title frequently does not find a
-// book at all: "Iron Flame" returns a 1963 laboratory index and not the novel,
-// "Bitten" a French verb-conjugation guide, "Uprooted" a humanitarian policy
-// report. With the author appended each comes back first.
+// What to ask the catalog for, for a pick. The rule itself is catalogSearchQuery,
+// shared with the importers, which ask the same catalogs the same question.
 export function searchQueryFor(mediaType: MediaType, pick: Pick): string {
-  const creator = getCatalogProvider(mediaType).searchesCreator === true ? pick.creator?.trim() : undefined
-  return creator ? `${pick.title} ${creator}` : pick.title
+  return catalogSearchQuery(mediaType, pick.title, pick.creator)
 }
 
 // One search per pick the local catalog didn't already answer for, bounded —
@@ -645,6 +657,17 @@ export function filterByGenre(
   )
 }
 
+// The length lever as a predicate, for the two places that ask it: filterByLength,
+// which drops what doesn't match, and chooseMatch, which prefers an edition that
+// does. Spelled once so the two can't come to disagree about the same lever.
+export function matchesLengthFor(
+  mediaType: MediaType,
+  length: LengthBucket,
+): (match: CatalogSearchResult) => boolean {
+  const provider = getCatalogProvider(mediaType)
+  return (match) => provider.matchesLength(match, length)
+}
+
 // Whether the by-id lookup can be skipped.
 export function hasLengthDimension(mediaType: MediaType, result: CatalogSearchResult): boolean {
   if (mediaType === 'book') return result.pageCount != null
@@ -672,7 +695,7 @@ export function filterByLength(
     mediaType,
     {
       answered: (match) => hasLengthDimension(mediaType, match),
-      matches: (match) => provider.matchesLength(match, length),
+      matches: matchesLengthFor(mediaType, length),
       what: 'length',
     },
     lookup,
@@ -715,10 +738,10 @@ export async function resolveFromCatalog(
       normalized: string
     }>(
       `select id, external_id, title, metadata, popularity_score,
-            btrim(regexp_replace(regexp_replace(replace(lower(title), '&', ' and '), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g')) as normalized
+            ${NORMALIZED_TITLE_SQL} as normalized
        from media_items
       where type = $1
-        and btrim(regexp_replace(regexp_replace(replace(lower(title), '&', ' and '), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g')) = any($2)`,
+        and ${NORMALIZED_TITLE_SQL} = any($2)`,
       [mediaType, wanted],
     ),
   )

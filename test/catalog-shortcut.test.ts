@@ -12,7 +12,7 @@ import { skipWithoutDatabase } from './support/db.ts'
 //
 // Needs a migrated database: `npm run db:up && npm run db:migrate`.
 describe('local catalog shortcut', { skip: skipWithoutDatabase }, () => {
-  const ids: number[] = []
+  let bookId = 0
 
   const insertBook = async (title: string) => {
     const {
@@ -27,8 +27,7 @@ describe('local catalog shortcut', { skip: skipWithoutDatabase }, () => {
         Date.now(),
       ],
     )
-    ids.push(item.id)
-    return item.id
+    bookId = item.id
   }
 
   before(async () => {
@@ -36,7 +35,7 @@ describe('local catalog shortcut', { skip: skipWithoutDatabase }, () => {
   })
 
   after(async () => {
-    await pool.query('delete from media_items where id = any($1)', [ids])
+    await pool.query('delete from media_items where id = $1', [bookId])
     await pool.end()
   })
 
