@@ -38,9 +38,10 @@ describe('accessLog', () => {
   it('names the request that threw, and lets the throw through', async () => {
     const boom = new Error('kaboom')
     await assert.rejects(
-      run('/books/7', async () => {
-        throw boom
-      }),
+      async () =>
+        run('/books/7', async () => {
+          throw boom
+        }),
       boom,
     )
 
