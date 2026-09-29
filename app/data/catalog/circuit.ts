@@ -2,6 +2,10 @@
 //
 // Not a shield over a single fan-out — several requests are in flight before
 // any has failed, and those still pay full retries. It bounds what comes after.
+import { logger } from '../../log.ts'
+
+const log = logger('catalog')
+
 export interface ProviderCircuit {
   isOpen(): boolean
   // Runs `operation`, recording whether it threw. Callers check isOpen()
@@ -24,7 +28,7 @@ export function createProviderCircuit(name: string, threshold: number, cooldownM
       const open = failures >= threshold && Date.now() - lastFailureAt < cooldownMs
       if (announced && !open) {
         announced = false
-        console.info(`[catalog] ${name} circuit half-open — the next call tries it for real`)
+        log.info(`${name} circuit half-open — the next call tries it for real`)
       }
       return open
     },
@@ -35,7 +39,7 @@ export function createProviderCircuit(name: string, threshold: number, cooldownM
         // Worth saying out loud: while the circuit was open every call went to
         // the fallback silently, so recovery and "still suppressed" look the
         // same from the log — both are an absence of failures.
-        if (failures > 0) console.info(`[catalog] ${name} recovered after ${failures} failure(s)`)
+        if (failures > 0) log.info(`${name} recovered after ${failures} failure(s)`)
         failures = 0
         announced = false
         return result
@@ -44,8 +48,8 @@ export function createProviderCircuit(name: string, threshold: number, cooldownM
         lastFailureAt = Date.now()
         if (failures >= threshold && !announced) {
           announced = true
-          console.warn(
-            `[catalog] ${name} circuit open after ${failures} consecutive failures — ` +
+          log.warn(
+            `${name} circuit open after ${failures} consecutive failures — ` +
               `skipping it for ${Math.round(cooldownMs / 1000)}s`,
           )
         }

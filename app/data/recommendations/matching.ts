@@ -13,6 +13,9 @@ import { requestStructured } from './claude.ts'
 import { CatalogUnavailableError, GenerationError } from './errors.ts'
 import type { DecadeRelation, Pick } from './picks.ts'
 import { track } from './timings.ts'
+import { logger } from '../../log.ts'
+
+const log = logger('generation')
 
 export interface Candidate {
   pick: Pick
@@ -323,7 +326,7 @@ export function applyVerdicts(candidates: Candidate[], verdicts: PickVerdict[]):
 // Two audiences: GenerationError carries a message to the waiting page (see
 // errors.ts), and the detail that would only puzzle them goes to the log.
 function mismatch(detail: string): GenerationError {
-  console.warn(`[generation] verification mismatch: ${detail}`)
+  log.warn(`verification mismatch: ${detail}`)
   return new GenerationError('Checking the picks came back incomplete — try generating again.')
 }
 
@@ -440,10 +443,7 @@ export async function searchForPicks(
       matches[index] = await search(mediaType, searchQueryFor(mediaType, picks[index]))
     } catch (error) {
       failed++
-      console.warn(
-        `[generation] ${mediaType} search failed for ${JSON.stringify(picks[index].title)}:`,
-        error,
-      )
+      log.warn(`${mediaType} search failed for ${JSON.stringify(picks[index].title)}`, error)
     }
   })
 
@@ -467,7 +467,7 @@ async function lookupQuietly(
   try {
     return await lookup(mediaType, externalId)
   } catch (error) {
-    console.warn(`[generation] ${mediaType} lookup failed for ${externalId}:`, error)
+    log.warn(`${mediaType} lookup failed for ${externalId}`, error)
     return null
   }
 }

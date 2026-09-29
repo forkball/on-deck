@@ -1,3 +1,7 @@
+import { logger } from '../../log.ts'
+
+const log = logger('generation')
+
 // Log-only: nothing is stored or shown.
 export interface PickDrops {
   unfound: number
@@ -45,7 +49,7 @@ export function unaccountedFor(tally: PickTally): number {
 }
 
 export function logPickTally(tally: PickTally): void {
-  console.info(`[generation] ${summarizePickTally(tally)}`)
+  log.info(summarizePickTally(tally))
 }
 
 const DROP_LABELS: Record<keyof PickDrops, string> = {

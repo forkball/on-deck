@@ -5,6 +5,9 @@ import type { MediaType } from '../mediaItems.ts'
 import { generationTranscripts } from '../schema.ts'
 import type { RecommendationFilters } from './picks.ts'
 import type { PickTally } from './tally.ts'
+import { logger } from '../../log.ts'
+
+const log = logger('generation')
 
 // Enough to compare a run that went wrong against the two before it, and few
 // enough that a prompt carrying 200 logged titles doesn't accumulate.
@@ -57,7 +60,7 @@ export async function finishTranscript(
       tally: JSON.stringify(outcome.tally),
     })
   } catch (error) {
-    console.warn(`[generation] transcript ${id} could not be finished:`, error)
+    log.warn(`transcript ${id} could not be finished`, error)
   }
 }
 

@@ -4,6 +4,10 @@
 // attempts served 27/27 searches where three served 21/27 — the difference
 // between a search reaching Google Books and one quietly resolving against
 // Open Library instead.
+import { logger } from '../../log.ts'
+
+const log = logger('catalog')
+
 const FETCH_ATTEMPTS = 6
 const RETRY_BASE_MS = 250
 
@@ -80,8 +84,8 @@ export async function fetchWithRetry(
     // nothing — the two failures that paid for the latency would otherwise
     // leave no trace, which is exactly the case that looks like "the provider
     // is just slow".
-    console.warn(
-      `[catalog] ${provider} attempt ${attempt}/${FETCH_ATTEMPTS} failed after ${Date.now() - startedAt}ms: ${detail}`,
+    log.warn(
+      `${provider} attempt ${attempt}/${FETCH_ATTEMPTS} failed after ${Date.now() - startedAt}ms: ${detail}`,
     )
 
     if (attempt < FETCH_ATTEMPTS) {

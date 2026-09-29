@@ -48,6 +48,9 @@ import { emptyDrops, logPickTally, type PickTally } from './tally.ts'
 import { finishTranscript, startTranscript } from './transcripts.ts'
 import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
+import { logger } from '../../log.ts'
+
+const log = logger('generation')
 
 // Which levers a run was narrowed by, in the words the form used for them, so the
 // advice names the thing there is a control for.
@@ -246,7 +249,7 @@ export async function generateRecommendations(
       prompt: asked.prompt,
       response: asked.response,
     }).catch((error) => {
-      console.warn('[generation] transcript could not be started:', error)
+      log.warn('transcript could not be started', error)
       return null
     })
     checkpoint = { ...checkpoint, picks }

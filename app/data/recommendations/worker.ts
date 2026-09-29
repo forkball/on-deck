@@ -20,6 +20,9 @@ import type { RecommendationFilters } from './picks.ts'
 import { saveRunTimings } from './runs.ts'
 import { saveUnconfirmedRun } from './unconfirmed.ts'
 import { startTimings, summarizeTimings, type RunTimings } from './timings.ts'
+import { logger, withLogContext } from '../../log.ts'
+
+const log = logger('generation')
 
 // Drains the recommendation queue through a fixed number of slots. Every
 // in-flight run holds a user's whole log in memory on a 512MB machine and fans
@@ -51,7 +54,11 @@ export function startGenerationWorker(): GenerationWorker {
   let stopped = false
   let timer: NodeJS.Timeout | null = null
 
-  async function run(job: ClaimedJob): Promise<void> {
+  function run(job: ClaimedJob): Promise<void> {
+    return withLogContext({ job: job.id, user: job.userId }, () => runJob(job))
+  }
+
+  async function runJob(job: ClaimedJob): Promise<void> {
     running++
     const timings = startTimings({ queuedMs: job.queuedMs, attempt: job.attempt })
     let runId: number | null = null
@@ -131,7 +138,7 @@ export function startGenerationWorker(): GenerationWorker {
           // Falls through to the ordinary failure below: someone waiting on a run
           // that couldn't be salvaged should be told the catalog is down, not that
           // saving what it couldn't confirm also failed.
-          console.error(`[generation] job=${job.id} could not keep unconfirmed picks:`, saveError)
+          log.error('could not keep unconfirmed picks', saveError)
         }
       }
 
@@ -140,7 +147,7 @@ export function startGenerationWorker(): GenerationWorker {
       //
       // Logged whatever it is: this is the only place the detail of a failed run
       // is kept, since it doesn't travel to the page.
-      console.error(`[generation] job=${job.id} failed:`, error)
+      log.error('run failed', error)
 
       // Only a message written for the person reaches them; everything else gets
       // the generic line. See errors.ts — silence is the safe default, so a new
@@ -161,7 +168,7 @@ export function startGenerationWorker(): GenerationWorker {
   }
 
   async function recordTimings(job: ClaimedJob, runId: number | null, measured: RunTimings): Promise<void> {
-    console.info(`[generation] job=${job.id} run=${runId ?? 'none'} ${summarizeTimings(measured)}`)
+    log.info(`run=${runId ?? 'none'} ${summarizeTimings(measured)}`)
     await saveJobTimings(db, job.id, measured)
     if (runId != null) await saveRunTimings(db, runId, measured)
   }

@@ -13,6 +13,9 @@ import {
   type User,
 } from '../schema.ts'
 import { fetchLetterboxdFeed, letterboxdSyncAvailableTo, type LetterboxdEntry } from './letterboxdFeed.ts'
+import { logger } from '../../log.ts'
+
+const log = logger('letterboxd')
 
 // Only the entries needing a TMDB detail lookup do any network work, and after
 // the first sync that is usually none of them — so this bounds a list that is
@@ -127,8 +130,8 @@ export async function syncLetterboxdDiary(
     // Named rather than counted, and written after the fact: nothing else in
     // the log records that a row existed, so this line is the only account of
     // what a background job took and why it believed it should.
-    console.info(
-      `Letterboxd sync removed ${removed.length} row(s) for user ${userId}, absent from the feed: ${removed.join(', ')}`,
+    log.info(
+      `removed ${removed.length} row(s) for user ${userId}, absent from the feed: ${removed.join(', ')}`,
     )
   }
 
@@ -461,7 +464,7 @@ function swallow(userId: number, run: Promise<LetterboxdSyncResult>): Promise<vo
   return run.then(
     () => undefined,
     (error: unknown) => {
-      console.error(`Letterboxd sync failed for user ${userId}:`, error)
+      log.error(`sync failed for user ${userId}`, error)
     },
   )
 }
