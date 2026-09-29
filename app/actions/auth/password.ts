@@ -24,9 +24,9 @@ const LEGACY_PARAMS: ScryptParams = { N: 16384, r: 8, p: 1 }
 // guess costs an attacker, which is the whole point of scrypt over a plain hash.
 //
 // 65536 rather than the 2^17 general guidance because memory is 128 * N * r —
-// 64 MiB here, 128 MiB at 2^17 — and these run on 512 MB machines alongside a
-// generation worker that holds a user's whole log. Four simultaneous logins at
-// 2^17 would be the entire machine.
+// 64 MiB here, 128 MiB at 2^17 — and these run on 256 MB machines (plus swap,
+// see fly.toml) alongside a generation worker that holds a user's whole log.
+// `derive` queues hashes so only one of these is ever held at a time.
 const CURRENT_PARAMS: ScryptParams = { N: 65536, r: 8, p: 1 }
 
 const KEY_LENGTH = 64
@@ -38,13 +38,30 @@ function maxmemFor({ N, r }: ScryptParams): number {
   return Math.max(32 * 1024 * 1024, 256 * N * r)
 }
 
+// scrypt claims 128 * N * r bytes up front — 64 MiB at CURRENT_PARAMS — so two
+// logins landing together would need 128 MiB on a 256 MB machine. Queueing
+// them caps the spike at one hash; the second waits a few hundred ms.
+let previous: Promise<unknown> = Promise.resolve()
+
+function oneAtATime<T>(work: () => Promise<T>): Promise<T> {
+  // `work` on both arms, so a hash that failed still lets the next one run.
+  const next = previous.then(work, work)
+  // The caller handles `next`'s rejection; the chain only needs to know it
+  // settled, and mustn't surface the same error a second time.
+  previous = next.catch(() => {})
+  return next
+}
+
 // Hand-wrapped rather than promisified: promisify's types drop scrypt's
 // options overload, and the options are the entire point here.
 function derive(password: string, salt: Buffer, params: ScryptParams): Promise<Buffer> {
   const options: ScryptOptions = { ...params, maxmem: maxmemFor(params) }
-  return new Promise((resolve, reject) => {
-    scrypt(password, salt, KEY_LENGTH, options, (error, key) => (error ? reject(error) : resolve(key)))
-  })
+  return oneAtATime(
+    () =>
+      new Promise((resolve, reject) => {
+        scrypt(password, salt, KEY_LENGTH, options, (error, key) => (error ? reject(error) : resolve(key)))
+      }),
+  )
 }
 
 // The parameters are inputs to the derivation, not notes about it: change any of

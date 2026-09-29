@@ -84,6 +84,20 @@ describe('verifyPassword', () => {
   })
 })
 
+// Hashes are queued one at a time to cap scrypt's memory, so a hash that fails
+// must not jam the queue for every login behind it.
+describe('the hash queue', () => {
+  it('keeps serving after a hash fails', async () => {
+    // N must be a power of two, so scrypt refuses this outright.
+    const unusable = `scrypt$N=3,r=8,p=1$${'aa'.repeat(16)}$${'bb'.repeat(64)}`
+    const failing = verifyPassword('hunter2', unusable)
+    const queued = hashPassword('hunter2')
+
+    await assert.rejects(failing)
+    assert.equal(await verifyPassword('hunter2', await queued), true)
+  })
+})
+
 describe('needsRehash', () => {
   it('is false for a hash just written', async () => {
     assert.equal(needsRehash(await hashPassword('hunter2')), false)
