@@ -12,7 +12,7 @@ import { skipWithoutDatabase } from './support/db.ts'
 //
 // Needs a migrated database: `npm run db:up && npm run db:migrate`.
 describe('local catalog shortcut', { skip: skipWithoutDatabase }, () => {
-  let bookId = 0
+  const ids: number[] = []
 
   const insertBook = async (title: string) => {
     const {
@@ -27,15 +27,16 @@ describe('local catalog shortcut', { skip: skipWithoutDatabase }, () => {
         Date.now(),
       ],
     )
-    bookId = item.id
+    ids.push(item.id)
   }
 
   before(async () => {
     await insertBook('Fire & Blood')
+    await insertBook('Spider-Man: Blue')
   })
 
   after(async () => {
-    await pool.query('delete from media_items where id = $1', [bookId])
+    await pool.query('delete from media_items where id = any($1)', [ids])
     await pool.end()
   })
 
@@ -51,6 +52,14 @@ describe('local catalog shortcut', { skip: skipWithoutDatabase }, () => {
     const resolved = await resolveFromCatalog('book', [pick('Fire & Blood')])
 
     assert.equal(resolved.get(0)?.title, 'Fire & Blood')
+  })
+
+  // Punctuation is deleted, not spaced, so a hyphenated row matches the unhyphenated
+  // spelling — and the database half has to agree about that too.
+  it('matches a hyphenated stored title against an unhyphenated pick', async () => {
+    const resolved = await resolveFromCatalog('book', [pick('Spiderman Blue')])
+
+    assert.equal(resolved.get(0)?.title, 'Spider-Man: Blue')
   })
 
   it('does not match a different book', async () => {

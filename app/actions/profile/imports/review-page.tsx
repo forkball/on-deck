@@ -14,12 +14,12 @@ import type {
 } from '../../../data/imports/review.ts'
 import {
   REVIEW_REASONS,
-  normalizeTitle,
   reasonGroup,
   type BulkKind,
   type CandidateLike,
   type LogValues,
 } from '../../../data/imports/classify.ts'
+import { normalizeTitle } from '../../../data/titles.ts'
 import type { ImportBatch } from '../../../data/schema.ts'
 import { mediaTypeUiFor } from '../../../mediaTypes.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
