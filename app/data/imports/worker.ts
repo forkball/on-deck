@@ -10,6 +10,9 @@ import { db } from '../db.ts'
 import type { ImportBatch } from '../schema.ts'
 import { claimBatch, failBatch, touchClaim, CLAIM_STALE_MS } from './batches.ts'
 import { matchBatch } from './matcher.ts'
+import { logger } from '../../log.ts'
+
+const log = logger('import')
 
 const IDLE_POLL_MS = 2000
 
@@ -30,7 +33,7 @@ export function startImportWorker(): ImportWorker {
   let running = false
   let stopped = false
   let timer: NodeJS.Timeout | null = setInterval(() => {
-    void tick().catch((error) => console.error('import worker', error))
+    void tick().catch((error) => log.error('worker tick failed', error))
   }, IDLE_POLL_MS)
 
   async function run(batch: ImportBatch): Promise<void> {

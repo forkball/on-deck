@@ -34,6 +34,9 @@ import {
   TV_GENRES,
   type TmdbSearchResult,
 } from './tmdb.ts'
+import { logger } from '../../log.ts'
+
+const log = logger('search')
 
 // Structurally what TMDB returns, aliased so other providers satisfy one shape.
 export type CatalogSearchResult = TmdbSearchResult
@@ -319,8 +322,8 @@ function logSearch(
   results: MediaItem[],
   startedAt: number,
 ): void {
-  console.info(
-    `[search] ${type} ${JSON.stringify(query)} ${cache} ${results.length} result(s) ` +
+  log.info(
+    `${type} ${JSON.stringify(query)} ${cache} ${results.length} result(s) ` +
       `via ${sourcesOf(results)} ${duration(Date.now() - startedAt)}`,
   )
 }
@@ -351,10 +354,7 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
     // handler as a bare stack with no query and no media type on it. Rethrown
     // immediately — the 500 is still the right answer, this only makes it
     // possible to tell which search caused it.
-    console.error(
-      `[search] ${type} ${JSON.stringify(query)} failed after ${duration(Date.now() - startedAt)}:`,
-      error,
-    )
+    log.error(`${type} ${JSON.stringify(query)} failed after ${duration(Date.now() - startedAt)}`, error)
     throw error
   }
 

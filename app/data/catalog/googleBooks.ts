@@ -3,6 +3,9 @@ import { createProviderCircuit } from './circuit.ts'
 import { fetchWithRetry } from './retry.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
 import { searchBooks as searchOpenLibraryBooks } from './openLibrary.ts'
+import { logger } from '../../log.ts'
+
+const log = logger('catalog')
 
 const GOOGLE_BOOKS_BASE = 'https://www.googleapis.com/books/v1'
 
@@ -164,7 +167,7 @@ export async function searchBooks(query: string): Promise<CatalogSearchResult[]>
     try {
       return await circuit.run(() => searchGoogleBooksOnly(query))
     } catch (error) {
-      console.error('Google Books search failed, falling back to Open Library:', error)
+      log.error('Google Books search failed, falling back to Open Library', error)
     }
   }
 
