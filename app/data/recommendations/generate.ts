@@ -2,7 +2,7 @@ import { inList } from 'remix/data-table'
 
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { platformFamilies } from '../catalog/igdb.ts'
-import { upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
+import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
 import type { Db } from '../db.ts'
 import { isFollowing } from '../follows.ts'
 import { countUserMediaLog, listUserMediaLog, CONSUMPTION_STATUSES, type MediaType } from '../mediaItems.ts'
@@ -259,6 +259,11 @@ export async function generateRecommendations(
 
   // Not capped at TARGET_COUNT: verification below drops some too, so the
   // over-request slack has to reach it.
+  const lengthProvider = getCatalogProvider(mediaType)
+  const lengthWanted = filters.length
+    ? (match: CatalogSearchResult) => lengthProvider.matchesLength(match, filters.length!)
+    : undefined
+
   const shortlist: Candidate[] = []
   const seenExternalIds = new Set<string>()
   // One per series, placed by the catalog wherever it says and by the model where no
@@ -279,7 +284,10 @@ export async function generateRecommendations(
       continue
     }
 
-    const match = chooseMatch(pick, matches, mediaType)
+    // The length lever picks the printing as well as filtering on it: a page count
+    // belongs to an edition, and dropping a work because the edition we happened to
+    // choose was the wrong length answers a question nobody asked.
+    const match = chooseMatch(pick, matches, mediaType, lengthWanted)
     if (!match) {
       drops.titleMismatch++
       continue

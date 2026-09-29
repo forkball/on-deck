@@ -158,6 +158,10 @@ export function describeSeen(seen: string[], noun: string, subject: string | nul
         `have already worked through.`
 }
 
+function singularNoun(mediaType: MediaType): string {
+  return mediaTypeUiFor(mediaType).singular
+}
+
 function buildFilterInstructions(filters: RecommendationFilters, noun: string, mediaType: MediaType): string {
   const clauses: string[] = []
   if (filters.genre) {
@@ -181,7 +185,13 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string, m
   // The medium's own bucket, never a runtime for everything — see lengthOptions.
   if (filters.length) {
     const phrase = describeLength(getCatalogProvider(mediaType), filters.length)
-    if (phrase) clauses.push(`Only suggest ${noun} with ${phrase}.`)
+    if (phrase) {
+      clauses.push(
+        `Only suggest ${noun} with ${phrase}. This is checked against the catalog too, so one outside that ` +
+          `range is discarded — and a ${singularNoun(mediaType)} that only just misses it will not survive, so ` +
+          `pick ones comfortably inside.`,
+      )
+    }
   }
   if (filters.playerType === 'singleplayer') clauses.push(`Only suggest ${noun} playable single-player.`)
   if (filters.playerType === 'multiplayer') clauses.push(`Only suggest ${noun} playable multiplayer.`)

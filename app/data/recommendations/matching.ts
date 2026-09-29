@@ -219,6 +219,14 @@ export function chooseMatch(
   pick: Pick,
   matches: CatalogSearchResult[],
   mediaType: MediaType = 'movie',
+  // An edition the run has a reason to want. The length lever is the case: a book's
+  // page count belongs to the printing, not to the book, and the printings of one
+  // work disagree wildly — The Denial of Death is 646 pages in one and 352 in
+  // another. Choosing a printing that answers the question the run asked is more
+  // truthful than dropping the work because a different printing didn't. Of ten
+  // out-of-band picks in one run, five had an in-band edition sitting in the same
+  // result list.
+  prefer?: (match: CatalogSearchResult) => boolean,
 ): CatalogSearchResult | null {
   const sameWork = matches.filter((match) => titlesLikelyMatch(pick.title, match.title))
   if (sameWork.length === 0) return null
@@ -252,14 +260,18 @@ export function chooseMatch(
   // sorting by it first is what picked the stubs: a stub is often filed under the
   // original year while the edition people can actually read is a later reprint.
   const yearIdentifiesTheWork = !decadeComesFromPick(mediaType)
+  const wanted = (match: CatalogSearchResult) => (prefer?.(match) ? 0 : 1)
 
   return [...editions].sort((a, b) =>
     yearIdentifiesTheWork
-      ? distance(a) - distance(b) ||
+      ? // A film has one entry, not printings, so `prefer` is left out of this
+        // branch: it could only pull a remake ahead of the film that was asked for.
+        distance(a) - distance(b) ||
         carries(b) - carries(a) ||
         b.popularity - a.popularity ||
         a.title.length - b.title.length
-      : carries(b) - carries(a) ||
+      : wanted(a) - wanted(b) ||
+        carries(b) - carries(a) ||
         b.popularity - a.popularity ||
         distance(a) - distance(b) ||
         a.title.length - b.title.length,

@@ -258,6 +258,36 @@ describe('chooseMatch', () => {
     assert.equal(chosen?.title, 'The Wrath and the Dawn')
   })
 
+  // A page count belongs to the printing: The Denial of Death is 646 pages in one
+  // edition and 352 in another. A run asking for 250–500 should get the printing
+  // that answers it rather than losing the book to the one that doesn't.
+  it('takes an edition the run asked for over one it did not', () => {
+    const chosen = chooseMatch(
+      pick('The Denial of Death', 1973),
+      [
+        { ...hit('The Denial of Death', 1973), pageCount: 646, overview: 'a plot', posterUrl: 'c.jpg' },
+        { ...hit('The Denial of Death', 1997), pageCount: 352, overview: 'a plot', posterUrl: 'c.jpg' },
+      ],
+      'book',
+      (match) => (match.pageCount ?? 0) >= 250 && (match.pageCount ?? 0) <= 500,
+    )
+
+    assert.equal(chosen?.pageCount, 352)
+  })
+
+  // A film has one entry rather than printings, so the preference must not be able
+  // to pull a remake ahead of the film that was asked for.
+  it('will not let a preference outrank the year where the year is the work', () => {
+    const chosen = chooseMatch(
+      pick('Dune', 1984),
+      [hit('Dune', 1984), { ...hit('Dune', 2021), runtimeMinutes: 155 }],
+      'movie',
+      (match) => match.runtimeMinutes != null,
+    )
+
+    assert.equal(chosen?.releaseYear, 1984)
+  })
+
   it('answers null when no hit is the book at all', () => {
     assert.equal(chooseMatch(pick('Written in Red', 2013), [hit('Writing Red: An Anthology', 2013)]), null)
   })
