@@ -157,7 +157,11 @@ export default createController(routes.profile.imports, {
       let searched = queries[0]!
       let results: CatalogSearchResult[] = []
       for (searched of queries) {
-        results = await provider.search(searched.query)
+        // What the person typed is free text; the looser queries are spellings of
+        // the row's own title.
+        results = await provider.search(
+          searched.step === 'typed' ? { text: searched.query } : { title: searched.query },
+        )
         if (results.length > 0) break
       }
 

@@ -76,6 +76,12 @@ does nothing on its own.
     guess is tested directly
   - `app/data/catalog/` — external metadata providers behind one `CatalogProvider`
     interface (`provider.ts` is the registry; `tmdb`/`openLibrary`/`igdb` implement it).
+    `query.ts` is what a caller asks for — a title, or the text a person typed, plus
+    a creator or an isbn where one is known. Rendering that into a query string is
+    each provider's own business, since only Google Books can confine a term to a
+    field (`intitle:`/`inauthor:`). It imports nothing, for the same reason
+    `titles.ts` doesn't: every provider needs it, and importing the registry to get
+    it is a cycle.
     `retry.ts` holds the shared GET-with-backoff the two book providers use;
     `circuit.ts` holds the per-provider "stop asking, it's down" rule, which is
     policy each provider opts into rather than something the registry applies

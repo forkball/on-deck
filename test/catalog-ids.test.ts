@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { catalogSearchQuery } from '../app/data/catalog/provider.ts'
+import { fieldedBookQuery, plainBookQuery } from '../app/data/catalog/googleBooks.ts'
 import { parseGoogleBooksId } from '../app/data/catalog/googleBooks.ts'
 
 // What someone actually pastes. Google has changed this URL shape at least once,
@@ -50,21 +50,65 @@ describe('parseGoogleBooksId', () => {
   })
 })
 
-// Shared by the recommendation pipeline and the CSV importers, which ask the same
-// catalogs the same question and used to disagree about how.
-describe('catalogSearchQuery', () => {
-  it('names the author for a catalog whose search reads one', () => {
-    assert.equal(catalogSearchQuery('book', 'Iron Flame', 'Rebecca Yarros'), 'Iron Flame Rebecca Yarros')
+// Google Books is the one catalog that can be asked a precise question, and asking
+// it a vague one is what fills the table with study guides: "Iron Flame Rebecca
+// Yarros" is free text over titles, descriptions and blurbs alike, so a summary of
+// the novel outranks the novel.
+describe('fieldedBookQuery', () => {
+  it('confines the title and the author to their own fields', () => {
+    assert.equal(
+      fieldedBookQuery({ title: 'Iron Flame', creator: 'Rebecca Yarros' }),
+      'intitle:"Iron Flame" inauthor:"Rebecca Yarros"',
+    )
   })
 
-  it('leaves titles alone for catalogs that match titles', () => {
-    assert.equal(catalogSearchQuery('movie', 'Dune', 'Denis Villeneuve'), 'Dune')
-    assert.equal(catalogSearchQuery('game', 'Portal 2', 'Valve'), 'Portal 2')
+  it('still qualifies the title when nobody is named', () => {
+    assert.equal(fieldedBookQuery({ title: 'Iron Flame' }), 'intitle:"Iron Flame"')
+    assert.equal(fieldedBookQuery({ title: 'Iron Flame', creator: null }), 'intitle:"Iron Flame"')
+    assert.equal(fieldedBookQuery({ title: 'Iron Flame', creator: '  ' }), 'intitle:"Iron Flame"')
+  })
+
+  // An unbalanced quote is the failure this guards: it would close the phrase early
+  // and hand the rest of the title back to free text, which is what we are escaping.
+  it('drops a quote inside a title rather than leaving the phrase open', () => {
+    assert.equal(fieldedBookQuery({ title: 'The "Genius" Myth' }), 'intitle:"The  Genius  Myth"')
+  })
+
+  // A search box is not a title field: `intitle:"yarros"` finds nothing, and someone
+  // typing an author, a series or half a title has to find something.
+  it('qualifies nothing when the words are only what a person typed', () => {
+    assert.equal(fieldedBookQuery({ text: 'yarros' }), null)
+    assert.equal(plainBookQuery({ text: 'yarros' }), 'yarros')
+  })
+
+  // An isbn identifies the volume outright, so there is nothing left to qualify.
+  it('asks by isbn when there is one, and nothing else', () => {
+    assert.equal(
+      fieldedBookQuery({ title: 'Iron Flame', creator: 'Rebecca Yarros', isbn: '9781649374172' }),
+      'isbn:9781649374172',
+    )
+  })
+})
+
+// What the qualified query falls back to when it finds nothing, and the only form
+// Open Library understands — it has no qualifiers, and would search for the words.
+describe('plainBookQuery', () => {
+  it('runs the title and the author together', () => {
+    assert.equal(
+      plainBookQuery({ title: 'Iron Flame', creator: 'Rebecca Yarros' }),
+      'Iron Flame Rebecca Yarros',
+    )
   })
 
   it('takes a missing or blank creator as no creator', () => {
-    assert.equal(catalogSearchQuery('book', 'Iron Flame'), 'Iron Flame')
-    assert.equal(catalogSearchQuery('book', 'Iron Flame', null), 'Iron Flame')
-    assert.equal(catalogSearchQuery('book', 'Iron Flame', '  '), 'Iron Flame')
+    assert.equal(plainBookQuery({ title: 'Iron Flame' }), 'Iron Flame')
+    assert.equal(plainBookQuery({ title: 'Iron Flame', creator: null }), 'Iron Flame')
+    assert.equal(plainBookQuery({ title: 'Iron Flame', creator: '  ' }), 'Iron Flame')
+  })
+
+  // The one qualifier Open Library does read, which is why the importer could get
+  // away with composing it by hand for as long as it did.
+  it('keeps an isbn lookup as an isbn lookup', () => {
+    assert.equal(plainBookQuery({ title: 'Iron Flame', isbn: '9781649374172' }), 'isbn:9781649374172')
   })
 })
