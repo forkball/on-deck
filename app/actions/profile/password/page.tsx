@@ -23,7 +23,6 @@ export function ProfilePasswordPage(handle: Handle<ProfilePasswordPageProps>) {
       // This page is only reached from the edit form, and since it lost its
       // Cancel button the back link is the only way back out.
       <Page
-        title="Change password"
         heading="Change password"
         back={{ href: routes.profile.edit.index.href(), label: '← Back to edit profile' }}
         displayName={displayName}

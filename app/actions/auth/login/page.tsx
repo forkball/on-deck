@@ -10,7 +10,7 @@ export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
     const { error, next } = handle.props
 
     return (
-      <Page title="Log in" heading="Log in" width="narrow" authed={false}>
+      <Page heading="Log in" width="narrow">
         {error && <p mix={css({ color: '#b91c1c' })}>{error}</p>}
         <form
           method="post"

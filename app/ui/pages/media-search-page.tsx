@@ -45,13 +45,8 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
     const returnTo = `${ui.hrefs.search()}?q=${encodeURIComponent(query)}`
 
     return (
-      <Page
-        title={ui.searchHeading}
-        heading={ui.searchHeading}
-        width="wide"
-        displayName={displayName}
-        toast={message && <Toast message={message} />}
-      >
+      <Page heading={ui.searchHeading} width="wide" displayName={displayName}>
+        {message && <Toast message={message} />}
         <MediaTabLinks
           current={mediaType}
           // Switching type starts a fresh search rather than carrying the

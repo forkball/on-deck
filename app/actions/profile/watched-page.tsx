@@ -36,7 +36,7 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
     const heading = `My ${ui.attributive} log`
 
     return (
-      <Page title={heading} heading={heading} displayName={displayName}>
+      <Page heading={heading} displayName={displayName}>
         {/* GET, so a filtered list is a URL you can link to or reload.
               `page` is deliberately not carried across: changing the filter
               changes how many pages there are, so it starts again at the

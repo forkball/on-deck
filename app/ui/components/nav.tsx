@@ -5,6 +5,10 @@ import { NotificationBell } from '../../browser/notification-bell.tsx'
 import { ProfileMenu } from '../../browser/profile-menu.tsx'
 import { routes } from '../../routes.ts'
 
+// The widest a page gets: Page's `wide` column matches it, so wide content
+// lines up with the nav above it.
+export const NAV_WIDTH = '720px'
+
 export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
   return () => {
     const { authed, displayName } = handle.props
@@ -16,7 +20,7 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
             display: 'flex',
             alignItems: 'center',
             gap: '20px',
-            maxWidth: '720px',
+            maxWidth: NAV_WIDTH,
             margin: '0 auto',
             padding: '16px 24px',
           })}

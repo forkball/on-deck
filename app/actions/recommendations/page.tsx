@@ -188,7 +188,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
     const ui = MEDIA_TYPE_UI[mediaType]
 
     return (
-      <Page title="Recommendations" heading="Recommendations" width="wide" displayName={displayName}>
+      <Page heading="Recommendations" width="wide" displayName={displayName}>
         <p mix={css({ margin: 0, color: '#555' })}>
           Rewrites your {ui.attributive} taste profile from what you've logged, then finds picks to try next.
         </p>

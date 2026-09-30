@@ -31,7 +31,7 @@ export function UserWatchedPage(handle: Handle<UserWatchedPageProps>) {
     const heading = `What ${label} has ${ui.pastParticiple} (${noun})`
 
     return (
-      <Page title={heading} heading={heading} displayName={displayName}>
+      <Page heading={heading} displayName={displayName}>
         {/* No actions: this is someone else's log, not yours to edit. */}
         <WatchedList log={movieLog} mediaType={mediaType} returnTo={returnTo} />
 

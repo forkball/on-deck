@@ -17,7 +17,7 @@ export function SignupPage(handle: Handle<SignupPageProps>) {
     const { errors, values } = handle.props
 
     return (
-      <Page title="Sign up" heading="Sign up" width="narrow" authed={false}>
+      <Page heading="Sign up" width="narrow">
         <form
           method="post"
           action={routes.auth.signup.action.href()}

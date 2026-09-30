@@ -140,7 +140,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
 
     return (
       <Page title={label} displayName={displayName}>
-        <h1 mix={css({ margin: '0 0 4px', overflowWrap: 'break-word' })}>{label}</h1>
+        <h1 mix={css({ marginBottom: '4px', overflowWrap: 'break-word' })}>{label}</h1>
         <p mix={css({ margin: '0 0 12px', color: '#555' })}>
           {locked ? (
             <>

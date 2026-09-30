@@ -15,7 +15,7 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
     const { notifications, displayName } = handle.props
 
     return (
-      <Page title="Notifications" heading="Notifications" displayName={displayName}>
+      <Page heading="Notifications" displayName={displayName}>
         {notifications.length === 0 ? (
           <p>
             Nothing yet — you'll hear about it here when someone you follow (and who follows you back) runs a

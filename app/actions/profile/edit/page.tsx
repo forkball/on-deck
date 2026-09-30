@@ -121,25 +121,15 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
   return () => {
     const { values, errors, confirming, settings, saved, displayName, connections, activeTab } = handle.props
 
-    // The default width, same as the profile page, so this heading lands on the
-    // same left edge as the name it edits rather than 80px in from it. The form
-    // keeps its own narrower measure — inputs 640px wide read worse, and that
-    // was what the narrower <main> was really for.
+    // The default width, like the profile page, so this heading lands on the same
+    // left edge as the name it edits. The form keeps its own narrower measure.
     return (
-      <Page
-        title="Settings"
-        heading="Settings"
-        displayName={displayName}
-        toast={
-          <>
-            {saved && <Toast message="Taste settings saved." />}
-            {connections.letterboxd?.justConnected && (
-              <Toast message="Connected. Your recent films are on their way in." />
-            )}
-            {connections.steam.justConnected && <Toast message="Steam account connected." />}
-          </>
-        }
-      >
+      <Page heading="Settings" displayName={displayName}>
+        {saved && <Toast message="Taste settings saved." />}
+        {connections.letterboxd?.justConnected && (
+          <Toast message="Connected. Your recent films are on their way in." />
+        )}
+        {connections.steam.justConnected && <Toast message="Steam account connected." />}
         <Tabs
           idPrefix="profile-edit"
           active={activeTab}

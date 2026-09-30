@@ -184,10 +184,9 @@ export function HomePage(handle: Handle<HomePageProps>) {
 
     return (
       <Page
-        heading={dashboard ? <>Hey, {dashboard.displayName}</> : 'On Deck'}
-        // Signed in, the same 720 the nav uses, so the dashboard lines up with it above.
+        title={null}
+        heading={dashboard ? `Hey, ${dashboard.displayName}` : 'On Deck'}
         width={dashboard ? 'wide' : 'default'}
-        authed={dashboard != null}
         displayName={dashboard?.displayName}
       >
         {dashboard ? (

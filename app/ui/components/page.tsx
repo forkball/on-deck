@@ -3,41 +3,38 @@ import { css } from 'remix/ui'
 
 import type { BackLink } from '../backLink.ts'
 import { Document } from './document.tsx'
-import { Nav } from './nav.tsx'
+import { Nav, NAV_WIDTH } from './nav.tsx'
 
-// The three column widths a page comes in. `wide` is the 720 the nav uses, for
+// The three column widths a page comes in. `wide` is the nav's own width, for
 // pages whose content is itself wide — tabs, result grids, a poster beside its
 // details. `narrow` is a lone form.
-const WIDTHS = {
-  narrow: '420px',
-  default: '640px',
-  wide: '720px',
-} as const
+const MAIN_STYLES = {
+  narrow: css({ maxWidth: '420px', margin: '0 auto', padding: '32px 24px' }),
+  default: css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' }),
+  wide: css({ maxWidth: NAV_WIDTH, margin: '0 auto', padding: '32px 24px' }),
+}
 
-export type PageWidth = keyof typeof WIDTHS
+const backStyle = css({ margin: '0 0 16px' })
+
+export type PageWidth = keyof typeof MAIN_STYLES
 
 export interface PageProps {
   children?: RemixNode
-  // The document title, before the " | On Deck" suffix. Omitted, the tab reads
-  // just "On Deck".
-  title?: string
   // The page's <h1>. Left out by a page that places its heading inside its own
-  // layout (a poster beside the title, a heading that changes with the state
-  // the page is in); `.doodle main h1` in app.css still puts it at the same
-  // height as everyone else's.
-  heading?: RemixNode
+  // layout (a poster beside the title); `.doodle main h1` in app.css still puts
+  // it at the same height as everyone else's.
+  heading?: string
+  // The browser tab's title, before the app name is appended. Defaults to the
+  // heading; null leaves the tab reading just the app name.
+  title?: string | null
   // Where "back" goes, above the heading, when the page was opened from
   // somewhere worth returning to.
   back?: BackLink | null
   width?: PageWidth
-  // Signed-out pages say so; everything else is behind login.
-  authed?: boolean
+  // The signed-in member's name for the nav. Absent on signed-out pages.
   displayName?: string
   // Anything that belongs in <head> beyond the title (a page's own script).
   head?: RemixNode
-  // A toast from the redirect that landed here. Toasts are position: fixed,
-  // so this only decides where the markup goes, not where it shows.
-  toast?: RemixNode
 }
 
 // Every page's frame: nav, the centred column, the back link and the heading,
@@ -45,29 +42,18 @@ export interface PageProps {
 // different height from the next one.
 export function Page(handle: Handle<PageProps>) {
   return () => {
-    const {
-      children,
-      title,
-      heading,
-      back,
-      width = 'default',
-      authed = true,
-      displayName,
-      head,
-      toast,
-    } = handle.props
+    const { children, heading, title = heading, back, width = 'default', displayName, head } = handle.props
 
     return (
-      <Document title={title == null ? undefined : `${title} | On Deck`} head={head}>
-        <Nav authed={authed} displayName={displayName} />
-        {toast}
-        <main mix={css({ maxWidth: WIDTHS[width], margin: '0 auto', padding: '32px 24px' })}>
+      <Document title={title ?? undefined} head={head}>
+        <Nav authed={displayName !== undefined} displayName={displayName} />
+        <main mix={MAIN_STYLES[width]}>
           {back && (
-            <p mix={css({ margin: '0 0 16px' })}>
+            <p mix={backStyle}>
               <a href={back.href}>{back.label}</a>
             </p>
           )}
-          {heading != null && <h1>{heading}</h1>}
+          {heading !== undefined && <h1>{heading}</h1>}
           {children}
         </main>
       </Document>

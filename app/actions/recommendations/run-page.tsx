@@ -126,21 +126,17 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
     const forLabel = ['you', ...run.otherMemberLabels].join(', ')
     const paramLines = describeParams(run.params, run.mediaType)
     const backLink = backLinkFrom(from)
-    const heading = run.name || `Recommendations for ${forLabel}`
 
     return (
       <Page
-        title={heading}
-        heading={heading}
+        heading={run.name || `Recommendations for ${forLabel}`}
         back={backLink}
         width="wide"
         displayName={displayName}
-        toast={
-          prunedOldestRun && (
-            <Toast message="You can keep up to 3 recommendation runs at a time, so your oldest one was removed." />
-          )
-        }
       >
+        {prunedOldestRun && (
+          <Toast message="You can keep up to 3 recommendation runs at a time, so your oldest one was removed." />
+        )}
         <p mix={css({ color: '#555' })}>
           {date}
           {run.name && ` — Recommendations for ${forLabel}`}

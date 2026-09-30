@@ -22,7 +22,7 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
       : routes.users.search.href()
 
     return (
-      <Page title="Find people" heading="Find people" displayName={displayName}>
+      <Page heading="Find people" displayName={displayName}>
         <UserSearchForm
           query={query}
           searchHref={routes.users.search.href()}

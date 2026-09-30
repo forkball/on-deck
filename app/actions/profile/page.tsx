@@ -256,24 +256,16 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
     const savedReturnTo = `${profileHref}?saved=1`
 
     return (
-      <Page
-        title="My profile"
-        heading={displayName}
-        displayName={displayName}
-        toast={
-          <>
-            {/* One at a time: these arrive as query params on a redirect, and no
+      <Page title="My profile" heading={displayName} displayName={displayName}>
+        {/* One at a time: these arrive as query params on a redirect, and no
             action sets more than one of them. */}
-            {rebuildError ? (
-              <Toast message={rebuildError} variant="error" />
-            ) : rebuilt ? (
-              <Toast message="Taste profile rewritten." />
-            ) : saved ? (
-              <Toast message="Saved." />
-            ) : null}
-          </>
-        }
-      >
+        {rebuildError ? (
+          <Toast message={rebuildError} variant="error" />
+        ) : rebuilt ? (
+          <Toast message="Taste profile rewritten." />
+        ) : saved ? (
+          <Toast message="Saved." />
+        ) : null}
         <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
           <a href={routes.profile.following.href()}>{followingCount} following</a> ·{' '}
           <a href={routes.profile.followers.href()}>

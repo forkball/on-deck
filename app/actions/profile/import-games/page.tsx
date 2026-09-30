@@ -74,7 +74,7 @@ export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
     const { displayName, steamId, error, result } = handle.props
 
     return (
-      <Page title="Import from Steam" heading="Import from Steam" displayName={displayName}>
+      <Page heading="Import from Steam" displayName={displayName}>
         {error && <p mix={css({ color: '#b91c1c' })}>{error}</p>}
 
         {result ? (

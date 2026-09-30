@@ -16,7 +16,7 @@ export function GoodreadsImportPage(handle: Handle<GoodreadsImportPageProps>) {
     const { displayName, error, pendingHref } = handle.props
 
     return (
-      <Page title="Import from Goodreads" heading="Import from Goodreads" displayName={displayName}>
+      <Page heading="Import from Goodreads" displayName={displayName}>
         {pendingHref && (
           <div mix={css({ fontSize: '14px', marginBottom: '12px' })}>
             You have an import waiting. <a href={pendingHref}>Pick it back up</a> — uploading again starts
