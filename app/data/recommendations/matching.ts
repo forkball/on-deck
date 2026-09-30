@@ -6,8 +6,8 @@ import {
   type LengthBucket,
 } from '../catalog/provider.ts'
 import { pool } from '../db.ts'
-import { normalizeTitle, NORMALIZED_TITLE_SQL, withoutSubtitle } from '../titles.ts'
-import { parseMediaMetadata } from '../mediaMetadata.ts'
+import { normalizeName, normalizeTitle, withoutSubtitle } from '../titles.ts'
+import { parseMediaMetadata, type MediaMetadata } from '../mediaMetadata.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { requestStructured } from './claude.ts'
 import { CatalogUnavailableError, GenerationError } from './errors.ts'
@@ -674,19 +674,47 @@ export function filterByLength(
 
 const YEAR_TOLERANCE = 1
 
-// Resolves picks against the catalog we already hold, so a provider is only
-// asked about titles we've never seen (~21% of picks are already there).
+// Whether a row we already hold is the work a pick names.
 //
-// The match is tight on purpose: normalised title equality *and* release year
-// within one, since a looser rule confuses same-titled works from different eras
-// (Dune 1984 and 2021).
+// The year settles it for a film, a show or a game: the catalog's year is the work's,
+// and two same-titled works from different eras are different works (Dune 1984 and
+// 2021). For a book the stored year is a *printing* — the same reason decadeComesFromPick
+// exists — so it settles nothing: we hold The Denial of Death as a 2007 edition and a
+// pick for it says 1973, 34 years apart, and the shortcut missed a book it had.
 //
-// A row with no overview counts as a miss — verifyPicksAgainstOverviews judges
-// on plot text, so skipping the provider would skip the only check that catches
-// a wrong match. Only ~12% of books carry one.
+// So the author settles it for a book, which is the one thing a printing can't change.
+// Only where both sides say who wrote it: 66 of 832 book rows carry no author, and for
+// those the year is still the best question available, wrong as it often is.
+function sameWork(mediaType: MediaType, pick: Pick, metadata: MediaMetadata): boolean {
+  if (decadeComesFromPick(mediaType)) {
+    const stored = normalizeName(metadata.creator)
+    const asked = normalizeName(pick.creator)
+    if (stored && asked) return stored === asked
+  }
+
+  return metadata.releaseYear != null && Math.abs(metadata.releaseYear - pick.year) <= YEAR_TOLERANCE
+}
+
+// Resolves picks against the catalog we already hold, so a provider is only asked
+// about titles we've never seen.
 //
-// Raw SQL because the normalisation has to happen in the database. Matches
-// normalizeTitle exactly.
+// Only rows from the provider we would otherwise ask. A book row sourced from Open
+// Library answers with what Open Library knew — no page count, a work-level year, and
+// an id Google Books cannot resolve — so taking it keeps a run on data the app has
+// moved off. 549 of 832 book rows are still Open Library's, which is also why this
+// costs searches rather than saving them until those rows are repointed.
+//
+// A row with no overview counts as a miss — verifyPicksAgainstOverviews judges on plot
+// text, so skipping the provider would skip the only check that catches a wrong match.
+// Only 230 of those 832 rows carry one, which caps what this can do.
+//
+// Titles are compared here rather than in the query. The rule then has one spelling
+// instead of two — it used to be written again as SQL, kept in step with the
+// TypeScript by hand — and it can use titlesMatchOutright, so a stored "The Night
+// Circus: A Novel" answers a pick for "The Night Circus", which string equality in
+// SQL never could. The cost is one extra round trip and the titles for one media type
+// on the wire: 23 kB for books, 26 kB for movies, against a table with no index on
+// title, so the query was always a scan.
 export async function resolveFromCatalog(
   mediaType: MediaType,
   picks: Pick[],
@@ -694,44 +722,42 @@ export async function resolveFromCatalog(
   const resolved = new Map<number, CatalogSearchResult>()
   if (picks.length === 0) return resolved
 
-  const wanted = picks.map((pick) => normalizeTitle(pick.title))
-
-  // Timed alongside the provider calls it exists to avoid, so the saving is
-  // legible rather than assumed.
-  const { rows } = await track('catalog.local', () =>
-    pool.query<{
-      id: number
-      external_id: string
-      title: string
-      metadata: string
-      popularity_score: number | null
-      normalized: string
-    }>(
-      `select id, external_id, title, metadata, popularity_score,
-            ${NORMALIZED_TITLE_SQL} as normalized
-       from media_items
-      where type = $1
-        and ${NORMALIZED_TITLE_SQL} = any($2)`,
-      [mediaType, wanted],
+  // Timed alongside the provider calls it exists to avoid, so the saving is legible
+  // rather than assumed.
+  const { rows: candidates } = await track('catalog.local', () =>
+    pool.query<{ id: number; title: string }>(
+      'select id, title from media_items where type = $1 and external_source = $2',
+      [mediaType, getCatalogProvider(mediaType).sourceName],
     ),
   )
-  if (rows.length === 0) return resolved
+  if (candidates.length === 0) return resolved
 
-  const byTitle = new Map<string, typeof rows>()
-  for (const row of rows) {
-    byTitle.set(row.normalized, [...(byTitle.get(row.normalized) ?? []), row])
-  }
+  const matching = picks.map((pick) =>
+    candidates.filter((row) => titlesMatchOutright(pick.title, row.title)).map((row) => row.id),
+  )
+  const ids = [...new Set(matching.flat())]
+  if (ids.length === 0) return resolved
+
+  // By primary key, and only for the handful whose titles matched, so the metadata —
+  // overviews and image lists, the bulk of the table — is fetched for those alone.
+  const { rows } = await pool.query<{
+    id: number
+    external_id: string
+    title: string
+    metadata: string
+    popularity_score: number | null
+  }>('select id, external_id, title, metadata, popularity_score from media_items where id = any($1)', [ids])
+  const byId = new Map(rows.map((row) => [row.id, row]))
 
   for (const [index, pick] of picks.entries()) {
-    const candidates = byTitle.get(normalizeTitle(pick.title))
-    if (!candidates) continue
+    for (const id of matching[index]!) {
+      const row = byId.get(id)
+      if (!row) continue
 
-    for (const row of candidates) {
       const metadata = parseMediaMetadata(row.metadata)
-      if (metadata.releaseYear == null) continue
-      if (Math.abs(metadata.releaseYear - pick.year) > YEAR_TOLERANCE) continue
       // No overview, no verification — so no shortcut.
       if (!metadata.overview) continue
+      if (!sameWork(mediaType, pick, metadata)) continue
 
       resolved.set(index, {
         externalId: row.external_id,
