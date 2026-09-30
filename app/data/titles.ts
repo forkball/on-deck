@@ -51,3 +51,44 @@ export function withoutSubtitle(title: string): string {
 export function normalizeName(name: string | null | undefined): string {
   return (name ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
 }
+
+// Whether two titles name the same work on their own evidence, for a caller that
+// must not get it wrong. scripts/backfill-google-books.ts repoints a row everyone's
+// log points at, so a false match writes the wrong book into other people's
+// histories.
+//
+// Word sets, not character distance. An edit ratio measures the wrong thing here,
+// and measured it backwards: "Dune House Corrino" against "Dune: The Battle of
+// Corrin" scored 0.52 on shared letters and was accepted — a different novel —
+// while "House Corrino: Dune" against "Dune: House Corrino" scored 0.44 and was
+// rejected. No threshold separates those two, because the metric rewards incidental
+// overlap and penalises reordering, the one difference that doesn't matter.
+export function titlesNameSameWork(a: string, b: string): boolean {
+  const na = normalizeTitle(a)
+  const nb = normalizeTitle(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+
+  // The same words in a different order, which is how two catalogs disagree about
+  // where a series name belongs: "Twelfth Night, or What You Will" against
+  // "Twelfth Night: Or, What You Will".
+  const words = new Set(na.split(' '))
+  const other = new Set(nb.split(' '))
+  if (words.size !== other.size) return false
+  for (const word of words) if (!other.has(word)) return false
+  return true
+}
+
+// Whether every word of one title appears in the other. Not sufficient on its own,
+// which is the whole reason it is separate: "The Goldfinch" sits inside "The
+// Goldfinch: A Novel", and "Dune" sits inside "Dune: House Harkonnen" exactly the
+// same way. Nothing in the words says which of those two is a subtitle and which is
+// a different novel — withoutSubtitle can't tell either, since it only knows where
+// the colon is. A caller pairs this with something that can: the author, who is
+// Frank Herbert for one Dune and Brian Herbert for the other.
+export function titleWordsFitInside(shorter: string, longer: string): boolean {
+  const inner = normalizeTitle(shorter)
+  const outer = new Set(normalizeTitle(longer).split(' '))
+  if (!inner || outer.size === 0) return false
+  return inner.split(' ').every((word) => outer.has(word))
+}
