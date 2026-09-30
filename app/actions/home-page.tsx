@@ -5,9 +5,8 @@ import { FeedAutoLoad } from '../browser/feed-auto-load.tsx'
 import type { FeedCursor, FeedItem } from '../data/feed.ts'
 import type { LuckyState } from '../data/recommendations/lucky.ts'
 import { luckyRecommendationsHref, routes } from '../routes.ts'
-import { Document } from '../ui/components/document.tsx'
+import { Page } from '../ui/components/page.tsx'
 import { LUCKY_CARD_BOX, LUCKY_PICK_LABEL, LuckyPickCard } from './lucky-pick-card.tsx'
-import { Nav } from '../ui/components/nav.tsx'
 import { FEED_LIST_ID, FeedList } from './activity-feed.tsx'
 
 export interface HomeDashboard {
@@ -146,7 +145,6 @@ function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
 function Pitch() {
   return () => (
     <>
-      <h1>On Deck</h1>
       <p>
         A media taste profile for you (and your group) — movies, TV, books, and games — with a recommender
         that knows what you actually like.
@@ -185,34 +183,29 @@ export function HomePage(handle: Handle<HomePageProps>) {
     const { dashboard } = handle.props
 
     return (
-      <Document title="On Deck">
-        <Nav authed={dashboard != null} displayName={dashboard?.displayName} />
-        <main
-          mix={css({
-            // The same 720 the nav uses, so the page lines up with it above.
-            maxWidth: dashboard ? '720px' : '640px',
-            margin: '0 auto',
-            padding: dashboard ? '32px 24px' : '48px 24px',
-          })}
-        >
-          {dashboard ? (
-            <>
-              <h1 mix={css({ margin: 0 })}>Hey, {dashboard.displayName}</h1>
-              <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '16px' })}>
-                <a href={routes.media.href()} class="doodle-border" mix={CTA_BUTTON}>
-                  Search for media
-                </a>
-                <a href={routes.recommendations.index.href()} class="doodle-border" mix={CTA_BUTTON}>
-                  Get recommendations
-                </a>
-              </div>
-              <Dashboard dashboard={dashboard} />
-            </>
-          ) : (
-            <Pitch />
-          )}
-        </main>
-      </Document>
+      <Page
+        heading={dashboard ? <>Hey, {dashboard.displayName}</> : 'On Deck'}
+        // Signed in, the same 720 the nav uses, so the dashboard lines up with it above.
+        width={dashboard ? 'wide' : 'default'}
+        authed={dashboard != null}
+        displayName={dashboard?.displayName}
+      >
+        {dashboard ? (
+          <>
+            <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '12px' })}>
+              <a href={routes.media.href()} class="doodle-border" mix={CTA_BUTTON}>
+                Search for media
+              </a>
+              <a href={routes.recommendations.index.href()} class="doodle-border" mix={CTA_BUTTON}>
+                Get recommendations
+              </a>
+            </div>
+            <Dashboard dashboard={dashboard} />
+          </>
+        ) : (
+          <Pitch />
+        )}
+      </Page>
     )
   }
 }

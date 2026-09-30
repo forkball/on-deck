@@ -3,8 +3,7 @@ import { css } from 'remix/ui'
 
 import type { SteamImportResult } from '../../../data/imports/steam.ts'
 import { routes } from '../../../routes.ts'
-import { Document } from '../../../ui/components/document.tsx'
-import { Nav } from '../../../ui/components/nav.tsx'
+import { Page } from '../../../ui/components/page.tsx'
 
 export interface SteamImportPageProps {
   displayName: string
@@ -75,45 +74,40 @@ export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
     const { displayName, steamId, error, result } = handle.props
 
     return (
-      <Document title="Import from Steam | On Deck">
-        <Nav authed={true} displayName={displayName} />
-        <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>Import from Steam</h1>
+      <Page title="Import from Steam" heading="Import from Steam" displayName={displayName}>
+        {error && <p mix={css({ color: '#b91c1c' })}>{error}</p>}
 
-          {error && <p mix={css({ color: '#b91c1c' })}>{error}</p>}
-
-          {result ? (
-            <ImportSummary result={result} />
-          ) : steamId ? (
-            <>
-              <p mix={css({ color: '#555' })}>
-                Connected to Steam account <code>{steamId}</code>. Importing brings in the games you own,
-                using your Steam playtime to tell them apart: anything you've played is logged as played, and
-                anything you've never launched goes on your want-to-play list.
-              </p>
-              <p mix={css({ fontSize: '13px', color: '#888' })}>
-                A large library takes a few minutes — each game is looked up individually. Leave the tab open
-                until it finishes.
-              </p>
-              <div mix={css({ marginTop: '16px' })}>
-                <form method="post" action={routes.profile.importGames.upload.href()}>
-                  <button type="submit">Import my library</button>
-                </form>
-              </div>
-            </>
-          ) : (
-            <>
-              <p mix={css({ color: '#555' })}>
-                No Steam account connected yet. Importing your library needs one, since the library is read
-                from Steam rather than uploaded.
-              </p>
-              <p>
-                <a href={routes.profile.edit.index.href()}>Connect Steam in settings →</a>
-              </p>
-            </>
-          )}
-        </main>
-      </Document>
+        {result ? (
+          <ImportSummary result={result} />
+        ) : steamId ? (
+          <>
+            <p mix={css({ color: '#555' })}>
+              Connected to Steam account <code>{steamId}</code>. Importing brings in the games you own, using
+              your Steam playtime to tell them apart: anything you've played is logged as played, and anything
+              you've never launched goes on your want-to-play list.
+            </p>
+            <p mix={css({ fontSize: '13px', color: '#888' })}>
+              A large library takes a few minutes — each game is looked up individually. Leave the tab open
+              until it finishes.
+            </p>
+            <div mix={css({ marginTop: '16px' })}>
+              <form method="post" action={routes.profile.importGames.upload.href()}>
+                <button type="submit">Import my library</button>
+              </form>
+            </div>
+          </>
+        ) : (
+          <>
+            <p mix={css({ color: '#555' })}>
+              No Steam account connected yet. Importing your library needs one, since the library is read from
+              Steam rather than uploaded.
+            </p>
+            <p>
+              <a href={routes.profile.edit.index.href()}>Connect Steam in settings →</a>
+            </p>
+          </>
+        )}
+      </Page>
     )
   }
 }

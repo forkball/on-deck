@@ -164,14 +164,15 @@
 }
 
 /* Every page's title starts at the same height: flush with the top of <main>,
-   so the 32px padding every page gives <main> is the only gap under the nav.
-   Left to the browser, an <h1> brings a top margin of 0.67em (~21px) with it,
-   so the pages that zeroed it and the ones that didn't put their titles at two
-   different heights, and moving between nav tabs made the heading jump.
+   so the 32px padding Page (app/ui/components/page.tsx) gives <main> is the
+   only gap under the nav. Left to the browser, an <h1> brings a top margin of
+   0.67em (~21px) with it. Here rather than on Page's own <h1> so it also holds
+   for the pages that place their heading inside their own layout — the media
+   detail page, a member's profile, the import review.
 
    Only the top is set. The space under a title is each page's call — a detail
-   page's title sits 4px over its byline, the search page's 16px over its tabs —
-   and those are css() rules, which this unlayered one would override. */
+   page's title sits 4px over its byline — and those are css() rules, which
+   this unlayered one would override. */
 .doodle main h1 {
   margin-top: 0;
 }

@@ -12,10 +12,9 @@ import {
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { Toast } from '../../ui/components/toast.tsx'
 import { routes } from '../../routes.ts'
-import { Document } from '../../ui/components/document.tsx'
+import { Page } from '../../ui/components/page.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
 import { PROFILE_TABS } from './edit/page.tsx'
@@ -257,117 +256,121 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
     const savedReturnTo = `${profileHref}?saved=1`
 
     return (
-      <Document title="My profile | On Deck">
-        <Nav authed={true} displayName={displayName} />
-        {/* One at a time: these arrive as query params on a redirect, and no
+      <Page
+        title="My profile"
+        heading={displayName}
+        displayName={displayName}
+        toast={
+          <>
+            {/* One at a time: these arrive as query params on a redirect, and no
             action sets more than one of them. */}
-        {rebuildError ? (
-          <Toast message={rebuildError} variant="error" />
-        ) : rebuilt ? (
-          <Toast message="Taste profile rewritten." />
-        ) : saved ? (
-          <Toast message="Saved." />
-        ) : null}
-        <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>{displayName}</h1>
-          <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
-            <a href={routes.profile.following.href()}>{followingCount} following</a> ·{' '}
-            <a href={routes.profile.followers.href()}>
-              {followersCount} follower{followersCount === 1 ? '' : 's'}
-            </a>
-          </p>
+            {rebuildError ? (
+              <Toast message={rebuildError} variant="error" />
+            ) : rebuilt ? (
+              <Toast message="Taste profile rewritten." />
+            ) : saved ? (
+              <Toast message="Saved." />
+            ) : null}
+          </>
+        }
+      >
+        <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
+          <a href={routes.profile.following.href()}>{followingCount} following</a> ·{' '}
+          <a href={routes.profile.followers.href()}>
+            {followersCount} follower{followersCount === 1 ? '' : 's'}
+          </a>
+        </p>
 
-          {waitingImports.map((waiting) => (
-            <p
-              key={waiting.href}
-              mix={css({
-                border: '1px solid #d9cfbe',
-                borderLeft: '4px solid #3E5C76',
-                borderRadius: '8px',
-                background: '#fbf4ea',
-                padding: '10px 14px',
-                margin: '0 0 16px',
-                fontSize: '14px',
-              })}
-            >
-              {waiting.matching ? (
-                <>
-                  Your {waiting.noun} import is still matching. <a href={waiting.href}>See progress</a>
-                </>
-              ) : (
-                <>
-                  Your {waiting.noun} import is waiting for review. <a href={waiting.href}>Continue it</a>
-                </>
-              )}
-            </p>
-          ))}
-
-          {/* Rendered the way other people see it on users/show-page —
-              editing it lives under Settings in the nav. */}
-          {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
-
-          <MediaTabs
-            idPrefix="profile"
-            active={activeTab}
-            panels={Object.fromEntries(
-              ACTIVE_MEDIA_TYPES.map((type) => {
-                const ui = MEDIA_TYPE_UI[type]
-                const source = sourceLink(type, sources)
-                const { summary, profileUpdatedAt, log, total } = media[type]
-                const seeAllHref =
-                  type === DEFAULT_MEDIA_TYPE
-                    ? routes.profile.watched.href()
-                    : `${routes.profile.watched.href()}?type=${type}`
-
-                return [
-                  type,
-                  <>
-                    <TasteProfileSummary
-                      label={`My ${ui.attributive} taste profile`}
-                      summary={summary}
-                      updatedAt={profileUpdatedAt}
-                      mediaType={type}
-                      settings={settings}
-                      loggedCount={total}
-                      rebuildsLeft={rebuildsLeft}
-                    />
-                    {/* Each importer only understands one medium, so the
-                        entry point lives on that medium's tab. */}
-                    {source ? (
-                      <div
-                        mix={css({
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'baseline',
-                          gap: '12px',
-                        })}
-                      >
-                        <h2>What I've {ui.pastParticiple}</h2>
-                        <a href={source.href} mix={css({ fontSize: '13px', textAlign: 'right' })}>
-                          {source.label}
-                        </a>
-                      </div>
-                    ) : (
-                      <h2>What I've {ui.pastParticiple}</h2>
-                    )}
-                    <LoggedList
-                      log={log}
-                      total={total}
-                      // Carries the tab, so "back" returns to the one you left.
-                      detailHref={(id) => withReturnTo(ui.hrefs.show(id), `${profileHref}?tab=${type}`)}
-                      seeAllHref={seeAllHref}
-                      emptyHref={ui.hrefs.search()}
-                      emptyLabel={`search for a ${ui.itemNoun}`}
-                      returnTo={savedReturnTo}
-                      mediaType={type}
-                    />
-                  </>,
-                ]
-              }),
+        {waitingImports.map((waiting) => (
+          <p
+            key={waiting.href}
+            mix={css({
+              border: '1px solid #d9cfbe',
+              borderLeft: '4px solid #3E5C76',
+              borderRadius: '8px',
+              background: '#fbf4ea',
+              padding: '10px 14px',
+              margin: '0 0 16px',
+              fontSize: '14px',
+            })}
+          >
+            {waiting.matching ? (
+              <>
+                Your {waiting.noun} import is still matching. <a href={waiting.href}>See progress</a>
+              </>
+            ) : (
+              <>
+                Your {waiting.noun} import is waiting for review. <a href={waiting.href}>Continue it</a>
+              </>
             )}
-          />
-        </main>
-      </Document>
+          </p>
+        ))}
+
+        {/* Rendered the way other people see it on users/show-page —
+              editing it lives under Settings in the nav. */}
+        {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
+
+        <MediaTabs
+          idPrefix="profile"
+          active={activeTab}
+          panels={Object.fromEntries(
+            ACTIVE_MEDIA_TYPES.map((type) => {
+              const ui = MEDIA_TYPE_UI[type]
+              const source = sourceLink(type, sources)
+              const { summary, profileUpdatedAt, log, total } = media[type]
+              const seeAllHref =
+                type === DEFAULT_MEDIA_TYPE
+                  ? routes.profile.watched.href()
+                  : `${routes.profile.watched.href()}?type=${type}`
+
+              return [
+                type,
+                <>
+                  <TasteProfileSummary
+                    label={`My ${ui.attributive} taste profile`}
+                    summary={summary}
+                    updatedAt={profileUpdatedAt}
+                    mediaType={type}
+                    settings={settings}
+                    loggedCount={total}
+                    rebuildsLeft={rebuildsLeft}
+                  />
+                  {/* Each importer only understands one medium, so the
+                        entry point lives on that medium's tab. */}
+                  {source ? (
+                    <div
+                      mix={css({
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'baseline',
+                        gap: '12px',
+                      })}
+                    >
+                      <h2>What I've {ui.pastParticiple}</h2>
+                      <a href={source.href} mix={css({ fontSize: '13px', textAlign: 'right' })}>
+                        {source.label}
+                      </a>
+                    </div>
+                  ) : (
+                    <h2>What I've {ui.pastParticiple}</h2>
+                  )}
+                  <LoggedList
+                    log={log}
+                    total={total}
+                    // Carries the tab, so "back" returns to the one you left.
+                    detailHref={(id) => withReturnTo(ui.hrefs.show(id), `${profileHref}?tab=${type}`)}
+                    seeAllHref={seeAllHref}
+                    emptyHref={ui.hrefs.search()}
+                    emptyLabel={`search for a ${ui.itemNoun}`}
+                    returnTo={savedReturnTo}
+                    mediaType={type}
+                  />
+                </>,
+              ]
+            }),
+          )}
+        />
+      </Page>
     )
   }
 }

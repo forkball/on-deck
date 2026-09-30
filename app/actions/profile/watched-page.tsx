@@ -3,9 +3,8 @@ import { css } from 'remix/ui'
 
 import type { InteractionStatus, listUserMediaLog } from '../../data/mediaItems.ts'
 import { routes } from '../../routes.ts'
-import { Document } from '../../ui/components/document.tsx'
+import { Page } from '../../ui/components/page.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedList } from '../../ui/components/watched-list.tsx'
 import { Field } from '../../ui/shared/field.tsx'
@@ -37,73 +36,68 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
     const heading = `My ${ui.attributive} log`
 
     return (
-      <Document title={`${heading} | On Deck`}>
-        <Nav authed={true} displayName={displayName} />
-        <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>{heading}</h1>
-
-          {/* GET, so a filtered list is a URL you can link to or reload.
+      <Page title={heading} heading={heading} displayName={displayName}>
+        {/* GET, so a filtered list is a URL you can link to or reload.
               `page` is deliberately not carried across: changing the filter
               changes how many pages there are, so it starts again at the
               first. The type is preserved, since it's which tab you came
               from rather than part of the filter. */}
-          <form
-            method="get"
-            action={routes.profile.watched.href()}
-            mix={css({ display: 'flex', alignItems: 'flex-end', gap: '8px', margin: '0 0 24px' })}
-          >
-            {mediaType !== DEFAULT_MEDIA_TYPE && <input type="hidden" name="type" value={mediaType} />}
-            {/* Field spans its container by design, so it needs a bounded box
+        <form
+          method="get"
+          action={routes.profile.watched.href()}
+          mix={css({ display: 'flex', alignItems: 'flex-end', gap: '8px', margin: '0 0 24px' })}
+        >
+          {mediaType !== DEFAULT_MEDIA_TYPE && <input type="hidden" name="type" value={mediaType} />}
+          {/* Field spans its container by design, so it needs a bounded box
                 of its own here or it squeezes the button off the row. */}
-            <div mix={css({ flex: '0 1 200px' })}>
-              <Field label="Status">
-                {/* `selected` rather than defaultValue — see StatusSelect. */}
-                <select name="status">
-                  <option value="" selected={status === null}>
-                    All
+          <div mix={css({ flex: '0 1 200px' })}>
+            <Field label="Status">
+              {/* `selected` rather than defaultValue — see StatusSelect. */}
+              <select name="status">
+                <option value="" selected={status === null}>
+                  All
+                </option>
+                {statusOptionsFor(mediaType).map((option) => (
+                  <option key={option.value} value={option.value} selected={option.value === status}>
+                    {option.label}
                   </option>
-                  {statusOptionsFor(mediaType).map((option) => (
-                    <option key={option.value} value={option.value} selected={option.value === status}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <button type="submit">Filter</button>
-          </form>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <button type="submit">Filter</button>
+        </form>
 
-          {movieLog.length === 0 && (
-            <p mix={css({ color: '#555' })}>
-              Nothing in your {ui.attributive} log
-              {status ? ` under "${statusLabelsFor(mediaType)[status]}"` : ''}.
-            </p>
-          )}
+        {movieLog.length === 0 && (
+          <p mix={css({ color: '#555' })}>
+            Nothing in your {ui.attributive} log
+            {status ? ` under "${statusLabelsFor(mediaType)[status]}"` : ''}.
+          </p>
+        )}
 
-          {/* Your own log, so every row can be edited in place. */}
-          <WatchedList
-            log={movieLog}
-            mediaType={mediaType}
-            returnTo={returnTo}
-            actions={({ interaction, item }) => (
-              <MediaLogEditModal
-                mediaType={mediaType}
-                interaction={interaction}
-                title={item?.title ?? 'Unknown title'}
-                returnTo={returnTo}
-              />
-            )}
-          />
-
-          {totalPages > 1 && (
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              pageHref={(p) => `${routes.profile.watched.href()}?page=${p}${filterQuery}`}
+        {/* Your own log, so every row can be edited in place. */}
+        <WatchedList
+          log={movieLog}
+          mediaType={mediaType}
+          returnTo={returnTo}
+          actions={({ interaction, item }) => (
+            <MediaLogEditModal
+              mediaType={mediaType}
+              interaction={interaction}
+              title={item?.title ?? 'Unknown title'}
+              returnTo={returnTo}
             />
           )}
-        </main>
-      </Document>
+        />
+
+        {totalPages > 1 && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            pageHref={(p) => `${routes.profile.watched.href()}?page=${p}${filterQuery}`}
+          />
+        )}
+      </Page>
     )
   }
 }

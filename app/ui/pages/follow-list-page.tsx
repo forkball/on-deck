@@ -4,8 +4,7 @@ import { css } from 'remix/ui'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { Document } from '../components/document.tsx'
-import { Nav } from '../components/nav.tsx'
+import { Page } from '../components/page.tsx'
 
 export interface FollowListPageProps {
   title: string
@@ -33,74 +32,69 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
       handle.props
 
     return (
-      <Document title={`${title} | On Deck`}>
-        <Nav authed={true} displayName={displayName} />
-        <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>{heading}</h1>
-
-          {users.length === 0 ? (
-            <p>{emptyMessage}</p>
-          ) : (
-            <ul
-              mix={css({
-                listStyle: 'none',
-                margin: 0,
-                padding: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-              })}
-            >
-              {users.map((user) => {
-                const following = followingByUserId.get(user.id) ?? false
-                const isViewer = user.id === viewerId
-                const canView = !user.is_private || following || isViewer
-                return (
-                  <li
-                    key={user.id}
-                    mix={css({
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '12px',
-                      border: '1px solid #ddd',
-                      borderRadius: '8px',
-                      padding: '12px 16px',
-                    })}
-                  >
-                    <div mix={css({ minWidth: 0, overflowWrap: 'break-word' })}>
-                      {canView ? (
-                        <a href={routes.users.show.href({ userId: String(user.id) })}>
-                          <strong>{displayLabel(user)}</strong>
-                        </a>
-                      ) : (
+      <Page title={title} heading={heading} displayName={displayName}>
+        {users.length === 0 ? (
+          <p>{emptyMessage}</p>
+        ) : (
+          <ul
+            mix={css({
+              listStyle: 'none',
+              margin: 0,
+              padding: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            })}
+          >
+            {users.map((user) => {
+              const following = followingByUserId.get(user.id) ?? false
+              const isViewer = user.id === viewerId
+              const canView = !user.is_private || following || isViewer
+              return (
+                <li
+                  key={user.id}
+                  mix={css({
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    padding: '12px 16px',
+                  })}
+                >
+                  <div mix={css({ minWidth: 0, overflowWrap: 'break-word' })}>
+                    {canView ? (
+                      <a href={routes.users.show.href({ userId: String(user.id) })}>
                         <strong>{displayLabel(user)}</strong>
-                      )}
-                    </div>
-
-                    {isViewer ? (
-                      <span mix={css({ fontSize: '13px', color: '#555', flexShrink: 0 })}>You</span>
+                      </a>
                     ) : (
-                      <form
-                        method="post"
-                        mix={css({ flexShrink: 0 })}
-                        action={
-                          following
-                            ? routes.users.unfollow.href({ userId: String(user.id) })
-                            : routes.users.follow.href({ userId: String(user.id) })
-                        }
-                      >
-                        <input type="hidden" name="return_to" value={returnTo} />
-                        <button type="submit">{following ? 'Unfollow' : 'Follow'}</button>
-                      </form>
+                      <strong>{displayLabel(user)}</strong>
                     )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </main>
-      </Document>
+                  </div>
+
+                  {isViewer ? (
+                    <span mix={css({ fontSize: '13px', color: '#555', flexShrink: 0 })}>You</span>
+                  ) : (
+                    <form
+                      method="post"
+                      mix={css({ flexShrink: 0 })}
+                      action={
+                        following
+                          ? routes.users.unfollow.href({ userId: String(user.id) })
+                          : routes.users.follow.href({ userId: String(user.id) })
+                      }
+                    >
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <button type="submit">{following ? 'Unfollow' : 'Follow'}</button>
+                    </form>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Page>
     )
   }
 }
