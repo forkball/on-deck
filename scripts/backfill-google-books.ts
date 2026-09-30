@@ -54,7 +54,7 @@ import { rematchMediaItem } from '../app/data/mediaItems.ts'
 import { fieldedBookQuery, getBookById, searchGoogleBooksOnly } from '../app/data/catalog/googleBooks.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from '../app/data/catalog/tmdb.ts'
 import { runBounded } from '../app/data/imports/csv.ts'
-import { normalizeName, normalizeTitle, withoutSubtitle } from '../app/data/titles.ts'
+import { normalizeName, titleWordsFitInside, titlesNameSameWork } from '../app/data/titles.ts'
 import { parseMediaMetadata } from '../app/data/mediaMetadata.ts'
 
 types.setTypeParser(types.builtins.INT8, (value) => parseInt(value, 10))
@@ -135,34 +135,6 @@ async function searchGoogleBooksTwice(query: string): Promise<CatalogSearchResul
   return spendGoogleBooksRequest(() => searchGoogleBooksOnly(query))
 }
 
-// The title rules themselves come from app/data/titles.ts, which imports nothing —
-// unlike app/data/recommendations/matching.ts, whose module scope builds the app's db
-// pool and the Claude client. The similarity check below stays local for that reason.
-function levenshteinDistance(a: string, b: string): number {
-  const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0))
-  for (let i = 0; i <= a.length; i++) dp[i][0] = i
-  for (let j = 0; j <= b.length; j++) dp[0][j] = j
-  for (let i = 1; i <= a.length; i++) {
-    for (let j = 1; j <= b.length; j++) {
-      dp[i][j] =
-        a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
-    }
-  }
-  return dp[a.length][b.length]
-}
-
-const TITLE_SIMILARITY_THRESHOLD = 0.5
-
-function titlesLikelyMatch(a: string, b: string): boolean {
-  const na = normalizeTitle(a)
-  const nb = normalizeTitle(b)
-  if (!na || !nb) return false
-  if (na === nb) return true
-  if (na === withoutSubtitle(b) || withoutSubtitle(a) === nb) return true
-  const distance = levenshteinDistance(na, nb)
-  return 1 - distance / Math.max(na.length, nb.length) >= TITLE_SIMILARITY_THRESHOLD
-}
-
 const OPEN_LIBRARY_BASE = 'https://openlibrary.org'
 const FETCH_ATTEMPTS = 3
 const RETRY_BASE_MS = 400
@@ -222,7 +194,7 @@ async function findIsbnForWork(workExternalId: string): Promise<string | null> {
   }
 
   // No English-tagged edition carried an ISBN — fall back to the first one
-  // that has any, same as before. titlesLikelyMatch still gates the result,
+  // that has any, same as before. titlesNameSameWork still gates the result,
   // so a foreign match here gets caught rather than written.
   for (const edition of entries) {
     const isbn = pickIsbn(edition)
@@ -283,6 +255,23 @@ async function recordAttempt(line: ReportLine): Promise<void> {
   )
 }
 
+// Whether a candidate is the row's book. The titles agreeing on their own is enough;
+// short of that the author has to agree too, which is what separates a subtitle from
+// a sequel — "Dune" fits inside "Dune: House Harkonnen" as neatly as "The Goldfinch"
+// fits inside "The Goldfinch: A Novel", and only the author says which is which.
+//
+// The same rule the recommendation pipeline settled on for books in #177: a reprint
+// changes the year, the subtitle and the cover, and not who wrote it.
+function isSameBook(row: Row, candidate: CatalogSearchResult): boolean {
+  if (titlesNameSameWork(row.title, candidate.title)) return true
+
+  const stored = normalizeName(parseMediaMetadata(row.metadata).creator)
+  const found = normalizeName(candidate.creator)
+  if (!stored || !found || stored !== found) return false
+
+  return titleWordsFitInside(row.title, candidate.title) || titleWordsFitInside(candidate.title, row.title)
+}
+
 // The second attempt, for a row an ISBN couldn't place. Accepted only when the
 // author agrees as well as the title: a title on its own is exactly what this
 // script refuses to repoint a row on, and the author is the one thing a reprint
@@ -298,8 +287,7 @@ async function findByTitleAndAuthor(row: Row): Promise<CatalogSearchResult | nul
   const candidates = await searchGoogleBooksTwice(query)
   return (
     candidates.find(
-      (candidate) =>
-        titlesLikelyMatch(row.title, candidate.title) && normalizeName(candidate.creator) === asked,
+      (candidate) => isSameBook(row, candidate) && normalizeName(candidate.creator) === asked,
     ) ?? null
   )
 }
@@ -378,7 +366,7 @@ async function main() {
           if (!first) {
             missed = 'no-google-hit'
             detail = `ISBN ${isbn} — no Google Books hit`
-          } else if (!titlesLikelyMatch(row.title, first.title)) {
+          } else if (!isSameBook(row, first)) {
             missed = 'title-mismatch'
             detail = `ISBN ${isbn} matched "${first.title}", too different from "${row.title}"`
           } else {
