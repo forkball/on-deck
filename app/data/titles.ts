@@ -33,15 +33,6 @@ export function normalizeTitle(title: string): string {
   )
 }
 
-// The same rule for Postgres to run, because resolveFromCatalog compares a stored
-// row's title to a pick's inside the query — in a select list and in a filter, so it
-// has to agree with itself as well as with the function above.
-// test/catalog-shortcut.test.ts is what holds the three spellings together, and it
-// needs a database, so it is the weakest link in this arrangement: see the note in
-// resolveFromCatalog about doing the comparison in TypeScript instead.
-export const NORMALIZED_TITLE_SQL =
-  "btrim(regexp_replace(regexp_replace(replace(lower(title), '&', ' and '), '[^a-z0-9[:space:]]', '', 'g'), '\\s+', ' ', 'g'))"
-
 // Where a subtitle starts, for comparing the main title alone. Stripped at the
 // separator rather than by prefix: "Foundation" is a prefix of "Foundation and
 // Empire", a different novel.
@@ -52,4 +43,11 @@ export const NORMALIZED_TITLE_SQL =
 export function withoutSubtitle(title: string): string {
   const [main] = title.split(/\s*[:–—]\s*/)
   return normalizeTitle(main ?? title)
+}
+
+// How a person's name is compared. Spaces go too, unlike a title: catalogs and
+// models disagree about how to space initials — "J.R.R. Tolkien" against "J. R. R.
+// Tolkien" — and a name is one token to a reader either way.
+export function normalizeName(name: string | null | undefined): string {
+  return (name ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
 }
