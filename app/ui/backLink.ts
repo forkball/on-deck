@@ -21,8 +21,22 @@ export function withReturnTo(href: string, returnTo: string): string {
 // same-origin relative path is let through. Otherwise every "back" link and
 // every redirect after a form post is an open redirect. The one copy of this
 // rule: the login form and the where-to-watch picker redirect with it too.
+//
+// Resolved rather than pattern-matched, because the browser resolves it too:
+// it reads `\` as `/` and drops tabs and newlines, so a path that doesn't start
+// with `//` as written can still start with `//` once parsed. Resolving against
+// a placeholder origin and checking we are still on it catches every such
+// spelling at once. The value itself is returned unchanged — it is the same
+// URL either way, and re-serialising would re-encode what the caller wrote.
+const RESOLVE_BASE = 'http://return-path.invalid'
+
 export function safeReturnPath(value: string | null | undefined): string | null {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return null
+  if (!value || !value.startsWith('/')) return null
+  try {
+    if (new URL(value, RESOLVE_BASE).origin !== RESOLVE_BASE) return null
+  } catch {
+    return null
+  }
   return value
 }
 
