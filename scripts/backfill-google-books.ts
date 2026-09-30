@@ -6,8 +6,16 @@
 // finding the old one.
 //
 // Dry run by default — prints what it would do without writing anything.
-// Pass --apply to actually update rows. Pass --limit N to try it on a
-// handful first.
+// Pass --apply to actually update rows. Pass --limit=N to try it on a handful
+// first, --max-requests=N to stop at a spend you choose, and --retry-settled to
+// re-ask about rows a previous run already gave a verdict on.
+//
+// Every attempt is recorded in book_backfill_attempts, and a row with a settled
+// verdict is left out of the next run. Without that, the rows this can't match
+// keep external_source = 'openlibrary' and so stay in the set it selects: over
+// half of them, measured, which made a second run spend most of its quota
+// re-deriving failures it already knew. Google Books' quota is shared with the
+// live app, so a wasted request here is one a person's search doesn't get.
 //
 // No stored ISBN exists on these rows to anchor a match, so this recovers
 // one from Open Library's own edition data first and matches Google Books by
@@ -15,6 +23,15 @@
 // overwrite a row's metadata (poster, description, page count) while a
 // user's rating/notes stay attached to it. Rows that don't clear an ISBN and
 // a title sanity check are left untouched rather than forced.
+//
+// Where no ISBN turns up, or the one that does leads to a different book, there
+// is a second attempt by title and author — `intitle:`/`inauthor:`, which is a
+// question precise enough to be worth asking (app/data/catalog/googleBooks.ts).
+// It has to clear the title check *and* the author, since a title alone is what
+// this refuses to match on. Open Library's ISBN is often an edition in another
+// language: "La Mort heureuse" resolves to an ISBN for "A Happy Death", which
+// fails the title check and leaves the row untouched though Google holds the
+// French edition too.
 //
 // Deliberately its own pool rather than the app's (app/data/db.ts) — see
 // db/migrate.ts for why.
@@ -24,19 +41,29 @@ import { Pool, types } from 'pg'
 import { createDatabase } from 'remix/data-table'
 import { createPostgresDatabaseAdapter } from 'remix/data-table/postgres'
 
-import { mediaItems, type MediaItem } from '../app/data/schema.ts'
 import { rematchMediaItem } from '../app/data/mediaItems.ts'
-import { getBookById, searchGoogleBooksOnly } from '../app/data/catalog/googleBooks.ts'
+import { fieldedBookQuery, getBookById, searchGoogleBooksOnly } from '../app/data/catalog/googleBooks.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from '../app/data/catalog/tmdb.ts'
 import { runBounded } from '../app/data/imports/csv.ts'
-import { normalizeTitle, withoutSubtitle } from '../app/data/titles.ts'
+import { normalizeName, normalizeTitle, withoutSubtitle } from '../app/data/titles.ts'
+import { parseMediaMetadata } from '../app/data/mediaMetadata.ts'
 
 types.setTypeParser(types.builtins.INT8, (value) => parseInt(value, 10))
 types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value))
 
 const APPLY = process.argv.includes('--apply')
-const limitArg = process.argv.find((arg) => arg.startsWith('--limit='))
-const LIMIT = limitArg ? Number(limitArg.slice('--limit='.length)) : undefined
+const RETRY_SETTLED = process.argv.includes('--retry-settled')
+
+function numericFlag(name: string): number | undefined {
+  const arg = process.argv.find((candidate) => candidate.startsWith(`--${name}=`))
+  return arg ? Number(arg.slice(name.length + 3)) : undefined
+}
+
+const LIMIT = numericFlag('limit')
+// A ceiling on Google Books requests for this run, counted across both the
+// search and the by-id lookup that applying a match costs. Rows are left for the
+// next run rather than half-done: the budget is checked before a row starts.
+const MAX_REQUESTS = numericFlag('max-requests')
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const db = createDatabase(createPostgresDatabaseAdapter(pool))
@@ -63,6 +90,37 @@ async function throttleGoogleBooks(): Promise<void> {
       setTimeout(resolve, GOOGLE_BOOKS_RATE_WINDOW_MS - (now - googleBooksCallTimes[0])),
     )
   }
+}
+
+// The budget, alongside the window above. The window keeps a run under Google's
+// per-minute cap; this is what keeps one run from taking the whole day's quota,
+// which the live app draws on too. Checked before a row starts rather than before
+// each request, so a row in flight finishes rather than being left half-applied —
+// a run can overshoot by the two requests one row costs.
+let requestsSpent = 0
+
+function budgetSpent(): boolean {
+  return MAX_REQUESTS != null && requestsSpent >= MAX_REQUESTS
+}
+
+async function spendGoogleBooksRequest<T>(work: () => Promise<T>): Promise<T> {
+  await throttleGoogleBooks()
+  requestsSpent++
+  return work()
+}
+
+// An empty `items` from Google Books is not reliably an answer: measured twice in
+// twenty searches, with the same query returning results moments later. Now that a
+// verdict is recorded and honoured, believing the first empty response writes the
+// row off for good — so it is asked a second time before that.
+const EMPTY_RETRY_DELAY_MS = 1_000
+
+async function searchGoogleBooksTwice(query: string): Promise<CatalogSearchResult[]> {
+  const first = await spendGoogleBooksRequest(() => searchGoogleBooksOnly(query))
+  if (first.length > 0) return first
+
+  await new Promise((resolve) => setTimeout(resolve, EMPTY_RETRY_DELAY_MS))
+  return spendGoogleBooksRequest(() => searchGoogleBooksOnly(query))
 }
 
 // The title rules themselves come from app/data/titles.ts, which imports nothing —
@@ -162,79 +220,186 @@ async function findIsbnForWork(workExternalId: string): Promise<string | null> {
   return null
 }
 
-type Row = MediaItem
+interface Row {
+  id: number
+  external_id: string
+  title: string
+  metadata: unknown
+}
+
+type Outcome =
+  | 'matched'
+  | 'matched-by-title'
+  | 'no-isbn'
+  | 'no-google-hit'
+  | 'google-unavailable'
+  | 'title-mismatch'
+  | 'error'
 
 interface ReportLine {
   row: Row
-  outcome: 'matched' | 'no-isbn' | 'no-google-hit' | 'google-unavailable' | 'title-mismatch' | 'error'
+  outcome: Outcome
   detail: string
+  // Whether the volume this row is being moved onto carries the two fields the
+  // move is for. Without an overview there is nothing to verify a recommendation
+  // against and the local-catalog shortcut skips the row anyway, so a match with
+  // none of its own has changed the source and fixed nothing. Counted in the dry
+  // run so the decision to spend the quota can be made on it.
+  gains?: string
+}
+
+// A verdict asking again would only re-derive. The two left out are about Google or
+// about us, not about the book: 'google-unavailable' means Google didn't answer, and
+// a re-run is what turns it into an answer.
+const SETTLED: ReadonlySet<Outcome> = new Set([
+  'matched',
+  'matched-by-title',
+  'no-isbn',
+  'no-google-hit',
+  'title-mismatch',
+])
+
+// Only ever written under --apply. A dry run is defined by writing nothing, and a
+// recorded 'matched' from a dry run would take the row out of the run that applies it.
+async function recordAttempt(line: ReportLine): Promise<void> {
+  await pool.query(
+    `insert into book_backfill_attempts (media_item_id, outcome, detail, attempted_at)
+     values ($1,$2,$3,$4)
+     on conflict (media_item_id) do update
+        set outcome = excluded.outcome, detail = excluded.detail, attempted_at = excluded.attempted_at`,
+    [line.row.id, line.outcome, line.detail, Date.now()],
+  )
+}
+
+// The second attempt, for a row an ISBN couldn't place. Accepted only when the
+// author agrees as well as the title: a title on its own is exactly what this
+// script refuses to repoint a row on, and the author is the one thing a reprint
+// or a translation doesn't change.
+async function findByTitleAndAuthor(row: Row): Promise<CatalogSearchResult | null> {
+  const creator = parseMediaMetadata(row.metadata).creator
+  if (!creator) return null
+
+  const query = fieldedBookQuery({ title: row.title, creator })
+  if (!query) return null
+
+  const asked = normalizeName(creator)
+  const candidates = await searchGoogleBooksTwice(query)
+  return (
+    candidates.find(
+      (candidate) =>
+        titlesLikelyMatch(row.title, candidate.title) && normalizeName(candidate.creator) === asked,
+    ) ?? null
+  )
 }
 
 async function main() {
   if (!process.env.GOOGLE_BOOKS_API_KEY) throw new Error('GOOGLE_BOOKS_API_KEY is required')
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required')
 
-  const allRows: Row[] = await db.findMany(mediaItems, {
-    where: { type: 'book', external_source: 'openlibrary' },
-  })
+  // Raw SQL rather than db.findMany for the one thing findMany can't express: the
+  // rows a previous run has already settled, which are the whole point of the table.
+  const { rows: allRows } = await pool.query<Row>(
+    `select m.id, m.external_id, m.title, m.metadata
+       from media_items m
+       left join book_backfill_attempts a on a.media_item_id = m.id
+      where m.type = 'book'
+        and m.external_source = 'openlibrary'
+        ${RETRY_SETTLED ? '' : `and (a.outcome is null or a.outcome not in (${[...SETTLED].map((o) => `'${o}'`).join(',')}))`}
+      order by m.id`,
+  )
   const rows = LIMIT ? allRows.slice(0, LIMIT) : allRows
 
-  console.log(`${rows.length} Open Library book row(s). Mode: ${APPLY ? 'APPLY' : 'DRY RUN'}`)
+  const {
+    rows: [settled],
+  } = await pool.query<{ count: number }>(
+    `select count(*)::int as count from book_backfill_attempts a
+       join media_items m on m.id = a.media_item_id
+      where m.external_source = 'openlibrary' and a.outcome = any($1)`,
+    [[...SETTLED]],
+  )
+
+  console.log(
+    `${rows.length} Open Library book row(s) to try. Mode: ${APPLY ? 'APPLY' : 'DRY RUN'}` +
+      `${MAX_REQUESTS == null ? '' : `, budget ${MAX_REQUESTS} Google Books request(s)`}` +
+      `${settled && settled.count > 0 ? `. ${settled.count} already settled and skipped${RETRY_SETTLED ? ' — no, re-asked, --retry-settled is set' : ''}` : ''}`,
+  )
 
   const lines: ReportLine[] = []
+  let skippedForBudget = 0
+
+  const report = async (row: Row, outcome: Outcome, detail: string, found?: CatalogSearchResult) => {
+    const gains = found
+      ? `overview ${found.overview ? 'yes' : 'no'}, ${found.pageCount ?? 'no'} page(s)`
+      : undefined
+    lines.push({ row, outcome, detail, gains })
+    if (APPLY) await recordAttempt({ row, outcome, detail })
+  }
 
   // Per-row, not per-batch: Google Books and Open Library both wobble
   // (measured live 503s from both), and one row's failure shouldn't lose the
   // report for every other row already resolved by the time it happens.
   await runBounded(rows, 5, async (row) => {
+    if (budgetSpent()) {
+      skippedForBudget++
+      return
+    }
+
     try {
       const isbn = await findIsbnForWork(row.external_id)
-      if (!isbn) {
-        lines.push({ row, outcome: 'no-isbn', detail: 'no ISBN on any Open Library edition' })
-        return
-      }
 
-      await throttleGoogleBooks()
       // Google Books only, never searchBooks: that one falls back to Open
       // Library, which would answer with the source this row is being moved off
       // and report it as a match. fetchWithRetry has already spent its attempts
       // by the time this throws, so a throw here means Google would not answer,
       // which is a row to leave alone rather than resolve some other way.
-      let candidates: CatalogSearchResult[]
+      let candidate: CatalogSearchResult | null = null
+      let how: 'matched' | 'matched-by-title' = 'matched'
+      let missed: Outcome = 'no-isbn'
+      let detail = 'no ISBN on any Open Library edition'
+
       try {
-        candidates = await searchGoogleBooksOnly(`isbn:${isbn}`)
+        if (isbn) {
+          const [first] = await searchGoogleBooksTwice(`isbn:${isbn}`)
+          if (!first) {
+            missed = 'no-google-hit'
+            detail = `ISBN ${isbn} — no Google Books hit`
+          } else if (!titlesLikelyMatch(row.title, first.title)) {
+            missed = 'title-mismatch'
+            detail = `ISBN ${isbn} matched "${first.title}", too different from "${row.title}"`
+          } else {
+            candidate = first
+            detail = `ISBN ${isbn} -> ${first.externalId} "${first.title}"`
+          }
+        }
+
+        // Whatever the ISBN did or didn't settle, the title and author are still
+        // worth one question — see the note at the top of the file.
+        if (!candidate) {
+          const found = await findByTitleAndAuthor(row)
+          if (found) {
+            candidate = found
+            how = 'matched-by-title'
+            detail = `title and author -> ${found.externalId} "${found.title}" (${detail})`
+          }
+        }
       } catch (error) {
-        lines.push({
+        await report(
           row,
-          outcome: 'google-unavailable',
+          'google-unavailable',
           // Kept apart from no-google-hit: one means Google says this book does
           // not exist, the other means Google did not answer. Only the first is
           // a fact about the catalogue, and a re-run turns the second into one.
-          detail: `ISBN ${isbn} — Google Books did not answer: ${error instanceof Error ? error.message : String(error)}`,
-        })
+          `Google Books did not answer: ${error instanceof Error ? error.message : String(error)}`,
+        )
         return
       }
 
-      const candidate = candidates[0]
       if (!candidate) {
-        lines.push({ row, outcome: 'no-google-hit', detail: `ISBN ${isbn} — no Google Books hit` })
+        await report(row, missed, detail)
         return
       }
 
-      if (!titlesLikelyMatch(row.title, candidate.title)) {
-        lines.push({
-          row,
-          outcome: 'title-mismatch',
-          detail: `ISBN ${isbn} matched "${candidate.title}", too different from "${row.title}"`,
-        })
-        return
-      }
-
-      lines.push({
-        row,
-        outcome: 'matched',
-        detail: `ISBN ${isbn} -> ${candidate.externalId} "${candidate.title}"`,
-      })
+      await report(row, how, detail, candidate)
 
       if (APPLY) {
         const result = await rematchMediaItem(
@@ -242,10 +407,7 @@ async function main() {
           'book',
           row.id,
           candidate.externalId,
-          async (externalId) => {
-            await throttleGoogleBooks()
-            return getBookById(externalId)
-          },
+          (externalId) => spendGoogleBooksRequest(() => getBookById(externalId)),
           'google-books',
           'Google Books lookup failed during backfill.',
         )
@@ -254,12 +416,15 @@ async function main() {
         }
       }
     } catch (error) {
-      lines.push({ row, outcome: 'error', detail: error instanceof Error ? error.message : String(error) })
+      await report(row, 'error', error instanceof Error ? error.message : String(error))
     }
   })
 
   for (const line of lines) {
-    console.log(`[${line.outcome}] row ${line.row.id} "${line.row.title}" — ${line.detail}`)
+    console.log(
+      `[${line.outcome}] row ${line.row.id} "${line.row.title}" — ${line.detail}` +
+        `${line.gains ? ` [${line.gains}]` : ''}`,
+    )
   }
 
   const counts = lines.reduce<Record<string, number>>((acc, line) => {
@@ -267,7 +432,21 @@ async function main() {
     return acc
   }, {})
   console.log('\nSummary:', counts)
-  if (!APPLY) console.log('Dry run — nothing was written. Re-run with --apply to write these changes.')
+
+  // The number the whole job is for. 498 of the 549 Open Library book rows carry no
+  // overview, against 179 of 283 Google Books ones — so a matched row that gains one
+  // is a row a recommendation can be verified against and the local catalog can
+  // answer for. A match that gains nothing has moved the source and nothing else.
+  const matches = lines.filter((line) => line.gains)
+  const withOverview = matches.filter((line) => line.gains?.includes('overview yes')).length
+  console.log(`${withOverview} of ${matches.length} match(es) bring an overview`)
+  console.log(`Google Books requests spent: ${requestsSpent}`)
+  if (skippedForBudget > 0) {
+    console.log(`${skippedForBudget} row(s) left for the next run — the budget ran out.`)
+  }
+  if (!APPLY) {
+    console.log('Dry run — nothing was written, and no attempt was recorded. Re-run with --apply.')
+  }
 
   await pool.end()
 }

@@ -245,6 +245,20 @@ export const unconfirmedRuns = table({
   },
 })
 
+// What the Open Library → Google Books backfill already tried, so a re-run spends
+// its Google Books quota on rows it has not asked about yet. Written only by
+// scripts/backfill-google-books.ts; nothing the app serves reads it.
+export const bookBackfillAttempts = table({
+  name: 'book_backfill_attempts',
+  columns: {
+    media_item_id: c.integer().notNull().references('media_items', 'id'),
+    outcome: c.text().notNull(),
+    detail: c.text().notNull(),
+    attempted_at: c.integer().notNull(),
+  },
+  primaryKey: ['media_item_id'],
+})
+
 export const userRecommendations = table({
   name: 'user_recommendations',
   columns: {
