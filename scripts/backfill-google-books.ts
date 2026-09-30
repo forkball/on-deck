@@ -33,6 +33,15 @@
 // fails the title check and leaves the row untouched though Google holds the
 // French edition too.
 //
+// Pass --production to run it against production. That is the only way this
+// reaches production: without it the connection is DATABASE_URL, so a run with a
+// flag forgotten touches development rather than everyone's rows. Same reasoning
+// as scripts/prod-query.ts, which reads PRODUCTION_DATABASE_URL and never
+// DATABASE_URL — a script that touches production should say so rather than
+// inherit whatever the ambient environment points at. `npm run
+// prod:backfill-books` is that spelling, and the narrow capability the settings
+// can allow.
+//
 // Deliberately its own pool rather than the app's (app/data/db.ts) — see
 // db/migrate.ts for why.
 
@@ -65,7 +74,10 @@ const LIMIT = numericFlag('limit')
 // next run rather than half-done: the budget is checked before a row starts.
 const MAX_REQUESTS = numericFlag('max-requests')
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const PRODUCTION = process.argv.includes('--production')
+const CONNECTION = PRODUCTION ? process.env.PRODUCTION_DATABASE_URL : process.env.DATABASE_URL
+
+const pool = new Pool({ connectionString: CONNECTION })
 const db = createDatabase(createPostgresDatabaseAdapter(pool))
 
 // Google Books' quota is 100 requests/minute/user — measured live, a plain
@@ -294,7 +306,9 @@ async function findByTitleAndAuthor(row: Row): Promise<CatalogSearchResult | nul
 
 async function main() {
   if (!process.env.GOOGLE_BOOKS_API_KEY) throw new Error('GOOGLE_BOOKS_API_KEY is required')
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required')
+  if (!CONNECTION) {
+    throw new Error(PRODUCTION ? 'PRODUCTION_DATABASE_URL is required' : 'DATABASE_URL is required')
+  }
 
   // Raw SQL rather than db.findMany for the one thing findMany can't express: the
   // rows a previous run has already settled, which are the whole point of the table.
@@ -319,7 +333,8 @@ async function main() {
   )
 
   console.log(
-    `${rows.length} Open Library book row(s) to try. Mode: ${APPLY ? 'APPLY' : 'DRY RUN'}` +
+    `${rows.length} Open Library book row(s) to try. ` +
+      `Database: ${PRODUCTION ? 'PRODUCTION' : 'development'}. Mode: ${APPLY ? 'APPLY' : 'DRY RUN'}` +
       `${MAX_REQUESTS == null ? '' : `, budget ${MAX_REQUESTS} Google Books request(s)`}` +
       `${settled && settled.count > 0 ? `. ${settled.count} already settled and skipped${RETRY_SETTLED ? ' — no, re-asked, --retry-settled is set' : ''}` : ''}`,
   )
