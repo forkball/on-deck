@@ -1,10 +1,6 @@
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
-import {
-  catalogSearchQuery,
-  getCatalogProvider,
-  type CatalogSearchResult,
-  type LengthBucket,
-} from '../catalog/provider.ts'
+import { getCatalogProvider, type CatalogSearchResult, type LengthBucket } from '../catalog/provider.ts'
+import type { CatalogQuery } from '../catalog/query.ts'
 import { pool } from '../db.ts'
 import { normalizeName, normalizeTitle, withoutSubtitle } from '../titles.ts'
 import { parseMediaMetadata, type MediaMetadata } from '../mediaMetadata.ts'
@@ -24,7 +20,7 @@ export interface Candidate {
 
 // These two are every outbound catalog request the pipeline makes, so timing
 // them here covers all of it.
-function searchForType(mediaType: MediaType, query: string): Promise<CatalogSearchResult[]> {
+function searchForType(mediaType: MediaType, query: CatalogQuery): Promise<CatalogSearchResult[]> {
   return track('catalog.search', () => getCatalogProvider(mediaType).search(query))
 }
 
@@ -407,12 +403,13 @@ function catalogDown(what: string): GenerationError {
   )
 }
 
-export type CatalogSearch = (mediaType: MediaType, query: string) => Promise<CatalogSearchResult[]>
+export type CatalogSearch = (mediaType: MediaType, query: CatalogQuery) => Promise<CatalogSearchResult[]>
 
-// What to ask the catalog for, for a pick. The rule itself is catalogSearchQuery,
-// shared with the importers, which ask the same catalogs the same question.
-export function searchQueryFor(mediaType: MediaType, pick: Pick): string {
-  return catalogSearchQuery(mediaType, pick.title, pick.creator)
+// What to ask the catalog for, for a pick. Both fields go, whatever the medium:
+// which of them a provider can use is the provider's own answer, given in the
+// registry — TMDB and IGDB search titles only, so they drop the creator there.
+export function searchQueryFor(_mediaType: MediaType, pick: Pick): CatalogQuery {
+  return { title: pick.title, creator: pick.creator }
 }
 
 // One search per pick the local catalog didn't already answer for, bounded —

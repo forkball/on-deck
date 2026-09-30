@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
+import { queryWords } from '../app/data/catalog/query.ts'
 import {
   applyVerdicts,
   searchQueryFor,
@@ -772,22 +773,24 @@ describe('withOverviews', () => {
 describe('searchQueryFor', () => {
   const pick = (title: string, creator?: string) => ({ title, year: 2023, reason: '', creator })
 
-  // "Iron Flame" alone returns a 1963 laboratory index and not the novel; the
-  // volume with a cover, a blurb and its genres is not in those results at all.
-  it('adds the author for a catalog whose search reads one', () => {
-    assert.equal(searchQueryFor('book', pick('Iron Flame', 'Rebecca Yarros')), 'Iron Flame Rebecca Yarros')
+  // Both fields travel, whatever the medium: which of them a catalog can use is the
+  // catalog's answer and is given in the provider registry, not decided here. Books
+  // confine the author to its own field ("Iron Flame" alone returns a 1963 laboratory
+  // index, not the novel); TMDB and IGDB drop it, because "Dune Denis Villeneuve"
+  // finds a making-of and "Portal 2 Valve" finds nothing at all.
+  it('hands over the title and whoever made it', () => {
+    assert.deepEqual(searchQueryFor('book', pick('Iron Flame', 'Rebecca Yarros')), {
+      title: 'Iron Flame',
+      creator: 'Rebecca Yarros',
+    })
+    assert.deepEqual(searchQueryFor('movie', pick('Dune', 'Denis Villeneuve')), {
+      title: 'Dune',
+      creator: 'Denis Villeneuve',
+    })
   })
 
-  // TMDB and IGDB match titles: "Dune Denis Villeneuve" finds a making-of, and
-  // "Portal 2 Valve" finds nothing at all.
-  it('leaves a title alone for catalogs that match titles', () => {
-    assert.equal(searchQueryFor('movie', pick('Dune', 'Denis Villeneuve')), 'Dune')
-    assert.equal(searchQueryFor('game', pick('Portal 2', 'Valve')), 'Portal 2')
-  })
-
-  it('falls back to the title when the model named nobody', () => {
-    assert.equal(searchQueryFor('book', pick('Iron Flame')), 'Iron Flame')
-    assert.equal(searchQueryFor('book', pick('Iron Flame', '   ')), 'Iron Flame')
+  it('carries no creator when the model named nobody', () => {
+    assert.deepEqual(searchQueryFor('book', pick('Iron Flame')), { title: 'Iron Flame', creator: undefined })
   })
 })
 
@@ -799,8 +802,8 @@ describe('searchForPicks', () => {
     const local = new Map([[1, hit('b from catalog')]])
 
     const matches = await searchForPicks('book', three, local as never, async (_type, query) => {
-      asked.push(query)
-      return [hit(query)]
+      asked.push(queryWords(query))
+      return [hit(queryWords(query))]
     })
 
     assert.deepEqual(asked, ['a', 'c'])
@@ -812,9 +815,9 @@ describe('searchForPicks', () => {
 
   it('leaves a pick unfound when its search throws, rather than failing the run', async () => {
     const matches = await searchForPicks('book', three, new Map(), async (_type, query) => {
-      if (query === 'b')
+      if (queryWords(query) === 'b')
         throw Object.assign(new TypeError('fetch failed'), { cause: new Error('read ECONNRESET') })
-      return [hit(query)]
+      return [hit(queryWords(query))]
     })
 
     assert.deepEqual(
@@ -856,7 +859,7 @@ describe('searchForPicks', () => {
       peak = Math.max(peak, inFlight)
       await new Promise((resolve) => setTimeout(resolve, 1))
       inFlight--
-      return [hit(query)]
+      return [hit(queryWords(query))]
     })
 
     assert.equal(peak, 8, 'the search fan-out should hold to SEARCH_CONCURRENCY')

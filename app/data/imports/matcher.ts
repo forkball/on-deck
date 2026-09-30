@@ -5,12 +5,8 @@
 // round trips — tens of seconds, which is survivable in a request but loses the
 // whole import to any timeout, and gives the person nothing to come back to.
 
-import {
-  catalogSearchQuery,
-  getCatalogProvider,
-  upsertCatalogItem,
-  type CatalogSearchResult,
-} from '../catalog/provider.ts'
+import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
+import type { CatalogQuery } from '../catalog/query.ts'
 import type { Db } from '../db.ts'
 import type { MediaType } from '../mediaItems.ts'
 import type { ImportBatch } from '../schema.ts'
@@ -37,8 +33,8 @@ const PROGRESS_STRIDE = 10
 
 // A failed lookup lands the row in "couldn't find" rather than failing the import.
 async function searchQuietly(
-  provider: { search(query: string): Promise<CatalogSearchResult[]> },
-  query: string,
+  provider: { search(query: CatalogQuery): Promise<CatalogSearchResult[]> },
+  query: CatalogQuery,
 ): Promise<CatalogSearchResult[]> {
   try {
     return await provider.search(query)
@@ -77,7 +73,7 @@ export async function matchBatch(db: Db, batch: ImportBatch): Promise<void> {
     let identified = false
 
     if (row.isbn) {
-      results = await searchQuietly(provider, `isbn:${row.isbn}`)
+      results = await searchQuietly(provider, { title: row.raw_title, isbn: row.isbn })
       // `isbn:` is a Google Books qualifier. The Open Library fallback has no
       // such qualifier and reads it as text, so its hits are not identifications.
       identified = results.length > 0 && results.every((result) => result.sourceOverride == null)
@@ -85,7 +81,7 @@ export async function matchBatch(db: Db, batch: ImportBatch): Promise<void> {
     }
 
     if (results.length === 0) {
-      results = await searchQuietly(provider, catalogSearchQuery(mediaType, row.raw_title, row.author))
+      results = await searchQuietly(provider, { title: row.raw_title, creator: row.author })
     }
 
     for (const result of results) details.set(result.externalId, result)

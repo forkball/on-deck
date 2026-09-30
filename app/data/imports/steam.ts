@@ -103,7 +103,7 @@ async function matchGame(steamName: string): Promise<CatalogSearchResult | null>
   // Searched separately rather than re-filtering the first result set: a query
   // like "Painkiller: Gold" doesn't return plain "Painkiller" at all.
   for (const query of searchVariants(steamName)) {
-    const results = await getCatalogProvider('game').search(query)
+    const results = await getCatalogProvider('game').search({ title: query })
     const wanted = normalizeTitle(query)
 
     const exact = results.find((result) => normalizeTitle(result.title) === wanted)

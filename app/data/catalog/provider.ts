@@ -1,3 +1,4 @@
+import { queryWords, type CatalogQuery } from './query.ts'
 import type { Db } from '../db.ts'
 import {
   markMediaItemEnriched,
@@ -51,7 +52,7 @@ export interface CatalogProvider {
   // Recorded as media_items.external_source, so ids from different providers
   // can't collide.
   sourceName: string
-  search(query: string): Promise<CatalogSearchResult[]>
+  search(query: CatalogQuery): Promise<CatalogSearchResult[]>
   getById(externalId: string): Promise<CatalogSearchResult | null>
   genres: string[]
   playerTypes?: string[]
@@ -85,18 +86,6 @@ export interface CatalogProvider {
 
 // Fits after "Only suggest books with …". Null when the medium doesn't offer the
 // bucket, in which case there is nothing truthful to ask for.
-// What to ask a catalog for, given what we know about the work. The title, plus who
-// made it where the provider's search reads that.
-//
-// One builder for the recommendation pipeline and the importers both: they ask the
-// same catalogs the same question, and until this they disagreed about how. The
-// importer appended an author whenever the CSV happened to carry one, which was
-// books only by accident of which parser fills the column.
-export function catalogSearchQuery(type: MediaType, title: string, creator?: string | null): string {
-  const named = searchReadsCreator(type) ? creator?.trim() : undefined
-  return named ? `${title} ${named}` : title
-}
-
 // Whether the provider's search reads more than a title — see searchesCreator.
 // Exported because the picks prompt asks the model for a creator only where one
 // will be used.
@@ -113,7 +102,7 @@ export function describeLength(provider: CatalogProvider, length: LengthBucket):
 const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
   movie: {
     sourceName: 'tmdb',
-    search: searchMovies,
+    search: (query) => searchMovies(queryWords(query)),
     getById: getMovieById,
     genres: MOVIE_GENRES,
     parseExternalId: (input) => parseTmdbId(input, 'movie'),
@@ -168,7 +157,7 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
   },
   game: {
     sourceName: 'igdb',
-    search: searchGames,
+    search: (query) => searchGames(queryWords(query)),
     getById: getGameById,
     genres: GAME_GENRES,
     playerTypes: GAME_PLAYER_TYPES,
@@ -192,7 +181,7 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
   },
   tv: {
     sourceName: 'tmdb',
-    search: searchTv,
+    search: (query) => searchTv(queryWords(query)),
     getById: getTvShowById,
     genres: TV_GENRES,
     parseExternalId: (input) => parseTmdbId(input, 'tv'),
@@ -286,7 +275,8 @@ export async function searchCatalog(type: MediaType, query: string): Promise<Cat
   const cached = answers.get(key)
   if (cached) return cached
 
-  const results = await getCatalogProvider(type).search(query)
+  // `text`, not `title`: this is the door a person's typing comes through.
+  const results = await getCatalogProvider(type).search({ text: query })
   answers.set(key, results)
   return results
 }

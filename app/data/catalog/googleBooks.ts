@@ -1,4 +1,5 @@
 import { stripPublisherPromo } from './blurb.ts'
+import { queryWords, type CatalogQuery } from './query.ts'
 import { createProviderCircuit } from './circuit.ts'
 import { fetchWithRetry } from './retry.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
@@ -160,18 +161,76 @@ export async function searchGoogleBooksOnly(query: string): Promise<CatalogSearc
   return (data.items ?? []).map(toResult)
 }
 
-export async function searchBooks(query: string): Promise<CatalogSearchResult[]> {
+// Google Books reads a bare query as free text across everything it holds — the
+// description and the publisher blurb included — so "Iron Flame Rebecca Yarros"
+// matches a study guide *about* the novel as readily as the novel, and both come
+// back ahead of it when the guide is the better keyword match. `intitle:` and
+// `inauthor:` confine each term to the field it came from, which is the whole
+// point: a summary's title is "Summary of Iron Flame", not "Iron Flame".
+//
+// Quoted so a multi-word title stays one phrase. Any quote inside the title is
+// dropped rather than escaped — Google Books has no escape for it, and a stray
+// one closes the phrase early and spills the rest of the title back into free
+// text, which is the failure this exists to avoid.
+function quoted(term: string): string {
+  return `"${term.replace(/"/g, ' ').trim()}"`
+}
+
+// Null when there is nothing to qualify: free text a person typed, which has to be
+// searched as typed — see CatalogQuery.
+export function fieldedBookQuery({ title, creator, isbn }: CatalogQuery): string | null {
+  if (isbn) return `isbn:${isbn}`
+  if (!title) return null
+
+  const terms = [`intitle:${quoted(title)}`]
+  const named = creator?.trim()
+  if (named) terms.push(`inauthor:${quoted(named)}`)
+  return terms.join(' ')
+}
+
+// The unqualified form, for two jobs: the retry when the qualified query finds
+// nothing, and Open Library, which has neither qualifier and would search for the
+// words "intitle" and "inauthor".
+export function plainBookQuery(query: CatalogQuery): string {
+  if (query.isbn) return `isbn:${query.isbn}`
+
+  const words = queryWords(query)
+  const named = query.creator?.trim()
+  return named ? `${words} ${named}` : words
+}
+
+export async function searchBooks(query: CatalogQuery): Promise<CatalogSearchResult[]> {
+  const plain = plainBookQuery(query)
+  const fielded = fieldedBookQuery(query)
+
+  // Qualified first, then unqualified if it found nothing. The qualified query is
+  // strictly narrower, so an empty answer means one of three things: the title is
+  // spelled differently here than Google files it, the author is, or Google returned
+  // an empty `items` for a query that works — which it does intermittently, to both
+  // shapes, often enough to see twice in twenty measured searches. Free text is what
+  // used to find the book in all three cases.
+  //
+  // An isbn renders the same either way and free text has nothing to qualify, so both
+  // make one request rather than two.
+  const attempts = fielded == null || fielded === plain ? [plain] : [fielded, plain]
+
   // Skipped rather than tried once per pick: the rest of a run's fan-out would
   // each pay three attempts and a second of sleeping for the same answer.
   if (!circuit.isOpen()) {
     try {
-      return await circuit.run(() => searchGoogleBooksOnly(query))
+      return await circuit.run(async () => {
+        for (const attempt of attempts) {
+          const results = await searchGoogleBooksOnly(attempt)
+          if (results.length > 0) return results
+        }
+        return []
+      })
     } catch (error) {
       log.error('Google Books search failed, falling back to Open Library', error)
     }
   }
 
-  const fallback = await searchOpenLibraryBooks(query)
+  const fallback = await searchOpenLibraryBooks(plain)
   return fallback.map((result) => ({ ...result, sourceOverride: 'openlibrary' }))
 }
 
