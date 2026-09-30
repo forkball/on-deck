@@ -192,7 +192,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       <Document title="Recommendations | On Deck">
         <Nav authed={true} displayName={displayName} />
         <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>Recommendations</h1>
+          <h1 mix={css({ margin: '0 0 8px' })}>Recommendations</h1>
           <p mix={css({ margin: 0, color: '#555' })}>
             Rewrites your {ui.attributive} taste profile from what you've logged, then finds picks to try
             next.
