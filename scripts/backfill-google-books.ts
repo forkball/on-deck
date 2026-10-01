@@ -135,6 +135,47 @@ async function searchGoogleBooksTwice(query: string): Promise<CatalogSearchResul
   return spendGoogleBooksRequest(() => searchGoogleBooksOnly(query))
 }
 
+// A query whose answer is not in doubt, asked before an empty result is believed.
+//
+// Google Books serves an outage as HTTP 200 with `totalItems: 0`, which at the point
+// we read it is indistinguishable from "no such book" — nothing throws, so neither
+// fetchWithRetry nor the retry above does anything about it. On 2026-10-01 a run
+// recorded 29 of 30 rows as "no Google Books hit" during such a spell, and every one
+// of those ISBNs had matched minutes earlier; `isbn:` queries were answering 0 while
+// title queries returned 503. Because the verdict is settled, those 29 rows would
+// have been skipped by every future run: the backfill would have quietly written off
+// 5% of the job on an outage.
+//
+// So "no hit" now has to be a fact about the catalogue rather than about the day. If
+// the canary comes back empty too, the whole run stops: a provider that cannot answer
+// this cannot answer anything, and every verdict after it would be fiction.
+const CANARY_QUERY = 'intitle:"dune"'
+
+// How long a passing canary stands for. Not once per run: a run of 500 rows takes
+// twenty minutes, and an outage starting in the middle of one would poison every
+// verdict after it while an answer from minute one vouched for them.
+const CANARY_GOOD_FOR_MS = 30_000
+
+let canaryCheckedAt = 0
+let abortReason: string | null = null
+
+async function believesEmptyResults(): Promise<boolean> {
+  if (abortReason != null) return false
+  if (Date.now() - canaryCheckedAt < CANARY_GOOD_FOR_MS) return true
+
+  const canary = await spendGoogleBooksRequest(() => searchGoogleBooksOnly(CANARY_QUERY))
+  if (canary.length > 0) {
+    canaryCheckedAt = Date.now()
+    return true
+  }
+
+  abortReason =
+    `Google Books answered ${JSON.stringify(CANARY_QUERY)} with nothing, so it is not ` +
+    'answering at all. Stopping rather than recording verdicts it would take an outage to ' +
+    'justify. Try again later.'
+  return false
+}
+
 const OPEN_LIBRARY_BASE = 'https://openlibrary.org'
 const FETCH_ATTEMPTS = 3
 const RETRY_BASE_MS = 400
@@ -342,6 +383,7 @@ async function main() {
   // (measured live 503s from both), and one row's failure shouldn't lose the
   // report for every other row already resolved by the time it happens.
   await runBounded(rows, 5, async (row) => {
+    if (abortReason != null) return
     if (budgetSpent()) {
       skippedForBudget++
       return
@@ -364,6 +406,7 @@ async function main() {
         if (isbn) {
           const [first] = await searchGoogleBooksTwice(`isbn:${isbn}`)
           if (!first) {
+            if (!(await believesEmptyResults())) return
             missed = 'no-google-hit'
             detail = `ISBN ${isbn} — no Google Books hit`
           } else if (!isSameBook(row, first)) {
@@ -379,6 +422,7 @@ async function main() {
         // worth one question — see the note at the top of the file.
         if (!candidate) {
           const found = await findByTitleAndAuthor(row)
+          if (!found && !(await believesEmptyResults())) return
           if (found) {
             candidate = found
             how = 'matched-by-title'
@@ -446,6 +490,11 @@ async function main() {
   console.log(`Google Books requests spent: ${requestsSpent}`)
   if (skippedForBudget > 0) {
     console.log(`${skippedForBudget} row(s) left for the next run — the budget ran out.`)
+  }
+  if (abortReason != null) {
+    console.error(`\nStopped: ${abortReason}`)
+    console.error('Rows reached after that point were left untouched and unrecorded.')
+    process.exitCode = 1
   }
   if (!APPLY) {
     console.log('Dry run — nothing was written, and no attempt was recorded. Re-run with --apply.')
