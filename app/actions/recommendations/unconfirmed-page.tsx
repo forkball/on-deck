@@ -1,10 +1,9 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { Document } from '../../ui/components/document.tsx'
+import { Page } from '../../ui/components/page.tsx'
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { ModelProvided } from './model-provided.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
 import { routes } from '../../routes.ts'
 import type { UnconfirmedRunDetail } from '../../data/recommendations/unconfirmed.ts'
 
@@ -30,61 +29,59 @@ export function UnconfirmedRunPage(handle: Handle<UnconfirmedRunPageProps>) {
     })
 
     return (
-      <Document title={`Unconfirmed ${noun} | On Deck`}>
-        <Nav authed={true} displayName={displayName} />
-        <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          <p mix={css({ margin: '0 0 16px' })}>
-            <a href={routes.recommendations.index.href()}>← Recommendations</a>
+      <Page
+        title={`Unconfirmed ${noun}`}
+        heading="Suggested, but not confirmed"
+        back={{ href: routes.recommendations.index.href(), label: '← Recommendations' }}
+        width="wide"
+        displayName={displayName}
+      >
+        <div
+          mix={css({
+            border: '1px solid #f0c36d',
+            background: '#fdf6e3',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            margin: '16px 0 24px',
+          })}
+        >
+          <p mix={css({ margin: 0 })}>{run.reason}</p>
+          <p mix={css({ margin: '8px 0 0', fontSize: '13px', color: '#555' })}>
+            The run was retried and the catalog still wouldn't answer, so the model's own suggestions were
+            kept rather than thrown away. Nothing has checked that they exist, that the years are right, or
+            that you haven't already logged them — so they can't be added to your log from here. Generating
+            again once the catalog is back will produce a real run.
           </p>
-          <h1>Suggested, but not confirmed</h1>
+        </div>
 
-          <div
-            mix={css({
-              border: '1px solid #f0c36d',
-              background: '#fdf6e3',
-              borderRadius: '8px',
-              padding: '12px 16px',
-              margin: '16px 0 24px',
-            })}
-          >
-            <p mix={css({ margin: 0 })}>{run.reason}</p>
-            <p mix={css({ margin: '8px 0 0', fontSize: '13px', color: '#555' })}>
-              The run was retried and the catalog still wouldn't answer, so the model's own suggestions were
-              kept rather than thrown away. Nothing has checked that they exist, that the years are right, or
-              that you haven't already logged them — so they can't be added to your log from here. Generating
-              again once the catalog is back will produce a real run.
-            </p>
-          </div>
+        <p mix={css({ color: '#888', fontSize: '13px' })}>{date}</p>
 
-          <p mix={css({ color: '#888', fontSize: '13px' })}>{date}</p>
+        <ol
+          mix={css({
+            margin: '16px 0 0',
+            padding: '0 0 0 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          })}
+        >
+          {run.picks.map((pick) => (
+            <li key={`${pick.title}-${pick.year}`}>
+              <span mix={css({ fontWeight: 700 })}>{pick.title}</span>
+              {pick.year ? ` (${pick.year})` : ''}
+              <p mix={css({ margin: '4px 0 0', fontStyle: 'italic', color: '#555' })}>
+                <ModelProvided note="Written by the model from the taste profile this run was built on — not a description from the catalogue.">
+                  {pick.reason}
+                </ModelProvided>
+              </p>
+            </li>
+          ))}
+        </ol>
 
-          <ol
-            mix={css({
-              margin: '16px 0 0',
-              padding: '0 0 0 20px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            })}
-          >
-            {run.picks.map((pick) => (
-              <li key={`${pick.title}-${pick.year}`}>
-                <span mix={css({ fontWeight: 700 })}>{pick.title}</span>
-                {pick.year ? ` (${pick.year})` : ''}
-                <p mix={css({ margin: '4px 0 0', fontStyle: 'italic', color: '#555' })}>
-                  <ModelProvided note="Written by the model from the taste profile this run was built on — not a description from the catalogue.">
-                    {pick.reason}
-                  </ModelProvided>
-                </p>
-              </li>
-            ))}
-          </ol>
-
-          <p mix={css({ marginTop: '24px' })}>
-            <a href={routes.recommendations.index.href()}>Generate a new run</a>
-          </p>
-        </main>
-      </Document>
+        <p mix={css({ marginTop: '24px' })}>
+          <a href={routes.recommendations.index.href()}>Generate a new run</a>
+        </p>
+      </Page>
     )
   }
 }

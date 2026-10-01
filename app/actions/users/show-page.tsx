@@ -12,9 +12,8 @@ import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { Document } from '../../ui/components/document.tsx'
+import { Page } from '../../ui/components/page.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
 
@@ -140,71 +139,66 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
     const returnTo = routes.users.show.href({ userId: String(user.id) })
 
     return (
-      <Document title={`${label} | On Deck`}>
-        <Nav authed={true} displayName={displayName} />
-        <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1 mix={css({ margin: '0 0 4px', overflowWrap: 'break-word' })}>{label}</h1>
-          <p mix={css({ margin: '0 0 12px', color: '#555' })}>
-            {locked ? (
-              <>
-                {followingCount} following · {followersCount} follower{followersCount === 1 ? '' : 's'}
-              </>
-            ) : (
-              <>
-                <a href={routes.users.following.href({ userId: String(user.id) })}>
-                  {followingCount} following
-                </a>{' '}
-                ·{' '}
-                <a href={routes.users.followers.href({ userId: String(user.id) })}>
-                  {followersCount} follower{followersCount === 1 ? '' : 's'}
-                </a>
-              </>
-            )}
-          </p>
-          <FollowButton userId={user.id} following={viewerFollows} returnTo={returnTo} />
-
+      <Page title={label} displayName={displayName}>
+        <h1 mix={css({ marginBottom: '4px', overflowWrap: 'break-word' })}>{label}</h1>
+        <p mix={css({ margin: '0 0 12px', color: '#555' })}>
           {locked ? (
-            <p>This profile is private. Follow {label} to see their bio and log.</p>
+            <>
+              {followingCount} following · {followersCount} follower{followersCount === 1 ? '' : 's'}
+            </>
           ) : (
             <>
-              {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
-
-              <MediaTabs
-                idPrefix="user-profile"
-                active={activeTab!}
-                panels={Object.fromEntries(
-                  ACTIVE_MEDIA_TYPES.map((type) => {
-                    const ui = MEDIA_TYPE_UI[type]
-                    const { summary, log, total } = media![type]
-                    const watchedHref = routes.users.watched.href({ userId: String(user.id) })
-
-                    return [
-                      type,
-                      <>
-                        <TasteProfileSummary
-                          label={`${label}'s ${ui.attributive} taste profile`}
-                          summary={summary}
-                        />
-                        <h2>
-                          What {label} has {ui.pastParticiple}
-                        </h2>
-                        <LoggedList
-                          log={log}
-                          total={total}
-                          detailHref={(id) => withReturnTo(ui.hrefs.show(id), `${returnTo}?tab=${type}`)}
-                          seeAllHref={
-                            type === DEFAULT_MEDIA_TYPE ? watchedHref : `${watchedHref}?type=${type}`
-                          }
-                        />
-                      </>,
-                    ]
-                  }),
-                )}
-              />
+              <a href={routes.users.following.href({ userId: String(user.id) })}>
+                {followingCount} following
+              </a>{' '}
+              ·{' '}
+              <a href={routes.users.followers.href({ userId: String(user.id) })}>
+                {followersCount} follower{followersCount === 1 ? '' : 's'}
+              </a>
             </>
           )}
-        </main>
-      </Document>
+        </p>
+        <FollowButton userId={user.id} following={viewerFollows} returnTo={returnTo} />
+
+        {locked ? (
+          <p>This profile is private. Follow {label} to see their bio and log.</p>
+        ) : (
+          <>
+            {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
+
+            <MediaTabs
+              idPrefix="user-profile"
+              active={activeTab!}
+              panels={Object.fromEntries(
+                ACTIVE_MEDIA_TYPES.map((type) => {
+                  const ui = MEDIA_TYPE_UI[type]
+                  const { summary, log, total } = media![type]
+                  const watchedHref = routes.users.watched.href({ userId: String(user.id) })
+
+                  return [
+                    type,
+                    <>
+                      <TasteProfileSummary
+                        label={`${label}'s ${ui.attributive} taste profile`}
+                        summary={summary}
+                      />
+                      <h2>
+                        What {label} has {ui.pastParticiple}
+                      </h2>
+                      <LoggedList
+                        log={log}
+                        total={total}
+                        detailHref={(id) => withReturnTo(ui.hrefs.show(id), `${returnTo}?tab=${type}`)}
+                        seeAllHref={type === DEFAULT_MEDIA_TYPE ? watchedHref : `${watchedHref}?type=${type}`}
+                      />
+                    </>,
+                  ]
+                }),
+              )}
+            />
+          </>
+        )}
+      </Page>
     )
   }
 }

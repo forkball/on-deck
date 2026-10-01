@@ -163,6 +163,15 @@
   padding: 0 26px;
 }
 
+/* Every page's title starts flush with the top of <main>, rather than 0.67em
+   (~21px) down where the browser puts an <h1>. Here rather than on Page's own
+   <h1> so it also holds for a page that places its heading inside its own
+   layout. Only the top: the space under a title is each page's call, set with
+   css() rules this unlayered one would override. */
+.doodle main h1 {
+  margin-top: 0;
+}
+
 /* Rating/notes only make sense once something's actually been watched —
    reacts live to the status <select> with no JS, via :has() + option:checked. */
 .watched-only-fields {

@@ -6,14 +6,16 @@ import { routes } from '../../routes.ts'
 export interface DocumentProps {
   children?: RemixNode
   head?: RemixNode
+  // The page's own title; the app name is appended here. Absent, the tab reads
+  // just the app name.
   title?: string
 }
 
-const DEFAULT_TITLE = readAppDisplayName('On%20Deck')
+const APP_NAME = readAppDisplayName('On%20Deck')
 
 export function Document(handle: Handle<DocumentProps>) {
   return () => {
-    let { children, head, title = DEFAULT_TITLE } = handle.props
+    let { children, head, title } = handle.props
 
     return (
       <html lang="en">
@@ -21,7 +23,7 @@ export function Document(handle: Handle<DocumentProps>) {
           <meta charSet="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-          <title>{title}</title>
+          <title>{title ? `${title} | ${APP_NAME}` : APP_NAME}</title>
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
           <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Short+Stack&display=swap" />

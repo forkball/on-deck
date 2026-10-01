@@ -24,9 +24,8 @@ import type { ImportBatch } from '../../../data/schema.ts'
 import { mediaTypeUiFor } from '../../../mediaTypes.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
 import { routes } from '../../../routes.ts'
-import { Document } from '../../../ui/components/document.tsx'
+import { Page } from '../../../ui/components/page.tsx'
 import { Modal } from '../../../ui/components/modal.tsx'
-import { Nav } from '../../../ui/components/nav.tsx'
 import { Collapsible } from '../../../ui/shared/collapsible.tsx'
 import { count } from '../../../ui/shared/count.ts'
 import { Field } from '../../../ui/shared/field.tsx'
@@ -1075,335 +1074,323 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
     const notFound = backFirst(model.notFound, model.last)
     const next = nextAnchors([...uncertainGroups.flatMap((group) => group.entries), ...notFound])
     return (
-      <Document title="Review your import | On Deck">
-        <Nav authed={true} displayName={displayName} />
-        <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          {saved ? (
-            <>
-              <h1>Saved {count(counts.save, singular, plural)} to your log</h1>
-              <p mix={css({ color: '#15803d' })}>They're in your log now.</p>
-              <ul mix={css({ color: '#555' })}>
-                <li>{model.confidentCount} matched without help</li>
-                {model.confirmedCount > 0 && <li>{model.confirmedCount} you checked or picked</li>}
-                {model.uncertain.length > 0 && (
-                  <li>{model.uncertain.length} saved as we matched them, unchecked</li>
-                )}
-                {counts.unchanged > 0 && (
-                  <li>{counts.unchanged} already in your log and left as they were</li>
-                )}
-                {counts.leftOut > 0 && <li>{counts.leftOut} left out</li>}
-              </ul>
-
-              {/* Named, with a link to each, so a wrong match can still be fixed. */}
+      <Page title="Review your import" width="wide" displayName={displayName}>
+        {saved ? (
+          <>
+            <h1>Saved {count(counts.save, singular, plural)} to your log</h1>
+            <p mix={css({ color: '#15803d' })}>They're in your log now.</p>
+            <ul mix={css({ color: '#555' })}>
+              <li>{model.confidentCount} matched without help</li>
+              {model.confirmedCount > 0 && <li>{model.confirmedCount} you checked or picked</li>}
               {model.uncertain.length > 0 && (
-                <Collapsible summary={`The ${model.uncertain.length} saved as we matched them`} boxed>
-                  <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 8px' })}>
-                    We weren't sure about these. If one is the wrong {singular}, open it, remove it from your
-                    log, and log the right one.
-                  </p>
-                  <ul mix={savedListStyle}>
-                    {model.uncertain.map(({ row, item }) => (
-                      <li key={row.id} mix={css({ marginBottom: '4px' })}>
-                        {item ? (
-                          <a href={hrefs.show(item.id)}>
-                            {item.title} {item.releaseYear ?? ''}
-                          </a>
-                        ) : (
-                          row.title
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </Collapsible>
+                <li>{model.uncertain.length} saved as we matched them, unchecked</li>
               )}
-              {model.leftOutRows.length > 0 && (
-                <Collapsible summary={`The ${model.leftOutRows.length} left out`} boxed>
-                  <ul mix={savedListStyle}>
-                    {model.leftOutRows.map((row) => (
-                      <li key={row.id} mix={css({ marginBottom: '4px' })}>
-                        {row.title} {row.year ?? ''}{' '}
-                        <span mix={css({ color: '#888' })}>· {leftOutReason(row.state)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </Collapsible>
-              )}
-              <p>
-                <a href={routes.profile.watched.href()}>See my log</a>
-                {' · '}
-                <a href={routes.profile.importMovies.index.href()}>Import another file</a>
-              </p>
+              {counts.unchanged > 0 && <li>{counts.unchanged} already in your log and left as they were</li>}
+              {counts.leftOut > 0 && <li>{counts.leftOut} left out</li>}
+            </ul>
 
-              {/* An export is a snapshot; the feed keeps it current. Offered, not done for them. */}
-              {offerFeed && (
-                <section
+            {/* Named, with a link to each, so a wrong match can still be fixed. */}
+            {model.uncertain.length > 0 && (
+              <Collapsible summary={`The ${model.uncertain.length} saved as we matched them`} boxed>
+                <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 8px' })}>
+                  We weren't sure about these. If one is the wrong {singular}, open it, remove it from your
+                  log, and log the right one.
+                </p>
+                <ul mix={savedListStyle}>
+                  {model.uncertain.map(({ row, item }) => (
+                    <li key={row.id} mix={css({ marginBottom: '4px' })}>
+                      {item ? (
+                        <a href={hrefs.show(item.id)}>
+                          {item.title} {item.releaseYear ?? ''}
+                        </a>
+                      ) : (
+                        row.title
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </Collapsible>
+            )}
+            {model.leftOutRows.length > 0 && (
+              <Collapsible summary={`The ${model.leftOutRows.length} left out`} boxed>
+                <ul mix={savedListStyle}>
+                  {model.leftOutRows.map((row) => (
+                    <li key={row.id} mix={css({ marginBottom: '4px' })}>
+                      {row.title} {row.year ?? ''}{' '}
+                      <span mix={css({ color: '#888' })}>· {leftOutReason(row.state)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Collapsible>
+            )}
+            <p>
+              <a href={routes.profile.watched.href()}>See my log</a>
+              {' · '}
+              <a href={routes.profile.importMovies.index.href()}>Import another file</a>
+            </p>
+
+            {/* An export is a snapshot; the feed keeps it current. Offered, not done for them. */}
+            {offerFeed && (
+              <section
+                mix={css({
+                  border: '1px solid #d9cfbe',
+                  borderRadius: '8px',
+                  padding: '16px 18px',
+                  marginTop: '24px',
+                })}
+              >
+                <h2 mix={css({ marginTop: 0, fontSize: '15px' })}>Keep it up to date?</h2>
+                <p mix={css({ fontSize: '13px', color: '#555', marginTop: 0 })}>
+                  This file is a snapshot. Connect your diary and what you log on Letterboxd from here on
+                  follows on its own.
+                </p>
+                <form
+                  method="post"
+                  action={routes.profile.letterboxd.connect.href()}
+                  mix={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '12px' })}
+                >
+                  <Field
+                    label="Letterboxd username"
+                    hint="The last part of your profile URL — letterboxd.com/yourname/"
+                  >
+                    <input
+                      type="text"
+                      name="username"
+                      placeholder="yourname"
+                      autocomplete="off"
+                      spellcheck={false}
+                    />
+                  </Field>
+                  <button type="submit">Connect</button>
+                </form>
+              </section>
+            )}
+          </>
+        ) : (
+          <>
+            {/* One wrapper, so the drawer keeps its position (and open state) across reloads. */}
+            <div>
+              <h1>Review before saving</h1>
+              {error ? <p mix={css({ color: '#b91c1c' })}>{error}</p> : null}
+              <p mix={css({ fontSize: '15px', margin: '0 0 4px' })}>
+                {counts.total} rows.{' '}
+                {header.alreadyLogged > 0 && `${header.alreadyLogged} already in your log, `}
+                <b mix={css({ fontWeight: 400 })}>{model.confidentCount} matched cleanly</b>
+                {header.answered > 0 && `, ${header.answered} answered`}
+                {header.remembered > 0 && `, ${header.remembered} answered as last time`},{' '}
+                {model.uncertain.length} worth a look, and {model.notFound.length} we couldn't find.
+              </p>
+              {reviewsOnly && (
+                <p
                   mix={css({
-                    border: '1px solid #d9cfbe',
-                    borderRadius: '8px',
-                    padding: '16px 18px',
-                    marginTop: '24px',
+                    fontSize: '13px',
+                    color: '#8a5a1e',
+                    background: '#fdf3e3',
+                    border: '1px solid #f0dcbb',
+                    borderRadius: '4px',
+                    padding: '10px 12px',
+                    margin: '0 0 16px',
                   })}
                 >
-                  <h2 mix={css({ marginTop: 0, fontSize: '15px' })}>Keep it up to date?</h2>
-                  <p mix={css({ fontSize: '13px', color: '#555', marginTop: 0 })}>
-                    This file is a snapshot. Connect your diary and what you log on Letterboxd from here on
-                    follows on its own.
+                  This is only the films you reviewed — <b mix={css({ fontWeight: 600 })}>reviews.csv</b>{' '}
+                  carries nothing about the rest of what you've watched. Upload the whole export zip instead
+                  if you want your full history.
+                </p>
+              )}
+              {(model.conflicts.length > 0 || model.duplicates.length > 0) && (
+                <p mix={css({ fontSize: '13px', color: ACCENT, marginBottom: '20px' })}>
+                  The decisions below would change or drop something you already have.
+                </p>
+              )}
+
+              {model.conflicts.length > 0 && (
+                <Flag title="Already in your log" count={model.conflicts.length}>
+                  <p mix={css({ fontSize: '14px', color: '#555', margin: '0 0 12px' })}>
+                    You've logged these before, and the import disagrees. Rows matching what you already have
+                    aren't listed — there's nothing to decide.
                   </p>
                   <form
                     method="post"
-                    action={routes.profile.letterboxd.connect.href()}
-                    mix={css({ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '12px' })}
-                  >
-                    <Field
-                      label="Letterboxd username"
-                      hint="The last part of your profile URL — letterboxd.com/yourname/"
-                    >
-                      <input
-                        type="text"
-                        name="username"
-                        placeholder="yourname"
-                        autocomplete="off"
-                        spellcheck={false}
-                      />
-                    </Field>
-                    <button type="submit">Connect</button>
-                  </form>
-                </section>
-              )}
-            </>
-          ) : (
-            <>
-              {/* One wrapper, so the drawer keeps its position (and open state) across reloads. */}
-              <div>
-                <h1>Review before saving</h1>
-                {error ? <p mix={css({ color: '#b91c1c' })}>{error}</p> : null}
-                <p mix={css({ fontSize: '15px', margin: '0 0 4px' })}>
-                  {counts.total} rows.{' '}
-                  {header.alreadyLogged > 0 && `${header.alreadyLogged} already in your log, `}
-                  <b mix={css({ fontWeight: 400 })}>{model.confidentCount} matched cleanly</b>
-                  {header.answered > 0 && `, ${header.answered} answered`}
-                  {header.remembered > 0 && `, ${header.remembered} answered as last time`},{' '}
-                  {model.uncertain.length} worth a look, and {model.notFound.length} we couldn't find.
-                </p>
-                {reviewsOnly && (
-                  <p
+                    action={routes.profile.imports.conflicts.href({ batchId })}
+                    data-in-place
                     mix={css({
-                      fontSize: '13px',
-                      color: '#8a5a1e',
-                      background: '#fdf3e3',
-                      border: '1px solid #f0dcbb',
-                      borderRadius: '4px',
-                      padding: '10px 12px',
-                      margin: '0 0 16px',
+                      display: 'flex',
+                      gap: '8px',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      marginBottom: '14px',
                     })}
                   >
-                    This is only the films you reviewed — <b mix={css({ fontWeight: 600 })}>reviews.csv</b>{' '}
-                    carries nothing about the rest of what you've watched. Upload the whole export zip instead
-                    if you want your full history.
-                  </p>
-                )}
-                {(model.conflicts.length > 0 || model.duplicates.length > 0) && (
-                  <p mix={css({ fontSize: '13px', color: ACCENT, marginBottom: '20px' })}>
-                    The decisions below would change or drop something you already have.
-                  </p>
-                )}
-
-                {model.conflicts.length > 0 && (
-                  <Flag title="Already in your log" count={model.conflicts.length}>
-                    <p mix={css({ fontSize: '14px', color: '#555', margin: '0 0 12px' })}>
-                      You've logged these before, and the import disagrees. Rows matching what you already
-                      have aren't listed — there's nothing to decide.
-                    </p>
-                    <form
-                      method="post"
-                      action={routes.profile.imports.conflicts.href({ batchId })}
-                      data-in-place
-                      mix={css({
-                        display: 'flex',
-                        gap: '8px',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                        marginBottom: '14px',
-                      })}
+                    <span mix={css({ fontSize: '13px', color: '#8d8579' })}>
+                      For all {model.conflicts.length}
+                    </span>
+                    <button
+                      type="submit"
+                      name="choice"
+                      value="keep"
+                      class={batch.conflict_choice === 'keep' ? 'primary' : undefined}
+                      mix={css({ fontSize: '13px' })}
                     >
-                      <span mix={css({ fontSize: '13px', color: '#8d8579' })}>
-                        For all {model.conflicts.length}
-                      </span>
-                      <button
-                        type="submit"
-                        name="choice"
-                        value="keep"
-                        class={batch.conflict_choice === 'keep' ? 'primary' : undefined}
-                        mix={css({ fontSize: '13px' })}
-                      >
-                        Keep what's on On Deck
-                      </button>
-                      <button
-                        type="submit"
-                        name="choice"
-                        value="take"
-                        class={batch.conflict_choice === 'take' ? 'primary' : undefined}
-                        mix={css({ fontSize: '13px' })}
-                      >
-                        Take the import
-                      </button>
-                    </form>
-                    <div id="import-conflicts">
-                      {model.conflicts.map((entry) => (
-                        <ConflictCard
-                          key={entry.row.id}
-                          batchId={batchId}
-                          entry={entry}
-                          pastParticiple={pastParticiple}
-                        />
-                      ))}
-                    </div>
-                    <LazyList
-                      listId="import-conflicts"
-                      initial={CONFLICTS_VISIBLE}
-                      step={CONFLICTS_VISIBLE}
-                    />
-                    <p mix={css({ fontSize: '13px', color: '#888', margin: '10px 0 0' })}>
-                      Only the fields that differ are highlighted.
-                    </p>
-                  </Flag>
-                )}
-
-                {model.duplicates.length > 0 && (
-                  <Flag title={`Two rows, one ${singular}`} count={model.duplicates.length}>
-                    <p mix={css({ fontSize: '14px', color: '#555', margin: '0 0 12px' })}>
-                      Two rows landed on the same {singular}, and your log keeps one entry per {singular}.
-                      Usually that means they're two different {plural} sharing a name and one row matched
-                      wrong.
-                    </p>
-                    {model.duplicates.map((entry, i) => (
-                      <DuplicateCard
-                        key={`${entry.item.id}-${i}`}
+                      Keep what's on On Deck
+                    </button>
+                    <button
+                      type="submit"
+                      name="choice"
+                      value="take"
+                      class={batch.conflict_choice === 'take' ? 'primary' : undefined}
+                      mix={css({ fontSize: '13px' })}
+                    >
+                      Take the import
+                    </button>
+                  </form>
+                  <div id="import-conflicts">
+                    {model.conflicts.map((entry) => (
+                      <ConflictCard
+                        key={entry.row.id}
                         batchId={batchId}
                         entry={entry}
-                        singular={singular}
-                        plural={plural}
                         pastParticiple={pastParticiple}
                       />
                     ))}
-                    <p mix={css({ fontSize: '13px', color: '#888', margin: '10px 0 0' })}>
-                      Until you decide, the weaker match of each pair is held back rather than overwriting the
-                      other.
-                    </p>
-                  </Flag>
-                )}
+                  </div>
+                  <LazyList listId="import-conflicts" initial={CONFLICTS_VISIBLE} step={CONFLICTS_VISIBLE} />
+                  <p mix={css({ fontSize: '13px', color: '#888', margin: '10px 0 0' })}>
+                    Only the fields that differ are highlighted.
+                  </p>
+                </Flag>
+              )}
 
-                {uncertainGroups.length > 0 && (
-                  <>
-                    <h2>
-                      Worth a look{' '}
-                      <span mix={css({ color: '#888', fontSize: '14px' })}>({model.uncertain.length})</span>
-                    </h2>
-                    <p mix={css({ fontSize: '13px', color: '#888', marginBottom: '10px' })}>
-                      Least certain first. These save as matched unless you say otherwise. Leave out keeps one
-                      out of your log; your file isn't changed.
-                    </p>
-                    {uncertainGroups.map((group) => (
-                      <section
-                        key={group.key}
-                        id={groupAnchor(group.key)}
-                        mix={css({ marginBottom: '18px', scrollMarginTop: '12px' })}
-                      >
-                        <h3 mix={css({ margin: '14px 0 2px', fontSize: '16px' })}>
-                          {group.title}{' '}
-                          <span mix={css({ color: '#888', fontSize: '13px', fontWeight: 400 })}>
-                            ({group.entries.length})
-                          </span>
-                        </h3>
-                        {group.blurb && (
-                          <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 8px' })}>
-                            {group.blurb}
-                          </p>
-                        )}
-                        <AnsweredList
-                          batchId={batchId}
-                          section={group.key}
-                          entries={model.answered[group.key]}
-                          pastParticiple={pastParticiple}
-                          accepted={group.entries.length === 0 ? acceptedBy(group.key, model) : null}
-                        />
-                        <div id={`import-uncertain-${group.key}`}>
-                          {group.entries.map((entry) => (
-                            <UncertainCard
-                              key={entry.row.id}
-                              batchId={batchId}
-                              entry={entry}
-                              pastParticiple={pastParticiple}
-                              next={next.get(entry.row.id)}
-                            />
-                          ))}
-                        </div>
-                        <LazyList
-                          listId={`import-uncertain-${group.key}`}
-                          initial={ROWS_VISIBLE}
-                          step={ROWS_VISIBLE}
-                        />
-                      </section>
-                    ))}
-                  </>
-                )}
-
-                {(model.notFound.length > 0 || model.answered.not_found.length > 0) && (
-                  <>
-                    <hr />
-                    <h2 id={groupAnchor('not_found')} mix={css({ scrollMarginTop: '12px' })}>
-                      Couldn't find{' '}
-                      <span mix={css({ color: '#888', fontSize: '14px' })}>({model.notFound.length})</span>
-                    </h2>
-                    <p mix={css({ fontSize: '13px', color: '#888', marginBottom: '10px' })}>
-                      No catalog result under that name. <b>These won't be saved</b> unless you track them
-                      down.
-                    </p>
-                    <AnsweredList
+              {model.duplicates.length > 0 && (
+                <Flag title={`Two rows, one ${singular}`} count={model.duplicates.length}>
+                  <p mix={css({ fontSize: '14px', color: '#555', margin: '0 0 12px' })}>
+                    Two rows landed on the same {singular}, and your log keeps one entry per {singular}.
+                    Usually that means they're two different {plural} sharing a name and one row matched
+                    wrong.
+                  </p>
+                  {model.duplicates.map((entry, i) => (
+                    <DuplicateCard
+                      key={`${entry.item.id}-${i}`}
                       batchId={batchId}
-                      section="not_found"
-                      entries={model.answered.not_found}
+                      entry={entry}
+                      singular={singular}
+                      plural={plural}
                       pastParticiple={pastParticiple}
                     />
-                    <div id="import-not-found">
-                      {notFound.map(({ row }) => (
-                        <NotFoundCard key={row.id} batchId={batchId} row={row} next={next.get(row.id)} />
-                      ))}
-                    </div>
-                    <LazyList listId="import-not-found" initial={ROWS_VISIBLE} step={ROWS_VISIBLE} />
-                  </>
-                )}
-              </div>
+                  ))}
+                  <p mix={css({ fontSize: '13px', color: '#888', margin: '10px 0 0' })}>
+                    Until you decide, the weaker match of each pair is held back rather than overwriting the
+                    other.
+                  </p>
+                </Flag>
+              )}
 
-              <ReviewDrawer
-                batchId={batchId}
-                last={model.last}
-                sections={model.sections.map((section) => ({
-                  ...section,
-                  title:
-                    section.key === 'not_found'
-                      ? "Couldn't find"
-                      : reasonGroup(section.key, singular, plural).title,
-                  href: `#${groupAnchor(section.key)}`,
-                  bulk: bulkFor(section.key, model),
-                }))}
-                unchecked={model.uncertain.length}
-                leftOut={counts.leftOut}
-                save={counts.save}
-                singular={singular}
-                plural={plural}
-              />
+              {uncertainGroups.length > 0 && (
+                <>
+                  <h2>
+                    Worth a look{' '}
+                    <span mix={css({ color: '#888', fontSize: '14px' })}>({model.uncertain.length})</span>
+                  </h2>
+                  <p mix={css({ fontSize: '13px', color: '#888', marginBottom: '10px' })}>
+                    Least certain first. These save as matched unless you say otherwise. Leave out keeps one
+                    out of your log; your file isn't changed.
+                  </p>
+                  {uncertainGroups.map((group) => (
+                    <section
+                      key={group.key}
+                      id={groupAnchor(group.key)}
+                      mix={css({ marginBottom: '18px', scrollMarginTop: '12px' })}
+                    >
+                      <h3 mix={css({ margin: '14px 0 2px', fontSize: '16px' })}>
+                        {group.title}{' '}
+                        <span mix={css({ color: '#888', fontSize: '13px', fontWeight: 400 })}>
+                          ({group.entries.length})
+                        </span>
+                      </h3>
+                      {group.blurb && (
+                        <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 8px' })}>{group.blurb}</p>
+                      )}
+                      <AnsweredList
+                        batchId={batchId}
+                        section={group.key}
+                        entries={model.answered[group.key]}
+                        pastParticiple={pastParticiple}
+                        accepted={group.entries.length === 0 ? acceptedBy(group.key, model) : null}
+                      />
+                      <div id={`import-uncertain-${group.key}`}>
+                        {group.entries.map((entry) => (
+                          <UncertainCard
+                            key={entry.row.id}
+                            batchId={batchId}
+                            entry={entry}
+                            pastParticiple={pastParticiple}
+                            next={next.get(entry.row.id)}
+                          />
+                        ))}
+                      </div>
+                      <LazyList
+                        listId={`import-uncertain-${group.key}`}
+                        initial={ROWS_VISIBLE}
+                        step={ROWS_VISIBLE}
+                      />
+                    </section>
+                  ))}
+                </>
+              )}
 
-              <InPlaceForms />
-              <ImportPicker
-                candidatesTemplate={routes.profile.imports.candidates.href({ batchId, rowId: ROW_TOKEN })}
-                resolveTemplate={routes.profile.imports.resolve.href({ batchId, rowId: ROW_TOKEN })}
-                rowToken={ROW_TOKEN}
-              />
-            </>
-          )}
-        </main>
-      </Document>
+              {(model.notFound.length > 0 || model.answered.not_found.length > 0) && (
+                <>
+                  <hr />
+                  <h2 id={groupAnchor('not_found')} mix={css({ scrollMarginTop: '12px' })}>
+                    Couldn't find{' '}
+                    <span mix={css({ color: '#888', fontSize: '14px' })}>({model.notFound.length})</span>
+                  </h2>
+                  <p mix={css({ fontSize: '13px', color: '#888', marginBottom: '10px' })}>
+                    No catalog result under that name. <b>These won't be saved</b> unless you track them down.
+                  </p>
+                  <AnsweredList
+                    batchId={batchId}
+                    section="not_found"
+                    entries={model.answered.not_found}
+                    pastParticiple={pastParticiple}
+                  />
+                  <div id="import-not-found">
+                    {notFound.map(({ row }) => (
+                      <NotFoundCard key={row.id} batchId={batchId} row={row} next={next.get(row.id)} />
+                    ))}
+                  </div>
+                  <LazyList listId="import-not-found" initial={ROWS_VISIBLE} step={ROWS_VISIBLE} />
+                </>
+              )}
+            </div>
+
+            <ReviewDrawer
+              batchId={batchId}
+              last={model.last}
+              sections={model.sections.map((section) => ({
+                ...section,
+                title:
+                  section.key === 'not_found'
+                    ? "Couldn't find"
+                    : reasonGroup(section.key, singular, plural).title,
+                href: `#${groupAnchor(section.key)}`,
+                bulk: bulkFor(section.key, model),
+              }))}
+              unchecked={model.uncertain.length}
+              leftOut={counts.leftOut}
+              save={counts.save}
+              singular={singular}
+              plural={plural}
+            />
+
+            <InPlaceForms />
+            <ImportPicker
+              candidatesTemplate={routes.profile.imports.candidates.href({ batchId, rowId: ROW_TOKEN })}
+              resolveTemplate={routes.profile.imports.resolve.href({ batchId, rowId: ROW_TOKEN })}
+              rowToken={ROW_TOKEN}
+            />
+          </>
+        )}
+      </Page>
     )
   }
 }

@@ -132,6 +132,10 @@ does nothing on its own.
   A member correcting a bad match for themselves does it through the import
   review (`repointRow`), which changes which existing row a staged row points at
   and leaves the catalog alone.
+- Every page renders through `Page` (`app/ui/components/page.tsx`), which owns
+  the nav, the column width (`narrow`/default/`wide`), the back link and the
+  `<h1>`. Don't lay out `<Document>`/`<Nav>`/`<main>` by hand: that is how the
+  pages drifted into putting their titles at different heights.
 - Tests live in `test/`, usually one file per module under test
   (`import-review.test.ts` covers `data/imports/review.ts`), though a few cover
   a pair — `lucky.test.ts` holds both `lucky` and `exclusions`. `npm test` runs

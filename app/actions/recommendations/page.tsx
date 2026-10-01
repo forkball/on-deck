@@ -14,8 +14,7 @@ import {
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { Document } from '../../ui/components/document.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
+import { Page } from '../../ui/components/page.tsx'
 import { RunList } from '../../ui/components/run-list.tsx'
 import type { UnconfirmedRunDetail } from '../../data/recommendations/unconfirmed.ts'
 import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, mediaTypeUiFor, type ActiveMediaType } from '../../mediaTypes.ts'
@@ -189,103 +188,98 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
     const ui = MEDIA_TYPE_UI[mediaType]
 
     return (
-      <Document title="Recommendations | On Deck">
-        <Nav authed={true} displayName={displayName} />
-        <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>Recommendations</h1>
-          <p mix={css({ margin: 0, color: '#555' })}>
-            Rewrites your {ui.attributive} taste profile from what you've logged, then finds picks to try
-            next.
-          </p>
-          <p mix={css({ margin: '4px 0 0', color: '#888', fontSize: '13px' })}>
-            Only your last {MAX_RUNS_PER_USER} runs are kept — generating a new one deletes the oldest.
-          </p>
-          <MediaTabLinks current={mediaType} hrefFor={(type) => `${recsHref}?mediaType=${type}`} />
+      <Page heading="Recommendations" width="wide" displayName={displayName}>
+        <p mix={css({ margin: 0, color: '#555' })}>
+          Rewrites your {ui.attributive} taste profile from what you've logged, then finds picks to try next.
+        </p>
+        <p mix={css({ margin: '4px 0 0', color: '#888', fontSize: '13px' })}>
+          Only your last {MAX_RUNS_PER_USER} runs are kept — generating a new one deletes the oldest.
+        </p>
+        <MediaTabLinks current={mediaType} hrefFor={(type) => `${recsHref}?mediaType=${type}`} />
 
-          {duplicate && <DuplicateNotice duplicate={duplicate} />}
+        {duplicate && <DuplicateNotice duplicate={duplicate} />}
 
-          {error && (
-            <p
-              mix={css({
-                margin: '0 0 16px',
-                padding: '12px 16px',
-                border: '1px solid #b91c1c',
-                borderRadius: '8px',
-                color: '#b91c1c',
-              })}
-            >
-              {error}
+        {error && (
+          <p
+            mix={css({
+              margin: '0 0 16px',
+              padding: '12px 16px',
+              border: '1px solid #b91c1c',
+              borderRadius: '8px',
+              color: '#b91c1c',
+            })}
+          >
+            {error}
+          </p>
+        )}
+
+        <GenerateRecommendationsForm
+          friends={friends.map((friend) => ({
+            id: friend.id,
+            label: displayLabel(friend),
+            loggedTypes: loggedTypes[friend.id] ?? [],
+          }))}
+          viewerLoggedTypes={viewerLoggedTypes}
+          mediaType={mediaType}
+          mediaTypeLabel={ui.attributive}
+          itemNoun={ui.singular}
+          shortlistCount={TARGET_COUNT}
+          runsLeftLabel={runsLeftLabel(dailyRuns)}
+          runsRemaining={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.remaining : undefined}
+          runsLimit={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.limit : undefined}
+          sources={ACTIVE_MEDIA_TYPES.map((type) => ({
+            value: type,
+            label: MEDIA_TYPE_UI[type].tabLabel,
+          }))}
+          genres={genres}
+          lengthOptions={lengthOptions}
+          playerTypes={playerTypes}
+          multiplayerTypes={multiplayerTypes}
+          platforms={platforms}
+          seriesTypes={seriesTypes}
+          generateHref={routes.recommendations.generate.href()}
+          luckyHref={routes.recommendations.lucky.href()}
+          luckyAvailable={lucky.available}
+          luckyWaitLabel={lucky.nextAt == null ? '' : `about ${timeUntil(lucky.nextAt)}`}
+          startLucky={startLucky === true}
+          findPeopleHref={routes.users.search.href()}
+        />
+
+        {runsFromOthers.length > 0 && (
+          <RunsSection
+            title="Recommendations from others"
+            caption="Group runs that included you."
+            runs={runsFromOthers}
+          />
+        )}
+
+        {unconfirmedRuns.length > 0 && <UnconfirmedSection runs={unconfirmedRuns} />}
+
+        {luckyRuns.length > 0 && (
+          <RunsSection
+            title="Lucky picks"
+            caption={`Your last ${MAX_LUCKY_RUNS_PER_USER} draws.`}
+            runs={luckyRuns}
+          />
+        )}
+
+        <section mix={css({ marginTop: '40px' })}>
+          <h2>Past recommendations</h2>
+          {runs.length > 0 && (
+            <p mix={sectionCaption}>
+              Your last {MAX_RUNS_PER_USER} {ui.attributive} runs.
             </p>
           )}
-
-          <GenerateRecommendationsForm
-            friends={friends.map((friend) => ({
-              id: friend.id,
-              label: displayLabel(friend),
-              loggedTypes: loggedTypes[friend.id] ?? [],
-            }))}
-            viewerLoggedTypes={viewerLoggedTypes}
-            mediaType={mediaType}
-            mediaTypeLabel={ui.attributive}
-            itemNoun={ui.singular}
-            shortlistCount={TARGET_COUNT}
-            runsLeftLabel={runsLeftLabel(dailyRuns)}
-            runsRemaining={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.remaining : undefined}
-            runsLimit={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.limit : undefined}
-            sources={ACTIVE_MEDIA_TYPES.map((type) => ({
-              value: type,
-              label: MEDIA_TYPE_UI[type].tabLabel,
-            }))}
-            genres={genres}
-            lengthOptions={lengthOptions}
-            playerTypes={playerTypes}
-            multiplayerTypes={multiplayerTypes}
-            platforms={platforms}
-            seriesTypes={seriesTypes}
-            generateHref={routes.recommendations.generate.href()}
-            luckyHref={routes.recommendations.lucky.href()}
-            luckyAvailable={lucky.available}
-            luckyWaitLabel={lucky.nextAt == null ? '' : `about ${timeUntil(lucky.nextAt)}`}
-            startLucky={startLucky === true}
-            findPeopleHref={routes.users.search.href()}
-          />
-
-          {runsFromOthers.length > 0 && (
-            <RunsSection
-              title="Recommendations from others"
-              caption="Group runs that included you."
-              runs={runsFromOthers}
-            />
+          {runs.length === 0 ? (
+            <p>
+              Nothing yet — log a few {ui.plural} on your{' '}
+              <a href={routes.profile.index.href()}>profile page</a>, then get recommendations above.
+            </p>
+          ) : (
+            <RunList runs={runs} returnTo={routes.recommendations.index.href()} />
           )}
-
-          {unconfirmedRuns.length > 0 && <UnconfirmedSection runs={unconfirmedRuns} />}
-
-          {luckyRuns.length > 0 && (
-            <RunsSection
-              title="Lucky picks"
-              caption={`Your last ${MAX_LUCKY_RUNS_PER_USER} draws.`}
-              runs={luckyRuns}
-            />
-          )}
-
-          <section mix={css({ marginTop: '40px' })}>
-            <h2>Past recommendations</h2>
-            {runs.length > 0 && (
-              <p mix={sectionCaption}>
-                Your last {MAX_RUNS_PER_USER} {ui.attributive} runs.
-              </p>
-            )}
-            {runs.length === 0 ? (
-              <p>
-                Nothing yet — log a few {ui.plural} on your{' '}
-                <a href={routes.profile.index.href()}>profile page</a>, then get recommendations above.
-              </p>
-            ) : (
-              <RunList runs={runs} returnTo={routes.recommendations.index.href()} />
-            )}
-          </section>
-        </main>
-      </Document>
+        </section>
+      </Page>
     )
   }
 }

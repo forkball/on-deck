@@ -1,12 +1,10 @@
 import type { Handle } from 'remix/ui'
-import { css } from 'remix/ui'
 
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { Document } from '../../ui/components/document.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
+import { Page } from '../../ui/components/page.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedList } from '../../ui/components/watched-list.tsx'
 import { MEDIA_TYPE_UI, mediaTypeQuery, type ActiveMediaType } from '../../mediaTypes.ts'
@@ -33,23 +31,18 @@ export function UserWatchedPage(handle: Handle<UserWatchedPageProps>) {
     const heading = `What ${label} has ${ui.pastParticiple} (${noun})`
 
     return (
-      <Document title={`${heading} | On Deck`}>
-        <Nav authed={true} displayName={displayName} />
-        <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>{heading}</h1>
+      <Page heading={heading} displayName={displayName}>
+        {/* No actions: this is someone else's log, not yours to edit. */}
+        <WatchedList log={movieLog} mediaType={mediaType} returnTo={returnTo} />
 
-          {/* No actions: this is someone else's log, not yours to edit. */}
-          <WatchedList log={movieLog} mediaType={mediaType} returnTo={returnTo} />
-
-          {totalPages > 1 && (
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              pageHref={(p) => `${watchedHref}?page=${p}${typeQuery}`}
-            />
-          )}
-        </main>
-      </Document>
+        {totalPages > 1 && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            pageHref={(p) => `${watchedHref}?page=${p}${typeQuery}`}
+          />
+        )}
+      </Page>
     )
   }
 }
