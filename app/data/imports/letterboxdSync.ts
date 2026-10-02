@@ -29,8 +29,11 @@ const CONCURRENCY = 8
 const COOLDOWN_MS = 15 * 60 * 1000
 
 // What a caller in front of a person will wait before giving up and letting the
-// sync finish on its own.
+// sync finish on its own. A recommendation run is already a wait the member
+// chose; a page load isn't, so it gets the shorter leash and leaves a slow feed
+// to show up on the next visit.
 const WAIT_MS = 3_000
+export const PAGE_WAIT_MS = 1_500
 
 export interface LetterboxdSyncResult {
   // Diary entries the feed held, before the connection point narrowed them.
@@ -484,11 +487,11 @@ export function syncLetterboxdInBackground(db: Db, user: User): void {
 // the profile drawing its recent films. Bounded, because a slow feed is not a
 // reason to fail or stall the thing the member actually asked for; the sync
 // carries on in the background either way.
-export async function syncLetterboxdBeforeReading(db: Db, user: User): Promise<void> {
+export async function syncLetterboxdBeforeReading(db: Db, user: User, waitMs = WAIT_MS): Promise<void> {
   const run = startSync(db, user)
   if (!run) return
 
-  await Promise.race([swallow(user.id, run), new Promise((resolve) => setTimeout(resolve, WAIT_MS).unref())])
+  await Promise.race([swallow(user.id, run), new Promise((resolve) => setTimeout(resolve, waitMs).unref())])
 }
 
 // A member asking for the diary to be read now, and waiting for it. Awaited
