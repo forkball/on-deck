@@ -47,6 +47,32 @@
   border-image: url(/vendor/doodle/border.svg) 10 10 10 10 stretch stretch;
 }
 
+/* Fields draw the same shapes at a 2px stroke rather than 3: a field sits idle
+   on the page far more than a button does, and at the button's weight a form
+   read as a stack of heavy boxes. Same path and same 10px slice, so the box —
+   and the one-height row beside a button — is unchanged; only the line thins.
+   Listed after the rules above at equal specificity so it wins over them. */
+.doodle select,
+.doodle input:not([type='checkbox']):not([type='radio']) {
+  border-image: url(/field-light.svg) 10 10 10 10 stretch stretch;
+}
+
+.doodle select:hover,
+.doodle select:focus-visible,
+.doodle input:not([type='checkbox']):not([type='radio']):hover,
+.doodle input:not([type='checkbox']):not([type='radio']):focus-visible {
+  border-image: url(/field.svg) 10 10 10 10 stretch stretch;
+}
+
+.doodle textarea {
+  border-image: url(/textarea-light.svg) 10 10 10 10 stretch stretch;
+}
+
+.doodle textarea:hover,
+.doodle textarea:focus-visible {
+  border-image: url(/textarea.svg) 10 10 10 10 stretch stretch;
+}
+
 .doodle button,
 .doodle .doodle-border,
 .doodle select,
