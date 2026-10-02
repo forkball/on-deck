@@ -120,8 +120,8 @@
 
 /* The other half of a form row: a <select> or text <input> beside a button
    takes no block padding either, so the row stands at one height. Only the
-   block padding is stated: a select's inline padding is DoodleCSS's caret
-   allowance (`padding-right: 1.5em`) and an input's is the browser's.
+   block padding is stated: an input's inline padding is the browser's, and a
+   select's right padding is the caret allowance set just below.
 
    A <textarea> keeps 4px: it holds prose, not one line, and on no padding its
    first line sits against the border. It is also left out of the line-height
@@ -133,6 +133,15 @@
 .doodle select,
 .doodle input:not([type='checkbox']):not([type='radio']) {
   padding-block: 0;
+}
+
+/* DoodleCSS paints the caret as an 18.5px background 10px in from the right
+   (`background-position-x: calc(100% - 10px)`) but only allows `padding-right:
+   1.5em` (24px) for it, so the caret overlapped the last letter of the option
+   with no gap at all. 10px offset + 18.5px caret + an 8px gap is 36px. Pixels,
+   not em: the caret is a fixed-size image and doesn't scale with the text. */
+.doodle select:not([multiple]) {
+  padding-right: 36px;
 }
 
 /* Padding gets them to the same height while Short Stack is rendering, but the
