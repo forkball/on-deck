@@ -5,7 +5,7 @@ import { redirect } from 'remix/response/redirect'
 
 import { activeBatches } from '../../data/imports/batches.ts'
 import { letterboxdSyncAvailableTo } from '../../data/imports/letterboxdFeed.ts'
-import { PAGE_WAIT_MS, syncLetterboxdBeforeReading } from '../../data/imports/letterboxdSync.ts'
+import { syncLetterboxdBeforeReading } from '../../data/imports/letterboxdSync.ts'
 import {
   getProfileRebuildAllowance,
   recordProfileRebuild,
@@ -55,11 +55,11 @@ export default createController(routes.profile, {
       // last visit is on this page rather than the next one. Only the log waits
       // on it: everything else the page needs is loaded alongside, inside the
       // time the feed was going to take anyway. Bounded — a slow feed holds the
-      // render for PAGE_WAIT_MS at most and finishes in the background — and a
+      // render for a few seconds at most and finishes in the background — and a
       // no-op unless a Letterboxd account is connected and the fetch cooldown
       // has passed.
       const [media, followingCount, followersCount, rebuildAllowance, batches] = await Promise.all([
-        syncLetterboxdBeforeReading(db, auth.identity, PAGE_WAIT_MS).then(() =>
+        syncLetterboxdBeforeReading(db, auth.identity).then(() =>
           loadMediaSummaries(db, auth.identity.id, RECENT_COUNT),
         ),
         countFollowing(db, auth.identity.id),
@@ -181,8 +181,8 @@ export default createController(routes.profile, {
       const filter = { type: mediaType, statuses: status ? [status] : undefined }
 
       // Same as the profile: the feed before the log, so the list is current
-      // on this visit, held to PAGE_WAIT_MS.
-      await syncLetterboxdBeforeReading(db, auth.identity, PAGE_WAIT_MS)
+      // on this visit.
+      await syncLetterboxdBeforeReading(db, auth.identity)
 
       // Counted through the same filter, or the last page of a filtered list
       // pages past its own end.
