@@ -3,7 +3,7 @@ import { after, before, describe, it } from 'node:test'
 
 import { db, pool } from '../app/data/db.ts'
 import {
-  syncLetterboxdBeforeRun,
+  syncLetterboxdBeforeReading,
   syncLetterboxdInBackground,
   syncLetterboxdNow,
 } from '../app/data/imports/letterboxdSync.ts'
@@ -60,7 +60,7 @@ describe('the Letterboxd sync cooldown', { skip: skipWithoutDatabase }, () => {
     // Awaited rather than the background trigger, so the assertion isn't a
     // race: a sync that was going to happen has happened by the time this
     // returns.
-    await syncLetterboxdBeforeRun(db, await load())
+    await syncLetterboxdBeforeReading(db, await load())
 
     assert.equal(fetches, 0)
   })
@@ -69,7 +69,7 @@ describe('the Letterboxd sync cooldown', { skip: skipWithoutDatabase }, () => {
     fetches = 0
     await syncedAgo(16 * 60 * 1000)
 
-    await syncLetterboxdBeforeRun(db, await load())
+    await syncLetterboxdBeforeReading(db, await load())
 
     assert.equal(fetches, 1)
   })
@@ -95,7 +95,7 @@ describe('the Letterboxd sync cooldown', { skip: skipWithoutDatabase }, () => {
     await syncedAgo(16 * 60 * 1000)
 
     await syncLetterboxdNow(db, await load())
-    await syncLetterboxdBeforeRun(db, await load())
+    await syncLetterboxdBeforeReading(db, await load())
 
     assert.equal(fetches, 1)
   })

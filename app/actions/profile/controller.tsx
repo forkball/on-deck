@@ -5,7 +5,7 @@ import { redirect } from 'remix/response/redirect'
 
 import { activeBatches } from '../../data/imports/batches.ts'
 import { letterboxdSyncAvailableTo } from '../../data/imports/letterboxdFeed.ts'
-import { syncLetterboxdInBackground } from '../../data/imports/letterboxdSync.ts'
+import { syncLetterboxdBeforeReading, syncLetterboxdInBackground } from '../../data/imports/letterboxdSync.ts'
 import {
   getProfileRebuildAllowance,
   recordProfileRebuild,
@@ -49,6 +49,12 @@ export default createController(routes.profile, {
       const auth = context.get(Auth)
 
       const db = context.get(Database)
+      // Before the log is read, so a diary entry made since the last visit is
+      // on this page rather than the next one. Bounded — a slow feed holds the
+      // render for a few seconds at most and finishes in the background — and a
+      // no-op unless a Letterboxd account is connected and the fetch cooldown
+      // has passed.
+      await syncLetterboxdBeforeReading(db, auth.identity)
       const media = await loadMediaSummaries(db, auth.identity.id, RECENT_COUNT)
       const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
@@ -69,12 +75,6 @@ export default createController(routes.profile, {
         noun: mediaTypeUiFor(batch.media_type).attributive,
         matching: batch.status === 'matching',
       }))
-
-      // Kicked off beside the render, never awaited into it: reading the feed
-      // and looking up any film new to the catalog is seconds of network, and
-      // the log it updates is the one this page draws next time. No-op unless a
-      // Letterboxd account is connected and the fetch cooldown has passed.
-      syncLetterboxdInBackground(db, auth.identity)
 
       return context.render(
         <ProfilePage

@@ -479,11 +479,12 @@ export function syncLetterboxdInBackground(db: Db, user: User): void {
   void swallow(user.id, run)
 }
 
-// For a caller that would rather not act on a stale log — a recommendation run
-// generating against films the member already watched. Bounded, because a slow
-// feed is not a reason to fail the thing the member actually asked for; the
-// sync carries on in the background either way.
-export async function syncLetterboxdBeforeRun(db: Db, user: User): Promise<void> {
+// For a caller about to read the log that would rather not read a stale one — a
+// recommendation run generating against films the member already watched, or
+// the profile drawing its recent films. Bounded, because a slow feed is not a
+// reason to fail or stall the thing the member actually asked for; the sync
+// carries on in the background either way.
+export async function syncLetterboxdBeforeReading(db: Db, user: User): Promise<void> {
   const run = startSync(db, user)
   if (!run) return
 
