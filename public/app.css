@@ -135,13 +135,18 @@
   padding-block: 0;
 }
 
-/* DoodleCSS paints the caret as an 18.5px background 10px in from the right
-   (`background-position-x: calc(100% - 10px)`) but only allows `padding-right:
-   1.5em` (24px) for it, so the caret overlapped the last letter of the option
-   with no gap at all. 10px offset + 18.5px caret + an 8px gap is 36px. Pixels,
-   not em: the caret is a fixed-size image and doesn't scale with the text. */
+/* DoodleCSS paints the caret at caret.svg's own 18.5px, with a 3px stroke —
+   taller than the text's x-height and heavier than the 2px field border around
+   it. Drawn at 12px wide the stroke scales to ~2px, the same line as the field.
+
+   It sits 10px in from the right (`background-position-x: calc(100% - 10px)`),
+   and DoodleCSS only allows `padding-right: 1.5em` for it, which left the caret
+   overlapping the last letter of the option. 10px offset + 12px caret + an 8px
+   gap is 30px. Pixels, not em: the caret is a fixed size and doesn't scale with
+   the text. */
 .doodle select:not([multiple]) {
-  padding-right: 36px;
+  background-size: 12px auto;
+  padding-right: 30px;
 }
 
 /* Padding gets them to the same height while Short Stack is rendering, but the
