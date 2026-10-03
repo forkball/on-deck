@@ -10,7 +10,7 @@ import { PasswordConfirmModal } from '../../../ui/components/password-confirm-mo
 import { Field } from '../../../ui/shared/field.tsx'
 import { Tabs } from '../../../ui/components/tabs.tsx'
 import { Connections, type ConnectionsProps } from './connections.tsx'
-import { Button, Checkbox, Select, TextInput, Textarea } from '../../../ui/shared/form-controls.tsx'
+import { Button, CheckboxOption, Select, TextInput, Textarea } from '../../../ui/shared/form-controls.tsx'
 
 // The three things this page holds have nothing to do with each other beyond
 // belonging to the same account, and each is its own form with its own submit —
@@ -87,18 +87,13 @@ function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSetting
             </Select>
           </Field>
 
-          {/* Not routed through Field for the same reason the privacy
-              checkbox above isn't — it stretches inputs to full width. */}
-          <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
-            <label mix={css({ display: 'flex', alignItems: 'center', gap: '8px' })}>
-              <Checkbox name="use_notes" defaultChecked={settings.useNotes} mix={css({ width: 'auto' })} />
-              Use the notes I've written on things I've logged
-            </label>
-            <span mix={css({ fontSize: '12px', color: '#888' })}>
-              Your notes say more about why you liked something than a rating can. Turn this off to keep them
-              to yourself — everything else about the entry is still used.
-            </span>
-          </div>
+          <CheckboxOption
+            name="use_notes"
+            defaultChecked={settings.useNotes}
+            hint="Your notes say more about why you liked something than a rating can. Turn this off to keep them to yourself — everything else about the entry is still used."
+          >
+            Use the notes I've written on things I've logged
+          </CheckboxOption>
 
           <div>
             <Button type="submit">Save taste settings</Button>
@@ -173,22 +168,13 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
                       placeholder="Tell people a bit about yourself…"
                     />
                   </Field>
-                  {/* Not routed through Field — that stretches inputs to 100%
-                width, which turns a checkbox into a giant square. */}
-                  <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
-                    <label mix={css({ display: 'flex', alignItems: 'center', gap: '8px' })}>
-                      <Checkbox
-                        name="is_private"
-                        defaultChecked={values.is_private}
-                        mix={css({ width: 'auto' })}
-                      />
-                      Private profile
-                    </label>
-                    <span mix={css({ fontSize: '12px', color: '#888' })}>
-                      Anyone can still find you by name and see your follow counts. Your bio and log are only
-                      visible to people who follow you.
-                    </span>
-                  </div>
+                  <CheckboxOption
+                    name="is_private"
+                    defaultChecked={values.is_private}
+                    hint="Anyone can still find you by name and see your follow counts. Your bio and log are only visible to people who follow you."
+                  >
+                    Private profile
+                  </CheckboxOption>
                   {/* Both handles are unique and reachable — changing either is
                 what the password confirms. The modal lives inside this form,
                 so its box is one of these fields. */}

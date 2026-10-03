@@ -247,6 +247,98 @@
   padding: 0;
 }
 
+/* CheckboxOption and RadioOption (form-controls.tsx). The control and its text
+   on one centred line, 8px apart, with an optional hint under the text — lined
+   up with the text, not the control. Here because `.doodle label` sets display
+   and padding unlayered, and a css() rule can't outrank that.
+
+   The control's margin is zeroed so the gap is the only space beside it and
+   the hint's indent (24px control + 8px gap) is exact. The text is nudged down
+   a hair because Short Stack's letters sit high in their line box; in em, so it
+   holds at any size. */
+.doodle .choice[hidden] {
+  display: none;
+}
+
+.doodle label.choice-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  line-height: 1.25;
+}
+
+.doodle label.choice-label input {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.doodle .choice-text {
+  position: relative;
+  top: 0.05em;
+}
+
+.doodle .choice-hint {
+  margin-top: 4px;
+  padding-left: 32px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #888;
+}
+
+/* ChoiceGroup. A <fieldset> for what it says — one question, its options — and
+   none of Doodle's look: `.doodle fieldset` draws the hand-drawn border box,
+   which these groups never had. */
+.doodle fieldset.choice-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-image: none;
+  min-width: 0;
+}
+
+.doodle .choice-legend {
+  display: block;
+  padding: 0;
+}
+
+.doodle .choice-legend.section {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.doodle .choice-legend.subsection {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.doodle .choice-options {
+  display: flex;
+}
+
+.doodle .choice-options.column {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.doodle .choice-options.row {
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.doodle .choice-group-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #888;
+}
+
 /* The "Not for me" chip in the rating picker. Its border, radius and colours
    live with the component in star-rating.tsx; only the padding is here, for the
    same reason as the modal trigger above — `.doodle label { padding: .25em 0 }`

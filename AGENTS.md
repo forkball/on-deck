@@ -138,9 +138,12 @@ does nothing on its own.
   pages drifted into putting their titles at different heights.
 - Every visible control renders through `app/ui/shared/form-controls.tsx`:
   `Button` (with a `variant` rather than a class string), `ButtonLink`,
-  `TextInput`, `Select`, `Textarea`, `Checkbox` and `Radio`, plus
-  `buttonFrameClass` for a `<span>` or `<summary>` that has to look like a
-  button. Their look is in `public/app.css`, because DoodleCSS is unlayered and
+  `TextInput`, `Select` and `Textarea`, plus `buttonFrameClass` for a `<span>`
+  or `<summary>` that has to look like a button. Checkboxes and radios come
+  only as `CheckboxOption`/`RadioOption` — the control with its label and an
+  optional `hint` under it — inside a `ChoiceGroup` (`<fieldset>` + `<legend>`)
+  when several answer one question; there is no bare `Checkbox` to lay a label
+  beside by hand. Their look is in `public/app.css`, because DoodleCSS is unlayered and
   a `css()` rule can't beat it. `test/form-controls.test.tsx` fails on a raw
   `<button>`, `<input>`, `<select>` or `<textarea>` anywhere else; hidden inputs
   and the invisible toggles CSS reads (tabs, modal, carousel) are listed there

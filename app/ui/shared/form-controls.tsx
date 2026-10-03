@@ -1,7 +1,8 @@
-import type { Handle, Props } from 'remix/ui'
+import type { Handle, Props, RemixNode } from 'remix/ui'
 
 // The app's form controls. Every button, text input, select, textarea, checkbox
-// and radio a person can see renders through one of these, so the look lives in
+// and radio a person can see renders through one of these — checkboxes and
+// radios as a labelled CheckboxOption or RadioOption, usually in a ChoiceGroup — so the look lives in
 // one place rather than as a class string retyped at each call site —
 // test/form-controls.test.ts fails on a raw control anywhere else.
 //
@@ -119,10 +120,74 @@ export function Textarea(handle: Handle<Props<'textarea'>>) {
   return () => <textarea {...handle.props} />
 }
 
-export function Checkbox(handle: Handle<InputAttributes>) {
-  return () => <input {...({ ...handle.props, type: 'checkbox' } as Props<'input'>)} />
+// A checkbox or radio with its label, and optionally a line under it. There is
+// no bare Checkbox or Radio to reach for instead: an unlabelled one is never
+// what a page wants, and every page that laid its own label beside one did it a
+// little differently — three ways, before these.
+//
+// `children` is the label: text, plus anything that belongs on its line (a
+// "runs left" pill, a "(soon)"). `hint` sits under the label, lined up with the
+// label's text rather than the control, and outside the <label> so it stays
+// readable when the option is disabled and the label fades — it is often the
+// line saying why. Every other attribute reaches the <input>, `mix` included.
+//
+// The layout is in app.css (`.choice`): DoodleCSS sets `.doodle label {
+// display: inline-block; padding }` unlayered, which no css() rule can beat.
+// `hidden` is passed to the wrapper for the same reason it needs a rule there —
+// Doodle's display would otherwise override the browser's own [hidden].
+export type ChoiceOptionProps = InputAttributes & {
+  hint?: RemixNode
+  hidden?: boolean
 }
 
-export function Radio(handle: Handle<InputAttributes>) {
-  return () => <input {...({ ...handle.props, type: 'radio' } as Props<'input'>)} />
+function ChoiceOption(handle: Handle<ChoiceOptionProps & { kind: 'checkbox' | 'radio' }>): () => RemixNode {
+  return () => {
+    const { kind, children, hint, hidden, ...input } = handle.props
+    return (
+      <div class="choice" hidden={hidden}>
+        <label class="choice-label">
+          <input {...({ ...input, type: kind } as Props<'input'>)} />
+          <span class="choice-text">{children}</span>
+        </label>
+        {hint != null && hint !== false && <div class="choice-hint">{hint}</div>}
+      </div>
+    )
+  }
+}
+
+export function CheckboxOption(handle: Handle<ChoiceOptionProps>) {
+  return () => <ChoiceOption {...handle.props} kind="checkbox" />
+}
+
+export function RadioOption(handle: Handle<ChoiceOptionProps>) {
+  return () => <ChoiceOption {...handle.props} kind="radio" />
+}
+
+// A set of options that answer one question: a <fieldset> whose <legend> is the
+// question, so a screen reader names it before reading the choices. The legend
+// comes in the form's two heading sizes — `section` is the small capitals of
+// "What are you after?", `subsection` the bold "Taste" inside Settings.
+//
+// `hint` is a line for the group as a whole, under the options. `layout` is
+// how they sit: a column, or a row that wraps.
+export type ChoiceGroupProps = {
+  legend: RemixNode
+  legendSize?: 'section' | 'subsection'
+  layout?: 'column' | 'row'
+  hint?: RemixNode
+  children?: RemixNode
+  mix?: Props<'fieldset'>['mix']
+}
+
+export function ChoiceGroup(handle: Handle<ChoiceGroupProps>) {
+  return () => {
+    const { legend, legendSize = 'section', layout = 'column', hint, children, mix } = handle.props
+    return (
+      <fieldset class="choice-group" mix={mix}>
+        <legend class={`choice-legend ${legendSize}`}>{legend}</legend>
+        <div class={`choice-options ${layout}`}>{children}</div>
+        {hint != null && hint !== false && <div class="choice-group-hint">{hint}</div>}
+      </fieldset>
+    )
+  }
 }

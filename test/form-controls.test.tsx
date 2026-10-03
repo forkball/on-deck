@@ -8,8 +8,9 @@ import {
   Button,
   ButtonLink,
   buttonFrameClass,
-  Checkbox,
-  Radio,
+  CheckboxOption,
+  ChoiceGroup,
+  RadioOption,
   Select,
   Textarea,
   TextInput,
@@ -62,8 +63,6 @@ describe('form controls', () => {
   it('fixes each input to its type', async () => {
     assert.match(await renderToString(<TextInput name="q" />), /type="text"/)
     assert.match(await renderToString(<TextInput type="password" name="p" />), /type="password"/)
-    assert.match(await renderToString(<Checkbox name="c" />), /type="checkbox"/)
-    assert.match(await renderToString(<Radio name="r" value="1" />), /type="radio"/)
     assert.match(await renderToString(<Textarea name="t" rows={3} />), /^<textarea[^>]*rows="3"/)
     assert.match(
       await renderToString(
@@ -76,14 +75,68 @@ describe('form controls', () => {
   })
 })
 
+describe('choice options and groups', () => {
+  it('labels the control, and passes every attribute to the input', async () => {
+    const html = await renderToString(
+      <RadioOption name="mode" value="self" defaultChecked disabled>
+        Just me
+      </RadioOption>,
+    )
+    assert.match(
+      html,
+      /^<div class="choice"><label class="choice-label"><input [^>]*><span class="choice-text">Just me<\/span><\/label><\/div>$/,
+    )
+    for (const attribute of ['type="radio"', 'name="mode"', 'value="self"', 'checked', 'disabled']) {
+      assert.ok(html.includes(attribute), `${attribute} in ${html}`)
+    }
+    assert.match(await renderToString(<CheckboxOption name="c">Books</CheckboxOption>), /type="checkbox"/)
+  })
+
+  // Outside the <label>, so a disabled option's fade doesn't take the line that
+  // says why it is disabled.
+  it('puts a hint under the label, outside it', async () => {
+    const html = await renderToString(
+      <CheckboxOption name="is_private" hint="Only followers see your log.">
+        Private profile
+      </CheckboxOption>,
+    )
+    assert.match(html, /<\/label><div class="choice-hint">Only followers see your log\.<\/div><\/div>$/)
+  })
+
+  it('hides an option without unmounting it', async () => {
+    const html = await renderToString(<CheckboxOption hidden>Sam</CheckboxOption>)
+    // Attribute order is the renderer's business, so each is looked for on its own.
+    assert.match(html, /^<div [^>]*\bhidden\b/)
+    assert.match(html, /^<div [^>]*class="choice"/)
+  })
+
+  it('names its question with a legend', async () => {
+    const html = await renderToString(
+      <ChoiceGroup legend="Taste" legendSize="subsection" layout="row" hint="Changes which taste is read.">
+        <CheckboxOption name="source">Movies</CheckboxOption>
+      </ChoiceGroup>,
+    )
+    assert.match(
+      html,
+      /^<fieldset class="choice-group"><legend class="choice-legend subsection">Taste<\/legend><div class="choice-options row">/,
+    )
+    assert.match(html, /<div class="choice-group-hint">Changes which taste is read\.<\/div><\/fieldset>$/)
+    // Defaults: a section-size legend over a column.
+    assert.match(
+      await renderToString(<ChoiceGroup legend="Who?" />),
+      /choice-legend section.*choice-options column/,
+    )
+  })
+})
+
 // The point of the components is that there is one place to change how a control
 // looks. That stops being true the first time a page writes a raw <button>, so
 // this reads every .tsx under app/ and fails on one outside form-controls.tsx.
 //
 // What is allowed through: <input type="hidden">, which renders nothing, and the
 // inputs below that are not form fields at all. Each is invisible and exists for
-// its :checked state, which CSS reads to drive something else — so a Checkbox or
-// Radio, which draws a visible control, would be the wrong thing to render.
+// its :checked state, which CSS reads to drive something else — so a CheckboxOption or
+// RadioOption, which draws a visible, labelled control, would be the wrong thing.
 const NOT_FORM_FIELDS: Array<{ file: string; marker: string; why: string }> = [
   { file: 'app/ui/components/tabs.tsx', marker: 'type="radio"', why: 'which tab is open' },
   { file: 'app/ui/components/image-carousel.tsx', marker: 'type="radio"', why: 'which slide is shown' },
@@ -152,6 +205,10 @@ describe('raw form controls', () => {
       }
     }
 
-    assert.deepEqual(found, [], 'use Button, TextInput, Select, Textarea, Checkbox or Radio instead')
+    assert.deepEqual(
+      found,
+      [],
+      'use Button, TextInput, Select, Textarea, CheckboxOption or RadioOption instead',
+    )
   })
 })

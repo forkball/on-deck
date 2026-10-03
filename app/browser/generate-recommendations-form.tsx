@@ -1,9 +1,16 @@
 import { clientEntry, css, on } from 'remix/ui'
 
-import { Field, hintStyle } from '../ui/shared/field.tsx'
+import { Field } from '../ui/shared/field.tsx'
 import { SEEN_BY_OPTIONS, type SeenBy } from '../ui/shared/seen-by.ts'
-import { FriendPicker, radioOption, sectionLabel, type FriendOption } from './friend-picker.tsx'
-import { Button, Checkbox, Select, TextInput } from '../ui/shared/form-controls.tsx'
+import { FriendPicker, sectionLabel, type FriendOption } from './friend-picker.tsx'
+import {
+  Button,
+  CheckboxOption,
+  ChoiceGroup,
+  RadioOption,
+  Select,
+  TextInput,
+} from '../ui/shared/form-controls.tsx'
 
 export type { FriendOption }
 
@@ -137,10 +144,10 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         noFriendsPicked ||
         (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
 
-      const caption = css({ margin: '10px 0 0', fontSize: '12px', color: '#888', lineHeight: 1.4 })
-
       const runsPill = css({
         display: 'inline-block',
+        // Inside the option's label, so this is its distance from the words.
+        marginLeft: '10px',
         padding: '2px 8px',
         borderRadius: '999px',
         border: '1px solid #ccc',
@@ -186,55 +193,48 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             }),
           ]}
         >
-          <div>
-            <p mix={sectionLabel}>What are you after?</p>
-            <div mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}>
-              <div>
-                <div mix={css({ display: 'flex', alignItems: 'center', gap: '10px' })}>
-                  {radioOption({
-                    name: 'run_kind',
-                    value: 'shortlist',
-                    checked: !startLucky,
-                    onChange: () => {
-                      runKind = 'shortlist'
-                      handle.update()
-                    },
-                    children: 'A shortlist',
-                  })}
-                  {runsRemaining != null && runsLimit != null && (
-                    <span mix={runsPill}>
-                      {runsRemaining}/{runsLimit} runs left today
-                    </span>
-                  )}
-                </div>
-                <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
+          <ChoiceGroup legend="What are you after?">
+            <RadioOption
+              name="run_kind"
+              value="shortlist"
+              defaultChecked={!startLucky}
+              mix={on('change', () => {
+                runKind = 'shortlist'
+                handle.update()
+              })}
+              hint={
+                <>
                   {shortlistCaption(shortlistCount, seenBy, isGroupRun)}
                   {runsRemaining == null && runsLeftLabel && ` ${runsLeftLabel}.`}
-                </p>
-              </div>
-              <div mix={css({ color: luckyAvailable ? 'inherit' : '#888' })}>
-                {radioOption({
-                  name: 'run_kind',
-                  value: 'lucky',
-                  checked: startLucky,
-                  disabled: !luckyAvailable,
-                  onChange: () => {
-                    runKind = 'lucky'
-                    handle.update()
-                  },
-                  children: "Today's lucky pick",
-                })}
-                <p
-                  mix={[caption, css({ paddingLeft: '1.6em' })]}
-                >{`One ${itemNoun} nobody in the run has logged.`}</p>
-                {!luckyAvailable && (
-                  <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
-                    Already drawn — another in {luckyWaitLabel}.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
+                </>
+              }
+            >
+              A shortlist
+              {runsRemaining != null && runsLimit != null && (
+                <span mix={runsPill}>
+                  {runsRemaining}/{runsLimit} runs left today
+                </span>
+              )}
+            </RadioOption>
+            <RadioOption
+              name="run_kind"
+              value="lucky"
+              defaultChecked={startLucky}
+              disabled={!luckyAvailable}
+              mix={on('change', () => {
+                runKind = 'lucky'
+                handle.update()
+              })}
+              hint={
+                <>
+                  {`One ${itemNoun} nobody in the run has logged.`}
+                  {!luckyAvailable && <div>Already drawn — another in {luckyWaitLabel}.</div>}
+                </>
+              }
+            >
+              Today's lucky pick
+            </RadioOption>
+          </ChoiceGroup>
 
           <div mix={onlyForShortlist}>
             <Field label="Name this run (optional)">
@@ -292,38 +292,37 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 )}
               </summary>
 
-              <section mix={[settingsSection, css({ marginTop: '12px' })]}>
-                <p mix={settingsHeading}>Taste</p>
-                <div mix={css({ display: 'flex', gap: '8px 20px', flexWrap: 'wrap' })}>
-                  {sources.map((source) => (
-                    <label key={source.value}>
-                      <Checkbox
-                        name="source"
-                        value={source.value}
-                        checked={selectedSources.has(source.value)}
-                        mix={on('change', (event) => {
-                          if ((event.target as HTMLInputElement).checked) selectedSources.add(source.value)
-                          else selectedSources.delete(source.value)
-                          handle.update()
-                        })}
-                      />{' '}
-                      {source.label}
-                    </label>
-                  ))}
-                  {PLACEHOLDER_SOURCES.map((label) => (
-                    <label key={label} mix={css({ color: '#aaa' })}>
-                      <Checkbox disabled /> {label}{' '}
-                      <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
-                    </label>
-                  ))}
-                </div>
-                {hasSource && (
-                  <p mix={hintStyle}>
-                    You'll still get {mediaTypeLabel} picks — this only changes which taste they're drawn
-                    from.
-                  </p>
-                )}
-              </section>
+              <ChoiceGroup
+                legend="Taste"
+                legendSize="subsection"
+                layout="row"
+                mix={css({ marginTop: '12px' })}
+                hint={
+                  hasSource &&
+                  `You'll still get ${mediaTypeLabel} picks — this only changes which taste they're drawn from.`
+                }
+              >
+                {sources.map((source) => (
+                  <CheckboxOption
+                    key={source.value}
+                    name="source"
+                    value={source.value}
+                    checked={selectedSources.has(source.value)}
+                    mix={on('change', (event) => {
+                      if ((event.target as HTMLInputElement).checked) selectedSources.add(source.value)
+                      else selectedSources.delete(source.value)
+                      handle.update()
+                    })}
+                  >
+                    {source.label}
+                  </CheckboxOption>
+                ))}
+                {PLACEHOLDER_SOURCES.map((label) => (
+                  <CheckboxOption key={label} disabled>
+                    {label} <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
+                  </CheckboxOption>
+                ))}
+              </ChoiceGroup>
 
               <section mix={[settingsSection, sectionDivider]}>
                 <p mix={settingsHeading}>Filters</p>
