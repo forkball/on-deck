@@ -51,7 +51,12 @@ import { createDatabase } from 'remix/data-table'
 import { createPostgresDatabaseAdapter } from 'remix/data-table/postgres'
 
 import { rematchMediaItem } from '../app/data/mediaItems.ts'
-import { fieldedBookQuery, getBookById, searchGoogleBooksOnly } from '../app/data/catalog/googleBooks.ts'
+import {
+  fieldedBookQuery,
+  getBookById,
+  plainBookQuery,
+  searchGoogleBooksOnly,
+} from '../app/data/catalog/googleBooks.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from '../app/data/catalog/tmdb.ts'
 import { runBounded } from '../app/data/imports/csv.ts'
 import { normalizeName, titleWordsFitInside, titlesNameSameWork } from '../app/data/titles.ts'
@@ -137,19 +142,23 @@ async function searchGoogleBooksTwice(query: string): Promise<CatalogSearchResul
 
 // A query whose answer is not in doubt, asked before an empty result is believed.
 //
-// Google Books serves an outage as HTTP 200 with `totalItems: 0`, which at the point
-// we read it is indistinguishable from "no such book" — nothing throws, so neither
-// fetchWithRetry nor the retry above does anything about it. On 2026-10-01 a run
-// recorded 29 of 30 rows as "no Google Books hit" during such a spell, and every one
-// of those ISBNs had matched minutes earlier; `isbn:` queries were answering 0 while
-// title queries returned 503. Because the verdict is settled, those 29 rows would
-// have been skipped by every future run: the backfill would have quietly written off
-// 5% of the job on an outage.
+// Google Books answers a query it will not serve with HTTP 200 and `totalItems: 0`,
+// which at the point we read it is indistinguishable from "no such book" — nothing
+// throws, so neither fetchWithRetry nor the retry above does anything about it. On
+// 2026-10-01 a run recorded 29 of 30 rows as "no Google Books hit" that way, and every
+// one of those ISBNs had matched two days earlier. The cause turned out to be that
+// `isbn:`, `intitle:` and `inauthor:` had all begun answering 0 while unqualified text
+// kept working. Because the verdict is settled, those 29 rows would have been skipped
+// by every future run: 5% of the job written off over a provider's bad week.
 //
 // So "no hit" now has to be a fact about the catalogue rather than about the day. If
 // the canary comes back empty too, the whole run stops: a provider that cannot answer
 // this cannot answer anything, and every verdict after it would be fiction.
-const CANARY_QUERY = 'intitle:"dune"'
+// Deliberately unqualified. It was intitle:"dune" for a day, which is a canary that
+// cannot survive the thing it watches for: on 2026-10-02 every field-qualified query
+// began answering 0 while plain text kept working, so the canary would have aborted
+// every run while the catalogue was perfectly able to answer.
+const CANARY_QUERY = 'dune'
 
 // How long a passing canary stands for. Not once per run: a run of 500 rows takes
 // twenty minutes, and an outage starting in the middle of one would poison every
@@ -158,6 +167,32 @@ const CANARY_GOOD_FOR_MS = 30_000
 
 let canaryCheckedAt = 0
 let abortReason: string | null = null
+
+// Whether `isbn:`, `intitle:` and `inauthor:` are answering at all today, asked once.
+//
+// They are the precise way to ask, and when they work the ISBN alone settles most
+// rows in one request. When they don't, every one of them is a request spent to be
+// told nothing — measured at 5.5 requests per row against 1.6, which over 549 rows is
+// most of a day's quota burnt on queries already known to be dead. So they are tried
+// once, and dropped for the rest of the run if that one comes back empty.
+const QUALIFIED_CANARY = 'intitle:"dune"'
+
+let qualifiersAnswer: boolean | null = null
+
+async function qualifiersWork(): Promise<boolean> {
+  if (qualifiersAnswer == null) {
+    const probe = await spendGoogleBooksRequest(() => searchGoogleBooksOnly(QUALIFIED_CANARY))
+    qualifiersAnswer = probe.length > 0
+    if (!qualifiersAnswer) {
+      console.log(
+        `Google Books answered ${JSON.stringify(QUALIFIED_CANARY)} with nothing while plain ` +
+          'text still works, so the field qualifiers are not answering. Asking by ISBN is ' +
+          'skipped for this run; rows are settled on title and author instead.',
+      )
+    }
+  }
+  return qualifiersAnswer
+}
 
 async function believesEmptyResults(): Promise<boolean> {
   if (abortReason != null) return false
@@ -171,8 +206,10 @@ async function believesEmptyResults(): Promise<boolean> {
 
   abortReason =
     `Google Books answered ${JSON.stringify(CANARY_QUERY)} with nothing, so it is not ` +
-    'answering at all. Stopping rather than recording verdicts it would take an outage to ' +
-    'justify. Try again later.'
+    'answering at all. Stopping rather than recording verdicts that would take an outage ' +
+    'to justify. Google reports this as an empty result rather than an error, so there is ' +
+    'nothing in the response to read — try the same query in a browser to see whether it ' +
+    'is the catalogue or us.'
   return false
 }
 
@@ -255,6 +292,7 @@ interface Row {
 type Outcome =
   | 'matched'
   | 'matched-by-title'
+  | 'isbn-not-asked'
   | 'no-isbn'
   | 'no-google-hit'
   | 'google-unavailable'
@@ -273,9 +311,11 @@ interface ReportLine {
   gains?: string
 }
 
-// A verdict asking again would only re-derive. The two left out are about Google or
+// A verdict asking again would only re-derive. The ones left out are about Google or
 // about us, not about the book: 'google-unavailable' means Google didn't answer, and
-// a re-run is what turns it into an answer.
+// a re-run is what turns it into an answer. 'isbn-not-asked' is the same thing in
+// slower motion — the row has an ISBN and that ISBN is the best question there is, so
+// a run that couldn't ask it has not learned anything about the row worth keeping.
 const SETTLED: ReadonlySet<Outcome> = new Set([
   'matched',
   'matched-by-title',
@@ -321,11 +361,17 @@ async function findByTitleAndAuthor(row: Row): Promise<CatalogSearchResult | nul
   const creator = parseMediaMetadata(row.metadata).creator
   if (!creator) return null
 
-  const query = fieldedBookQuery({ title: row.title, creator })
-  if (!query) return null
-
+  // Qualified first, then plain, exactly as searchBooks does — and for a reason it
+  // learned the hard way. When the qualifiers went dead this was the whole second
+  // attempt, so a row the ISBN could not place had nowhere left to go. Plain text is
+  // safe here because the verdict is not the query's to give: isSameBook has to agree
+  // on the title and normalizeName on the author before anything is repointed.
   const asked = normalizeName(creator)
-  const candidates = await searchGoogleBooksTwice(query)
+  const plain = plainBookQuery({ title: row.title, creator })
+  const fielded = fieldedBookQuery({ title: row.title, creator })
+
+  let candidates = fielded == null || !(await qualifiersWork()) ? [] : await searchGoogleBooksTwice(fielded)
+  if (candidates.length === 0) candidates = await searchGoogleBooksTwice(plain)
   return (
     candidates.find(
       (candidate) => isSameBook(row, candidate) && normalizeName(candidate.creator) === asked,
@@ -399,11 +445,13 @@ async function main() {
       // which is a row to leave alone rather than resolve some other way.
       let candidate: CatalogSearchResult | null = null
       let how: 'matched' | 'matched-by-title' = 'matched'
-      let missed: Outcome = 'no-isbn'
-      let detail = 'no ISBN on any Open Library edition'
+      let missed: Outcome = isbn ? 'isbn-not-asked' : 'no-isbn'
+      let detail = isbn
+        ? `ISBN ${isbn} not asked — Google Books is not answering qualified queries`
+        : 'no ISBN on any Open Library edition'
 
       try {
-        if (isbn) {
+        if (isbn && (await qualifiersWork())) {
           const [first] = await searchGoogleBooksTwice(`isbn:${isbn}`)
           if (!first) {
             if (!(await believesEmptyResults())) return
