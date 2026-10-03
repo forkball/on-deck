@@ -271,18 +271,11 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                   <Button
                     key={candidate.externalId}
                     type="button"
+                    variant="plain"
                     mix={[
-                      css({
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                        background: 'none',
-                        border: 0,
-                        padding: 0,
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        position: 'relative',
-                      }),
+                      // No frame, padding or background is the plain variant, in
+                      // app.css: a css() rule can't outrank Doodle's button rules.
+                      css({ display: 'flex', flexDirection: 'column', gap: '6px', position: 'relative' }),
                       on('click', () => void choose(candidate)),
                     ]}
                   >

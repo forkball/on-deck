@@ -68,19 +68,12 @@ export function SuggestionDropdown(
             <Button
               key={suggestion.key}
               type="button"
+              variant="menu-choice"
               mix={[
-                css({
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: 'none',
-                  background: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.06)' },
-                }),
+                // Layout only: the row itself — no frame, left-aligned, the hover
+                // tint — is menu-choice in app.css, since Doodle's button rules are
+                // unlayered and a css() rule here can't set any of it.
+                css({ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }),
                 on('click', () => onSelect(suggestion)),
               ]}
             >

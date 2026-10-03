@@ -24,6 +24,10 @@ describe('form controls', () => {
       '<button type="button" class="linkish">Undo</button>',
     )
     assert.equal(
+      await renderToString(<Button variant="plain">Alien</Button>),
+      '<button type="button" class="plain">Alien</button>',
+    )
+    assert.equal(
       await renderToString(
         <Button variant="checkline" ticked class="extra">
           x

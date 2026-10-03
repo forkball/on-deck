@@ -498,6 +498,19 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
    country picker, where each country is its own submit button. Doodle gives
    every button a sketched border and centred text, unlayered, so this undoes
    both here. With no border to darken, focus shows as an outline instead. */
+/* Button variant "plain": a button whose look is its own content — the import
+   picker's poster tiles. Only what Doodle and the rules above put on every
+   button is taken off; layout stays with the call site, where css() can set it
+   because Doodle doesn't. The border width going to 0 is also what keeps the
+   hover and focus border-images from drawing. */
+.doodle button.plain {
+  border: 0;
+  border-image: none;
+  padding: 0;
+  background: none;
+  text-align: left;
+}
+
 .doodle button.menu-choice {
   border: none;
   border-image: none;

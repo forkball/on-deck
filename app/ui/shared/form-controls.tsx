@@ -31,8 +31,12 @@ export type ButtonVariant =
   // A submit drawn as a checkbox, with `ticked` for its state. Its box is a
   // `.checkline-box` span among the children; `radio` on that span for a radio.
   | 'checkline'
-  // A full-width row in a FloatingDropdown menu.
+  // A full-width row in a menu or a list of results: a FloatingDropdown, the
+  // profile menu, search suggestions. Borderless, left-aligned, tinted on hover.
   | 'menu-choice'
+  // No frame, padding or background: a button whose look is its content — the
+  // poster tiles in the import picker. Layout is the call site's.
+  | 'plain'
 
 const VARIANT_CLASS: Record<ButtonVariant, string | undefined> = {
   default: undefined,
@@ -42,6 +46,7 @@ const VARIANT_CLASS: Record<ButtonVariant, string | undefined> = {
   bare: 'bare',
   checkline: 'checkline',
   'menu-choice': 'menu-choice',
+  plain: 'plain',
 }
 
 function joinClasses(...classes: Array<string | false | null | undefined>): string | undefined {
