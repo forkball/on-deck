@@ -5,7 +5,7 @@ import { redirect } from 'remix/response/redirect'
 
 import { activeBatches } from '../../data/imports/batches.ts'
 import { letterboxdSyncAvailableTo } from '../../data/imports/letterboxdFeed.ts'
-import { syncLetterboxdInBackground } from '../../data/imports/letterboxdSync.ts'
+import { syncLetterboxdBeforeReading } from '../../data/imports/letterboxdSync.ts'
 import {
   getProfileRebuildAllowance,
   recordProfileRebuild,
@@ -49,12 +49,15 @@ export default createController(routes.profile, {
       const auth = context.get(Auth)
 
       const db = context.get(Database)
-      const media = await loadMediaSummaries(db, auth.identity.id, RECENT_COUNT)
       const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
-      const followingCount = await countFollowing(db, auth.identity.id)
-      const followersCount = await countFollowers(db, auth.identity.id)
-      const [rebuildAllowance, batches] = await Promise.all([
+      // Only the log waits on the feed; everything else loads alongside it.
+      const [media, followingCount, followersCount, rebuildAllowance, batches] = await Promise.all([
+        syncLetterboxdBeforeReading(db, auth.identity).then(() =>
+          loadMediaSummaries(db, auth.identity.id, RECENT_COUNT),
+        ),
+        countFollowing(db, auth.identity.id),
+        countFollowers(db, auth.identity.id),
         getProfileRebuildAllowance(db, auth.identity),
         activeBatches(db, auth.identity.id),
       ])
@@ -69,12 +72,6 @@ export default createController(routes.profile, {
         noun: mediaTypeUiFor(batch.media_type).attributive,
         matching: batch.status === 'matching',
       }))
-
-      // Kicked off beside the render, never awaited into it: reading the feed
-      // and looking up any film new to the catalog is seconds of network, and
-      // the log it updates is the one this page draws next time. No-op unless a
-      // Letterboxd account is connected and the fetch cooldown has passed.
-      syncLetterboxdInBackground(db, auth.identity)
 
       return context.render(
         <ProfilePage
@@ -177,16 +174,18 @@ export default createController(routes.profile, {
       const status = parseInteractionStatus(context.url.searchParams.get('status'))
       const filter = { type: mediaType, statuses: status ? [status] : undefined }
 
+      await syncLetterboxdBeforeReading(db, auth.identity)
+
       // Counted through the same filter, or the last page of a filtered list
       // pages past its own end.
-      const totalWatched = await countUserMediaLog(db, auth.identity.id, filter)
-      const movieLog = await listUserMediaLog(db, auth.identity.id, {
-        ...filter,
-        limit: PAGE_SIZE,
-        offset: (page - 1) * PAGE_SIZE,
-      })
-
-      syncLetterboxdInBackground(db, auth.identity)
+      const [totalWatched, movieLog] = await Promise.all([
+        countUserMediaLog(db, auth.identity.id, filter),
+        listUserMediaLog(db, auth.identity.id, {
+          ...filter,
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+        }),
+      ])
 
       return context.render(
         <ProfileWatchedPage
