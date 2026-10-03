@@ -51,13 +51,7 @@ export default createController(routes.profile, {
       const db = context.get(Database)
       const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
-      // The feed is read before the log is, so a diary entry made since the
-      // last visit is on this page rather than the next one. Only the log waits
-      // on it: everything else the page needs is loaded alongside, inside the
-      // time the feed was going to take anyway. Bounded — a slow feed holds the
-      // render for a few seconds at most and finishes in the background — and a
-      // no-op unless a Letterboxd account is connected and the fetch cooldown
-      // has passed.
+      // Only the log waits on the feed; everything else loads alongside it.
       const [media, followingCount, followersCount, rebuildAllowance, batches] = await Promise.all([
         syncLetterboxdBeforeReading(db, auth.identity).then(() =>
           loadMediaSummaries(db, auth.identity.id, RECENT_COUNT),
@@ -180,18 +174,18 @@ export default createController(routes.profile, {
       const status = parseInteractionStatus(context.url.searchParams.get('status'))
       const filter = { type: mediaType, statuses: status ? [status] : undefined }
 
-      // Same as the profile: the feed before the log, so the list is current
-      // on this visit.
       await syncLetterboxdBeforeReading(db, auth.identity)
 
       // Counted through the same filter, or the last page of a filtered list
       // pages past its own end.
-      const totalWatched = await countUserMediaLog(db, auth.identity.id, filter)
-      const movieLog = await listUserMediaLog(db, auth.identity.id, {
-        ...filter,
-        limit: PAGE_SIZE,
-        offset: (page - 1) * PAGE_SIZE,
-      })
+      const [totalWatched, movieLog] = await Promise.all([
+        countUserMediaLog(db, auth.identity.id, filter),
+        listUserMediaLog(db, auth.identity.id, {
+          ...filter,
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+        }),
+      ])
 
       return context.render(
         <ProfileWatchedPage

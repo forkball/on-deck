@@ -3,6 +3,7 @@ import { after, before, describe, it } from 'node:test'
 
 import { db, pool } from '../app/data/db.ts'
 import {
+  COOLDOWN_MS,
   syncLetterboxdBeforeReading,
   syncLetterboxdInBackground,
   syncLetterboxdNow,
@@ -10,10 +11,9 @@ import {
 import { users, type User } from '../app/data/schema.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 
-// The cooldown is what stops every page load pulling a ~220KB feed, and it is
-// also what makes a diary edit look like it never arrived: nothing re-reads
-// Letterboxd for a couple of minutes, and until Sync now existed there was no
-// way to ask it to. So the rule worth pinning is which trigger obeys it.
+// The cooldown is what stops every page load pulling a ~220KB feed, and Sync
+// now is the one trigger that skips it. So the rule worth pinning is which
+// trigger obeys it.
 //
 // A database because the cooldown is read off the user row and stamped back
 // onto it — the part that decides anything is the write, not the comparison.
@@ -55,7 +55,7 @@ describe('the Letterboxd sync cooldown', { skip: skipWithoutDatabase }, () => {
 
   it('leaves the feed alone on a page load inside the cooldown', async () => {
     fetches = 0
-    await syncedAgo(60 * 1000)
+    await syncedAgo(COOLDOWN_MS / 2)
 
     // Awaited rather than the background trigger, so the assertion isn't a
     // race: a sync that was going to happen has happened by the time this
@@ -67,7 +67,7 @@ describe('the Letterboxd sync cooldown', { skip: skipWithoutDatabase }, () => {
 
   it('reads it again once the cooldown has passed', async () => {
     fetches = 0
-    await syncedAgo(3 * 60 * 1000)
+    await syncedAgo(COOLDOWN_MS + 60 * 1000)
 
     await syncLetterboxdBeforeReading(db, await load())
 
@@ -92,7 +92,7 @@ describe('the Letterboxd sync cooldown', { skip: skipWithoutDatabase }, () => {
   // carry on as if nothing had been read.
   it('restarts the cooldown behind it', async () => {
     fetches = 0
-    await syncedAgo(3 * 60 * 1000)
+    await syncedAgo(COOLDOWN_MS + 60 * 1000)
 
     await syncLetterboxdNow(db, await load())
     await syncLetterboxdBeforeReading(db, await load())
@@ -113,7 +113,7 @@ describe('the Letterboxd sync cooldown', { skip: skipWithoutDatabase }, () => {
   it('says nothing and touches nothing while the gate is closed', async () => {
     fetches = 0
     delete process.env.LETTERBOXD_FEED_SYNC
-    await syncedAgo(3 * 60 * 1000)
+    await syncedAgo(COOLDOWN_MS + 60 * 1000)
 
     syncLetterboxdInBackground(db, await load())
     assert.equal(await syncLetterboxdNow(db, await load()), null)

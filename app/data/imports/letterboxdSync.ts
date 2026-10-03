@@ -28,7 +28,7 @@ const CONCURRENCY = 8
 // read the feed on visit and a member who has just logged a film is coming
 // there to see it; long enough that paging through the watched list or
 // clicking between tabs doesn't refetch it on every load.
-const COOLDOWN_MS = 2 * 60 * 1000
+export const COOLDOWN_MS = 2 * 60 * 1000
 
 // What a caller in front of a person will wait before giving up and letting the
 // sync finish on its own.
@@ -471,8 +471,8 @@ function swallow(userId: number, run: Promise<LetterboxdSyncResult>): Promise<vo
   )
 }
 
-// Fire-and-forget, for a page that only needs the log to be current the next
-// time it is looked at. Never awaited on a render: a feed fetch plus a detail
+// Fire-and-forget, for a caller that only needs the log to be current the next
+// time it is looked at — connecting an account. Never awaited on a render: a feed fetch plus a detail
 // lookup per new film does not belong on the response path.
 export function syncLetterboxdInBackground(db: Db, user: User): void {
   const run = startSync(db, user)
@@ -481,9 +481,8 @@ export function syncLetterboxdInBackground(db: Db, user: User): void {
   void swallow(user.id, run)
 }
 
-// For a caller about to read the log that would rather not read a stale one — a
-// recommendation run generating against films the member already watched, or
-// the profile drawing its recent films. Bounded, because a slow feed is not a
+// For a caller about to read the log that would rather not read a stale one, so
+// a diary entry made since the last read is in what it reads. Bounded, because a slow feed is not a
 // reason to fail or stall the thing the member actually asked for; the sync
 // carries on in the background either way.
 export async function syncLetterboxdBeforeReading(db: Db, user: User): Promise<void> {
