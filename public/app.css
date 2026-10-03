@@ -26,13 +26,25 @@
    light while idle, dark on hover or focus. Checked is dark too — the `*` alone
    is a small mark, and the darker ring is what makes the chosen option in a
    group read as chosen at a glance. Same shapes and slices as DoodleCSS's own
-   checkbox.svg and radio.svg, so the boxes keep their size. */
+   checkbox.svg and radio.svg.
+
+   DoodleCSS sizes both at 1.5em (24px) but gives the radio a 16px border, and a
+   border can't shrink below itself: 16 + 16 made every radio 32px beside a 24px
+   checkbox. A 12px border brings it back to 24. That draws the 16px slice at
+   three quarters, so radio.svg's stroke is 2.67 to land on 2px. */
 .doodle input[type='checkbox'] {
   border-image: url(/checkbox-light.svg) 6 6 6 6 stretch stretch;
 }
 
 .doodle input[type='radio'] {
+  border-width: 12px;
   border-image: url(/radio-light.svg) 16 16 16 16 stretch stretch;
+  /* The browser's radio margin is 3px on top and none below, where a
+     checkbox's is 3px both ways — so a centred radio sat 1.5px under a
+     checkbox in the same row. Block only: friend-picker.tsx zeroes its radios'
+     margin to sit them in a flex row, and this unlayered rule would beat that
+     on the sides too. Vertically it is symmetric, which is all that wanted. */
+  margin-block: 3px;
 }
 
 .doodle input[type='checkbox']:hover:not(:disabled),
