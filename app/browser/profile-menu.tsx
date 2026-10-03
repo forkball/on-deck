@@ -71,8 +71,8 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
             '& .menu form': {
               margin: 0,
             },
-            // A row like the links above it, not a framed button: menu-choice
-            // in app.css. Its width is the one thing a css() rule can still set.
+            // Drawn as one of the links above it (menu-link in app.css) though
+            // it has to be a form button. Width is the one thing css() can set.
             '& .menu button': {
               width: '100%',
             },
@@ -106,7 +106,7 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
             </a>
           ))}
           <form method="post" action={logoutHref}>
-            <Button type="submit" variant="menu-choice">
+            <Button type="submit" variant="menu-link">
               Log out
             </Button>
           </form>

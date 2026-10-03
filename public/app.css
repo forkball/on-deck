@@ -437,11 +437,31 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 .doodle button.linkish,
 .doodle button.bare,
 .doodle button.checkline,
-.doodle button.plain {
+.doodle button.plain,
+.doodle button.menu-link {
   border: 0;
   border-image: none;
   background: none;
   cursor: pointer;
+}
+
+/* Button variant "menu-link": a button that has to sit in a list of links and
+   read as one of them — Log out under the profile menu's links. Doodle's own
+   link look (`.doodle a`: #1c1c1c, bold) plus the underline links get from the
+   browser, and the menu's 4px 8px row padding. Line height back to normal, as
+   a link's is, so the rows stay one height. Focus keeps Doodle's dashed
+   outline, drawn just outside the text rather than 8px inside a 24px row. */
+.doodle button.menu-link {
+  padding: 4px 8px;
+  font-weight: bold;
+  color: #1c1c1c;
+  text-decoration: underline;
+  text-align: left;
+  line-height: normal;
+}
+
+.doodle button.menu-link:focus-visible {
+  outline-offset: 0;
 }
 
 /* Button variant "plain": a button whose look is its own content — the import
