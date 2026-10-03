@@ -10,6 +10,7 @@ import { PasswordConfirmModal } from '../../../ui/components/password-confirm-mo
 import { Field } from '../../../ui/shared/field.tsx'
 import { Tabs } from '../../../ui/components/tabs.tsx'
 import { Connections, type ConnectionsProps } from './connections.tsx'
+import { Button, Checkbox, Select, TextInput, Textarea } from '../../../ui/shared/form-controls.tsx'
 
 // The three things this page holds have nothing to do with each other beyond
 // belonging to the same account, and each is its own form with its own submit —
@@ -73,7 +74,7 @@ function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSetting
             label="How much of your log to use"
             hint="Counted from what you logged most recently. Narrowing it keeps your profile closer to where your taste is now, instead of averaging everything you've ever logged."
           >
-            <select name="log_limit">
+            <Select name="log_limit">
               {[...LIMIT_LABELS].map(([value, label]) => (
                 <option
                   key={String(value)}
@@ -83,19 +84,14 @@ function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSetting
                   {label}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
 
           {/* Not routed through Field for the same reason the privacy
               checkbox above isn't — it stretches inputs to full width. */}
           <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
             <label mix={css({ display: 'flex', alignItems: 'center', gap: '8px' })}>
-              <input
-                type="checkbox"
-                name="use_notes"
-                defaultChecked={settings.useNotes}
-                mix={css({ width: 'auto' })}
-              />
+              <Checkbox name="use_notes" defaultChecked={settings.useNotes} mix={css({ width: 'auto' })} />
               Use the notes I've written on things I've logged
             </label>
             <span mix={css({ fontSize: '12px', color: '#888' })}>
@@ -105,7 +101,7 @@ function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSetting
           </div>
 
           <div>
-            <button type="submit">Save taste settings</button>
+            <Button type="submit">Save taste settings</Button>
           </div>
           <span mix={css({ fontSize: '12px', color: '#888' })}>
             Changing these doesn't rewrite anything on its own. Each profile is rewritten next time you
@@ -154,11 +150,10 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
                     error={errors?.email}
                     hint="Used to log in. Nobody else sees it unless you have no username."
                   >
-                    <input type="email" name="email" required defaultValue={values.email} />
+                    <TextInput type="email" name="email" required defaultValue={values.email} />
                   </Field>
                   <Field label="Username" error={errors?.display_name} hint={USERNAME_HINT}>
-                    <input
-                      type="text"
+                    <TextInput
                       name="display_name"
                       required
                       maxLength={USERNAME_MAX_LENGTH}
@@ -170,7 +165,7 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
                     error={errors?.bio}
                     hint="Just for other people to read — it has no effect on your recommendations."
                   >
-                    <textarea
+                    <Textarea
                       name="bio"
                       rows={4}
                       maxLength={BIO_MAX_LENGTH}
@@ -182,8 +177,7 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
                 width, which turns a checkbox into a giant square. */}
                   <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
                     <label mix={css({ display: 'flex', alignItems: 'center', gap: '8px' })}>
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         name="is_private"
                         defaultChecked={values.is_private}
                         mix={css({ width: 'auto' })}
@@ -205,7 +199,7 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
                     defaultOpen={confirming}
                   />
                   <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px' })}>
-                    <button type="submit">Save changes</button>
+                    <Button type="submit">Save changes</Button>
                     <a href={routes.profile.password.index.href()} mix={css({ marginLeft: 'auto' })}>
                       Change password
                     </a>

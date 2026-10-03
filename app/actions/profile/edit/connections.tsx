@@ -3,6 +3,7 @@ import { css } from 'remix/ui'
 
 import { routes } from '../../../routes.ts'
 import { Field } from '../../../ui/shared/field.tsx'
+import { Button, TextInput } from '../../../ui/shared/form-controls.tsx'
 
 // The accounts On Deck reads from, on the page where the rest of the account
 // lives. They used to sit on their own import pages — beside the uploader that
@@ -163,10 +164,10 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
                 marginTop: '12px',
               })}
             >
-              <button type="submit">Sync now</button>
-              <button type="submit" formaction={routes.profile.letterboxd.disconnect.href()}>
+              <Button type="submit">Sync now</Button>
+              <Button type="submit" formaction={routes.profile.letterboxd.disconnect.href()}>
                 Disconnect
-              </button>
+              </Button>
             </form>
           </>
         ) : (
@@ -190,16 +191,10 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
                 label="Letterboxd username"
                 hint="The last part of your profile URL — letterboxd.com/yourname/"
               >
-                <input
-                  type="text"
-                  name="username"
-                  placeholder="yourname"
-                  autocomplete="off"
-                  spellcheck={false}
-                />
+                <TextInput name="username" placeholder="yourname" autocomplete="off" spellcheck={false} />
               </Field>
               <div>
-                <button type="submit">Connect</button>
+                <Button type="submit">Connect</Button>
               </div>
             </form>
           </>
@@ -250,7 +245,7 @@ function SteamBlock(handle: Handle<{ connection: SteamConnection }>) {
               action={routes.profile.steam.disconnect.href()}
               mix={css({ marginTop: '12px' })}
             >
-              <button type="submit">Disconnect</button>
+              <Button type="submit">Disconnect</Button>
             </form>
           </>
         ) : (

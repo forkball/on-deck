@@ -136,6 +136,15 @@ does nothing on its own.
   the nav, the column width (`narrow`/default/`wide`), the back link and the
   `<h1>`. Don't lay out `<Document>`/`<Nav>`/`<main>` by hand: that is how the
   pages drifted into putting their titles at different heights.
+- Every visible control renders through `app/ui/shared/form-controls.tsx`:
+  `Button` (with a `variant` rather than a class string), `ButtonLink`,
+  `TextInput`, `Select`, `Textarea`, `Checkbox` and `Radio`, plus
+  `buttonFrameClass` for a `<span>` or `<summary>` that has to look like a
+  button. Their look is in `public/app.css`, because DoodleCSS is unlayered and
+  a `css()` rule can't beat it. `test/form-controls.test.tsx` fails on a raw
+  `<button>`, `<input>`, `<select>` or `<textarea>` anywhere else; hidden inputs
+  and the invisible toggles CSS reads (tabs, modal, carousel) are listed there
+  with the reason.
 - Tests live in `test/`, usually one file per module under test
   (`import-review.test.ts` covers `data/imports/review.ts`), though a few cover
   a pair — `lucky.test.ts` holds both `lucky` and `exclusions`. `npm test` runs

@@ -16,6 +16,7 @@ import { Page } from '../../ui/components/page.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
+import { Button } from '../../ui/shared/form-controls.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
@@ -114,9 +115,9 @@ function FollowButton(handle: Handle<{ userId: number; following: boolean; retur
         }
       >
         <input type="hidden" name="return_to" value={returnTo} />
-        <button type="submit" mix={css({ width: '100%', padding: '8px 12px' })}>
+        <Button type="submit" mix={css({ width: '100%', padding: '8px 12px' })}>
           {following ? 'Unfollow' : 'Follow'}
-        </button>
+        </Button>
       </form>
     )
   }

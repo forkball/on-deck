@@ -10,6 +10,7 @@ import { NotesField } from './notes-field.tsx'
 import { StarRatingInput } from './star-rating.tsx'
 import { StatusSelect } from './status-select.tsx'
 import { Field } from '../shared/field.tsx'
+import { Button } from '../shared/form-controls.tsx'
 
 export interface MediaLogEditModalProps {
   interaction: UserMediaInteraction
@@ -65,14 +66,14 @@ export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
           >
             <input type="hidden" name="_method" value="DELETE" />
             <input type="hidden" name="return_to" value={returnTo} />
-            <button type="submit" class="danger">
+            <Button type="submit" variant="danger">
               Delete log
-            </button>
+            </Button>
             <FrameForm />
           </form>
-          <button type="submit" form={`edit-log-form-${interaction.id}`} mix={css({ marginLeft: 'auto' })}>
+          <Button type="submit" form={`edit-log-form-${interaction.id}`} mix={css({ marginLeft: 'auto' })}>
             Save
-          </button>
+          </Button>
         </div>
       </Modal>
     )

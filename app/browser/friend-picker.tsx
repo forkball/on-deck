@@ -1,5 +1,6 @@
 import type { Handle } from 'remix/ui'
 import { css, on } from 'remix/ui'
+import { Button, Checkbox, Radio, TextInput } from '../ui/shared/form-controls.tsx'
 
 export type FriendOption = {
   id: number
@@ -42,8 +43,7 @@ export function radioOption(props: {
   return (
     <label>
       <span mix={radioRow}>
-        <input
-          type="radio"
+        <Radio
           name={props.name}
           value={props.value}
           disabled={props.disabled}
@@ -132,8 +132,7 @@ export function FriendPicker(handle: Handle<FriendPickerProps>) {
               marginTop: '12px',
             })}
           >
-            <input
-              type="text"
+            <TextInput
               placeholder="Search friends…"
               value={search}
               mix={on('input', (event) => onSearchChange((event.target as HTMLInputElement).value))}
@@ -146,8 +145,7 @@ export function FriendPicker(handle: Handle<FriendPickerProps>) {
             <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
               {friends.map((friend) => (
                 <label key={friend.id} mix={css({ display: visibleIds.has(friend.id) ? 'block' : 'none' })}>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     name="friend_ids"
                     value={String(friend.id)}
                     checked={selectedFriendIds.has(friend.id)}
@@ -162,23 +160,23 @@ export function FriendPicker(handle: Handle<FriendPickerProps>) {
 
             {totalPages > 1 && (
               <div mix={css({ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' })}>
-                <button
+                <Button
                   type="button"
                   disabled={clampedPage <= 1}
                   mix={on('click', () => onPageChange(Math.max(1, clampedPage - 1)))}
                 >
                   ← Prev
-                </button>
+                </Button>
                 <span mix={css({ color: '#888' })}>
                   Page {clampedPage} of {totalPages}
                 </span>
-                <button
+                <Button
                   type="button"
                   disabled={clampedPage >= totalPages}
                   mix={on('click', () => onPageChange(Math.min(totalPages, clampedPage + 1)))}
                 >
                   Next →
-                </button>
+                </Button>
               </div>
             )}
           </div>

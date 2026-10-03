@@ -2,6 +2,7 @@ import { clientEntry, css, on, ref } from 'remix/ui'
 
 import { count } from '../ui/shared/count.ts'
 import { postInPlace } from './shared/submit-in-place.ts'
+import { Button, TextInput } from '../ui/shared/form-controls.tsx'
 
 export type ImportPickerProps = {
   // Hrefs are built on the server so the route contract stays the one source of
@@ -230,14 +231,14 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                 <h3 mix={css({ margin: 0, fontWeight: 400 })}>
                   {data ? `Which film is row ${data.rowIndex}?` : 'Find this film'}
                 </h3>
-                <button
+                <Button
                   type="button"
-                  class="bare"
+                  variant="bare"
                   aria-label="Close"
                   mix={[css({ fontSize: '20px' }), on('click', close)]}
                 >
                   ✕
-                </button>
+                </Button>
               </div>
 
               {data && (
@@ -247,8 +248,7 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                 </p>
               )}
 
-              <input
-                type="text"
+              <TextInput
                 value={query}
                 placeholder="Search the catalog…"
                 autocomplete="off"
@@ -268,7 +268,7 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                 })}
               >
                 {(data?.candidates ?? []).map((candidate, i) => (
-                  <button
+                  <Button
                     key={candidate.externalId}
                     type="button"
                     mix={[
@@ -358,7 +358,7 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                         {candidate.creator}
                       </span>
                     )}
-                  </button>
+                  </Button>
                 ))}
               </div>
               <p

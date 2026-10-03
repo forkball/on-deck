@@ -3,6 +3,7 @@ import { clientEntry, css, on } from 'remix/ui'
 import { Field, hintStyle } from '../ui/shared/field.tsx'
 import { SEEN_BY_OPTIONS, type SeenBy } from '../ui/shared/seen-by.ts'
 import { FriendPicker, radioOption, sectionLabel, type FriendOption } from './friend-picker.tsx'
+import { Button, Checkbox, Select, TextInput } from '../ui/shared/form-controls.tsx'
 
 export type { FriendOption }
 
@@ -237,7 +238,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
           <div mix={onlyForShortlist}>
             <Field label="Name this run (optional)">
-              <input type="text" name="name" placeholder="e.g. Cozy weekend picks" />
+              <TextInput name="name" placeholder="e.g. Cozy weekend picks" />
             </Field>
           </div>
 
@@ -296,8 +297,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 <div mix={css({ display: 'flex', gap: '8px 20px', flexWrap: 'wrap' })}>
                   {sources.map((source) => (
                     <label key={source.value}>
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         name="source"
                         value={source.value}
                         checked={selectedSources.has(source.value)}
@@ -312,7 +312,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                   ))}
                   {PLACEHOLDER_SOURCES.map((label) => (
                     <label key={label} mix={css({ color: '#aaa' })}>
-                      <input type="checkbox" disabled /> {label}{' '}
+                      <Checkbox disabled /> {label}{' '}
                       <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
                     </label>
                   ))}
@@ -329,15 +329,15 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 <p mix={settingsHeading}>Filters</p>
                 <div mix={settingsGrid}>
                   <Field label="Genre">
-                    <select name="genre" defaultValue="">
+                    <Select name="genre" defaultValue="">
                       <option value="">Any</option>
                       {genres.map((genre) => (
                         <option value={genre}>{genre.replace(/^./, (c) => c.toUpperCase())}</option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
                   <Field label="Decade">
-                    <select
+                    <Select
                       name="decade"
                       defaultValue=""
                       mix={on('change', (event) => {
@@ -351,30 +351,30 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                           {value}s
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
                   {decade !== '' && (
                     <Field label="Relative to decade">
-                      <select name="decade_relation" defaultValue="within">
+                      <Select name="decade_relation" defaultValue="within">
                         <option value="before">Before</option>
                         <option value="within">Within</option>
                         <option value="after">After</option>
-                      </select>
+                      </Select>
                     </Field>
                   )}
                   <Field label="Length">
-                    <select name="length" defaultValue="">
+                    <Select name="length" defaultValue="">
                       <option value="">Any</option>
                       {lengthOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
                   {playerTypes.length > 0 && (
                     <Field label="Player type">
-                      <select
+                      <Select
                         name="player_type"
                         defaultValue=""
                         mix={on('change', (event) => {
@@ -388,43 +388,43 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                             {PLAYER_TYPE_LABELS[type] ?? type}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </Field>
                   )}
                   {playerType === 'multiplayer' && multiplayerTypes.length > 0 && (
                     <Field label="Multiplayer type">
-                      <select name="multiplayer_type" defaultValue="">
+                      <Select name="multiplayer_type" defaultValue="">
                         <option value="">Any</option>
                         {multiplayerTypes.map((type) => (
                           <option key={type} value={type}>
                             {MULTIPLAYER_TYPE_LABELS[type] ?? type}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </Field>
                   )}
                   {platforms.length > 0 && (
                     <Field label="Platform">
-                      <select name="platform" defaultValue="">
+                      <Select name="platform" defaultValue="">
                         <option value="">Any</option>
                         {platforms.map((platform) => (
                           <option key={platform} value={platform}>
                             {platform}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </Field>
                   )}
                   {seriesTypes.length > 0 && (
                     <Field label="Series">
-                      <select name="series" defaultValue="">
+                      <Select name="series" defaultValue="">
                         <option value="">Any</option>
                         {seriesTypes.map((type) => (
                           <option key={type} value={type}>
                             {SERIES_TYPE_LABELS[type] ?? type}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </Field>
                   )}
                 </div>
@@ -439,7 +439,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 <p mix={settingsHeading}>Group</p>
                 <div mix={settingsGrid}>
                   <Field label="History">
-                    <select
+                    <Select
                       name="seen_by"
                       defaultValue="no_one"
                       mix={on('change', (event) => {
@@ -452,7 +452,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                           {option.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
                 </div>
               </section>
@@ -482,7 +482,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 </p>
               )}
 
-          <button type="submit" disabled={disabled} mix={css({ minHeight: '44px', width: '100%' })}>
+          <Button type="submit" disabled={disabled} mix={css({ minHeight: '44px', width: '100%' })}>
             {submitting
               ? isLucky
                 ? 'Drawing…'
@@ -490,7 +490,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               : isLucky
                 ? `🎲 Draw today's pick`
                 : 'Get recommendations'}
-          </button>
+          </Button>
         </form>
       )
     }

@@ -6,6 +6,7 @@ import type { FeedCursor, FeedItem } from '../data/feed.ts'
 import type { LuckyState } from '../data/recommendations/lucky.ts'
 import { luckyRecommendationsHref, routes } from '../routes.ts'
 import { Page } from '../ui/components/page.tsx'
+import { ButtonLink } from '../ui/shared/form-controls.tsx'
 import { LUCKY_CARD_BOX, LUCKY_PICK_LABEL, LuckyPickCard } from './lucky-pick-card.tsx'
 import { FEED_LIST_ID, FeedList } from './activity-feed.tsx'
 
@@ -73,14 +74,14 @@ function LuckyPickCta() {
         One thing to watch, read or play — no filters, nothing to decide.
       </p>
       {/* rmx-document forces a full document load — see media-tab-links.tsx. */}
-      <a
+      <ButtonLink
         href={luckyRecommendationsHref()}
         rmx-document=""
-        class="doodle-border"
+
         mix={css({ display: 'inline-block', marginTop: '12px', textDecoration: 'none' })}
       >
         🎲 Draw today's pick
-      </a>
+      </ButtonLink>
     </div>
   )
 }
@@ -158,9 +159,9 @@ function Pitch() {
           marginTop: '32px',
         })}
       >
-        <a
+        <ButtonLink
           href={routes.auth.login.index.href()}
-          class="doodle-border"
+
           mix={css({
             display: 'inline-block',
             boxSizing: 'border-box',
@@ -171,7 +172,7 @@ function Pitch() {
           })}
         >
           Log in
-        </a>
+        </ButtonLink>
         <a href={routes.auth.signup.index.href()}>Sign up</a>
       </div>
     </>
@@ -192,12 +193,12 @@ export function HomePage(handle: Handle<HomePageProps>) {
         {dashboard ? (
           <>
             <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '12px' })}>
-              <a href={routes.media.href()} class="doodle-border" mix={CTA_BUTTON}>
+              <ButtonLink href={routes.media.href()} mix={CTA_BUTTON}>
                 Search for media
-              </a>
-              <a href={routes.recommendations.index.href()} class="doodle-border" mix={CTA_BUTTON}>
+              </ButtonLink>
+              <ButtonLink href={routes.recommendations.index.href()} mix={CTA_BUTTON}>
                 Get recommendations
-              </a>
+              </ButtonLink>
             </div>
             <Dashboard dashboard={dashboard} />
           </>

@@ -18,6 +18,7 @@ import { Page } from '../../ui/components/page.tsx'
 import { RunList } from '../../ui/components/run-list.tsx'
 import type { UnconfirmedRunDetail } from '../../data/recommendations/unconfirmed.ts'
 import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, mediaTypeUiFor, type ActiveMediaType } from '../../mediaTypes.ts'
+import { Button } from '../../ui/shared/form-controls.tsx'
 
 export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
@@ -138,7 +139,7 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
             <input key={`${name}-${index}`} type="hidden" name={name} value={value} />
           ))}
           <input type="hidden" name="force" value="1" />
-          <button type="submit">Generate a new one anyway</button>
+          <Button type="submit">Generate a new one anyway</Button>
         </form>
       </div>
     )

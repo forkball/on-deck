@@ -7,6 +7,7 @@ import {
   type SuggestState,
   type Suggestion,
 } from './shared/suggestions.ts'
+import { Button, TextInput } from '../ui/shared/form-controls.tsx'
 
 export type UserSearchFormProps = {
   query: string
@@ -81,8 +82,7 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
               }),
             ]}
           >
-            <input
-              type="text"
+            <TextInput
               name="q"
               value={query}
               autocomplete="off"
@@ -104,7 +104,7 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
             {suggestState.open && <SuggestionDropdown state={suggestState} onSelect={selectSuggestion} />}
           </div>
 
-          <button
+          <Button
             type="submit"
             disabled={submitting}
             mix={css({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' })}
@@ -128,7 +128,7 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
               />
             )}
             {submitting ? 'Searching…' : 'Search'}
-          </button>
+          </Button>
         </form>
       )
     }

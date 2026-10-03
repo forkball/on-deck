@@ -1,4 +1,5 @@
 import { clientEntry, css, ref } from 'remix/ui'
+import { Button } from '../ui/shared/form-controls.tsx'
 
 export type ProfileMenuLink = {
   href: string
@@ -104,7 +105,7 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
             </a>
           ))}
           <form method="post" action={logoutHref}>
-            <button type="submit">Log out</button>
+            <Button type="submit">Log out</Button>
           </form>
         </div>
       </details>

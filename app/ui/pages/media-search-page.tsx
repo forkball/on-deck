@@ -19,6 +19,7 @@ import { Field } from '../shared/field.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { PlatformList } from '../components/platform-list.tsx'
 import { withReturnTo } from '../backLink.ts'
+import { Button } from '../shared/form-controls.tsx'
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
@@ -189,7 +190,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                               </div>
                               <NotesField defaultValue={interaction?.notes} />
                             </div>
-                            <button type="submit">Save</button>
+                            <Button type="submit">Save</Button>
                             <FrameForm />
                           </form>
                         </FloatingDropdown>

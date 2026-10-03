@@ -2,6 +2,7 @@ import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { FloatingDropdownCloser } from '../../browser/floating-dropdown-closer.tsx'
+import { buttonFrameClass } from '../shared/form-controls.tsx'
 
 // Native <details>/<summary>, so many can exist independently on one page —
 // one per search result row.
@@ -25,7 +26,7 @@ export function FloatingDropdown(
         <summary
           // `compact` is sized in app.css: `.doodle-border` is unlayered, so a
           // css() mix can't set its border width.
-          class={compact ? 'doodle-border compact' : 'doodle-border'}
+          class={buttonFrameClass('default', compact ? 'compact' : undefined)}
           mix={css({
             cursor: 'pointer',
             listStyle: 'none',

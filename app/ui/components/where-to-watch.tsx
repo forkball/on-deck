@@ -10,6 +10,7 @@ import {
 } from '../../data/watchRegion.ts'
 import { routes } from '../../routes.ts'
 import { FloatingDropdown } from './floating-dropdown.tsx'
+import { Button } from '../shared/form-controls.tsx'
 
 export interface WhereToWatchProps {
   // What the JustWatch link searches for.
@@ -76,15 +77,15 @@ export function WhereToWatch(handle: Handle<WhereToWatchProps>) {
                   // Styled as a row in app.css (`button.menu-choice`), not here:
                   // Doodle's button rules are unlayered and a css() mix can't
                   // outrank them. The current country is bold via aria-current.
-                  <button
+                  <Button
                     type="submit"
                     name="region"
                     value={option.value}
-                    class="menu-choice"
+                    variant="menu-choice"
                     aria-current={option.value === region ? 'true' : undefined}
                   >
                     {option.value === region ? `✓ ${option.label}` : option.label}
-                  </button>
+                  </Button>
                 ))}
               </form>
             </FloatingDropdown>

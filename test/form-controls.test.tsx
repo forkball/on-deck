@@ -1,0 +1,157 @@
+import assert from 'node:assert/strict'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, relative } from 'node:path'
+import { describe, it } from 'node:test'
+import { renderToString } from 'remix/ui/server'
+
+import {
+  Button,
+  ButtonLink,
+  buttonFrameClass,
+  Checkbox,
+  Radio,
+  Select,
+  Textarea,
+  TextInput,
+} from '../app/ui/shared/form-controls.tsx'
+
+describe('form controls', () => {
+  it('maps a button variant to the class app.css draws it with', async () => {
+    assert.equal(await renderToString(<Button>Go</Button>), '<button type="button">Go</button>')
+    assert.equal(
+      await renderToString(<Button variant="link">Undo</Button>),
+      '<button type="button" class="linkish">Undo</button>',
+    )
+    assert.equal(
+      await renderToString(
+        <Button variant="checkline" ticked class="extra">
+          x
+        </Button>,
+      ),
+      '<button type="button" class="checkline ticked extra">x</button>',
+    )
+  })
+
+  it('keeps an explicit button type and forwards native attributes', async () => {
+    const html = await renderToString(
+      <Button type="submit" variant="danger" name="choice" value="keep" disabled>
+        Delete
+      </Button>,
+    )
+    assert.match(html, /^<button /)
+    for (const attribute of [
+      'type="submit"',
+      'class="danger"',
+      'name="choice"',
+      'value="keep"',
+      'disabled',
+    ]) {
+      assert.ok(html.includes(attribute), `${attribute} in ${html}`)
+    }
+  })
+
+  it('frames a link, or any other element, as a button', async () => {
+    assert.equal(
+      await renderToString(<ButtonLink href="/x">Log in</ButtonLink>),
+      '<a href="/x" class="doodle-border">Log in</a>',
+    )
+    assert.equal(buttonFrameClass('primary'), 'doodle-border primary')
+    assert.equal(buttonFrameClass('default', 'compact'), 'doodle-border compact')
+  })
+
+  it('fixes each input to its type', async () => {
+    assert.match(await renderToString(<TextInput name="q" />), /type="text"/)
+    assert.match(await renderToString(<TextInput type="password" name="p" />), /type="password"/)
+    assert.match(await renderToString(<Checkbox name="c" />), /type="checkbox"/)
+    assert.match(await renderToString(<Radio name="r" value="1" />), /type="radio"/)
+    assert.match(await renderToString(<Textarea name="t" rows={3} />), /^<textarea[^>]*rows="3"/)
+    assert.match(
+      await renderToString(
+        <Select name="s">
+          <option value="">Any</option>
+        </Select>,
+      ),
+      /^<select name="s"><option value="">Any<\/option><\/select>$/,
+    )
+  })
+})
+
+// The point of the components is that there is one place to change how a control
+// looks. That stops being true the first time a page writes a raw <button>, so
+// this reads every .tsx under app/ and fails on one outside form-controls.tsx.
+//
+// What is allowed through: <input type="hidden">, which renders nothing, and the
+// inputs below that are not form fields at all. Each is invisible and exists for
+// its :checked state, which CSS reads to drive something else — so a Checkbox or
+// Radio, which draws a visible control, would be the wrong thing to render.
+const NOT_FORM_FIELDS: Array<{ file: string; marker: string; why: string }> = [
+  { file: 'app/ui/components/tabs.tsx', marker: 'type="radio"', why: 'which tab is open' },
+  { file: 'app/ui/components/image-carousel.tsx', marker: 'type="radio"', why: 'which slide is shown' },
+  {
+    file: 'app/ui/components/star-rating.tsx',
+    marker: 'type="radio"',
+    why: 'drawn as stars by their labels',
+  },
+  { file: 'app/ui/components/modal.tsx', marker: 'modal-toggle', why: 'whether the modal is open' },
+  { file: 'app/ui/components/expandable-text.tsx', marker: 'type="checkbox"', why: '"more" / "less"' },
+  { file: 'app/actions/profile/imports/review-page.tsx', marker: 'drawer-check', why: 'the review drawer' },
+  {
+    file: 'app/browser/letterboxd-import-form.tsx',
+    marker: 'type="file"',
+    why: 'hidden inside its drop zone',
+  },
+]
+
+function tsxFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) return tsxFiles(path)
+    return entry.name.endsWith('.tsx') ? [path] : []
+  })
+}
+
+// Comments blanked out, newlines kept so line numbers still point at the source.
+// Prose about a control (`<select defaultValue>` doesn't preselect…) is not one.
+// Only whole-line `//` comments, so a URL in a string is never mistaken for one;
+// a trailing comment that names a tag fails this test loudly, never silently.
+function withoutComments(source: string): string {
+  const blank = (text: string) => text.replace(/[^\n]/g, ' ')
+  return source.replace(/\/\*[\s\S]*?\*\//g, blank).replace(/^[ \t]*\/\/.*$/gm, blank)
+}
+
+// The opening tag, up to the `>` that closes it rather than one inside a `{…}`.
+function openingTag(source: string, start: number): string {
+  let depth = 0
+  for (let i = start; i < source.length; i++) {
+    const char = source[i]
+    if (char === '{') depth++
+    else if (char === '}') depth--
+    else if (char === '>' && depth === 0) return source.slice(start, i + 1)
+  }
+  return source.slice(start)
+}
+
+describe('raw form controls', () => {
+  it('render only through app/ui/shared/form-controls.tsx', () => {
+    const root = join(import.meta.dirname, '..')
+    const found: string[] = []
+
+    for (const path of tsxFiles(join(root, 'app'))) {
+      const file = relative(root, path)
+      if (file === 'app/ui/shared/form-controls.tsx') continue
+      const source = withoutComments(readFileSync(path, 'utf8'))
+
+      // Whitespace after the name skips a bare `<button>` in a string; every
+      // real one here has attributes.
+      for (const match of source.matchAll(/<(button|input|select|textarea)\s/g)) {
+        const tag = openingTag(source, match.index)
+        if (tag.includes('type="hidden"')) continue
+        if (NOT_FORM_FIELDS.some((allowed) => allowed.file === file && tag.includes(allowed.marker))) continue
+        const line = source.slice(0, match.index).split('\n').length
+        found.push(`${file}:${line} <${match[1]}>`)
+      }
+    }
+
+    assert.deepEqual(found, [], 'use Button, TextInput, Select, Textarea, Checkbox or Radio instead')
+  })
+})

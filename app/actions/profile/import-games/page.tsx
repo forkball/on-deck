@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { SteamImportResult } from '../../../data/imports/steam.ts'
 import { routes } from '../../../routes.ts'
 import { Page } from '../../../ui/components/page.tsx'
+import { Button } from '../../../ui/shared/form-controls.tsx'
 
 export interface SteamImportPageProps {
   displayName: string
@@ -92,7 +93,7 @@ export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
             </p>
             <div mix={css({ marginTop: '16px' })}>
               <form method="post" action={routes.profile.importGames.upload.href()}>
-                <button type="submit">Import my library</button>
+                <Button type="submit">Import my library</Button>
               </form>
             </div>
           </>

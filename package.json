@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "NODE_ENV=development node --env-file-if-exists=.env --watch --import remix/node-tsx server.ts",
     "start": "NODE_ENV=production node --env-file-if-exists=.env --import remix/node-tsx server.ts",
-    "test": "NODE_ENV=test node --env-file-if-exists=.env --import remix/node-tsx --test",
+    "test": "NODE_ENV=test node --env-file-if-exists=.env --import remix/node-tsx --test 'test/**/*.test.ts' 'test/**/*.test.tsx'",
     "typecheck": "tsc --noEmit && node --import remix/node-tsx scripts/check-browser-bundle.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
