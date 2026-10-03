@@ -481,7 +481,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 </p>
               )}
 
-          <Button type="submit" disabled={disabled} mix={css({ minHeight: '44px', width: '100%' })}>
+          <Button type="submit" disabled={disabled} mix={css({ width: '100%' })}>
             {submitting
               ? isLucky
                 ? 'Drawing…'
