@@ -68,8 +68,14 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
             '& .menu a': {
               padding: '4px 8px',
             },
+            // Log out is the one action in a list of places to go, so a line
+            // sets it apart: the menu's 4px gap above it, 4px below, the same
+            // #ddd the tab underlines use.
             '& .menu form': {
               margin: 0,
+              marginTop: '4px',
+              paddingTop: '4px',
+              borderTop: '1px solid #ddd',
             },
             // Drawn as one of the links above it (menu-link in app.css) though
             // it has to be a form button. Width is the one thing css() can set.
