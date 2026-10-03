@@ -65,14 +65,17 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
               borderRadius: '8px',
               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
             },
-            '& .menu a': {
-              padding: '4px 8px',
-            },
+            // Log out is the one action in a list of places to go, so a line
+            // sets it apart: the menu's 4px gap above it, 4px below, the same
+            // #ddd the tab underlines use.
             '& .menu form': {
               margin: 0,
+              marginTop: '4px',
+              paddingTop: '4px',
+              borderTop: '1px solid #ddd',
             },
-            // A row like the links above it, not a framed button: menu-choice
-            // in app.css. Its width is the one thing a css() rule can still set.
+            // Log out is drawn as one of the links (menu-link, in app.css), though
+            // it has to be a form button. Width is the one thing css() can set.
             '& .menu button': {
               width: '100%',
             },
@@ -101,12 +104,12 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
         </summary>
         <div class="menu">
           {links.map((link) => (
-            <a key={link.href} href={link.href}>
+            <a key={link.href} href={link.href} class="menu-link">
               {link.label}
             </a>
           ))}
           <form method="post" action={logoutHref}>
-            <Button type="submit" variant="menu-choice">
+            <Button type="submit" variant="menu-link">
               Log out
             </Button>
           </form>

@@ -437,11 +437,42 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 .doodle button.linkish,
 .doodle button.bare,
 .doodle button.checkline,
-.doodle button.plain {
+.doodle button.plain,
+.doodle button.menu-link {
   border: 0;
   border-image: none;
   background: none;
   cursor: pointer;
+}
+
+/* "menu-link": an item in a menu of places to go — the profile menu's links,
+   and Log out, a button because it has to POST, among them. Plain at rest, and
+   bold and underlined under the pointer or keyboard focus, which is what says
+   which item a press would take. `.doodle a` makes every link bold, unlayered,
+   so the rest state has to be said here, for the links as much as the button.
+
+   The rest is what the button needs to sit among the links: the menu's 4px 8px
+   row padding, left-aligned text and a normal line height, so every row is one
+   height. Focus also keeps Doodle's dashed outline, on the links too, drawn
+   just outside the text rather than 8px inside a 24px row. */
+.doodle .menu-link {
+  padding: 4px 8px;
+  font-weight: normal;
+  color: #1c1c1c;
+  text-decoration: none;
+  text-align: left;
+  line-height: normal;
+}
+
+.doodle .menu-link:hover,
+.doodle .menu-link:focus-visible {
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+.doodle .menu-link:focus-visible {
+  outline: 2px dashed #3c3c3c;
+  outline-offset: 0;
 }
 
 /* Button variant "plain": a button whose look is its own content — the import

@@ -34,6 +34,10 @@ export type ButtonVariant =
   // A full-width row in a menu or a list of results: a FloatingDropdown, the
   // profile menu, search suggestions. Borderless, left-aligned, tinted on hover.
   | 'menu-choice'
+  // A button in a menu of links, drawn as one of them: the profile menu's Log out,
+  // which has to POST but sits under Media, People, Settings. The links take the
+  // same `menu-link` class, so all of them share one look.
+  | 'menu-link'
   // No frame, padding or background: a button whose look is its content — the
   // poster tiles in the import picker. Layout is the call site's.
   | 'plain'
@@ -46,6 +50,7 @@ const VARIANT_CLASS: Record<ButtonVariant, string | undefined> = {
   bare: 'bare',
   checkline: 'checkline',
   'menu-choice': 'menu-choice',
+  'menu-link': 'menu-link',
   plain: 'plain',
 }
 
