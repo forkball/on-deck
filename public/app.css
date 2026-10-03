@@ -22,11 +22,35 @@
   border-image: url(/border-light.svg) 10 10 10 10 stretch stretch;
 }
 
+/* Checkboxes and radios follow the same rule as every other field: a 2px line,
+   light while idle, dark on hover or focus. Checked is dark too — the `*` alone
+   is a small mark, and the darker ring is what makes the chosen option in a
+   group read as chosen at a glance. Same shapes and slices as DoodleCSS's own
+   checkbox.svg and radio.svg, so the boxes keep their size. */
+.doodle input[type='checkbox'] {
+  border-image: url(/checkbox-light.svg) 6 6 6 6 stretch stretch;
+}
+
+.doodle input[type='radio'] {
+  border-image: url(/radio-light.svg) 16 16 16 16 stretch stretch;
+}
+
+.doodle input[type='checkbox']:hover:not(:disabled),
+.doodle input[type='checkbox']:focus-visible,
+.doodle input[type='checkbox']:checked {
+  border-image: url(/checkbox.svg) 6 6 6 6 stretch stretch;
+}
+
+.doodle input[type='radio']:hover:not(:disabled),
+.doodle input[type='radio']:focus-visible,
+.doodle input[type='radio']:checked {
+  border-image: url(/radio.svg) 16 16 16 16 stretch stretch;
+}
+
 /* A disabled radio already greys its `-` glyph (DoodleCSS's own
    `:disabled:after { color: grey }`), but the ring is a border-image — an SVG
-   stroke baked at #3c3c3c — which `color` can't touch, so the border stayed
-   full black and the option still read as selectable. Fading the whole glyph
-   dims the ring along with it. */
+   with its colour baked in — which `color` can't touch, so the ring still read
+   as selectable. Fading the whole glyph dims the ring along with it. */
 .doodle input[type='radio']:disabled {
   opacity: 0.4;
 }
@@ -272,7 +296,8 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   color: #3c3c3c;
 }
 
-/* A submit drawn as Doodle's checkbox (or radio, with .radio on the box).
+/* A submit drawn as a checkbox (or radio, with .radio on the box), wearing the
+   same images as the real ones above: light idle, dark on hover or once ticked.
    While posting it shows the state it is heading to. */
 .doodle button.checkline {
   display: inline-flex;
@@ -294,13 +319,25 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   box-sizing: border-box;
   border-style: solid;
   border-width: 5px;
-  border-image: url(/vendor/doodle/checkbox.svg) 6 6 6 6 stretch stretch;
+  border-image: url(/checkbox-light.svg) 6 6 6 6 stretch stretch;
   font-size: 14px;
 }
 
 .doodle .checkline-box.radio {
   border-width: 10px;
-  border-image: url(/vendor/doodle/radio.svg) 16 16 16 16 stretch stretch;
+  border-image: url(/radio-light.svg) 16 16 16 16 stretch stretch;
+}
+
+.doodle button.checkline:hover:not(:disabled) .checkline-box,
+.doodle button.checkline:focus-visible .checkline-box,
+.doodle button.checkline.ticked .checkline-box {
+  border-image: url(/checkbox.svg) 6 6 6 6 stretch stretch;
+}
+
+.doodle button.checkline:hover:not(:disabled) .checkline-box.radio,
+.doodle button.checkline:focus-visible .checkline-box.radio,
+.doodle button.checkline.ticked .checkline-box.radio {
+  border-image: url(/radio.svg) 16 16 16 16 stretch stretch;
 }
 
 .doodle button.checkline.ticked .checkline-box::after,
