@@ -1,8 +1,14 @@
 /* App-level interaction states layered on top of the vendored DoodleCSS,
    which ships with focus-visible styling but no hover/idle distinction —
    every bordered control uses the same dark hand-drawn stroke all the time.
-   Here the border starts light and only turns dark (the vendored button.svg
-   / border.svg) on hover or focus, so idle controls read as quieter. */
+   Here the border starts light and only turns dark on hover or focus, so idle
+   controls read as quieter.
+
+   Buttons and one-line fields draw DoodleCSS's button.svg path, and textareas
+   its border.svg path, at a 2px stroke rather than the vendored 3: at 3 a form
+   read as a stack of heavy boxes. Same path and same 10px slice, so every box —
+   and the one-height row of a field beside a button — is unchanged; only the
+   line thins. Fieldsets keep the vendored weight. */
 
 .doodle button,
 .doodle .doodle-border,
@@ -33,35 +39,18 @@
 .doodle .doodle-border:focus-visible,
 .doodle select:focus-visible,
 .doodle input:not([type='checkbox']):not([type='radio']):focus-visible {
-  border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
+  border-image: url(/button.svg) 10 10 10 10 stretch stretch;
 }
 
 .doodle button.primary,
 .doodle .doodle-border.primary {
-  border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
+  border-image: url(/button.svg) 10 10 10 10 stretch stretch;
 }
 
 .doodle fieldset:hover,
 .doodle textarea:hover,
 .doodle textarea:focus-visible {
   border-image: url(/vendor/doodle/border.svg) 10 10 10 10 stretch stretch;
-}
-
-/* Fields draw the same shapes at a 2px stroke rather than 3: a field sits idle
-   on the page far more than a button does, and at the button's weight a form
-   read as a stack of heavy boxes. Same path and same 10px slice, so the box —
-   and the one-height row beside a button — is unchanged; only the line thins.
-   Listed after the rules above at equal specificity so it wins over them. */
-.doodle select,
-.doodle input:not([type='checkbox']):not([type='radio']) {
-  border-image: url(/field-light.svg) 10 10 10 10 stretch stretch;
-}
-
-.doodle select:hover,
-.doodle select:focus-visible,
-.doodle input:not([type='checkbox']):not([type='radio']):hover,
-.doodle input:not([type='checkbox']):not([type='radio']):focus-visible {
-  border-image: url(/field.svg) 10 10 10 10 stretch stretch;
 }
 
 .doodle textarea {
