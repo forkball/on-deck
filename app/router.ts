@@ -29,6 +29,7 @@ import { loadDatabase } from './data/db.ts'
 import type { AppContext } from './middleware/context.ts'
 import { loadAuth } from './middleware/auth.ts'
 import { accessLog } from './middleware/accessLog.ts'
+import { canonicalHost } from './middleware/canonicalHost.ts'
 import { inPlace } from './middleware/inPlace.ts'
 import { render } from './middleware/render.tsx'
 import { sessionCookie, sessionStorage } from './middleware/session.ts'
@@ -42,6 +43,8 @@ declare module 'remix/router' {
 
 export const router = createRouter<AppContext>({
   middleware: [
+    // First, so static files on an old address redirect too.
+    canonicalHost(),
     staticFiles('./public', { index: false }),
     accessLog(),
     inPlace(),

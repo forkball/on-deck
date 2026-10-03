@@ -146,3 +146,22 @@ fly deploy
 
 Subsequent deploys are just `fly deploy`. The database is external
 (Supabase) and isn't managed by Fly — nothing to provision there.
+
+### Custom domain
+
+The app is served at `whatsondeck.net`. Nothing in the code names its own
+host, so the domain is Fly and DNS configuration plus one secret:
+
+```sh
+fly certs add whatsondeck.net
+fly certs add www.whatsondeck.net
+fly ips list             # A/AAAA for the apex; www is a CNAME to <app>.fly.dev
+fly certs show whatsondeck.net   # wait for "Issued"
+fly secrets set CANONICAL_HOST=whatsondeck.net
+```
+
+`CANONICAL_HOST` turns on `app/middleware/canonicalHost.ts`, which 308s
+`*.fly.dev` and `www.` to the bare domain. Set it only after the certificate is
+issued — before that it redirects everyone to an address that can't serve them.
+Existing sessions don't carry over (the cookie is host-only), so everyone signs
+in once more after the switch.
