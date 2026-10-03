@@ -122,7 +122,8 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
                 names them, which is where that expectation gets set. */}
             <p mix={NOTE}>
               New diary entries only, with their rating and review. Edits and deletions follow — Letterboxd
-              wins, and films you logged here are never touched. Re-read every 15 minutes.
+              wins, and films you logged here are never touched. Re-read when you open your profile, at most
+              every couple of minutes.
             </p>
 
             {/* The boundary this feature would otherwise hide. Connecting
