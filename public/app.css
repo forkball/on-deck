@@ -143,10 +143,20 @@
    and DoodleCSS only allows `padding-right: 1.5em` for it, which left the caret
    overlapping the last letter of the option. 10px offset + 12px caret + an 8px
    gap is 30px. Pixels, not em: the caret is a fixed size and doesn't scale with
-   the text. */
+   the text.
+
+   Its colour follows the border's too: light while idle, the vendored dark one
+   on hover or focus, at the same moment the border turns dark. Only the image
+   is swapped, so DoodleCSS's position and no-repeat still apply. */
 .doodle select:not([multiple]) {
+  background-image: url(/caret-light.svg);
   background-size: 12px auto;
   padding-right: 30px;
+}
+
+.doodle select:not([multiple]):hover,
+.doodle select:not([multiple]):focus-visible {
+  background-image: url(/vendor/doodle/caret.svg);
 }
 
 /* Padding gets them to the same height while Short Stack is rendering, but the
