@@ -167,7 +167,9 @@ function Pitch() {
         >
           Log in
         </ButtonLink>
-        <a href={routes.auth.signup.index.href()}>Sign up</a>
+        <a href={routes.auth.signup.index.href()} class="tap-area">
+          Sign up
+        </a>
       </div>
     </>
   )

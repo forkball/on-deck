@@ -45,6 +45,7 @@ export const NotificationBell = clientEntry<NotificationBellProps>(
         <a
           href={href}
           aria-label="Notifications"
+          class="tap-area"
           mix={[
             css({
               position: 'relative',

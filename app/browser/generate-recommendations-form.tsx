@@ -295,7 +295,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               {/* Named on the summary when closed and not what the page
                   implies — folded away with no sign of it, a run drawn from a
                   different taste would look like a bug. */}
-              <summary mix={[sectionLabel, css({ cursor: 'pointer' })]}>
+              <summary class="tap-area" mix={[sectionLabel, css({ cursor: 'pointer' })]}>
                 Settings (optional)
                 {!settingsOpen && hasSource && !sourcesAreDefault && (
                   <span mix={css({ textTransform: 'none', letterSpacing: 0, fontWeight: 400 })}>

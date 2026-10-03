@@ -909,6 +909,7 @@ function ReviewDrawer(
         <div class="drawer-row">
           <label
             for={DRAWER_TOGGLE}
+            class="tap-area"
             mix={css({
               flex: '1 1 auto',
               minWidth: 0,

@@ -66,7 +66,7 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
                 >
                   <div mix={css({ minWidth: 0, overflowWrap: 'break-word' })}>
                     {canView ? (
-                      <a href={routes.users.show.href({ userId: String(user.id) })}>
+                      <a href={routes.users.show.href({ userId: String(user.id) })} class="tap-area">
                         <strong>{displayLabel(user)}</strong>
                       </a>
                     ) : (
