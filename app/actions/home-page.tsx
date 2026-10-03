@@ -38,8 +38,6 @@ const HEADING = css({ margin: '0 0 12px', fontSize: '18px' })
 // so side by side they split the width and stacked on a phone they match.
 const CTA_BUTTON = css({
   flex: '1 1 auto',
-  textAlign: 'center',
-  textDecoration: 'none',
   whiteSpace: 'nowrap',
 })
 
@@ -77,8 +75,7 @@ function LuckyPickCta() {
       <ButtonLink
         href={luckyRecommendationsHref()}
         rmx-document=""
-
-        mix={css({ display: 'inline-block', marginTop: '12px', textDecoration: 'none' })}
+        mix={css({ display: 'inline-block', marginTop: '12px' })}
       >
         🎲 Draw today's pick
       </ButtonLink>
@@ -161,14 +158,11 @@ function Pitch() {
       >
         <ButtonLink
           href={routes.auth.login.index.href()}
-
           mix={css({
             display: 'inline-block',
             boxSizing: 'border-box',
             width: '420px',
             maxWidth: '100%',
-            textAlign: 'center',
-            textDecoration: 'none',
           })}
         >
           Log in

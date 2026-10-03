@@ -147,7 +147,10 @@ does nothing on its own.
   a `css()` rule can't beat it. `test/form-controls.test.tsx` fails on a raw
   `<button>`, `<input>`, `<select>` or `<textarea>` anywhere else; hidden inputs
   and the invisible toggles CSS reads (tabs, modal, carousel) are listed there
-  with the reason.
+  with the reason. It also fails on a call site that passes one of these a look
+  property (`fontSize`, `padding`, `border`, `color`…) in its `mix`: a call site
+  sets layout only, and a different look is a new variant — a `css()` look
+  rule loses to Doodle's unlayered one and does nothing anyway.
 - Tests live in `test/`, usually one file per module under test
   (`import-review.test.ts` covers `data/imports/review.ts`), though a few cover
   a pair — `lucky.test.ts` holds both `lucky` and `exclusions`. `npm test` runs

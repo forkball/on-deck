@@ -115,7 +115,7 @@ function FollowButton(handle: Handle<{ userId: number; following: boolean; retur
         }
       >
         <input type="hidden" name="return_to" value={returnTo} />
-        <Button type="submit" mix={css({ width: '100%', padding: '8px 12px' })}>
+        <Button type="submit" mix={css({ width: '100%' })}>
           {following ? 'Unfollow' : 'Follow'}
         </Button>
       </form>

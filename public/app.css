@@ -152,6 +152,11 @@
   font-size: 1em;
   font-weight: normal;
   color: #3c3c3c;
+  /* The two a real <button> gets from the browser: centred text, and no
+     underline — which a link has, and every ButtonLink was taking off at its
+     own call site before this. */
+  text-align: center;
+  text-decoration: none;
 }
 
 /* Same box, too, declared once so "all buttons" is true: no block padding, so

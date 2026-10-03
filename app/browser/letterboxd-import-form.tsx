@@ -240,7 +240,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
                   type="button"
                   variant="bare"
                   aria-label="Remove file"
-                  mix={[css({ flex: '0 0 auto', fontSize: '16px' }), on('click', clearFile)]}
+                  mix={[css({ flex: '0 0 auto' }), on('click', clearFile)]}
                 >
                   ✕
                 </Button>

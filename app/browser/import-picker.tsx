@@ -231,12 +231,7 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                 <h3 mix={css({ margin: 0, fontWeight: 400 })}>
                   {data ? `Which film is row ${data.rowIndex}?` : 'Find this film'}
                 </h3>
-                <Button
-                  type="button"
-                  variant="bare"
-                  aria-label="Close"
-                  mix={[css({ fontSize: '20px' }), on('click', close)]}
-                >
+                <Button type="button" variant="bare" aria-label="Close" mix={on('click', close)}>
                   ✕
                 </Button>
               </div>

@@ -169,7 +169,7 @@ function ResolveForm(
         <input type="hidden" name="action" value={action} />
         {anchor && <input type="hidden" name="anchor" value={anchor} />}
         {externalId && <input type="hidden" name="external_id" value={externalId} />}
-        <Button type="submit" variant={variant} ticked={selected} mix={css({ fontSize: '13px' })}>
+        <Button type="submit" variant={variant} ticked={selected}>
           {label}
         </Button>
       </form>
@@ -190,12 +190,7 @@ function PickerButton(handle: Handle<{ rowId: number; label: string; variant?: R
     const { rowId, label, variant } = handle.props
 
     return (
-      <Button
-        type="button"
-        data-import-picker={String(rowId)}
-        variant={variant}
-        mix={css({ fontSize: '13px' })}
-      >
+      <Button type="button" data-import-picker={String(rowId)} variant={variant}>
         {label}
       </Button>
     )
@@ -1217,7 +1212,6 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       name="choice"
                       value="keep"
                       variant={batch.conflict_choice === 'keep' ? 'primary' : 'default'}
-                      mix={css({ fontSize: '13px' })}
                     >
                       Keep what's on On Deck
                     </Button>
@@ -1226,7 +1220,6 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       name="choice"
                       value="take"
                       variant={batch.conflict_choice === 'take' ? 'primary' : 'default'}
-                      mix={css({ fontSize: '13px' })}
                     >
                       Take the import
                     </Button>
