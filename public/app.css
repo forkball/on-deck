@@ -47,18 +47,44 @@
   border-image: url(/radio.svg) 16 16 16 16 stretch stretch;
 }
 
-/* A disabled radio already greys its `-` glyph (DoodleCSS's own
-   `:disabled:after { color: grey }`), but the ring is a border-image — an SVG
-   with its colour baked in — which `color` can't touch, so the ring still read
-   as selectable. Fading the whole glyph dims the ring along with it. */
-.doodle input[type='radio']:disabled {
-  opacity: 0.4;
+/* Disabled is one look for every control: the whole thing faded, label and
+   all, with no hover response. DoodleCSS had a different answer per element —
+   a grey `-` glyph in an empty checkbox or radio, grey text on a button, and
+   nothing at all on a text field — and none of them dim a border-image, whose
+   colour is baked into the SVG, so a disabled field still read as usable.
+   Opacity is the one thing that fades text, border and glyph together.
+
+   A checkbox or radio sits inside its <label>, so the label carries the fade
+   for both and the control itself is left at full opacity: fading each would
+   multiply to almost nothing. A checkline's :disabled means "posting", not
+   unavailable, and keeps its own look below. */
+.doodle input:disabled,
+.doodle select:disabled,
+.doodle textarea:disabled,
+.doodle button:disabled:not(.checkline),
+.doodle label:has(input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.doodle label:has(input:disabled) input:disabled {
+  opacity: 1;
+}
+
+/* Grey text under the fade would be faded twice; the opacity alone says it. */
+.doodle button:disabled {
+  color: #3c3c3c;
+}
+
+.doodle input[type='checkbox']:disabled:not(:checked)::after,
+.doodle input[type='radio']:disabled:not(:checked)::after {
+  content: ' ';
 }
 
 .doodle button:hover:not(:disabled),
 .doodle .doodle-border:hover,
-.doodle select:hover,
-.doodle input:not([type='checkbox']):not([type='radio']):hover,
+.doodle select:hover:not(:disabled),
+.doodle input:not([type='checkbox']):not([type='radio']):hover:not(:disabled),
 .doodle button:focus-visible,
 .doodle .doodle-border:focus-visible,
 .doodle select:focus-visible,
@@ -72,7 +98,7 @@
 }
 
 .doodle fieldset:hover,
-.doodle textarea:hover,
+.doodle textarea:hover:not(:disabled),
 .doodle textarea:focus-visible {
   border-image: url(/vendor/doodle/border.svg) 10 10 10 10 stretch stretch;
 }
@@ -81,16 +107,16 @@
   border-image: url(/textarea-light.svg) 10 10 10 10 stretch stretch;
 }
 
-.doodle textarea:hover,
+.doodle textarea:hover:not(:disabled),
 .doodle textarea:focus-visible {
   border-image: url(/textarea.svg) 10 10 10 10 stretch stretch;
 }
 
-.doodle button,
+.doodle button:not(:disabled),
 .doodle .doodle-border,
-.doodle select,
-.doodle input[type='checkbox'],
-.doodle input[type='radio'] {
+.doodle select:not(:disabled),
+.doodle input[type='checkbox']:not(:disabled),
+.doodle input[type='radio']:not(:disabled) {
   cursor: pointer;
 }
 
@@ -167,7 +193,7 @@
   padding-right: 30px;
 }
 
-.doodle select:not([multiple]):hover,
+.doodle select:not([multiple]):hover:not(:disabled),
 .doodle select:not([multiple]):focus-visible {
   background-image: url(/vendor/doodle/caret.svg);
 }
