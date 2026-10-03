@@ -21,6 +21,7 @@ import { stripPublisherPromo } from '../../data/catalog/blurb.ts'
 import { catalogPageFor } from '../../data/catalog/links.ts'
 import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { backLinkFrom, withReturnTo } from '../backLink.ts'
+import { Button, TextInput } from '../shared/form-controls.tsx'
 
 export interface MediaDetailPageProps {
   mediaType: ActiveMediaType
@@ -272,19 +273,19 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                     >
                       <input type="hidden" name="_method" value="DELETE" />
                       <input type="hidden" name="return_to" value={returnTo} />
-                      <button type="submit" class="danger">
+                      <Button type="submit" variant="danger">
                         Delete log
-                      </button>
+                      </Button>
                       <FrameForm />
                     </form>
                   )}
-                  <button
+                  <Button
                     type="submit"
                     form={`edit-${mediaType}-form-${item.id}`}
                     mix={css({ marginLeft: 'auto' })}
                   >
                     {interaction ? 'Update' : 'Save'}
-                  </button>
+                  </Button>
                 </div>
               </Modal>
             </div>
@@ -393,13 +394,12 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                       })}
                     >
                       <input type="hidden" name="return_to" value={returnTo} />
-                      <input
-                        type="text"
+                      <TextInput
                         name="catalog_link"
                         placeholder={ui.rematchPlaceholder}
                         mix={css({ flex: '1 1 240px' })}
                       />
-                      <button type="submit">Fix match</button>
+                      <Button type="submit">Fix match</Button>
                     </form>
                     <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
                       <a

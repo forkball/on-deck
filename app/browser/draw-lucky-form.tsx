@@ -1,6 +1,7 @@
 import { clientEntry, css, on } from 'remix/ui'
 
 import { FriendPicker, type FriendOption } from './friend-picker.tsx'
+import { Button } from '../ui/shared/form-controls.tsx'
 
 // Tells the shared `lucky` action which page a submission came from, so a
 // failure re-renders that page rather than the general recommendations one.
@@ -96,9 +97,9 @@ export const DrawLuckyForm = clientEntry<DrawLuckyFormProps>(import.meta.url, fu
           </p>
         )}
 
-        <button type="submit" disabled={disabled} mix={css({ minHeight: '44px', width: '100%' })}>
+        <Button type="submit" disabled={disabled} mix={css({ width: '100%' })}>
           {submitting ? 'Drawing…' : `🎲 Draw today's pick`}
-        </button>
+        </Button>
       </form>
     )
   }

@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css, on } from 'remix/ui'
 
 import type { SuggestState, Suggestion } from './suggestions.ts'
+import { Button } from '../../ui/shared/form-controls.tsx'
 
 // Rendered inside the two autosuggest forms (movie-search-form.tsx,
 // user-search-form.tsx) — a plain nested component, not its own hydration
@@ -64,22 +65,15 @@ export function SuggestionDropdown(
           <div mix={css({ padding: '12px', color: '#888', fontSize: '13px' })}>No matches.</div>
         ) : (
           state.suggestions.map((suggestion) => (
-            <button
+            <Button
               key={suggestion.key}
               type="button"
+              variant="menu-choice"
               mix={[
-                css({
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: 'none',
-                  background: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.06)' },
-                }),
+                // Layout only: the row itself — no frame, left-aligned, the hover
+                // tint — is menu-choice in app.css, since Doodle's button rules are
+                // unlayered and a css() rule here can't set any of it.
+                css({ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }),
                 on('click', () => onSelect(suggestion)),
               ]}
             >
@@ -104,7 +98,7 @@ export function SuggestionDropdown(
                   </span>
                 )}
               </span>
-            </button>
+            </Button>
           ))
         )}
       </div>

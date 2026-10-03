@@ -1,6 +1,7 @@
 import { clientEntry, css, on, ref } from 'remix/ui'
 
 import { space } from './shared/spacing.ts'
+import { Button } from '../ui/shared/form-controls.tsx'
 
 export type LetterboxdImportFormProps = {
   uploadHref: string
@@ -235,14 +236,14 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
                 )}
               </div>
               {!submitting && (
-                <button
+                <Button
                   type="button"
-                  class="bare"
+                  variant="bare"
                   aria-label="Remove file"
-                  mix={[css({ flex: '0 0 auto', fontSize: '16px' }), on('click', clearFile)]}
+                  mix={[css({ flex: '0 0 auto' }), on('click', clearFile)]}
                 >
                   ✕
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -254,7 +255,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
               justifyContent: 'flex-end',
             })}
           >
-            <button
+            <Button
               type="submit"
               disabled={submitting}
               mix={css({
@@ -283,7 +284,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
                 />
               )}
               {submitting ? 'Importing…' : 'Upload and import'}
-            </button>
+            </Button>
           </div>
         </form>
       )

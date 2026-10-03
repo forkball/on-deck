@@ -1,8 +1,14 @@
 /* App-level interaction states layered on top of the vendored DoodleCSS,
    which ships with focus-visible styling but no hover/idle distinction —
    every bordered control uses the same dark hand-drawn stroke all the time.
-   Here the border starts light and only turns dark (the vendored button.svg
-   / border.svg) on hover or focus, so idle controls read as quieter. */
+   Here the border starts light and only turns dark on hover or focus, so idle
+   controls read as quieter.
+
+   Buttons and one-line fields draw DoodleCSS's button.svg path, and textareas
+   its border.svg path, at a 2px stroke rather than the vendored 3: at 3 a form
+   read as a stack of heavy boxes. Same path and same 10px slice, so every box —
+   and the one-height row of a field beside a button — is unchanged; only the
+   line thins. Fieldsets keep the vendored weight. */
 
 .doodle button,
 .doodle .doodle-border,
@@ -11,47 +17,123 @@
   border-image: url(/button-light.svg) 10 10 10 10 stretch stretch;
 }
 
-.doodle fieldset,
-.doodle textarea {
+.doodle fieldset {
   border-image: url(/border-light.svg) 10 10 10 10 stretch stretch;
 }
 
-/* A disabled radio already greys its `-` glyph (DoodleCSS's own
-   `:disabled:after { color: grey }`), but the ring is a border-image — an SVG
-   stroke baked at #3c3c3c — which `color` can't touch, so the border stayed
-   full black and the option still read as selectable. Fading the whole glyph
-   dims the ring along with it. */
-.doodle input[type='radio']:disabled {
-  opacity: 0.4;
+/* Checkboxes and radios follow the same rule as every other field: a 2px line,
+   light while idle, dark on hover or focus. Checked is dark too — the `*` alone
+   is a small mark, and the darker ring is what makes the chosen option in a
+   group read as chosen at a glance. Same shapes and slices as DoodleCSS's own
+   checkbox.svg and radio.svg.
+
+   DoodleCSS sizes both at 1.5em (24px) but gives the radio a 16px border, and a
+   border can't shrink below itself: 16 + 16 made every radio 32px beside a 24px
+   checkbox. A 12px border brings it back to 24. That draws the 16px slice at
+   three quarters, so radio.svg's stroke is 2.67 to land on 2px. */
+/* The images serve the import review's checkline buttons too — a submit drawn
+   as a checkbox, dark once ticked. Each `.radio` selector outranks its
+   checkbox counterpart, so a radio-shaped box never takes the square image. */
+.doodle input[type='checkbox'],
+.doodle .checkline-box {
+  border-image: url(/checkbox-light.svg) 6 6 6 6 stretch stretch;
+}
+
+.doodle input[type='radio'],
+.doodle .checkline-box.radio {
+  border-image: url(/radio-light.svg) 16 16 16 16 stretch stretch;
+}
+
+.doodle input[type='radio'] {
+  border-width: 12px;
+}
+
+.doodle input[type='checkbox']:hover:not(:disabled),
+.doodle input[type='checkbox']:focus-visible,
+.doodle input[type='checkbox']:checked,
+.doodle button.checkline:hover:not(:disabled) .checkline-box,
+.doodle button.checkline:focus-visible .checkline-box,
+.doodle button.checkline.ticked .checkline-box {
+  border-image: url(/checkbox.svg) 6 6 6 6 stretch stretch;
+}
+
+.doodle input[type='radio']:hover:not(:disabled),
+.doodle input[type='radio']:focus-visible,
+.doodle input[type='radio']:checked,
+.doodle button.checkline:hover:not(:disabled) .checkline-box.radio,
+.doodle button.checkline:focus-visible .checkline-box.radio,
+.doodle button.checkline.ticked .checkline-box.radio {
+  border-image: url(/radio.svg) 16 16 16 16 stretch stretch;
+}
+
+/* Disabled is one look for every control: the whole thing faded, label and
+   all, with no hover response. DoodleCSS had a different answer per element —
+   a grey `-` glyph in an empty checkbox or radio, grey text on a button, and
+   nothing at all on a text field — and none of them dim a border-image, whose
+   colour is baked into the SVG, so a disabled field still read as usable.
+   Opacity is the one thing that fades text, border and glyph together.
+
+   A checkbox or radio is faded through its option's <label> rather than on
+   its own, so the label goes with it — and fading both would multiply to
+   almost nothing. A checkline's :disabled means "posting", not unavailable,
+   and keeps its own look below. */
+.doodle input:not([type='checkbox']):not([type='radio']):disabled,
+.doodle select:disabled,
+.doodle textarea:disabled,
+.doodle button:disabled:not(.checkline),
+.doodle label.choice-label:has(> input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.doodle input:disabled {
+  cursor: not-allowed;
+}
+
+/* Grey text under the fade would be faded twice; the opacity alone says it. */
+.doodle button:disabled {
+  color: #3c3c3c;
+}
+
+.doodle input[type='checkbox']:disabled:not(:checked)::after,
+.doodle input[type='radio']:disabled:not(:checked)::after {
+  content: ' ';
 }
 
 .doodle button:hover:not(:disabled),
 .doodle .doodle-border:hover,
-.doodle select:hover,
-.doodle input:not([type='checkbox']):not([type='radio']):hover,
+.doodle select:hover:not(:disabled),
+.doodle input:not([type='checkbox']):not([type='radio']):hover:not(:disabled),
 .doodle button:focus-visible,
 .doodle .doodle-border:focus-visible,
 .doodle select:focus-visible,
 .doodle input:not([type='checkbox']):not([type='radio']):focus-visible {
-  border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
+  border-image: url(/button.svg) 10 10 10 10 stretch stretch;
 }
 
 .doodle button.primary,
 .doodle .doodle-border.primary {
-  border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
+  border-image: url(/button.svg) 10 10 10 10 stretch stretch;
 }
 
-.doodle fieldset:hover,
-.doodle textarea:hover,
-.doodle textarea:focus-visible {
+.doodle fieldset:hover {
   border-image: url(/vendor/doodle/border.svg) 10 10 10 10 stretch stretch;
 }
 
-.doodle button,
+.doodle textarea {
+  border-image: url(/textarea-light.svg) 10 10 10 10 stretch stretch;
+}
+
+.doodle textarea:hover:not(:disabled),
+.doodle textarea:focus-visible {
+  border-image: url(/textarea.svg) 10 10 10 10 stretch stretch;
+}
+
+.doodle button:not(:disabled),
 .doodle .doodle-border,
-.doodle select,
-.doodle input[type='checkbox'],
-.doodle input[type='radio'] {
+.doodle select:not(:disabled),
+.doodle input[type='checkbox']:not(:disabled),
+.doodle input[type='radio']:not(:disabled) {
   cursor: pointer;
 }
 
@@ -75,6 +157,11 @@
   font-size: 1em;
   font-weight: normal;
   color: #3c3c3c;
+  /* The two a real <button> gets from the browser: centred text, and no
+     underline — which a link has, and every ButtonLink was taking off at its
+     own call site before this. */
+  text-align: center;
+  text-decoration: none;
 }
 
 /* Same box, too, declared once so "all buttons" is true: no block padding, so
@@ -94,8 +181,8 @@
 
 /* The other half of a form row: a <select> or text <input> beside a button
    takes no block padding either, so the row stands at one height. Only the
-   block padding is stated: a select's inline padding is DoodleCSS's caret
-   allowance (`padding-right: 1.5em`) and an input's is the browser's.
+   block padding is stated: an input's inline padding is the browser's, and a
+   select's right padding is the caret allowance set just below.
 
    A <textarea> keeps 4px: it holds prose, not one line, and on no padding its
    first line sits against the border. It is also left out of the line-height
@@ -107,6 +194,34 @@
 .doodle select,
 .doodle input:not([type='checkbox']):not([type='radio']) {
   padding-block: 0;
+}
+
+/* DoodleCSS paints the caret at caret.svg's own 18.5px, with a 3px stroke —
+   taller than the text's x-height and heavier than the 2px field border around
+   it. Drawn at 12px wide the stroke scales to ~2px, the same line as the field.
+
+   DoodleCSS sets it 10px in from the right but only allows `padding-right:
+   1.5em` for it, which left the caret overlapping the last letter of the
+   option. The inset, the size and the padding are stated together here, the
+   padding worked out from the other two plus an 8px gap, so changing either
+   can't put the caret back over the text. Pixels, not em: the caret is a fixed
+   size and doesn't scale with the text.
+
+   Its colour follows the border's too: light while idle, the vendored dark one
+   on hover or focus, at the same moment the border turns dark. Only the image
+   is swapped, so DoodleCSS's position and no-repeat still apply. */
+.doodle select:not([multiple]) {
+  --caret-inset: 10px;
+  --caret-size: 12px;
+  background-image: url(/caret-light.svg);
+  background-position: right var(--caret-inset) center;
+  background-size: var(--caret-size) auto;
+  padding-right: calc(var(--caret-inset) + var(--caret-size) + 8px);
+}
+
+.doodle select:not([multiple]):hover:not(:disabled),
+.doodle select:not([multiple]):focus-visible {
+  background-image: url(/vendor/doodle/caret.svg);
 }
 
 /* Padding gets them to the same height while Short Stack is rendering, but the
@@ -144,6 +259,110 @@
    unlayered Doodle one. */
 .doodle label.field {
   padding: 0;
+}
+
+/* CheckboxOption and RadioOption (form-controls.tsx). The control and its text
+   on one centred line, 8px apart, with an optional hint under the text — lined
+   up with the text, not the control. Here because `.doodle label` sets display
+   and padding unlayered, and a css() rule can't outrank that.
+
+   The control's size and the gap beside it are named on the option, and the
+   hint's indent is worked out from them, so it stays under the text if either
+   changes. The control's margin is zeroed so the gap is the only space beside
+   it. 24px is the size DoodleCSS draws both at (1.5em of its 16px), stated in
+   pixels because the hint's own 12px text would make an em mean 18 there.
+
+   Flex centres the text's line box on the control, but Short Stack's lowercase
+   letters sit low in that box — their middle lands about 0.075em under its
+   middle — so the text is lifted by that much to put the middle of the letters
+   on the middle of the control, which is what the eye checks. Measured from
+   pixels, the same for radios and checkboxes; in em, so it holds at any size. */
+.doodle .choice {
+  --choice-control: 24px;
+  --choice-gap: 8px;
+}
+
+.doodle label.choice-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--choice-gap);
+  padding: 0;
+  line-height: 1.25;
+}
+
+.doodle label.choice-label input {
+  flex: 0 0 auto;
+  width: var(--choice-control);
+  height: var(--choice-control);
+  margin: 0;
+}
+
+.doodle .choice-text {
+  position: relative;
+  top: -0.075em;
+}
+
+/* A line under an option, or under a whole group. */
+.doodle .choice-hint,
+.doodle .choice-group-hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #888;
+}
+
+.doodle .choice-hint {
+  margin-top: 4px;
+  padding-left: calc(var(--choice-control) + var(--choice-gap));
+}
+
+/* ChoiceGroup. A <fieldset> for what it says — one question, its options — and
+   none of Doodle's look: `.doodle fieldset` draws the hand-drawn border box,
+   which these groups never had. */
+.doodle fieldset.choice-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-image: none;
+  min-width: 0;
+}
+
+.doodle .choice-legend {
+  display: block;
+  padding: 0;
+}
+
+.doodle .choice-legend.section {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.doodle .choice-legend.subsection {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.doodle .choice-options {
+  display: flex;
+}
+
+.doodle .choice-options.column {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.doodle .choice-options.row {
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.doodle .choice-group-hint {
+  margin-top: 8px;
 }
 
 /* The "Not for me" chip in the rating picker. Its border, radius and colours
@@ -213,14 +432,24 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 }
 
 /* Buttons that read as text or an icon rather than a control. Unlayered, like
-   the rules above, so css() can't do this. */
+   the rules above, so css() can't do this. The border width going to 0 is also
+   what keeps the hover and focus border-images from drawing. */
 .doodle button.linkish,
 .doodle button.bare,
-.doodle button.checkline {
+.doodle button.checkline,
+.doodle button.plain {
   border: 0;
   border-image: none;
   background: none;
   cursor: pointer;
+}
+
+/* Button variant "plain": a button whose look is its own content — the import
+   picker's poster tiles. Layout stays with the call site, where css() can set
+   it because Doodle doesn't. */
+.doodle button.plain {
+  padding: 0;
+  text-align: left;
 }
 
 .doodle button.bare {
@@ -233,7 +462,8 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   color: #3c3c3c;
 }
 
-/* A submit drawn as Doodle's checkbox (or radio, with .radio on the box).
+/* A submit drawn as a checkbox (or radio, with .radio on the box), wearing the
+   same images as the real ones above: light idle, dark on hover or once ticked.
    While posting it shows the state it is heading to. */
 .doodle button.checkline {
   display: inline-flex;
@@ -255,13 +485,11 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   box-sizing: border-box;
   border-style: solid;
   border-width: 5px;
-  border-image: url(/vendor/doodle/checkbox.svg) 6 6 6 6 stretch stretch;
   font-size: 14px;
 }
 
 .doodle .checkline-box.radio {
   border-width: 10px;
-  border-image: url(/vendor/doodle/radio.svg) 16 16 16 16 stretch stretch;
 }
 
 .doodle button.checkline.ticked .checkline-box::after,

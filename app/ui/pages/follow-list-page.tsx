@@ -5,6 +5,7 @@ import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../components/page.tsx'
+import { Button } from '../shared/form-controls.tsx'
 
 export interface FollowListPageProps {
   title: string
@@ -86,7 +87,7 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
                       }
                     >
                       <input type="hidden" name="return_to" value={returnTo} />
-                      <button type="submit">{following ? 'Unfollow' : 'Follow'}</button>
+                      <Button type="submit">{following ? 'Unfollow' : 'Follow'}</Button>
                     </form>
                   )}
                 </li>

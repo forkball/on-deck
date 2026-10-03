@@ -1,0 +1,197 @@
+import type { Handle, Props, RemixNode } from 'remix/ui'
+
+// The app's form controls. Every button, text input, select, textarea, checkbox
+// and radio a person can see renders through one of these — checkboxes and
+// radios as a labelled CheckboxOption or RadioOption, usually in a ChoiceGroup — so the look lives in
+// one place rather than as a class string retyped at each call site —
+// test/form-controls.test.ts fails on a raw control anywhere else.
+//
+// Rendered on both sides — the generate and search forms are client entries —
+// so this lives in app/ui/shared and imports nothing but remix/ui.
+//
+// The look itself is in public/app.css, not here: DoodleCSS styles these
+// elements from outside any @layer, and a css() rule is layered, so it would
+// lose to Doodle at any specificity. What these components own is which of
+// those rules applies — the variant names, and the classes they map to.
+//
+// Each forwards every native attribute it is given, `mix` included, so a call
+// site's layout styles and event handlers reach the element unchanged.
+
+export type ButtonVariant =
+  // The hand-drawn frame. The default; no class.
+  | 'default'
+  // Dark frame at rest: the one action a form exists for.
+  | 'primary'
+  // Destructive (delete log). Red text in the default frame.
+  | 'danger'
+  // Reads as an underlined sentence rather than a control.
+  | 'link'
+  // Text or an icon with no frame — a close ×, a remove-file button.
+  | 'bare'
+  // A submit drawn as a checkbox, with `ticked` for its state. Its box is a
+  // `.checkline-box` span among the children; `radio` on that span for a radio.
+  | 'checkline'
+  // A full-width row in a menu or a list of results: a FloatingDropdown, the
+  // profile menu, search suggestions. Borderless, left-aligned, tinted on hover.
+  | 'menu-choice'
+  // No frame, padding or background: a button whose look is its content — the
+  // poster tiles in the import picker. Layout is the call site's.
+  | 'plain'
+
+const VARIANT_CLASS: Record<ButtonVariant, string | undefined> = {
+  default: undefined,
+  primary: 'primary',
+  danger: 'danger',
+  link: 'linkish',
+  bare: 'bare',
+  checkline: 'checkline',
+  'menu-choice': 'menu-choice',
+  plain: 'plain',
+}
+
+function joinClasses(...classes: Array<string | false | null | undefined>): string | undefined {
+  const joined = classes.filter(Boolean).join(' ')
+  return joined === '' ? undefined : joined
+}
+
+type ButtonProps = Props<'button'> & {
+  variant?: ButtonVariant
+  // Only meaningful on `checkline`: the box shows as ticked.
+  ticked?: boolean
+}
+
+export function Button(handle: Handle<ButtonProps>) {
+  return () => {
+    const { variant = 'default', ticked, class: className, type, ...rest } = handle.props
+
+    return (
+      <button
+        {...rest}
+        // A <button> with no type submits its form, which is never what a
+        // missing attribute was meant to say.
+        type={type ?? 'button'}
+        class={joinClasses(VARIANT_CLASS[variant], ticked && 'ticked', className)}
+      />
+    )
+  }
+}
+
+// The button frame for an element that has to be something other than a
+// <button> — a modal trigger is a <span> inside its <label>, a dropdown's
+// trigger is a <summary>. ButtonLink below is the <a> case. `.doodle-border`
+// is what app.css draws the frame on for those, and keeps every rule a real
+// button gets, hover and focus included.
+export function buttonFrameClass(variant: 'default' | 'primary' = 'default', extra?: string): string {
+  return joinClasses('doodle-border', variant === 'primary' && 'primary', extra)!
+}
+
+// A link that looks like a button: navigation, styled as an action.
+export function ButtonLink(handle: Handle<Props<'a'>>) {
+  return () => {
+    const { class: className, ...rest } = handle.props
+    return <a {...rest} class={buttonFrameClass('default', className)} />
+  }
+}
+
+// <input>'s props are a union keyed on `type`, each arm with the roles that
+// type may take. A component that fixes the type takes the attributes common to
+// all of them (`role` aside, which none of these call for) and restores the
+// arm's shape with one cast at the element.
+type InputAttributes = Omit<Props<'input'>, 'type' | 'role'>
+
+type TextInputProps = InputAttributes & {
+  type?: 'text' | 'email' | 'password' | 'search'
+}
+
+export function TextInput(handle: Handle<TextInputProps>) {
+  return () => {
+    const { type, ...rest } = handle.props
+    return <input {...({ ...rest, type: type ?? 'text' } as Props<'input'>)} />
+  }
+}
+
+// `defaultValue` doesn't preselect a <select> in this framework — HTML needs
+// `selected` on the matching <option>, so a call site that cares sets that on
+// its options (see StatusSelect). Left to the options rather than taken as a
+// prop here, since half the selects build their options from a table and the
+// other half write them out.
+export function Select(handle: Handle<Props<'select'>>) {
+  return () => <select {...handle.props} />
+}
+
+export function Textarea(handle: Handle<Props<'textarea'>>) {
+  return () => <textarea {...handle.props} />
+}
+
+// A checkbox or radio with its label, and optionally a line under it. There is
+// no bare Checkbox or Radio to reach for instead: an unlabelled one is never
+// what a page wants, and every page that laid its own label beside one did it a
+// little differently — three ways, before these.
+//
+// `children` is the label: text, plus anything that belongs on its line (a
+// "runs left" pill, a "(soon)"). `hint` sits under the label, lined up with the
+// label's text rather than the control, and outside the <label> so it stays
+// readable when the option is disabled and the label fades — it is often the
+// line saying why. Every other attribute reaches the <input>, `mix` included.
+//
+// The layout is in app.css (`.choice`): DoodleCSS sets `.doodle label {
+// display: inline-block; padding }` unlayered, which no css() rule can beat.
+// `hidden` goes on the wrapper, which nothing sets a display on, so the
+// browser's own [hidden] rule holds: the friend picker hides an option a
+// search filters out without unmounting it, keeping its ticked state.
+type ChoiceOptionProps = InputAttributes & {
+  hint?: RemixNode
+  hidden?: boolean
+}
+
+// The markup both share, called rather than rendered: one component per option,
+// which the friend picker re-renders a whole list of on every keystroke.
+function renderChoice(type: 'checkbox' | 'radio', props: ChoiceOptionProps): RemixNode {
+  const { children, hint, hidden, ...input } = props
+  return (
+    <div class="choice" hidden={hidden}>
+      <label class="choice-label">
+        <input {...({ ...input, type } as Props<'input'>)} />
+        <span class="choice-text">{children}</span>
+      </label>
+      {hint != null && hint !== false && <div class="choice-hint">{hint}</div>}
+    </div>
+  )
+}
+
+export function CheckboxOption(handle: Handle<ChoiceOptionProps>) {
+  return () => renderChoice('checkbox', handle.props)
+}
+
+export function RadioOption(handle: Handle<ChoiceOptionProps>) {
+  return () => renderChoice('radio', handle.props)
+}
+
+// A set of options that answer one question: a <fieldset> whose <legend> is the
+// question, so a screen reader names it before reading the choices. The legend
+// comes in the form's two heading sizes — `section` is the small capitals of
+// "What are you after?", `subsection` the bold "Taste" inside Settings.
+//
+// `hint` is a line for the group as a whole, under the options. `layout` is
+// how they sit: a column, or a row that wraps.
+type ChoiceGroupProps = {
+  legend: RemixNode
+  legendSize?: 'section' | 'subsection'
+  layout?: 'column' | 'row'
+  hint?: RemixNode
+  children?: RemixNode
+  mix?: Props<'fieldset'>['mix']
+}
+
+export function ChoiceGroup(handle: Handle<ChoiceGroupProps>) {
+  return () => {
+    const { legend, legendSize = 'section', layout = 'column', hint, children, mix } = handle.props
+    return (
+      <fieldset class="choice-group" mix={mix}>
+        <legend class={`choice-legend ${legendSize}`}>{legend}</legend>
+        <div class={`choice-options ${layout}`}>{children}</div>
+        {hint != null && hint !== false && <div class="choice-group-hint">{hint}</div>}
+      </fieldset>
+    )
+  }
+}

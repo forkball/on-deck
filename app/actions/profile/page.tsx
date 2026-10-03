@@ -18,6 +18,7 @@ import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
 import { PROFILE_TABS } from './edit/page.tsx'
+import { Button } from '../../ui/shared/form-controls.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
@@ -154,9 +155,9 @@ function TasteProfileSummary(
           >
             {/* The action refuses both of these too. This only saves someone
                 spending a click, and a rebuild, on finding that out. */}
-            <button type="submit" disabled={nothingLogged || outOfRebuilds}>
+            <Button type="submit" disabled={nothingLogged || outOfRebuilds}>
               Rebuild now
-            </button>
+            </Button>
             {(nothingLogged || rebuildsLeft != null) && (
               <span mix={css({ fontSize: '12px', color: '#888' })}>
                 {nothingLogged

@@ -1,8 +1,16 @@
 import { clientEntry, css, on } from 'remix/ui'
 
-import { Field, hintStyle } from '../ui/shared/field.tsx'
+import { Field } from '../ui/shared/field.tsx'
 import { SEEN_BY_OPTIONS, type SeenBy } from '../ui/shared/seen-by.ts'
-import { FriendPicker, radioOption, sectionLabel, type FriendOption } from './friend-picker.tsx'
+import { FriendPicker, type FriendOption } from './friend-picker.tsx'
+import {
+  Button,
+  CheckboxOption,
+  ChoiceGroup,
+  RadioOption,
+  Select,
+  TextInput,
+} from '../ui/shared/form-controls.tsx'
 
 export type { FriendOption }
 
@@ -39,6 +47,19 @@ export type GenerateRecommendationsFormProps = {
   startLucky: boolean
   findPeopleHref: string
 }
+
+// The Settings disclosure's label, in the same small capitals as the
+// ChoiceGroup legends above it (`.choice-legend.section` in app.css). Kept as a
+// css() rule because a <summary> can't take the legend's display: block without
+// losing its disclosure triangle.
+const sectionLabel = css({
+  margin: '0 0 10px',
+  fontSize: '12px',
+  fontWeight: 700,
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+  color: '#888',
+})
 
 const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
 
@@ -136,10 +157,10 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         noFriendsPicked ||
         (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
 
-      const caption = css({ margin: '10px 0 0', fontSize: '12px', color: '#888', lineHeight: 1.4 })
-
       const runsPill = css({
         display: 'inline-block',
+        // Inside the option's label, so this is its distance from the words.
+        marginLeft: '10px',
         padding: '2px 8px',
         borderRadius: '999px',
         border: '1px solid #ccc',
@@ -185,59 +206,52 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             }),
           ]}
         >
-          <div>
-            <p mix={sectionLabel}>What are you after?</p>
-            <div mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}>
-              <div>
-                <div mix={css({ display: 'flex', alignItems: 'center', gap: '10px' })}>
-                  {radioOption({
-                    name: 'run_kind',
-                    value: 'shortlist',
-                    checked: !startLucky,
-                    onChange: () => {
-                      runKind = 'shortlist'
-                      handle.update()
-                    },
-                    children: 'A shortlist',
-                  })}
-                  {runsRemaining != null && runsLimit != null && (
-                    <span mix={runsPill}>
-                      {runsRemaining}/{runsLimit} runs left today
-                    </span>
-                  )}
-                </div>
-                <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
+          <ChoiceGroup legend="What are you after?">
+            <RadioOption
+              name="run_kind"
+              value="shortlist"
+              defaultChecked={!startLucky}
+              mix={on('change', () => {
+                runKind = 'shortlist'
+                handle.update()
+              })}
+              hint={
+                <>
                   {shortlistCaption(shortlistCount, seenBy, isGroupRun)}
                   {runsRemaining == null && runsLeftLabel && ` ${runsLeftLabel}.`}
-                </p>
-              </div>
-              <div mix={css({ color: luckyAvailable ? 'inherit' : '#888' })}>
-                {radioOption({
-                  name: 'run_kind',
-                  value: 'lucky',
-                  checked: startLucky,
-                  disabled: !luckyAvailable,
-                  onChange: () => {
-                    runKind = 'lucky'
-                    handle.update()
-                  },
-                  children: "Today's lucky pick",
-                })}
-                <p
-                  mix={[caption, css({ paddingLeft: '1.6em' })]}
-                >{`One ${itemNoun} nobody in the run has logged.`}</p>
-                {!luckyAvailable && (
-                  <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
-                    Already drawn — another in {luckyWaitLabel}.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
+                </>
+              }
+            >
+              A shortlist
+              {runsRemaining != null && runsLimit != null && (
+                <span mix={runsPill}>
+                  {runsRemaining}/{runsLimit} runs left today
+                </span>
+              )}
+            </RadioOption>
+            <RadioOption
+              name="run_kind"
+              value="lucky"
+              defaultChecked={startLucky}
+              disabled={!luckyAvailable}
+              mix={on('change', () => {
+                runKind = 'lucky'
+                handle.update()
+              })}
+              hint={
+                <>
+                  {`One ${itemNoun} nobody in the run has logged.`}
+                  {!luckyAvailable && <div>Already drawn — another in {luckyWaitLabel}.</div>}
+                </>
+              }
+            >
+              Today's lucky pick
+            </RadioOption>
+          </ChoiceGroup>
 
           <div mix={onlyForShortlist}>
             <Field label="Name this run (optional)">
-              <input type="text" name="name" placeholder="e.g. Cozy weekend picks" />
+              <TextInput name="name" placeholder="e.g. Cozy weekend picks" />
             </Field>
           </div>
 
@@ -291,53 +305,51 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 )}
               </summary>
 
-              <section mix={[settingsSection, css({ marginTop: '12px' })]}>
-                <p mix={settingsHeading}>Taste</p>
-                <div mix={css({ display: 'flex', gap: '8px 20px', flexWrap: 'wrap' })}>
-                  {sources.map((source) => (
-                    <label key={source.value}>
-                      <input
-                        type="checkbox"
-                        name="source"
-                        value={source.value}
-                        checked={selectedSources.has(source.value)}
-                        mix={on('change', (event) => {
-                          if ((event.target as HTMLInputElement).checked) selectedSources.add(source.value)
-                          else selectedSources.delete(source.value)
-                          handle.update()
-                        })}
-                      />{' '}
-                      {source.label}
-                    </label>
-                  ))}
-                  {PLACEHOLDER_SOURCES.map((label) => (
-                    <label key={label} mix={css({ color: '#aaa' })}>
-                      <input type="checkbox" disabled /> {label}{' '}
-                      <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
-                    </label>
-                  ))}
-                </div>
-                {hasSource && (
-                  <p mix={hintStyle}>
-                    You'll still get {mediaTypeLabel} picks — this only changes which taste they're drawn
-                    from.
-                  </p>
-                )}
-              </section>
+              <ChoiceGroup
+                legend="Taste"
+                legendSize="subsection"
+                layout="row"
+                mix={css({ marginTop: '12px' })}
+                hint={
+                  hasSource &&
+                  `You'll still get ${mediaTypeLabel} picks — this only changes which taste they're drawn from.`
+                }
+              >
+                {sources.map((source) => (
+                  <CheckboxOption
+                    key={source.value}
+                    name="source"
+                    value={source.value}
+                    checked={selectedSources.has(source.value)}
+                    mix={on('change', (event) => {
+                      if ((event.target as HTMLInputElement).checked) selectedSources.add(source.value)
+                      else selectedSources.delete(source.value)
+                      handle.update()
+                    })}
+                  >
+                    {source.label}
+                  </CheckboxOption>
+                ))}
+                {PLACEHOLDER_SOURCES.map((label) => (
+                  <CheckboxOption key={label} disabled>
+                    {label} <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
+                  </CheckboxOption>
+                ))}
+              </ChoiceGroup>
 
               <section mix={[settingsSection, sectionDivider]}>
                 <p mix={settingsHeading}>Filters</p>
                 <div mix={settingsGrid}>
                   <Field label="Genre">
-                    <select name="genre" defaultValue="">
+                    <Select name="genre" defaultValue="">
                       <option value="">Any</option>
                       {genres.map((genre) => (
                         <option value={genre}>{genre.replace(/^./, (c) => c.toUpperCase())}</option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
                   <Field label="Decade">
-                    <select
+                    <Select
                       name="decade"
                       defaultValue=""
                       mix={on('change', (event) => {
@@ -351,30 +363,30 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                           {value}s
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
                   {decade !== '' && (
                     <Field label="Relative to decade">
-                      <select name="decade_relation" defaultValue="within">
+                      <Select name="decade_relation" defaultValue="within">
                         <option value="before">Before</option>
                         <option value="within">Within</option>
                         <option value="after">After</option>
-                      </select>
+                      </Select>
                     </Field>
                   )}
                   <Field label="Length">
-                    <select name="length" defaultValue="">
+                    <Select name="length" defaultValue="">
                       <option value="">Any</option>
                       {lengthOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
                   {playerTypes.length > 0 && (
                     <Field label="Player type">
-                      <select
+                      <Select
                         name="player_type"
                         defaultValue=""
                         mix={on('change', (event) => {
@@ -388,43 +400,43 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                             {PLAYER_TYPE_LABELS[type] ?? type}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </Field>
                   )}
                   {playerType === 'multiplayer' && multiplayerTypes.length > 0 && (
                     <Field label="Multiplayer type">
-                      <select name="multiplayer_type" defaultValue="">
+                      <Select name="multiplayer_type" defaultValue="">
                         <option value="">Any</option>
                         {multiplayerTypes.map((type) => (
                           <option key={type} value={type}>
                             {MULTIPLAYER_TYPE_LABELS[type] ?? type}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </Field>
                   )}
                   {platforms.length > 0 && (
                     <Field label="Platform">
-                      <select name="platform" defaultValue="">
+                      <Select name="platform" defaultValue="">
                         <option value="">Any</option>
                         {platforms.map((platform) => (
                           <option key={platform} value={platform}>
                             {platform}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </Field>
                   )}
                   {seriesTypes.length > 0 && (
                     <Field label="Series">
-                      <select name="series" defaultValue="">
+                      <Select name="series" defaultValue="">
                         <option value="">Any</option>
                         {seriesTypes.map((type) => (
                           <option key={type} value={type}>
                             {SERIES_TYPE_LABELS[type] ?? type}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </Field>
                   )}
                 </div>
@@ -439,7 +451,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 <p mix={settingsHeading}>Group</p>
                 <div mix={settingsGrid}>
                   <Field label="History">
-                    <select
+                    <Select
                       name="seen_by"
                       defaultValue="no_one"
                       mix={on('change', (event) => {
@@ -452,7 +464,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                           {option.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
                 </div>
               </section>
@@ -482,7 +494,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 </p>
               )}
 
-          <button type="submit" disabled={disabled} mix={css({ minHeight: '44px', width: '100%' })}>
+          <Button type="submit" disabled={disabled} mix={css({ width: '100%' })}>
             {submitting
               ? isLucky
                 ? 'Drawing…'
@@ -490,7 +502,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               : isLucky
                 ? `🎲 Draw today's pick`
                 : 'Get recommendations'}
-          </button>
+          </Button>
         </form>
       )
     }
