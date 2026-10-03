@@ -8,15 +8,6 @@ export type FriendOption = {
   loggedTypes: string[]
 }
 
-export const sectionLabel = css({
-  margin: '0 0 10px',
-  fontSize: '12px',
-  fontWeight: 700,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
-  color: '#888',
-})
-
 const FRIENDS_PAGE_SIZE = 8
 
 export interface FriendPickerProps {

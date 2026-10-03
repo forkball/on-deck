@@ -54,7 +54,7 @@ function joinClasses(...classes: Array<string | false | null | undefined>): stri
   return joined === '' ? undefined : joined
 }
 
-export type ButtonProps = Props<'button'> & {
+type ButtonProps = Props<'button'> & {
   variant?: ButtonVariant
   // Only meaningful on `checkline`: the box shows as ticked.
   ticked?: boolean
@@ -85,13 +85,11 @@ export function buttonFrameClass(variant: 'default' | 'primary' = 'default', ext
   return joinClasses('doodle-border', variant === 'primary' && 'primary', extra)!
 }
 
-export type ButtonLinkProps = Props<'a'> & { variant?: 'default' | 'primary' }
-
 // A link that looks like a button: navigation, styled as an action.
-export function ButtonLink(handle: Handle<ButtonLinkProps>) {
+export function ButtonLink(handle: Handle<Props<'a'>>) {
   return () => {
-    const { variant, class: className, ...rest } = handle.props
-    return <a {...rest} class={buttonFrameClass(variant, className)} />
+    const { class: className, ...rest } = handle.props
+    return <a {...rest} class={buttonFrameClass('default', className)} />
   }
 }
 
@@ -101,7 +99,7 @@ export function ButtonLink(handle: Handle<ButtonLinkProps>) {
 // arm's shape with one cast at the element.
 type InputAttributes = Omit<Props<'input'>, 'type' | 'role'>
 
-export type TextInputProps = InputAttributes & {
+type TextInputProps = InputAttributes & {
   type?: 'text' | 'email' | 'password' | 'search'
 }
 
@@ -138,34 +136,35 @@ export function Textarea(handle: Handle<Props<'textarea'>>) {
 //
 // The layout is in app.css (`.choice`): DoodleCSS sets `.doodle label {
 // display: inline-block; padding }` unlayered, which no css() rule can beat.
-// `hidden` is passed to the wrapper for the same reason it needs a rule there —
-// Doodle's display would otherwise override the browser's own [hidden].
-export type ChoiceOptionProps = InputAttributes & {
+// `hidden` goes on the wrapper, which nothing sets a display on, so the
+// browser's own [hidden] rule holds: the friend picker hides an option a
+// search filters out without unmounting it, keeping its ticked state.
+type ChoiceOptionProps = InputAttributes & {
   hint?: RemixNode
   hidden?: boolean
 }
 
-function ChoiceOption(handle: Handle<ChoiceOptionProps & { kind: 'checkbox' | 'radio' }>): () => RemixNode {
-  return () => {
-    const { kind, children, hint, hidden, ...input } = handle.props
-    return (
-      <div class="choice" hidden={hidden}>
-        <label class="choice-label">
-          <input {...({ ...input, type: kind } as Props<'input'>)} />
-          <span class="choice-text">{children}</span>
-        </label>
-        {hint != null && hint !== false && <div class="choice-hint">{hint}</div>}
-      </div>
-    )
-  }
+// The markup both share, called rather than rendered: one component per option,
+// which the friend picker re-renders a whole list of on every keystroke.
+function renderChoice(type: 'checkbox' | 'radio', props: ChoiceOptionProps): RemixNode {
+  const { children, hint, hidden, ...input } = props
+  return (
+    <div class="choice" hidden={hidden}>
+      <label class="choice-label">
+        <input {...({ ...input, type } as Props<'input'>)} />
+        <span class="choice-text">{children}</span>
+      </label>
+      {hint != null && hint !== false && <div class="choice-hint">{hint}</div>}
+    </div>
+  )
 }
 
 export function CheckboxOption(handle: Handle<ChoiceOptionProps>) {
-  return () => <ChoiceOption {...handle.props} kind="checkbox" />
+  return () => renderChoice('checkbox', handle.props)
 }
 
 export function RadioOption(handle: Handle<ChoiceOptionProps>) {
-  return () => <ChoiceOption {...handle.props} kind="radio" />
+  return () => renderChoice('radio', handle.props)
 }
 
 // A set of options that answer one question: a <fieldset> whose <legend> is the
@@ -175,7 +174,7 @@ export function RadioOption(handle: Handle<ChoiceOptionProps>) {
 //
 // `hint` is a line for the group as a whole, under the options. `layout` is
 // how they sit: a column, or a row that wraps.
-export type ChoiceGroupProps = {
+type ChoiceGroupProps = {
   legend: RemixNode
   legendSize?: 'section' | 'subsection'
   layout?: 'column' | 'row'

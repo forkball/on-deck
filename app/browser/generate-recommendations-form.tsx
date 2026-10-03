@@ -2,7 +2,7 @@ import { clientEntry, css, on } from 'remix/ui'
 
 import { Field } from '../ui/shared/field.tsx'
 import { SEEN_BY_OPTIONS, type SeenBy } from '../ui/shared/seen-by.ts'
-import { FriendPicker, sectionLabel, type FriendOption } from './friend-picker.tsx'
+import { FriendPicker, type FriendOption } from './friend-picker.tsx'
 import {
   Button,
   CheckboxOption,
@@ -47,6 +47,19 @@ export type GenerateRecommendationsFormProps = {
   startLucky: boolean
   findPeopleHref: string
 }
+
+// The Settings disclosure's label, in the same small capitals as the
+// ChoiceGroup legends above it (`.choice-legend.section` in app.css). Kept as a
+// css() rule because a <summary> can't take the legend's display: block without
+// losing its disclosure triangle.
+const sectionLabel = css({
+  margin: '0 0 10px',
+  fontSize: '12px',
+  fontWeight: 700,
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+  color: '#888',
+})
 
 const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
 
