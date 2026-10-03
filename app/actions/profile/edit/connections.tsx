@@ -268,7 +268,7 @@ function SteamBlock(handle: Handle<{ connection: SteamConnection }>) {
               is a document navigation, not a data fetch.
             */}
             <p mix={css({ marginTop: '12px' })}>
-              <a href={routes.profile.steam.connect.href()} rmx-document="">
+              <a href={routes.profile.steam.connect.href()} rmx-document="" class="tap-area">
                 Sign in through Steam →
               </a>
             </p>

@@ -50,7 +50,9 @@ export function Page(handle: Handle<PageProps>) {
         <main mix={MAIN_STYLES[width]}>
           {back && (
             <p mix={backStyle}>
-              <a href={back.href}>{back.label}</a>
+              <a href={back.href} class="tap-area">
+                {back.label}
+              </a>
             </p>
           )}
           {heading !== undefined && <h1>{heading}</h1>}

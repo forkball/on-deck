@@ -570,3 +570,66 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 .doodle button.menu-choice[aria-current] {
   font-weight: bold;
 }
+
+/* Touch targets. With a finger rather than a pointer, the things the app sizes
+   for a mouse are too small to hit reliably: the nav's links were 17px tall,
+   menu rows and option labels 24-26px, tabs 30px. 44px is the height phones are
+   designed around. All of this is for coarse pointers only, so nothing moves on
+   a desktop.
+
+   Two ways in. A row in a list — a menu item, a suggestion, a checkbox or radio
+   option — is simply made 44px tall, and the gaps between rows go, so a tap
+   between two of them still lands on one. Anything else — a link in the nav, a
+   tab, a back link, a close ✕ — keeps its size and gets an invisible tap area
+   around it instead (`tap-area`): a 44px-tall band centred on it and 8px
+   wider either side, drawn by ::after so the layout doesn't change. Exactly
+   44 rather than a fixed margin, so a 20px link reaches out 12px and no more —
+   a fixed 15 reached into the button above the home page's "Sign up". The
+   rating picker's "Not for me" chip sits beside the stars, so its band is no
+   wider than the chip. The text-like button variants get
+   it without the class, being small wherever they appear. */
+@media (pointer: coarse) {
+  .doodle .tap-area,
+  .doodle button.linkish,
+  .doodle a.linkish,
+  .doodle button.bare,
+  .doodle button.checkline,
+  .doodle label.rating-choice {
+    position: relative;
+  }
+
+  .doodle .tap-area::after,
+  .doodle button.linkish::after,
+  .doodle a.linkish::after,
+  .doodle button.bare::after,
+  .doodle button.checkline::after,
+  .doodle label.rating-choice::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -8px;
+    right: -8px;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+
+  .doodle label.rating-choice::after {
+    left: 0;
+    right: 0;
+  }
+
+  .doodle .menu-link,
+  .doodle button.menu-choice {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .doodle label.choice-label {
+    min-height: 44px;
+  }
+
+  .doodle .choice-options.column {
+    gap: 0;
+  }
+}

@@ -114,7 +114,7 @@ export function Modal(
             >
               {title && <h3 mix={css({ margin: 0 })}>{title}</h3>}
               {closeButton && (
-                <label for={id} mix={css({ cursor: 'pointer' })}>
+                <label for={id} class="tap-area" mix={css({ cursor: 'pointer' })}>
                   <span mix={css({ fontSize: '20px' })}>✕</span>
                 </label>
               )}

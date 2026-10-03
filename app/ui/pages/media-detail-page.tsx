@@ -422,7 +422,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                     sitting between the panels. */}
               {catalogPage && (
                 <p mix={css({ margin: 0, fontSize: '14px' })}>
-                  <a href={catalogPage.url} target="_blank" rel="noopener noreferrer">
+                  <a href={catalogPage.url} target="_blank" rel="noopener noreferrer" class="tap-area">
                     View on {catalogPage.name}
                   </a>
                 </p>
