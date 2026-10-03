@@ -218,13 +218,27 @@ export async function searchBooks(query: CatalogQuery): Promise<CatalogSearchRes
   // each pay three attempts and a second of sleeping for the same answer.
   if (!circuit.isOpen()) {
     try {
-      return await circuit.run(async () => {
+      const results = await circuit.run(async () => {
         for (const attempt of attempts) {
-          const results = await searchGoogleBooksOnly(attempt)
-          if (results.length > 0) return results
+          const found = await searchGoogleBooksOnly(attempt)
+          if (found.length > 0) return found
         }
         return []
       })
+      if (results.length > 0) return results
+
+      // Nothing found is not the same as Google having answered, and the difference
+      // is invisible from here. A key past its daily quota is served HTTP 200 with
+      // `totalItems: 0` — no error, no status to read, nothing to throw — so the
+      // catch below never ran, the circuit never opened (an empty answer is not a
+      // failure to count), and every book search in the app returned nothing at all
+      // while Open Library sat there able to answer. Measured on 2026-10-02: the same
+      // query keyless returned `429 Quota exceeded … 'Queries per day'`, keyed
+      // returned 200 and no items.
+      //
+      // So an empty answer falls through too. The cost when Google simply doesn't
+      // hold the book is one Open Library request, which is free and may well have it.
+      log.warn('Google Books returned nothing — asking Open Library, which may be a quota wall')
     } catch (error) {
       log.error('Google Books search failed, falling back to Open Library', error)
     }
