@@ -7,8 +7,9 @@
 //
 // Dry run by default — prints what it would do without writing anything.
 // Pass --apply to actually update rows. Pass --limit=N to try it on a handful
-// first, --max-requests=N to stop at a spend you choose, and --retry-settled to
-// re-ask about rows a previous run already gave a verdict on.
+// first, --max-requests=N to stop at a spend you choose, --retry-settled to
+// re-ask about rows a previous run already gave a verdict on, and --user=<display
+// name> to do one person's shelf rather than the whole table.
 //
 // Every attempt is recorded in book_backfill_attempts, and a row with a settled
 // verdict is left out of the next run. Without that, the rows this can't match
@@ -65,6 +66,13 @@ import { parseMediaMetadata } from '../app/data/mediaMetadata.ts'
 types.setTypeParser(types.builtins.INT8, (value) => parseInt(value, 10))
 types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value))
 
+// Shared by the row selection and the already-settled count, so the two cannot drift
+// and report a tally for a different set than the one being worked on.
+const LOGGED_BY = `and exists (
+  select 1 from user_media_interactions i
+    join users u on u.id = i.user_id
+   where i.media_item_id = m.id and u.display_name = $1)`
+
 const APPLY = process.argv.includes('--apply')
 const RETRY_SETTLED = process.argv.includes('--retry-settled')
 
@@ -74,6 +82,14 @@ function numericFlag(name: string): number | undefined {
 }
 
 const LIMIT = numericFlag('limit')
+
+// Whose books to repoint, by display name. Every remaining Open Library row is in
+// someone's shelf now, so a run is no longer a faceless batch: this is what makes it
+// possible to do one person's books, read every line, and stop — which is the pace the
+// matching rules have earned, having produced a new kind of wrong match in each of
+// four consecutive rounds.
+const userArg = process.argv.find((candidate) => candidate.startsWith('--user='))
+const USER = userArg?.slice('--user='.length)
 // A ceiling on Google Books requests for this run, counted across both the
 // search and the by-id lookup that applying a match costs. Rows are left for the
 // next run rather than half-done: the budget is checked before a row starts.
@@ -431,8 +447,28 @@ async function main() {
       where m.type = 'book'
         and m.external_source = 'openlibrary'
         ${RETRY_SETTLED ? '' : `and (a.outcome is null or a.outcome not in (${[...SETTLED].map((o) => `'${o}'`).join(',')}))`}
+        ${USER == null ? '' : LOGGED_BY}
       order by m.id`,
+    USER == null ? [] : [USER],
   )
+
+  // A name nobody has reads as "all done" rather than as a typo, so it says so.
+  if (USER != null && allRows.length === 0) {
+    const { rows: known } = await pool.query<{ display_name: string }>(
+      `select distinct u.display_name
+         from user_media_interactions i
+         join users u on u.id = i.user_id
+         join media_items m on m.id = i.media_item_id
+        where m.type = 'book' and m.external_source = 'openlibrary'
+        order by 1`,
+    )
+    if (!known.some((row) => row.display_name === USER)) {
+      throw new Error(
+        `No Open Library books are logged by ${JSON.stringify(USER)}. ` +
+          `Those who have some: ${known.map((row) => row.display_name).join(', ') || '(nobody)'}`,
+      )
+    }
+  }
   const rows = LIMIT ? allRows.slice(0, LIMIT) : allRows
 
   const {
@@ -440,12 +476,13 @@ async function main() {
   } = await pool.query<{ count: number }>(
     `select count(*)::int as count from book_backfill_attempts a
        join media_items m on m.id = a.media_item_id
-      where m.external_source = 'openlibrary' and a.outcome = any($1)`,
-    [[...SETTLED]],
+      where m.external_source = 'openlibrary' and a.outcome = any($1)
+        ${USER == null ? '' : LOGGED_BY.replace('$1', '$2')}`,
+    USER == null ? [[...SETTLED]] : [[...SETTLED], USER],
   )
 
   console.log(
-    `${rows.length} Open Library book row(s) to try. ` +
+    `${rows.length} Open Library book row(s) to try${USER == null ? '' : `, from ${USER}'s shelf`}. ` +
       `Database: ${PRODUCTION ? 'PRODUCTION' : 'development'}. Mode: ${APPLY ? 'APPLY' : 'DRY RUN'}` +
       `${MAX_REQUESTS == null ? '' : `, budget ${MAX_REQUESTS} Google Books request(s)`}` +
       `${settled && settled.count > 0 ? `. ${settled.count} already settled and skipped${RETRY_SETTLED ? ' — no, re-asked, --retry-settled is set' : ''}` : ''}`,
