@@ -8,8 +8,9 @@
 // Dry run by default — prints what it would do without writing anything.
 // Pass --apply to actually update rows. Pass --limit=N to try it on a handful
 // first, --max-requests=N to stop at a spend you choose, --retry-settled to
-// re-ask about rows a previous run already gave a verdict on, and --user=<display
-// name> to do one person's shelf rather than the whole table.
+// re-ask about rows a previous run already gave a verdict on, --user=<display
+// name> to do one person's shelf rather than the whole table, and
+// --skip=<id>,<id> to leave named rows alone.
 //
 // Every attempt is recorded in book_backfill_attempts, and a row with a settled
 // verdict is left out of the next run. Without that, the rows this can't match
@@ -90,6 +91,20 @@ const LIMIT = numericFlag('limit')
 // four consecutive rounds.
 const userArg = process.argv.find((candidate) => candidate.startsWith('--user='))
 const USER = userArg?.slice('--user='.length)
+
+// Rows to leave alone, by id. For the ones a dry run shows this cannot settle and no
+// rule is going to: a comic titled "Batman" or "Punisher" gives the title check
+// nothing to work with, and the author agrees across a publisher's whole line, so
+// every candidate passes and the pick comes down to a tiebreak. Those are better
+// repointed by hand, by someone who knows which book they own, than by a heuristic
+// tuned until it happens to agree.
+const skipArg = process.argv.find((candidate) => candidate.startsWith('--skip='))
+const SKIP = new Set(
+  (skipArg?.slice('--skip='.length) ?? '')
+    .split(',')
+    .map((id) => Number(id.trim()))
+    .filter((id) => Number.isInteger(id) && id > 0),
+)
 // A ceiling on Google Books requests for this run, counted across both the
 // search and the by-id lookup that applying a match costs. Rows are left for the
 // next run rather than half-done: the budget is checked before a row starts.
@@ -399,10 +414,27 @@ function bestOf(row: Row, candidates: CatalogSearchResult[]): CatalogSearchResul
   const passing = candidates.filter((candidate) => isSameBook(row, candidate))
   if (passing.length === 0) return null
 
+  // The year is a tiebreak and never a filter, because a book's stored year is the year
+  // of a printing — the whole reason #177 identifies books by their author instead.
+  // Among candidates that already agree on title and author it is the sharpest thing
+  // left, and it is what tells one Vol. 1 from another: "Daredevil by Chip Zdarsky
+  // Vol. 1" is 2019, and the 2022 "Daredevil & Elektra Vol. 1" is a different book by
+  // the same writer. Comics are where this bites, because their titles are generic
+  // enough — "Batman", "Punisher" — that the author agrees across a publisher's line
+  // and the title check has almost nothing to go on.
+  const wanted = parseMediaMetadata(row.metadata).releaseYear
+  const apart = (candidate: CatalogSearchResult) =>
+    wanted == null || candidate.releaseYear == null ? 50 : Math.abs(candidate.releaseYear - wanted)
+
   return passing.sort((a, b) => {
     const exact = (candidate: CatalogSearchResult) => (titlesNameSameWork(row.title, candidate.title) ? 0 : 1)
     const described = (candidate: CatalogSearchResult) => (candidate.overview ? 0 : 1)
-    return exact(a) - exact(b) || described(a) - described(b) || (b.pageCount ?? 0) - (a.pageCount ?? 0)
+    return (
+      exact(a) - exact(b) ||
+      described(a) - described(b) ||
+      apart(a) - apart(b) ||
+      (b.pageCount ?? 0) - (a.pageCount ?? 0)
+    )
   })[0]!
 }
 
@@ -490,6 +522,7 @@ async function main() {
 
   const lines: ReportLine[] = []
   let skippedForBudget = 0
+  let skipped = 0
 
   const report = async (row: Row, outcome: Outcome, detail: string, found?: CatalogSearchResult) => {
     const gains = found
@@ -504,6 +537,10 @@ async function main() {
   // report for every other row already resolved by the time it happens.
   await runBounded(rows, 5, async (row) => {
     if (abortReason != null) return
+    if (SKIP.has(row.id)) {
+      skipped++
+      return
+    }
     if (budgetSpent()) {
       skippedForBudget++
       return
@@ -610,6 +647,7 @@ async function main() {
   const withOverview = matches.filter((line) => line.gains?.includes('overview yes')).length
   console.log(`${withOverview} of ${matches.length} match(es) bring an overview`)
   console.log(`Google Books requests spent: ${requestsSpent}`)
+  if (skipped > 0) console.log(`${skipped} row(s) left alone by --skip.`)
   if (skippedForBudget > 0) {
     console.log(`${skippedForBudget} row(s) left for the next run — the budget ran out.`)
   }
