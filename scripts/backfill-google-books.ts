@@ -350,12 +350,26 @@ function isSameBook(row: Row, candidate: CatalogSearchResult): boolean {
   const found = normalizeName(candidate.creator)
   if (!stored || !found || stored !== found) return false
 
+  // Above this, a containment match is a collection and not the book. The tiebreak
+  // below prefers the longer candidate, which is right between a 117-page comic
+  // adaptation and the 685-page novel it adapts, and catastrophically wrong against an
+  // omnibus: "Navigators of Dune" was repointed onto "Dune: Legends, Heroes, Schools:
+  // (The Butlerian Jihad, … Navigators of Dune)" at 11,953 pages, because the omnibus
+  // contains the row's title and shares its author, and then won on length. The right
+  // volume, 419 pages, was the first result.
+  //
+  // A ceiling rather than a ratio because the row's own page count is usually missing —
+  // that is most of why this backfill exists. Only containment matches are capped: a
+  // title that agrees outright is the book whatever its length.
+  const SINGLE_WORK_MAX_PAGES = 1500
+
   // One direction only. The row's title fitting inside the candidate's is a subtitle
   // Google spells out — "The Goldfinch" filed as "The Goldfinch: A Novel". The reverse
   // is a candidate *less* specific than the row, which is a different book every time:
   // "House Corrino: Dune" matched plain "Dune" this way, 696 pages of the wrong novel,
   // with the author agreeing because the series shares one.
-  return titleWordsFitInside(row.title, candidate.title)
+  if (!titleWordsFitInside(row.title, candidate.title)) return false
+  return (candidate.pageCount ?? 0) <= SINGLE_WORK_MAX_PAGES
 }
 
 // Which of several passing candidates to take. `find` took the first, and Google's
