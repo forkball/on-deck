@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 
 import { titlesLikelyMatch } from '../app/data/recommendations/matching.ts'
 import {
+  normalizeName,
   normalizeTitle,
   withoutSubtitle,
   titleWordsFitInside,
@@ -115,5 +116,41 @@ describe('titleWordsFitInside', () => {
 
   it('refuses a title that only overlaps', () => {
     assert.equal(titleWordsFitInside('Dune House Corrino', 'Dune: The Battle of Corrin'), false)
+  })
+})
+
+// Catalogs disagree about accents constantly, and the two sides of a comparison come
+// from different ones by definition: a stored row from Open Library against a result
+// from Google Books.
+describe('accents', () => {
+  // The failure this fixes. Stripping anything outside a-z turned "Brontë" into
+  // "bront", which matches nothing spelled "Bronte", so the backfill skipped the clean
+  // 418-page Wuthering Heights at the top of its results and took a 100-page record
+  // that happened to carry the diaeresis too.
+  it('reads a name past its accents', () => {
+    assert.equal(normalizeName('Emily Brontë'), normalizeName('Emily Bronte'))
+    assert.equal(normalizeName('Gabriel García Márquez'), normalizeName('Gabriel Garcia Marquez'))
+  })
+
+  // NFD separates a letter from its mark, which is no help for the letters that are
+  // not a base plus a mark but characters of their own.
+  it('reads the letters NFD cannot take apart', () => {
+    assert.equal(normalizeName('Jo Nesbø'), normalizeName('Jo Nesbo'))
+    assert.equal(normalizeName('Søren Kierkegaard'), normalizeName('Soren Kierkegaard'))
+    assert.equal(normalizeTitle('Æon Flux'), normalizeTitle('Aeon Flux'))
+  })
+
+  it('folds a title the same way', () => {
+    assert.equal(
+      normalizeTitle('À la recherche du temps perdu'),
+      normalizeTitle('A la recherche du temps perdu'),
+    )
+    assert.equal(normalizeTitle('Mémoires'), normalizeTitle('Memoires'))
+  })
+
+  // The rules folding runs alongside, which it must not disturb.
+  it('leaves the ampersand and the punctuation rules alone', () => {
+    assert.equal(normalizeTitle('Fire & Blood'), normalizeTitle('Fire and Blood'))
+    assert.equal(normalizeTitle('Spider-Man'), normalizeTitle('Spiderman'))
   })
 })

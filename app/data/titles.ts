@@ -20,9 +20,38 @@
 // covers it on the import path. Which of the two spellings is right in general is a
 // real question with a measurable answer, and not one to settle inside a change that
 // is otherwise about there being five of them.
+// Accents folded to the letter underneath, not dropped. Stripping anything outside
+// a-z turns "Brontë" into "bront", which matches no catalog that spells her "Bronte"
+// — and the backfill then skipped the clean 418-page Wuthering Heights at the top of
+// its results for a 100-page record that happened to carry the diaeresis too. The
+// same holds for every title and author a catalog disagrees about: García, Nesbø,
+// Mémoires, Zoë.
+//
+// NFD splits a letter from its accent so the accent can be dropped, which handles é,
+// ü, å and the rest. It does nothing for the letters that are not a base plus a mark
+// but characters in their own right — ø, æ, ß, ł — so those are spelled out.
+const STRUCK_THROUGH: [from: RegExp, to: string][] = [
+  [/ø/g, 'o'],
+  [/æ/g, 'ae'],
+  [/œ/g, 'oe'],
+  [/ß/g, 'ss'],
+  [/ł/g, 'l'],
+  [/đ|ð/g, 'd'],
+  [/þ/g, 'th'],
+]
+
+function foldAccents(text: string): string {
+  const folded = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+  return STRUCK_THROUGH.reduce((carried, [from, to]) => carried.replace(from, to), folded)
+}
+
 export function normalizeTitle(title: string): string {
+  const folded = foldAccents(title)
   return (
-    title
+    folded
       .toLowerCase()
       // Before the punctuation pass, or the symbol is simply dropped and "The Wrath &
       // the Dawn" stops being "The Wrath and the Dawn".
@@ -49,7 +78,9 @@ export function withoutSubtitle(title: string): string {
 // models disagree about how to space initials — "J.R.R. Tolkien" against "J. R. R.
 // Tolkien" — and a name is one token to a reader either way.
 export function normalizeName(name: string | null | undefined): string {
-  return (name ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return foldAccents(name ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
 }
 
 // Whether two titles name the same work on their own evidence, for a caller that
