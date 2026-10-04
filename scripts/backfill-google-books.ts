@@ -199,6 +199,24 @@ const CANARY_GOOD_FOR_MS = 30_000
 let canaryCheckedAt = 0
 let abortReason: string | null = null
 
+// A 429 is the one provider failure that answers for every row at once: the limit is
+// on the key, not the query, so the next request cannot do better than the last. A run
+// that kept going through one spent 174 requests to settle 16 rows, and wrote
+// 'google-unavailable' against 136 books it never really asked about.
+//
+// Unlike the canary's empty answer, this needs no second opinion — Google has said
+// plainly what is wrong.
+function looksRateLimited(error: unknown): boolean {
+  return /\b429\b|rate limit|quota/i.test(error instanceof Error ? error.message : String(error))
+}
+
+function stopForRateLimit(): void {
+  abortReason ??=
+    'Google Books answered 429 — the key is over its rate or daily limit, so every ' +
+    'further request would fail the same way. Rows reached after this are recorded as ' +
+    'unavailable, which is not a settled verdict: a later run retries them with no flag.'
+}
+
 // Whether `isbn:`, `intitle:` and `inauthor:` are answering at all today, asked once.
 //
 // They are the precise way to ask, and when they work the ISBN alone settles most
@@ -589,6 +607,7 @@ async function main() {
           }
         }
       } catch (error) {
+        if (looksRateLimited(error)) stopForRateLimit()
         await report(
           row,
           'google-unavailable',
@@ -622,6 +641,7 @@ async function main() {
         }
       }
     } catch (error) {
+      if (looksRateLimited(error)) stopForRateLimit()
       await report(row, 'error', error instanceof Error ? error.message : String(error))
     }
   })
