@@ -350,7 +350,30 @@ function isSameBook(row: Row, candidate: CatalogSearchResult): boolean {
   const found = normalizeName(candidate.creator)
   if (!stored || !found || stored !== found) return false
 
-  return titleWordsFitInside(row.title, candidate.title) || titleWordsFitInside(candidate.title, row.title)
+  // One direction only. The row's title fitting inside the candidate's is a subtitle
+  // Google spells out — "The Goldfinch" filed as "The Goldfinch: A Novel". The reverse
+  // is a candidate *less* specific than the row, which is a different book every time:
+  // "House Corrino: Dune" matched plain "Dune" this way, 696 pages of the wrong novel,
+  // with the author agreeing because the series shares one.
+  return titleWordsFitInside(row.title, candidate.title)
+}
+
+// Which of several passing candidates to take. `find` took the first, and Google's
+// first is not the best: "Dune House Corrino" landed on "Dune: House Corrino Vol. 3",
+// a 117-page comic adaptation, while the novel sat further down the same results.
+//
+// A title that agrees outright beats one that merely contains the row's, and then
+// length breaks the tie — an adaptation or an abridgement is short, and the row being
+// repointed is the full work.
+function bestOf(row: Row, candidates: CatalogSearchResult[]): CatalogSearchResult | null {
+  const passing = candidates.filter((candidate) => isSameBook(row, candidate))
+  if (passing.length === 0) return null
+
+  return passing.sort((a, b) => {
+    const exact = (candidate: CatalogSearchResult) => (titlesNameSameWork(row.title, candidate.title) ? 0 : 1)
+    const described = (candidate: CatalogSearchResult) => (candidate.overview ? 0 : 1)
+    return exact(a) - exact(b) || described(a) - described(b) || (b.pageCount ?? 0) - (a.pageCount ?? 0)
+  })[0]!
 }
 
 // The second attempt, for a row an ISBN couldn't place. Accepted only when the
@@ -372,10 +395,10 @@ async function findByTitleAndAuthor(row: Row): Promise<CatalogSearchResult | nul
 
   let candidates = fielded == null || !(await qualifiersWork()) ? [] : await searchGoogleBooksTwice(fielded)
   if (candidates.length === 0) candidates = await searchGoogleBooksTwice(plain)
-  return (
-    candidates.find(
-      (candidate) => isSameBook(row, candidate) && normalizeName(candidate.creator) === asked,
-    ) ?? null
+
+  return bestOf(
+    row,
+    candidates.filter((candidate) => normalizeName(candidate.creator) === asked),
   )
 }
 
