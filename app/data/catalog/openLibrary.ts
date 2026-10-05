@@ -113,12 +113,29 @@ function coverUrl(coverId: number | undefined): string | null {
 const STUDY_AID_TITLE =
   /^\s*(summary|study guide|workbook|analysis|conversation starters|key takeaways|sparknotes)\b|\bstudy guide\b/i
 
-// Neither filter alone is enough: missing cover art marks index junk (real
-// books have ~94% coverage), the title pattern catches study aids that do
-// have covers.
-function looksReal(doc: OpenLibraryDoc): boolean {
+// Things sold alongside a book that are not the book: a box of several, or something
+// to colour in. Searching "fourth wing" offers the official colouring book, and "iron
+// flame" a three-volume boxed set, neither of which anyone means by the title they
+// typed — and a set has no single year, author or page count to be right about.
+//
+// Deliberately narrow. "Companion" is not here, though it would catch three more per
+// ten searches: The Hobbit Companion and A Dune Companion are real books that people
+// read and would reasonably want to log, and a filter that cannot tell them from an
+// activity book should not be guessing. Measured over ten queries, this removes 2
+// results in 161 and leaves 6 it could have argued for.
+const NOT_THE_BOOK_TITLE =
+  /\b(collection set|box(ed)? set|books? collection|set of \d+ books?|\d+ books? (collection|set)|colou?ring book|activity book)\b|\[collection\/set\]/i
+
+// No one filter is enough. Missing cover art marks index junk (real books have ~94%
+// coverage) and takes most summaries with it, the study-aid pattern catches the ones
+// that do have covers, and the pattern above catches what was never a book to read.
+export function looksReal(doc: OpenLibraryDoc): boolean {
   if (!doc.cover_i) return false
-  return !STUDY_AID_TITLE.test(doc.title ?? '')
+
+  // Subtitle too: Open Library splits titles inconsistently, so "Fourth Wing" can
+  // carry "The Official Coloring Book" in the field next to it.
+  const whole = `${doc.title ?? ''} ${doc.subtitle ?? ''}`
+  return !STUDY_AID_TITLE.test(doc.title ?? '') && !NOT_THE_BOOK_TITLE.test(whole)
 }
 
 function toResult(doc: OpenLibraryDoc): CatalogSearchResult {
