@@ -20,12 +20,9 @@
 // covers it on the import path. Which of the two spellings is right in general is a
 // real question with a measurable answer, and not one to settle inside a change that
 // is otherwise about there being five of them.
-// Accents folded to the letter underneath, not dropped. Stripping anything outside
-// a-z turns "Brontë" into "bront", which matches no catalog that spells her "Bronte"
-// — and the backfill then skipped the clean 418-page Wuthering Heights at the top of
-// its results for a 100-page record that happened to carry the diaeresis too. The
-// same holds for every title and author a catalog disagrees about: García, Nesbø,
-// Mémoires, Zoë.
+// Accents folded to the letter underneath, not dropped: stripping anything outside
+// a-z turns "Brontë" into "bront", which matches nothing spelled "Bronte". The two
+// sides of a comparison always come from different catalogs, which disagree on this.
 //
 // NFD splits a letter from its accent so the accent can be dropped, which handles é,
 // ü, å and the rest. It does nothing for the letters that are not a base plus a mark
@@ -83,17 +80,11 @@ export function normalizeName(name: string | null | undefined): string {
     .replace(/[^a-z0-9]/g, '')
 }
 
-// Whether two titles name the same work on their own evidence, for a caller that
-// must not get it wrong. scripts/backfill-google-books.ts repoints a row everyone's
-// log points at, so a false match writes the wrong book into other people's
-// histories.
+// Whether two titles name the same work, for a caller that must not get it wrong.
 //
-// Word sets, not character distance. An edit ratio measures the wrong thing here,
-// and measured it backwards: "Dune House Corrino" against "Dune: The Battle of
-// Corrin" scored 0.52 on shared letters and was accepted — a different novel —
-// while "House Corrino: Dune" against "Dune: House Corrino" scored 0.44 and was
-// rejected. No threshold separates those two, because the metric rewards incidental
-// overlap and penalises reordering, the one difference that doesn't matter.
+// Word sets rather than edit distance, which ranked these backwards: "Dune House
+// Corrino" scored higher against "Dune: The Battle of Corrin" — a different novel —
+// than "House Corrino: Dune" did against "Dune: House Corrino".
 export function titlesNameSameWork(a: string, b: string): boolean {
   const na = normalizeTitle(a)
   const nb = normalizeTitle(b)
@@ -110,13 +101,10 @@ export function titlesNameSameWork(a: string, b: string): boolean {
   return true
 }
 
-// Whether every word of one title appears in the other. Not sufficient on its own,
-// which is the whole reason it is separate: "The Goldfinch" sits inside "The
-// Goldfinch: A Novel", and "Dune" sits inside "Dune: House Harkonnen" exactly the
-// same way. Nothing in the words says which of those two is a subtitle and which is
-// a different novel — withoutSubtitle can't tell either, since it only knows where
-// the colon is. A caller pairs this with something that can: the author, who is
-// Frank Herbert for one Dune and Brian Herbert for the other.
+// Whether every word of one title appears in the other. Separate from the above, and
+// never sufficient alone: "The Goldfinch" sits inside "The Goldfinch: A Novel" exactly
+// as "Dune" sits inside "Dune: House Harkonnen". Only the author separates a subtitle
+// from a sequel, so callers check that too.
 export function titleWordsFitInside(shorter: string, longer: string): boolean {
   const inner = normalizeTitle(shorter)
   const outer = new Set(normalizeTitle(longer).split(' '))
