@@ -16,7 +16,6 @@ import {
   usernameSchema,
 } from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI } from '../../../mediaTypes.ts'
 import { hashPassword, PASSWORD_MIN_LENGTH } from '../password.ts'
 import { SignupPage } from './page.tsx'
 
@@ -83,7 +82,7 @@ export default createController(routes.auth.signup, {
       const session = completeAuth(context)
       session.set('auth', { userId: user.id })
 
-      return redirect(MEDIA_TYPE_UI[DEFAULT_MEDIA_TYPE].hrefs.search(), 303)
+      return redirect(routes.home.href(), 303)
     },
   },
 })
