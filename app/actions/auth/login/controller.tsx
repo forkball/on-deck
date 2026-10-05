@@ -9,7 +9,6 @@ import { db } from '../../../data/db.ts'
 import { users, type User } from '../../../data/schema.ts'
 import { updateUserPassword } from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI } from '../../../mediaTypes.ts'
 import { hashPassword, needsRehash, verifyPassword } from '../password.ts'
 import { LoginPage } from './page.tsx'
 import { safeReturnPath } from '../../../ui/backLink.ts'
@@ -75,7 +74,7 @@ export default createController(routes.auth.login, {
 
       const formData = context.get(FormData)
       const returnTo = safeReturnPath(String(formData.get('return_to') || ''))
-      return redirect(returnTo || MEDIA_TYPE_UI[DEFAULT_MEDIA_TYPE].hrefs.search(), 303)
+      return redirect(returnTo || routes.home.href(), 303)
     },
   },
 })
