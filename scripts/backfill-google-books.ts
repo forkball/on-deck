@@ -13,11 +13,9 @@
 // --skip=<id>,<id> to leave named rows alone.
 //
 // Every attempt is recorded in book_backfill_attempts, and a row with a settled
-// verdict is left out of the next run. Without that, the rows this can't match
-// keep external_source = 'openlibrary' and so stay in the set it selects: over
-// half of them, measured, which made a second run spend most of its quota
-// re-deriving failures it already knew. Google Books' quota is shared with the
-// live app, so a wasted request here is one a person's search doesn't get.
+// verdict is left out of the next run. Without that the rows this can't match stay
+// in the set it selects — over half of them — so a second run spends most of its
+// quota re-deriving failures it already knew. That quota is shared with the live app.
 //
 // No stored ISBN exists on these rows to anchor a match, so this recovers
 // one from Open Library's own edition data first and matches Google Books by
@@ -174,21 +172,15 @@ async function searchGoogleBooksTwice(query: string): Promise<CatalogSearchResul
 // A query whose answer is not in doubt, asked before an empty result is believed.
 //
 // Google Books answers a query it will not serve with HTTP 200 and `totalItems: 0`,
-// which at the point we read it is indistinguishable from "no such book" — nothing
-// throws, so neither fetchWithRetry nor the retry above does anything about it. On
-// 2026-10-01 a run recorded 29 of 30 rows as "no Google Books hit" that way, and every
-// one of those ISBNs had matched two days earlier. The cause turned out to be that
-// `isbn:`, `intitle:` and `inauthor:` had all begun answering 0 while unqualified text
-// kept working. Because the verdict is settled, those 29 rows would have been skipped
-// by every future run: 5% of the job written off over a provider's bad week.
+// which is indistinguishable from "no such book" — nothing throws, so no retry helps.
+// A run once recorded 29 of 30 rows as "no hit" that way while the field qualifiers
+// were down, and those verdicts are settled, so they would never be re-asked.
 //
-// So "no hit" now has to be a fact about the catalogue rather than about the day. If
-// the canary comes back empty too, the whole run stops: a provider that cannot answer
-// this cannot answer anything, and every verdict after it would be fiction.
-// Deliberately unqualified. It was intitle:"dune" for a day, which is a canary that
-// cannot survive the thing it watches for: on 2026-10-02 every field-qualified query
-// began answering 0 while plain text kept working, so the canary would have aborted
-// every run while the catalogue was perfectly able to answer.
+// So "no hit" has to be a fact about the catalogue rather than about the day. If the
+// canary is empty too, the run stops rather than record fiction.
+// Unqualified on purpose. A qualified canary cannot survive the thing it watches for:
+// when the field qualifiers went dead it would have aborted every run while the
+// catalogue was answering plain queries perfectly well.
 const CANARY_QUERY = 'dune'
 
 // How long a passing canary stands for. Not once per run: a run of 500 rows takes
@@ -199,13 +191,9 @@ const CANARY_GOOD_FOR_MS = 30_000
 let canaryCheckedAt = 0
 let abortReason: string | null = null
 
-// A 429 is the one provider failure that answers for every row at once: the limit is
-// on the key, not the query, so the next request cannot do better than the last. A run
-// that kept going through one spent 174 requests to settle 16 rows, and wrote
-// 'google-unavailable' against 136 books it never really asked about.
-//
-// Unlike the canary's empty answer, this needs no second opinion — Google has said
-// plainly what is wrong.
+// A 429 answers for every row at once: the limit is on the key, not the query, so the
+// next request cannot do better than the last. A run that kept going through one spent
+// 174 requests to settle 16 rows. Needs no second opinion, unlike an empty result.
 function looksRateLimited(error: unknown): boolean {
   return /\b429\b|rate limit|quota/i.test(error instanceof Error ? error.message : String(error))
 }
@@ -217,13 +205,10 @@ function stopForRateLimit(): void {
     'unavailable, which is not a settled verdict: a later run retries them with no flag.'
 }
 
-// Whether `isbn:`, `intitle:` and `inauthor:` are answering at all today, asked once.
-//
-// They are the precise way to ask, and when they work the ISBN alone settles most
-// rows in one request. When they don't, every one of them is a request spent to be
-// told nothing — measured at 5.5 requests per row against 1.6, which over 549 rows is
-// most of a day's quota burnt on queries already known to be dead. So they are tried
-// once, and dropped for the rest of the run if that one comes back empty.
+// Whether the field qualifiers are answering today, asked once. When they work an
+// ISBN settles most rows in one request; when they don't, each is a request spent to
+// be told nothing — 5.5 per row against 1.6. So they are dropped for the rest of a run
+// if the first one comes back empty.
 const QUALIFIED_CANARY = 'intitle:"dune"'
 
 let qualifiersAnswer: boolean | null = null
@@ -399,17 +384,14 @@ function isSameBook(row: Row, candidate: CatalogSearchResult): boolean {
   const found = normalizeName(candidate.creator)
   if (!stored || !found || stored !== found) return false
 
-  // Above this, a containment match is a collection and not the book. The tiebreak
-  // below prefers the longer candidate, which is right between a 117-page comic
-  // adaptation and the 685-page novel it adapts, and catastrophically wrong against an
-  // omnibus: "Navigators of Dune" was repointed onto "Dune: Legends, Heroes, Schools:
-  // (The Butlerian Jihad, … Navigators of Dune)" at 11,953 pages, because the omnibus
-  // contains the row's title and shares its author, and then won on length. The right
-  // volume, 419 pages, was the first result.
+  // Above this, a containment match is a collection rather than the book. The tiebreak
+  // elsewhere prefers the longer candidate, which is right between a comic adaptation
+  // and the novel it adapts and wrong against an omnibus — "Navigators of Dune" once
+  // landed on an 11,953-page collection that contained it.
   //
-  // A ceiling rather than a ratio because the row's own page count is usually missing —
-  // that is most of why this backfill exists. Only containment matches are capped: a
-  // title that agrees outright is the book whatever its length.
+  // A ceiling rather than a ratio, because the row's own page count is usually missing.
+  // Only containment matches are capped; an outright title match is the book at any
+  // length.
   const SINGLE_WORK_MAX_PAGES = 1500
 
   // One direction only. The row's title fitting inside the candidate's is a subtitle
