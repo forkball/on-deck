@@ -36,6 +36,23 @@ function capitalize(tag: string): string {
   return tag.replace(/^./, (c) => c.toUpperCase())
 }
 
+// Two lines of blurb, give or take. Cut on the server rather than clamped in CSS
+// because a description runs to several hundred words, and all of it would otherwise
+// travel to the browser twenty times over to be hidden on arrival.
+//
+// Cut at a word, but only where that leaves most of the budget: a space at character
+// 40 of 200 is not worth throwing away 160 characters to land on.
+const SUMMARY_MAX = 200
+
+function summarize(overview: string): string {
+  const text = overview.replace(/\s+/g, ' ').trim()
+  if (text.length <= SUMMARY_MAX) return text
+
+  const cut = text.slice(0, SUMMARY_MAX)
+  const lastSpace = cut.lastIndexOf(' ')
+  return `${(lastSpace > SUMMARY_MAX * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`
+}
+
 // Shared by every media type's search route. Everything that varies comes from
 // MEDIA_TYPE_UI.
 export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
@@ -81,7 +98,9 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
               })}
             >
               {results.map((item) => {
-                const { releaseYear, posterUrl, platforms, tags, creator } = parseMediaMetadata(item.metadata)
+                const { releaseYear, posterUrl, platforms, tags, creator, overview } = parseMediaMetadata(
+                  item.metadata,
+                )
                 const detailHref = withReturnTo(ui.hrefs.show(item.id), returnTo)
                 const interaction = interactionsByItemId.get(item.id)
                 return (
@@ -147,6 +166,18 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                         </div>
                       )}
                       <PlatformList platforms={platforms} />
+                      {overview && (
+                        <p
+                          mix={css({
+                            fontSize: '13px',
+                            color: '#555',
+                            margin: '6px 0 0',
+                            lineHeight: 1.4,
+                          })}
+                        >
+                          {summarize(overview)}
+                        </p>
+                      )}
                       {interaction && (
                         <p
                           mix={css({
