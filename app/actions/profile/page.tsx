@@ -330,15 +330,6 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
               return [
                 type,
                 <>
-                  <TasteProfileSummary
-                    label={`My ${ui.attributive} taste profile`}
-                    summary={summary}
-                    updatedAt={profileUpdatedAt}
-                    mediaType={type}
-                    settings={settings}
-                    loggedCount={total}
-                    rebuildsLeft={rebuildsLeft}
-                  />
                   {/* Each importer only understands one medium, so the
                         entry point lives on that medium's tab. */}
                   {source ? (
@@ -372,6 +363,15 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                     emptyLabel={`search for a ${ui.itemNoun}`}
                     returnTo={savedReturnTo}
                     mediaType={type}
+                  />
+                  <TasteProfileSummary
+                    label={`My ${ui.attributive} taste profile`}
+                    summary={summary}
+                    updatedAt={profileUpdatedAt}
+                    mediaType={type}
+                    settings={settings}
+                    loggedCount={total}
+                    rebuildsLeft={rebuildsLeft}
                   />
                 </>,
               ]
