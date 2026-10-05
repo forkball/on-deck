@@ -7,8 +7,10 @@
 //
 // Dry run by default — prints what it would do without writing anything.
 // Pass --apply to actually update rows. Pass --limit=N to try it on a handful
-// first, --max-requests=N to stop at a spend you choose, and --retry-settled to
-// re-ask about rows a previous run already gave a verdict on.
+// first, --max-requests=N to stop at a spend you choose, --retry-settled to
+// re-ask about rows a previous run already gave a verdict on, --user=<display
+// name> to do one person's shelf rather than the whole table, and
+// --skip=<id>,<id> to leave named rows alone.
 //
 // Every attempt is recorded in book_backfill_attempts, and a row with a settled
 // verdict is left out of the next run. Without that, the rows this can't match
@@ -65,6 +67,13 @@ import { parseMediaMetadata } from '../app/data/mediaMetadata.ts'
 types.setTypeParser(types.builtins.INT8, (value) => parseInt(value, 10))
 types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value))
 
+// Shared by the row selection and the already-settled count, so the two cannot drift
+// and report a tally for a different set than the one being worked on.
+const LOGGED_BY = `and exists (
+  select 1 from user_media_interactions i
+    join users u on u.id = i.user_id
+   where i.media_item_id = m.id and u.display_name = $1)`
+
 const APPLY = process.argv.includes('--apply')
 const RETRY_SETTLED = process.argv.includes('--retry-settled')
 
@@ -74,6 +83,28 @@ function numericFlag(name: string): number | undefined {
 }
 
 const LIMIT = numericFlag('limit')
+
+// Whose books to repoint, by display name. Every remaining Open Library row is in
+// someone's shelf now, so a run is no longer a faceless batch: this is what makes it
+// possible to do one person's books, read every line, and stop — which is the pace the
+// matching rules have earned, having produced a new kind of wrong match in each of
+// four consecutive rounds.
+const userArg = process.argv.find((candidate) => candidate.startsWith('--user='))
+const USER = userArg?.slice('--user='.length)
+
+// Rows to leave alone, by id. For the ones a dry run shows this cannot settle and no
+// rule is going to: a comic titled "Batman" or "Punisher" gives the title check
+// nothing to work with, and the author agrees across a publisher's whole line, so
+// every candidate passes and the pick comes down to a tiebreak. Those are better
+// repointed by hand, by someone who knows which book they own, than by a heuristic
+// tuned until it happens to agree.
+const skipArg = process.argv.find((candidate) => candidate.startsWith('--skip='))
+const SKIP = new Set(
+  (skipArg?.slice('--skip='.length) ?? '')
+    .split(',')
+    .map((id) => Number(id.trim()))
+    .filter((id) => Number.isInteger(id) && id > 0),
+)
 // A ceiling on Google Books requests for this run, counted across both the
 // search and the by-id lookup that applying a match costs. Rows are left for the
 // next run rather than half-done: the budget is checked before a row starts.
@@ -167,6 +198,24 @@ const CANARY_GOOD_FOR_MS = 30_000
 
 let canaryCheckedAt = 0
 let abortReason: string | null = null
+
+// A 429 is the one provider failure that answers for every row at once: the limit is
+// on the key, not the query, so the next request cannot do better than the last. A run
+// that kept going through one spent 174 requests to settle 16 rows, and wrote
+// 'google-unavailable' against 136 books it never really asked about.
+//
+// Unlike the canary's empty answer, this needs no second opinion — Google has said
+// plainly what is wrong.
+function looksRateLimited(error: unknown): boolean {
+  return /\b429\b|rate limit|quota/i.test(error instanceof Error ? error.message : String(error))
+}
+
+function stopForRateLimit(): void {
+  abortReason ??=
+    'Google Books answered 429 — the key is over its rate or daily limit, so every ' +
+    'further request would fail the same way. Rows reached after this are recorded as ' +
+    'unavailable, which is not a settled verdict: a later run retries them with no flag.'
+}
 
 // Whether `isbn:`, `intitle:` and `inauthor:` are answering at all today, asked once.
 //
@@ -350,7 +399,61 @@ function isSameBook(row: Row, candidate: CatalogSearchResult): boolean {
   const found = normalizeName(candidate.creator)
   if (!stored || !found || stored !== found) return false
 
-  return titleWordsFitInside(row.title, candidate.title) || titleWordsFitInside(candidate.title, row.title)
+  // Above this, a containment match is a collection and not the book. The tiebreak
+  // below prefers the longer candidate, which is right between a 117-page comic
+  // adaptation and the 685-page novel it adapts, and catastrophically wrong against an
+  // omnibus: "Navigators of Dune" was repointed onto "Dune: Legends, Heroes, Schools:
+  // (The Butlerian Jihad, … Navigators of Dune)" at 11,953 pages, because the omnibus
+  // contains the row's title and shares its author, and then won on length. The right
+  // volume, 419 pages, was the first result.
+  //
+  // A ceiling rather than a ratio because the row's own page count is usually missing —
+  // that is most of why this backfill exists. Only containment matches are capped: a
+  // title that agrees outright is the book whatever its length.
+  const SINGLE_WORK_MAX_PAGES = 1500
+
+  // One direction only. The row's title fitting inside the candidate's is a subtitle
+  // Google spells out — "The Goldfinch" filed as "The Goldfinch: A Novel". The reverse
+  // is a candidate *less* specific than the row, which is a different book every time:
+  // "House Corrino: Dune" matched plain "Dune" this way, 696 pages of the wrong novel,
+  // with the author agreeing because the series shares one.
+  if (!titleWordsFitInside(row.title, candidate.title)) return false
+  return (candidate.pageCount ?? 0) <= SINGLE_WORK_MAX_PAGES
+}
+
+// Which of several passing candidates to take. `find` took the first, and Google's
+// first is not the best: "Dune House Corrino" landed on "Dune: House Corrino Vol. 3",
+// a 117-page comic adaptation, while the novel sat further down the same results.
+//
+// A title that agrees outright beats one that merely contains the row's, and then
+// length breaks the tie — an adaptation or an abridgement is short, and the row being
+// repointed is the full work.
+function bestOf(row: Row, candidates: CatalogSearchResult[]): CatalogSearchResult | null {
+  const passing = candidates.filter((candidate) => isSameBook(row, candidate))
+  if (passing.length === 0) return null
+
+  // The year is a tiebreak and never a filter, because a book's stored year is the year
+  // of a printing — the whole reason #177 identifies books by their author instead.
+  // Among candidates that already agree on title and author it is the sharpest thing
+  // left, and it is what tells one Vol. 1 from another: "Daredevil by Chip Zdarsky
+  // Vol. 1" is 2019, and the 2022 "Daredevil & Elektra Vol. 1" is a different book by
+  // the same writer. Comics are where this bites, because their titles are generic
+  // enough — "Batman", "Punisher" — that the author agrees across a publisher's line
+  // and the title check has almost nothing to go on.
+  const wanted = parseMediaMetadata(row.metadata).releaseYear
+  const apart = (candidate: CatalogSearchResult) =>
+    wanted == null || candidate.releaseYear == null ? 50 : Math.abs(candidate.releaseYear - wanted)
+
+  return passing.sort((a, b) => {
+    const exact = (candidate: CatalogSearchResult) => (titlesNameSameWork(row.title, candidate.title) ? 0 : 1)
+    const described = (candidate: CatalogSearchResult) => (candidate.overview ? 0 : 1)
+    return (
+      exact(a) - exact(b) ||
+      described(a) - described(b) ||
+      apart(a) - apart(b) ||
+      (b.pageCount ?? 0) - (a.pageCount ?? 0)
+    )
+  })[0]!
 }
 
 // The second attempt, for a row an ISBN couldn't place. Accepted only when the
@@ -372,10 +475,10 @@ async function findByTitleAndAuthor(row: Row): Promise<CatalogSearchResult | nul
 
   let candidates = fielded == null || !(await qualifiersWork()) ? [] : await searchGoogleBooksTwice(fielded)
   if (candidates.length === 0) candidates = await searchGoogleBooksTwice(plain)
-  return (
-    candidates.find(
-      (candidate) => isSameBook(row, candidate) && normalizeName(candidate.creator) === asked,
-    ) ?? null
+
+  return bestOf(
+    row,
+    candidates.filter((candidate) => normalizeName(candidate.creator) === asked),
   )
 }
 
@@ -394,8 +497,28 @@ async function main() {
       where m.type = 'book'
         and m.external_source = 'openlibrary'
         ${RETRY_SETTLED ? '' : `and (a.outcome is null or a.outcome not in (${[...SETTLED].map((o) => `'${o}'`).join(',')}))`}
+        ${USER == null ? '' : LOGGED_BY}
       order by m.id`,
+    USER == null ? [] : [USER],
   )
+
+  // A name nobody has reads as "all done" rather than as a typo, so it says so.
+  if (USER != null && allRows.length === 0) {
+    const { rows: known } = await pool.query<{ display_name: string }>(
+      `select distinct u.display_name
+         from user_media_interactions i
+         join users u on u.id = i.user_id
+         join media_items m on m.id = i.media_item_id
+        where m.type = 'book' and m.external_source = 'openlibrary'
+        order by 1`,
+    )
+    if (!known.some((row) => row.display_name === USER)) {
+      throw new Error(
+        `No Open Library books are logged by ${JSON.stringify(USER)}. ` +
+          `Those who have some: ${known.map((row) => row.display_name).join(', ') || '(nobody)'}`,
+      )
+    }
+  }
   const rows = LIMIT ? allRows.slice(0, LIMIT) : allRows
 
   const {
@@ -403,12 +526,13 @@ async function main() {
   } = await pool.query<{ count: number }>(
     `select count(*)::int as count from book_backfill_attempts a
        join media_items m on m.id = a.media_item_id
-      where m.external_source = 'openlibrary' and a.outcome = any($1)`,
-    [[...SETTLED]],
+      where m.external_source = 'openlibrary' and a.outcome = any($1)
+        ${USER == null ? '' : LOGGED_BY.replace('$1', '$2')}`,
+    USER == null ? [[...SETTLED]] : [[...SETTLED], USER],
   )
 
   console.log(
-    `${rows.length} Open Library book row(s) to try. ` +
+    `${rows.length} Open Library book row(s) to try${USER == null ? '' : `, from ${USER}'s shelf`}. ` +
       `Database: ${PRODUCTION ? 'PRODUCTION' : 'development'}. Mode: ${APPLY ? 'APPLY' : 'DRY RUN'}` +
       `${MAX_REQUESTS == null ? '' : `, budget ${MAX_REQUESTS} Google Books request(s)`}` +
       `${settled && settled.count > 0 ? `. ${settled.count} already settled and skipped${RETRY_SETTLED ? ' — no, re-asked, --retry-settled is set' : ''}` : ''}`,
@@ -416,6 +540,7 @@ async function main() {
 
   const lines: ReportLine[] = []
   let skippedForBudget = 0
+  let skipped = 0
 
   const report = async (row: Row, outcome: Outcome, detail: string, found?: CatalogSearchResult) => {
     const gains = found
@@ -430,6 +555,10 @@ async function main() {
   // report for every other row already resolved by the time it happens.
   await runBounded(rows, 5, async (row) => {
     if (abortReason != null) return
+    if (SKIP.has(row.id)) {
+      skipped++
+      return
+    }
     if (budgetSpent()) {
       skippedForBudget++
       return
@@ -478,6 +607,7 @@ async function main() {
           }
         }
       } catch (error) {
+        if (looksRateLimited(error)) stopForRateLimit()
         await report(
           row,
           'google-unavailable',
@@ -511,6 +641,7 @@ async function main() {
         }
       }
     } catch (error) {
+      if (looksRateLimited(error)) stopForRateLimit()
       await report(row, 'error', error instanceof Error ? error.message : String(error))
     }
   })
@@ -536,6 +667,7 @@ async function main() {
   const withOverview = matches.filter((line) => line.gains?.includes('overview yes')).length
   console.log(`${withOverview} of ${matches.length} match(es) bring an overview`)
   console.log(`Google Books requests spent: ${requestsSpent}`)
+  if (skipped > 0) console.log(`${skipped} row(s) left alone by --skip.`)
   if (skippedForBudget > 0) {
     console.log(`${skippedForBudget} row(s) left for the next run — the budget ran out.`)
   }

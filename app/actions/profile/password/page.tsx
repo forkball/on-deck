@@ -6,6 +6,7 @@ import { Page } from '../../../ui/components/page.tsx'
 import { PasswordConfirmModal } from '../../../ui/components/password-confirm-modal.tsx'
 import { Field } from '../../../ui/shared/field.tsx'
 import { PASSWORD_MIN_LENGTH } from '../../auth/password.ts'
+import { Button, TextInput } from '../../../ui/shared/form-controls.tsx'
 
 export interface ProfilePasswordPageProps {
   errors?: Record<string, string>
@@ -38,7 +39,7 @@ export function ProfilePasswordPage(handle: Handle<ProfilePasswordPageProps>) {
             error={errors?.new_password}
             hint={`At least ${PASSWORD_MIN_LENGTH} characters.`}
           >
-            <input
+            <TextInput
               type="password"
               name="new_password"
               required
@@ -49,7 +50,7 @@ export function ProfilePasswordPage(handle: Handle<ProfilePasswordPageProps>) {
           {/* Asked for twice because a typo here locks the account out and
                 the input is masked, so nobody can proofread it. */}
           <Field label="Confirm new password" error={errors?.confirm_password}>
-            <input type="password" name="confirm_password" required autocomplete="new-password" />
+            <TextInput type="password" name="confirm_password" required autocomplete="new-password" />
           </Field>
           {/* No guarded fields: on this form every save needs the current
                 password, so the modal opens on any submit. */}
@@ -59,7 +60,7 @@ export function ProfilePasswordPage(handle: Handle<ProfilePasswordPageProps>) {
             defaultOpen={confirming}
           />
           <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px' })}>
-            <button type="submit">Change password</button>
+            <Button type="submit">Change password</Button>
           </div>
         </form>
       </Page>

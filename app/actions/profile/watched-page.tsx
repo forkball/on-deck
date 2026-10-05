@@ -10,6 +10,7 @@ import { WatchedList } from '../../ui/components/watched-list.tsx'
 import { Field } from '../../ui/shared/field.tsx'
 import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, mediaTypeQuery, type ActiveMediaType } from '../../mediaTypes.ts'
 import { statusLabelsFor, statusOptionsFor } from '../../interactionStatus.ts'
+import { Button, Select } from '../../ui/shared/form-controls.tsx'
 
 export interface ProfileWatchedPageProps {
   movieLog: Awaited<ReturnType<typeof listUserMediaLog>>
@@ -53,7 +54,7 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
           <div mix={css({ flex: '0 1 200px' })}>
             <Field label="Status">
               {/* `selected` rather than defaultValue — see StatusSelect. */}
-              <select name="status">
+              <Select name="status">
                 <option value="" selected={status === null}>
                   All
                 </option>
@@ -62,10 +63,10 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
           </div>
-          <button type="submit">Filter</button>
+          <Button type="submit">Filter</Button>
         </form>
 
         {movieLog.length === 0 && (

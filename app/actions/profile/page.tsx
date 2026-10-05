@@ -18,6 +18,7 @@ import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
 import { PROFILE_TABS } from './edit/page.tsx'
+import { Button } from '../../ui/shared/form-controls.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
@@ -115,7 +116,7 @@ function TasteProfileSummary(
 
     return (
       <details>
-        <summary mix={css({ cursor: 'pointer' })}>
+        <summary class="tap-area" mix={css({ cursor: 'pointer' })}>
           <h2 mix={css({ display: 'inline' })}>{label}</h2>
         </summary>
         <div mix={css({ border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginTop: '12px' })}>
@@ -143,8 +144,19 @@ function TasteProfileSummary(
             </>
           )}
 
-          <p mix={css({ margin: '8px 0 0', fontSize: '12px' })}>
-            <a href={routes.profile.edit.index.href()}>Change what it's written from →</a>
+          {/* On a touch screen the link's tap area reaches 15px around it,
+              2px more than the gap down to Rebuild below. Padding, because a
+              margin here would only merge with the form's own. */}
+          <p
+            mix={css({
+              margin: '8px 0 0',
+              fontSize: '12px',
+              '@media (pointer: coarse)': { paddingBottom: '4px' },
+            })}
+          >
+            <a href={routes.profile.edit.index.href()} class="tap-area">
+              Change what it's written from →
+            </a>
           </p>
 
           <form
@@ -154,9 +166,9 @@ function TasteProfileSummary(
           >
             {/* The action refuses both of these too. This only saves someone
                 spending a click, and a rebuild, on finding that out. */}
-            <button type="submit" disabled={nothingLogged || outOfRebuilds}>
+            <Button type="submit" disabled={nothingLogged || outOfRebuilds}>
               Rebuild now
-            </button>
+            </Button>
             {(nothingLogged || rebuildsLeft != null) && (
               <span mix={css({ fontSize: '12px', color: '#888' })}>
                 {nothingLogged
@@ -339,7 +351,11 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                       })}
                     >
                       <h2>What I've {ui.pastParticiple}</h2>
-                      <a href={source.href} mix={css({ fontSize: '13px', textAlign: 'right' })}>
+                      <a
+                        href={source.href}
+                        class="tap-area"
+                        mix={css({ fontSize: '13px', textAlign: 'right' })}
+                      >
                         {source.label}
                       </a>
                     </div>

@@ -25,7 +25,11 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
             padding: '16px 24px',
           })}
         >
-          <a href={routes.home.href()} mix={css({ fontWeight: 700, textDecoration: 'none' })}>
+          <a
+            href={routes.home.href()}
+            class="tap-area"
+            mix={css({ fontWeight: 700, textDecoration: 'none' })}
+          >
             On Deck
           </a>
           {authed ? (
@@ -51,8 +55,12 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
             </div>
           ) : (
             <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: 'auto' })}>
-              <a href={routes.auth.login.index.href()}>Log in</a>
-              <a href={routes.auth.signup.index.href()}>Sign up</a>
+              <a href={routes.auth.login.index.href()} class="tap-area">
+                Log in
+              </a>
+              <a href={routes.auth.signup.index.href()} class="tap-area">
+                Sign up
+              </a>
             </div>
           )}
         </div>

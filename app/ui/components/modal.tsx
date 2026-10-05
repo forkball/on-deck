@@ -1,5 +1,6 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
+import { buttonFrameClass } from '../shared/form-controls.tsx'
 
 type CSSStyle = Parameters<typeof css>[0]
 
@@ -73,7 +74,7 @@ export function Modal(
             {/* Padding comes from app.css, which states one box for every
                 button; setting it here would be layered and lose to it. */}
             <span
-              class={fab ? 'doodle-border modal-fab' : 'doodle-border'}
+              class={buttonFrameClass('default', fab ? 'modal-fab' : undefined)}
               mix={css(
                 fab
                   ? {
@@ -113,7 +114,7 @@ export function Modal(
             >
               {title && <h3 mix={css({ margin: 0 })}>{title}</h3>}
               {closeButton && (
-                <label for={id} mix={css({ cursor: 'pointer' })}>
+                <label for={id} class="tap-area" mix={css({ cursor: 'pointer' })}>
                   <span mix={css({ fontSize: '20px' })}>✕</span>
                 </label>
               )}

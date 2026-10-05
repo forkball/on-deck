@@ -136,6 +136,19 @@ does nothing on its own.
   the nav, the column width (`narrow`/default/`wide`), the back link and the
   `<h1>`. Don't lay out `<Document>`/`<Nav>`/`<main>` by hand: that is how the
   pages drifted into putting their titles at different heights.
+- Every visible control renders through `app/ui/shared/form-controls.tsx`:
+  `Button` (with a `variant` rather than a class string), `ButtonLink`,
+  `TextInput`, `Select` and `Textarea`, plus `buttonFrameClass` for a `<span>`
+  or `<summary>` that has to look like a button. Checkboxes and radios come
+  only as `CheckboxOption`/`RadioOption` — the control with its label and an
+  optional `hint` under it — inside a `ChoiceGroup` (`<fieldset>` + `<legend>`)
+  when several answer one question; there is no bare `Checkbox` to lay a label
+  beside by hand. Their look is in `public/app.css`, because DoodleCSS is unlayered and
+  a `css()` rule can't beat it. `test/form-controls.test.tsx` fails on a raw
+  `<button>`, `<input>`, `<select>` or `<textarea>` anywhere else; hidden inputs
+  and the invisible toggles CSS reads (tabs, modal, carousel) are listed there
+  with the reason. A call site's `mix` is for layout; a different look is a new
+  variant — a `css()` look rule loses to Doodle's unlayered one and does nothing.
 - Tests live in `test/`, usually one file per module under test
   (`import-review.test.ts` covers `data/imports/review.ts`), though a few cover
   a pair — `lucky.test.ts` holds both `lucky` and `exclusions`. `npm test` runs

@@ -1,4 +1,5 @@
 import { clientEntry, css, ref } from 'remix/ui'
+import { Button } from '../ui/shared/form-controls.tsx'
 
 export type ProfileMenuLink = {
   href: string
@@ -63,16 +64,23 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
               border: '1px solid #3c3c3c',
               borderRadius: '8px',
               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              // On a touch screen the rows are 44px (app.css), and touch: a gap
+              // between them would be a strip a tap lands on nothing in.
+              '@media (pointer: coarse)': { gap: 0 },
             },
-            '& .menu a': {
-              padding: '4px 8px',
-            },
+            // Log out is the one action in a list of places to go, so a line
+            // sets it apart: the menu's 4px gap above it, 4px below, the same
+            // #ddd the tab underlines use.
             '& .menu form': {
               margin: 0,
+              marginTop: '4px',
+              paddingTop: '4px',
+              borderTop: '1px solid #ddd',
             },
+            // Log out is drawn as one of the links (menu-link, in app.css), though
+            // it has to be a form button. Width is the one thing css() can set.
             '& .menu button': {
               width: '100%',
-              textAlign: 'left',
             },
           }),
           ref((node, signal) => {
@@ -91,7 +99,7 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
           }),
         ]}
       >
-        <summary aria-haspopup="true">
+        <summary aria-haspopup="true" class="tap-area">
           <span class="trigger-label">{displayName || 'My Profile'}</span>
           <span class="chevron" aria-hidden="true">
             ▾
@@ -99,12 +107,14 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
         </summary>
         <div class="menu">
           {links.map((link) => (
-            <a key={link.href} href={link.href}>
+            <a key={link.href} href={link.href} class="menu-link">
               {link.label}
             </a>
           ))}
           <form method="post" action={logoutHref}>
-            <button type="submit">Log out</button>
+            <Button type="submit" variant="menu-link">
+              Log out
+            </Button>
           </form>
         </div>
       </details>

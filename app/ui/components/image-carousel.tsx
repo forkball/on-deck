@@ -45,8 +45,8 @@ const navStyle = css({
 // Hidden but focusable, so arrow keys move through slides as in any radio group.
 //
 // Hidden via opacity and pointer-events rather than size: DoodleCSS gives
-// `.doodle input[type=radio]` a 16px border-image from outside any @layer, so
-// the element is really ~33px however small this says it is — an invisible
+// `.doodle input[type=radio]` a border-image from outside any @layer (12px a
+// side, via app.css), so the element is really ~24px however small this says it is — an invisible
 // click target over the image that would quietly change slides.
 const radioStyle = css({
   position: 'absolute',

@@ -48,7 +48,13 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
         })}
       >
         {ACTIVE_MEDIA_TYPES.map((type) => (
-          <a key={type} href={hrefFor(type)} rmx-document="" mix={current === type ? activeTab : tab}>
+          <a
+            key={type}
+            href={hrefFor(type)}
+            rmx-document=""
+            class="tap-area"
+            mix={current === type ? activeTab : tab}
+          >
             {MEDIA_TYPE_UI[type].tabLabel}
           </a>
         ))}

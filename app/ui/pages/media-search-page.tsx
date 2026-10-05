@@ -19,6 +19,7 @@ import { Field } from '../shared/field.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { PlatformList } from '../components/platform-list.tsx'
 import { withReturnTo } from '../backLink.ts'
+import { Button } from '../shared/form-controls.tsx'
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
@@ -80,7 +81,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
               })}
             >
               {results.map((item) => {
-                const { releaseYear, posterUrl, platforms, tags } = parseMediaMetadata(item.metadata)
+                const { releaseYear, posterUrl, platforms, tags, creator } = parseMediaMetadata(item.metadata)
                 const detailHref = withReturnTo(ui.hrefs.show(item.id), returnTo)
                 const interaction = interactionsByItemId.get(item.id)
                 return (
@@ -119,6 +120,14 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                         {item.title}
                       </a>
                       {releaseYear ? ` (${releaseYear})` : ''}
+                      {/* Searching "Strata" returns one from 1981 and one from 2011, and
+                          the card showed neither author — so the two were the same row to
+                          read. Rendered for every medium rather than books alone: TMDB
+                          rarely fills it, in which case nothing shows, and IGDB nearly
+                          always does. */}
+                      {creator && (
+                        <div mix={css({ fontSize: '13px', color: '#555', marginTop: '2px' })}>{creator}</div>
+                      )}
                       {tags.length > 0 && (
                         <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' })}>
                           {tags.map((tag) => (
@@ -189,7 +198,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                               </div>
                               <NotesField defaultValue={interaction?.notes} />
                             </div>
-                            <button type="submit">Save</button>
+                            <Button type="submit">Save</Button>
                             <FrameForm />
                           </form>
                         </FloatingDropdown>

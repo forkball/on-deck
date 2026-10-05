@@ -97,7 +97,7 @@ export function Tabs(handle: Handle<TabsProps>) {
           })}
         >
           {tabs.map((tab) => (
-            <label key={tab.id} for={`${idPrefix}-tab-${tab.id}`}>
+            <label key={tab.id} for={`${idPrefix}-tab-${tab.id}`} class="tap-area">
               {tab.label}
             </label>
           ))}

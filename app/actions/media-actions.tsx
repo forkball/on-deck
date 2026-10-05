@@ -88,10 +88,13 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       // typing, so it is the heaviest caller in the app and the one whose
       // answer the submitted search is about to want anyway.
       const results = await searchCatalog(mediaType, query)
+      // Who made it, next to the year. A year alone does not separate two books with
+      // the same name, and books are full of them: searching "Strata" offers one from
+      // 1981 and one from 2011, and only the author says which is the Pratchett.
       const suggestions = results.slice(0, SUGGESTION_LIMIT).map((result) => ({
         key: result.externalId,
         label: result.title,
-        sublabel: result.releaseYear ? String(result.releaseYear) : undefined,
+        sublabel: [result.releaseYear, result.creator].filter(Boolean).join(' · ') || undefined,
         imageUrl: result.posterUrl ?? undefined,
       }))
 

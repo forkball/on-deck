@@ -30,6 +30,7 @@ import { Collapsible } from '../../../ui/shared/collapsible.tsx'
 import { count } from '../../../ui/shared/count.ts'
 import { Field } from '../../../ui/shared/field.tsx'
 import { StarRatingDisplay } from '../../../ui/components/star-rating.tsx'
+import { Button, buttonFrameClass, type ButtonVariant, TextInput } from '../../../ui/shared/form-controls.tsx'
 
 export interface ImportReviewPageProps {
   displayName: string
@@ -149,7 +150,7 @@ function ResolveForm(
     rowId: number
     action: string
     label: RemixNode
-    variant?: ButtonVariant
+    variant?: ReviewButtonVariant
     selected?: boolean
     anchor?: string
     // For `repoint`: the catalog entry to point the row at.
@@ -168,38 +169,30 @@ function ResolveForm(
         <input type="hidden" name="action" value={action} />
         {anchor && <input type="hidden" name="anchor" value={anchor} />}
         {externalId && <input type="hidden" name="external_id" value={externalId} />}
-        <button
-          type="submit"
-          class={selected ? `${variant} ticked` : variant}
-          mix={css({ fontSize: '13px' })}
-        >
+        <Button type="submit" variant={variant} ticked={selected}>
           {label}
-        </button>
+        </Button>
       </form>
     )
   }
 }
 
-type ButtonVariant = 'primary' | 'linkish' | 'checkline'
+// The looks a resolve or picker button takes on this page.
+type ReviewButtonVariant = Extract<ButtonVariant, 'primary' | 'link' | 'checkline'>
 
 function rowAnchor(rowId: number): string {
   return `row-${rowId}`
 }
 
 // Opens the page's one picker on this row.
-function PickerButton(handle: Handle<{ rowId: number; label: string; variant?: ButtonVariant }>) {
+function PickerButton(handle: Handle<{ rowId: number; label: string; variant?: ReviewButtonVariant }>) {
   return () => {
     const { rowId, label, variant } = handle.props
 
     return (
-      <button
-        type="button"
-        data-import-picker={String(rowId)}
-        class={variant}
-        mix={css({ fontSize: '13px' })}
-      >
+      <Button type="button" data-import-picker={String(rowId)} variant={variant}>
         {label}
-      </button>
+      </Button>
     )
   }
 }
@@ -363,7 +356,7 @@ function DuplicateCard(
                 rowId={verdict.move.id}
                 action="skip"
                 label={`Actually the same ${singular} — leave row ${verdict.move.index} out`}
-                variant="linkish"
+                variant="link"
               />
             </div>
           </>
@@ -480,13 +473,13 @@ function UncertainCard(
               })}
             </div>
             <Actions>
-              <PickerButton rowId={row.id} label="Something else…" variant="linkish" />
+              <PickerButton rowId={row.id} label="Something else…" variant="link" />
               <ResolveForm
                 batchId={batchId}
                 rowId={row.id}
                 action="skip"
                 label="Leave out"
-                variant="linkish"
+                variant="link"
                 anchor={next}
               />
             </Actions>
@@ -514,7 +507,7 @@ function NotFoundCard(handle: Handle<{ batchId: string; row: ReviewRow['row']; n
             rowId={row.id}
             action="skip"
             label="Leave out"
-            variant="linkish"
+            variant="link"
             anchor={next}
           />
         </Actions>
@@ -672,7 +665,7 @@ function MatchedAnswers(
             rowId={row.id}
             action="skip"
             label="Leave out"
-            variant="linkish"
+            variant="link"
             anchor={next}
           />
         </Actions>
@@ -749,9 +742,9 @@ function LastLine(handle: Handle<{ batchId: string; last: LastAction }>) {
         {Object.entries(fields).map(([name, value]) => (
           <input key={name} type="hidden" name={name} value={value} />
         ))}
-        <button type="submit" class="linkish">
+        <Button type="submit" variant="link">
           Undo
-        </button>
+        </Button>
       </form>
     )
 
@@ -848,9 +841,9 @@ function ReviewDrawer(
 
     const saveForm = (label: string) => (
       <form method="post" action={routes.profile.imports.save.href({ batchId })}>
-        <button type="submit" class="primary">
+        <Button type="submit" variant="primary">
           {label}
-        </button>
+        </Button>
       </form>
     )
 
@@ -916,6 +909,7 @@ function ReviewDrawer(
         <div class="drawer-row">
           <label
             for={DRAWER_TOGGLE}
+            class="tap-area"
             mix={css({
               flex: '1 1 auto',
               minWidth: 0,
@@ -938,7 +932,7 @@ function ReviewDrawer(
           {needsConfirm ? (
             // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
             <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
-              <span class="doodle-border primary" mix={css({ display: 'inline-block' })}>
+              <span class={buttonFrameClass('primary')} mix={css({ display: 'inline-block' })}>
                 {saveLabel}
               </span>
             </label>
@@ -1031,14 +1025,10 @@ function BulkAccept(
       <form method="post" action={routes.profile.imports.bulk.href({ batchId })} data-in-place>
         <input type="hidden" name="kind" value={kind} />
         {ticked && <input type="hidden" name="undo" value="1" />}
-        <button
-          type="submit"
-          class={ticked ? 'checkline ticked' : 'checkline'}
-          aria-pressed={ticked ? 'true' : 'false'}
-        >
+        <Button type="submit" variant="checkline" ticked={ticked} aria-pressed={ticked ? 'true' : 'false'}>
           <span class="checkline-box" aria-hidden="true" />
           Accept {n} · {what}
-        </button>
+        </Button>
       </form>
     )
   }
@@ -1153,15 +1143,9 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     label="Letterboxd username"
                     hint="The last part of your profile URL — letterboxd.com/yourname/"
                   >
-                    <input
-                      type="text"
-                      name="username"
-                      placeholder="yourname"
-                      autocomplete="off"
-                      spellcheck={false}
-                    />
+                    <TextInput name="username" placeholder="yourname" autocomplete="off" spellcheck={false} />
                   </Field>
-                  <button type="submit">Connect</button>
+                  <Button type="submit">Connect</Button>
                 </form>
               </section>
             )}
@@ -1224,24 +1208,22 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     <span mix={css({ fontSize: '13px', color: '#8d8579' })}>
                       For all {model.conflicts.length}
                     </span>
-                    <button
+                    <Button
                       type="submit"
                       name="choice"
                       value="keep"
-                      class={batch.conflict_choice === 'keep' ? 'primary' : undefined}
-                      mix={css({ fontSize: '13px' })}
+                      variant={batch.conflict_choice === 'keep' ? 'primary' : 'default'}
                     >
                       Keep what's on On Deck
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="submit"
                       name="choice"
                       value="take"
-                      class={batch.conflict_choice === 'take' ? 'primary' : undefined}
-                      mix={css({ fontSize: '13px' })}
+                      variant={batch.conflict_choice === 'take' ? 'primary' : 'default'}
                     >
                       Take the import
-                    </button>
+                    </Button>
                   </form>
                   <div id="import-conflicts">
                     {model.conflicts.map((entry) => (

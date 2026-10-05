@@ -21,6 +21,7 @@ import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, parseMediaType } from '../../mediaTypes.ts'
 import { statusBadgeColor, statusLabelsFor } from '../../interactionStatus.ts'
 import { backLinkFrom, withReturnTo } from '../../ui/backLink.ts'
+import { Button } from '../../ui/shared/form-controls.tsx'
 
 const SOURCE_LABELS: Record<MediaType, string> = {
   movie: 'Movie taste',
@@ -281,7 +282,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                         </div>
                         <NotesField defaultValue={interaction?.notes} />
                       </div>
-                      <button type="submit">Save</button>
+                      <Button type="submit">Save</Button>
                       <FrameForm />
                     </form>
                   </FloatingDropdown>

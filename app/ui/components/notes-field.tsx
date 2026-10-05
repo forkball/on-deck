@@ -3,6 +3,7 @@ import { css } from 'remix/ui'
 
 import { routes } from '../../routes.ts'
 import { Field, hintStyle } from '../shared/field.tsx'
+import { Textarea } from '../shared/form-controls.tsx'
 
 // The note field, wherever something is logged — four places now, which is why
 // the control and the line under it live together rather than being spelled out
@@ -26,7 +27,7 @@ export function NotesField(handle: Handle<{ defaultValue?: string | null }>) {
   return () => (
     <div>
       <Field label="Notes">
-        <textarea
+        <Textarea
           name="notes"
           rows={3}
           defaultValue={handle.props.defaultValue ?? ''}

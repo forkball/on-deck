@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "NODE_ENV=development node --env-file-if-exists=.env --watch --import remix/node-tsx server.ts",
     "start": "NODE_ENV=production node --env-file-if-exists=.env --import remix/node-tsx server.ts",
-    "test": "NODE_ENV=test node --env-file-if-exists=.env --import remix/node-tsx --test",
+    "test": "NODE_ENV=test node --env-file-if-exists=.env --import remix/node-tsx --test 'test/**/*.test.ts' 'test/**/*.test.tsx'",
     "typecheck": "tsc --noEmit && node --import remix/node-tsx scripts/check-browser-bundle.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
@@ -14,7 +14,8 @@
     "db:migrate": "node --env-file-if-exists=.env --import remix/node-tsx db/migrate.ts up",
     "db:migrate:down": "node --env-file-if-exists=.env --import remix/node-tsx db/migrate.ts down",
     "prod:query": "node --env-file-if-exists=.env --import remix/node-tsx scripts/prod-query.ts",
-    "prod:backfill-books": "node --env-file-if-exists=.env --import remix/node-tsx scripts/backfill-google-books.ts --production"
+    "prod:backfill-books": "node --env-file-if-exists=.env --import remix/node-tsx scripts/backfill-google-books.ts --production",
+    "prod:enrich-books": "node --env-file-if-exists=.env --import remix/node-tsx scripts/enrich-open-library.ts --production"
   },
   "engines": {
     "node": ">=24.3.0"
