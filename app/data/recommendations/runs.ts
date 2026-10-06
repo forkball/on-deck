@@ -19,6 +19,7 @@ import { displayLabel } from '../users.ts'
 import type { SeenBy } from '../../ui/shared/seen-by.ts'
 import type { DecadeRelation, RecommendationFilters } from './picks.ts'
 import type { RunTimings } from './timings.ts'
+import { parseUnmatchedPicks, type UnmatchedPick } from './unmatched.ts'
 
 export const MAX_RUNS_PER_USER = 3
 
@@ -82,6 +83,9 @@ export interface GenerationParams {
 export interface RecommendationRunDetail extends RecommendationRunSummary {
   otherMemberLabels: string[]
   results: RecommendationResult[]
+  // Picks the model made that no catalog entry was found for. Shown apart from
+  // `results`, which are all catalog entries — see unmatched.ts.
+  unmatched: UnmatchedPick[]
   params: GenerationParams
 }
 
@@ -251,6 +255,7 @@ export interface SaveRunInput {
   name?: string
   params: GenerationParams
   results: RecommendationResult[]
+  unmatched?: UnmatchedPick[]
   lucky?: boolean
 }
 
@@ -264,6 +269,7 @@ export async function saveRun(db: Db, input: SaveRunInput): Promise<number> {
       name: input.name?.trim() || undefined,
       params: JSON.stringify(input.params),
       is_lucky: input.lucky === true,
+      unmatched_picks: JSON.stringify(input.unmatched ?? []),
     },
     { returnRow: true },
   )
@@ -471,6 +477,7 @@ export async function getRecommendationRun(
       owner,
       otherMemberLabels,
       results: [],
+      unmatched: parseUnmatchedPicks(run.unmatched_picks),
       params,
     }
   }
@@ -508,6 +515,7 @@ export async function getRecommendationRun(
     owner,
     otherMemberLabels,
     results,
+    unmatched: parseUnmatchedPicks(run.unmatched_picks),
     params,
   }
 }

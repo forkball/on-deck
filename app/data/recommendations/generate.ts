@@ -23,6 +23,7 @@ import {
   matchesSeries,
   resolveFromCatalog,
   searchForPicks,
+  seriesKey,
   seriesKeysFor,
   verifyPicksAgainstOverviews,
   withOverviews,
@@ -48,6 +49,7 @@ import { emptyDrops, logPickTally, type PickTally } from './tally.ts'
 import { finishTranscript, startTranscript } from './transcripts.ts'
 import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
+import { selectUnmatchedPicks, type UnmatchedCandidate } from './unmatched.ts'
 import { logger } from '../../log.ts'
 
 const log = logger('generation')
@@ -278,10 +280,24 @@ export async function generateRecommendations(
   const seenSeries = new Set<string>()
   const drops = emptyDrops()
 
+  // Picks the catalog couldn't place, which the run may still show as the model
+  // gave them — see unmatched.ts. Only the levers a pick answers for itself can be
+  // applied to one: the decade from its own year, the series from its own answer.
+  // The rest need a catalog record, and the run page says nothing checked them.
+  // Not for a lucky run, whose one pick is the point and has to be a real entry.
+  const unmatchedCandidates: UnmatchedCandidate[] = []
+  const keepUnmatched = (pick: Pick): void => {
+    if (lucky) return
+    if (filters.decade != null && !matchesDecade(pick.year, filters.decade, filters.decadeRelation)) return
+    if (filters.series && !matchesSeries(pick, filters.series)) return
+    unmatchedCandidates.push({ pick, seriesKey: seriesKey(pick) })
+  }
+
   for (const [i, pick] of picks.entries()) {
     const matches: CatalogSearchResult[] = matchesByPick[i]
     if (matches.length === 0) {
       drops.unfound++
+      keepUnmatched(pick)
       continue
     }
 
@@ -292,6 +308,9 @@ export async function generateRecommendations(
     const match = chooseMatch(pick, matches, mediaType, lengthWanted)
     if (!match) {
       drops.titleMismatch++
+      // The catalog answered with other titles, which says more about the catalog
+      // than the pick: a thin book search returns whatever it has.
+      keepUnmatched(pick)
       continue
     }
 
@@ -392,6 +411,20 @@ export async function generateRecommendations(
       surplus: verified.length - results.length,
       dropped: drops,
     }
+  }
+
+  // After the confirmed picks are settled, since these only fill the places they
+  // leave. Ranked order is kept, so the model's stronger unmatched picks come first.
+  const unmatched = selectUnmatchedPicks({
+    candidates: unmatchedCandidates,
+    excluded,
+    shownTitles: results.map((result) => result.item.title),
+    takenSeries: seenSeries,
+    slots: (lucky ? LUCKY_TARGET_COUNT : TARGET_COUNT) - results.length,
+  })
+  // Logged here rather than where it is built, so the line carries this count too.
+  if (tally) {
+    tally.shownUnmatched = unmatched.length
     logPickTally(tally)
   }
 
@@ -404,7 +437,11 @@ export async function generateRecommendations(
   // Thrown rather than returned: failJob puts a GenerationError's message in front
   // of whoever is waiting, and the job lands as failed rather than as a completed
   // run that isn't one.
-  if (results.length === 0) {
+  //
+  // A run of nothing but unmatched picks is still a run: the model's answer is
+  // what someone asked for, and the catalog not knowing a title is no reason to
+  // withhold it.
+  if (results.length === 0 && unmatched.length === 0) {
     // Before the throw: an empty run is the case most worth being able to read
     // afterwards, and it leaves no run row to hang the numbers off.
     if (transcriptId != null && tally) await finishTranscript(db, transcriptId, { tally })
@@ -431,6 +468,7 @@ export async function generateRecommendations(
         sourceTypes: profileTypes,
       } satisfies GenerationParams,
       results,
+      unmatched,
     }),
   )
 

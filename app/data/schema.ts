@@ -182,6 +182,9 @@ export const recommendationRuns = table({
     // its own — see the 20260821120000 migration.
     is_lucky: c.boolean().notNull().default(false),
     timings: c.text(),
+    // The model's picks no catalog entry could be found for, as JSON — see
+    // data/recommendations/unmatched.ts and the 20261006120000 migration.
+    unmatched_picks: c.text().notNull().default('[]'),
   },
 })
 

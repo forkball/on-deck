@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { GenerationParams, RecommendationRunDetail } from '../../data/recommendations/runs.ts'
+import type { UnmatchedPick } from '../../data/recommendations/unmatched.ts'
 import type { MediaType } from '../../data/mediaItems.ts'
 import { Toast } from '../../ui/components/toast.tsx'
 import { routes } from '../../routes.ts'
@@ -18,7 +19,7 @@ import { ModelProvided } from './model-provided.tsx'
 import { PlatformList } from '../../ui/components/platform-list.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { getCatalogProvider } from '../../data/catalog/provider.ts'
-import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, parseMediaType } from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
 import { statusBadgeColor, statusLabelsFor } from '../../interactionStatus.ts'
 import { backLinkFrom, withReturnTo } from '../../ui/backLink.ts'
 import { Button } from '../../ui/shared/form-controls.tsx'
@@ -107,6 +108,87 @@ export function describeParams(params: GenerationParams, mediaType: MediaType): 
   return lines
 }
 
+// The levers that need a catalog record to answer, by the name the summary line
+// gives them. Decade and series are absent: an unmatched pick answers those itself,
+// and generate.ts applied them to it.
+function uncheckedLevers(params: GenerationParams): string[] {
+  const levers: string[] = []
+  if (params.genre) levers.push('genre')
+  if (params.length) levers.push('length')
+  if (params.playerType) levers.push('player type')
+  if (params.multiplayerType) levers.push('multiplayer type')
+  if (params.platform) levers.push('platform')
+  return levers
+}
+
+const UNMATCHED_REASON_NOTE =
+  'Written by the model from the taste profile this run was built on. The catalog has no entry we could match, so nothing has checked it.'
+
+// The model's picks no catalog entry was found for, below the ones that were.
+//
+// Deliberately not the recommendation card, for the reason the unconfirmed page
+// gives: no cover, no log button, no detail link, because there is no catalog entry
+// behind any of these and each of those controls would imply there was. What it has
+// instead is a way to look for one.
+function UnmatchedSection(
+  handle: Handle<{ picks: UnmatchedPick[]; run: RecommendationRunDetail; alone: boolean }>,
+) {
+  return () => {
+    const { picks, run, alone } = handle.props
+    const ui = mediaTypeUiFor(run.mediaType)
+    const levers = uncheckedLevers(run.params)
+    const leverList =
+      levers.length <= 1
+        ? levers.join('')
+        : `${levers.slice(0, -1).join(', ')} and ${levers[levers.length - 1]}`
+
+    return (
+      <section mix={css({ marginTop: alone ? '24px' : '40px' })}>
+        <h2>
+          {alone ? 'Suggested' : 'Also suggested'}, but not found in {ui.catalogName}
+        </h2>
+        <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
+          The model picked {picks.length === 1 ? 'this' : 'these'}, but {ui.catalogName} has no entry we could
+          match, so nothing has checked that {picks.length === 1 ? 'it exists' : 'they exist'} or that the
+          details are right. {picks.length === 1 ? 'It' : 'They'} can't be logged from here.
+          {levers.length > 0 &&
+            ` Your ${leverList} ${levers.length === 1 ? 'filter' : 'filters'} couldn't be checked for ${picks.length === 1 ? 'it' : 'them'} either.`}
+        </p>
+        <ol
+          mix={css({
+            margin: 0,
+            padding: '0 0 0 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          })}
+        >
+          {picks.map((pick) => (
+            <li key={`${pick.title}-${pick.year}`}>
+              <span mix={css({ fontWeight: 700 })}>{pick.title}</span>
+              {pick.year ? ` (${pick.year})` : ''}
+              {pick.creator && <span mix={css({ color: '#555' })}> — {pick.creator}</span>}
+              <p mix={css({ margin: '4px 0 0', fontStyle: 'italic', color: '#555' })}>
+                <ModelProvided note={UNMATCHED_REASON_NOTE}>{pick.reason}</ModelProvided>
+              </p>
+              <p mix={css({ margin: '4px 0 0', fontSize: '13px' })}>
+                <a
+                  href={ui.catalogSearchUrl(pick.title, pick.year)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="tap-area"
+                >
+                  Search {ui.catalogName}
+                </a>
+              </p>
+            </li>
+          ))}
+        </ol>
+      </section>
+    )
+  }
+}
+
 export interface RecommendationRunPageProps {
   run: RecommendationRunDetail
   displayName: string
@@ -151,146 +233,152 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
           ))}
         </p>
 
-        <ul
-          mix={css({
-            listStyle: 'none',
-            margin: '24px 0 0',
-            padding: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-          })}
-        >
-          {run.results.map(({ item, reason, interaction }) => {
-            const { releaseYear, posterUrl, tags, platforms } = parseMediaMetadata(item.metadata)
-            const itemType = parseMediaType(item.type) ?? DEFAULT_MEDIA_TYPE
-            const itemUi = MEDIA_TYPE_UI[itemType]
-            // Where a log submitted from this row comes back to, and what
-            // the detail link offers as a way back.
-            const runHref = routes.recommendations.show.href({ runId: String(run.id) })
-            const detailHref = withReturnTo(itemUi.hrefs.show(item.id), runHref)
+        {run.results.length > 0 && (
+          <ul
+            mix={css({
+              listStyle: 'none',
+              margin: '24px 0 0',
+              padding: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            })}
+          >
+            {run.results.map(({ item, reason, interaction }) => {
+              const { releaseYear, posterUrl, tags, platforms } = parseMediaMetadata(item.metadata)
+              const itemType = parseMediaType(item.type) ?? DEFAULT_MEDIA_TYPE
+              const itemUi = MEDIA_TYPE_UI[itemType]
+              // Where a log submitted from this row comes back to, and what
+              // the detail link offers as a way back.
+              const runHref = routes.recommendations.show.href({ runId: String(run.id) })
+              const detailHref = withReturnTo(itemUi.hrefs.show(item.id), runHref)
 
-            return (
-              <li
-                key={item.id}
-                mix={css({
-                  display: 'flex',
-                  gap: '12px',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  padding: '16px',
-                })}
-              >
-                {posterUrl ? (
-                  <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
-                    <img
-                      src={posterUrl}
-                      alt={`${item.title} poster`}
-                      mix={css({ width: '60px', borderRadius: '4px', display: 'block' })}
+              return (
+                <li
+                  key={item.id}
+                  mix={css({
+                    display: 'flex',
+                    gap: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    padding: '16px',
+                  })}
+                >
+                  {posterUrl ? (
+                    <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
+                      <img
+                        src={posterUrl}
+                        alt={`${item.title} poster`}
+                        mix={css({ width: '60px', borderRadius: '4px', display: 'block' })}
+                      />
+                    </a>
+                  ) : (
+                    <div
+                      mix={css({
+                        width: '60px',
+                        height: '90px',
+                        flex: '0 0 auto',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                      })}
                     />
-                  </a>
-                ) : (
-                  <div
-                    mix={css({
-                      width: '60px',
-                      height: '90px',
-                      flex: '0 0 auto',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                    })}
-                  />
-                )}
-                <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
-                  <a href={detailHref} mix={css({ fontWeight: 700 })}>
-                    {item.title}
-                  </a>
-                  {releaseYear ? ` (${releaseYear})` : ''}
-                  {interaction && (
-                    <div mix={css({ marginTop: '4px' })}>
-                      <span
-                        mix={css({
-                          display: 'inline-block',
-                          padding: '2px 8px',
-                          borderRadius: '999px',
-                          fontSize: '11px',
-                          border: `1px solid ${statusBadgeColor(interaction.status)}`,
-                          color: statusBadgeColor(interaction.status),
-                        })}
-                      >
-                        {statusLabelsFor(itemType)[interaction.status] ?? interaction.status}
-                      </span>
-                    </div>
                   )}
-                  {tags.length > 0 && (
-                    <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' })}>
-                      {tags.map((tag) => (
+                  <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
+                    <a href={detailHref} mix={css({ fontWeight: 700 })}>
+                      {item.title}
+                    </a>
+                    {releaseYear ? ` (${releaseYear})` : ''}
+                    {interaction && (
+                      <div mix={css({ marginTop: '4px' })}>
                         <span
-                          key={tag}
                           mix={css({
-                            fontSize: '11px',
+                            display: 'inline-block',
                             padding: '2px 8px',
                             borderRadius: '999px',
-                            border: '1px solid #ccc',
-                            color: '#555',
+                            fontSize: '11px',
+                            border: `1px solid ${statusBadgeColor(interaction.status)}`,
+                            color: statusBadgeColor(interaction.status),
                           })}
                         >
-                          {tag}
+                          {statusLabelsFor(itemType)[interaction.status] ?? interaction.status}
                         </span>
-                      ))}
-                    </div>
-                  )}
-                  {/* Empty for everything but games, so no other type
+                      </div>
+                    )}
+                    {tags.length > 0 && (
+                      <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' })}>
+                        {tags.map((tag) => (
+                          <span
+                            key={tag}
+                            mix={css({
+                              fontSize: '11px',
+                              padding: '2px 8px',
+                              borderRadius: '999px',
+                              border: '1px solid #ccc',
+                              color: '#555',
+                            })}
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Empty for everything but games, so no other type
                         renders a gap here. */}
-                  <PlatformList platforms={platforms} />
-                  <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: '#555' })}>
-                    <ModelProvided note="Written by the model from the taste profile this run was built on — not a description from the catalogue.">
-                      {reason}
-                    </ModelProvided>
-                  </p>
-                </div>
-                {/* Right-hand column, so the control lines up down the list
+                    <PlatformList platforms={platforms} />
+                    <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: '#555' })}>
+                      <ModelProvided note="Written by the model from the taste profile this run was built on — not a description from the catalogue.">
+                        {reason}
+                      </ModelProvided>
+                    </p>
+                  </div>
+                  {/* Right-hand column, so the control lines up down the list
                       regardless of how long each title and reason runs. The
                       panel hangs from the right edge because at this position
                       a left-anchored one would open off the page. */}
-                <div mix={css({ flex: '0 0 auto', alignSelf: 'flex-start' })}>
-                  <FloatingDropdown triggerLabel={interaction ? 'Edit' : 'Log'} align="right">
-                    <form
-                      method="post"
-                      action={itemUi.hrefs.log(item.id)}
-                      mix={css({ display: 'flex', flexDirection: 'column', gap: '10px' })}
-                    >
-                      <input type="hidden" name="return_to" value={runHref} />
-                      <Field label={`Add to ${itemUi.singular} list`}>
-                        <StatusSelect
-                          mediaType={itemType}
-                          name="status"
-                          defaultValue={interaction?.status ?? 'want_to_consume'}
-                        />
-                      </Field>
-                      {/* Pre-filled from the existing log: the action writes
+                  <div mix={css({ flex: '0 0 auto', alignSelf: 'flex-start' })}>
+                    <FloatingDropdown triggerLabel={interaction ? 'Edit' : 'Log'} align="right">
+                      <form
+                        method="post"
+                        action={itemUi.hrefs.log(item.id)}
+                        mix={css({ display: 'flex', flexDirection: 'column', gap: '10px' })}
+                      >
+                        <input type="hidden" name="return_to" value={runHref} />
+                        <Field label={`Add to ${itemUi.singular} list`}>
+                          <StatusSelect
+                            mediaType={itemType}
+                            name="status"
+                            defaultValue={interaction?.status ?? 'want_to_consume'}
+                          />
+                        </Field>
+                        {/* Pre-filled from the existing log: the action writes
                             whatever is submitted, so leaving these out would
                             null a rating or note already there. */}
-                      <div class="watched-only-fields" mix={css({ flexDirection: 'column', gap: '10px' })}>
-                        <div>
-                          <p mix={css({ margin: '0 0 4px' })}>Rating</p>
-                          <StarRatingInput
-                            name="rating"
-                            idPrefix={`rec-rating-${item.id}`}
-                            defaultValue={interaction?.rating ?? null}
-                            disliked={interaction?.disliked ?? null}
-                          />
+                        <div class="watched-only-fields" mix={css({ flexDirection: 'column', gap: '10px' })}>
+                          <div>
+                            <p mix={css({ margin: '0 0 4px' })}>Rating</p>
+                            <StarRatingInput
+                              name="rating"
+                              idPrefix={`rec-rating-${item.id}`}
+                              defaultValue={interaction?.rating ?? null}
+                              disliked={interaction?.disliked ?? null}
+                            />
+                          </div>
+                          <NotesField defaultValue={interaction?.notes} />
                         </div>
-                        <NotesField defaultValue={interaction?.notes} />
-                      </div>
-                      <Button type="submit">Save</Button>
-                      <FrameForm />
-                    </form>
-                  </FloatingDropdown>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+                        <Button type="submit">Save</Button>
+                        <FrameForm />
+                      </form>
+                    </FloatingDropdown>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        {run.unmatched.length > 0 && (
+          <UnmatchedSection picks={run.unmatched} run={run} alone={run.results.length === 0} />
+        )}
       </Page>
     )
   }
