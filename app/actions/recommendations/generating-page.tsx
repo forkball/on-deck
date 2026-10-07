@@ -1,5 +1,4 @@
 import type { Handle } from 'remix/ui'
-import { css } from 'remix/ui'
 
 import { PHASE_LABELS, type GenerationPhase } from '../../data/recommendations/jobs.ts'
 import { GenerationProgress } from '../../browser/generation-progress.tsx'
@@ -41,23 +40,17 @@ export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
         {error ? (
           <GenerationFailure message={error} backHref={formHref} />
         ) : (
-          <>
-            <GenerationProgress
-              statusHref={statusHref}
-              formHref={formHref}
-              initialLabel={PHASE_LABELS[phase]}
-              initialPhase={phase}
-              initialStatus={status}
-              initialQueuedAhead={queuedAhead}
-              phases={phases}
-              labels={PHASE_LABELS}
-              key={jobId}
-            />
-            <p mix={css({ fontSize: '13px', color: '#888' })}>
-              This takes a little while — two of these steps are the model thinking. You can leave this page
-              open; it'll go to your picks on its own.
-            </p>
-          </>
+          <GenerationProgress
+            statusHref={statusHref}
+            formHref={formHref}
+            initialLabel={PHASE_LABELS[phase]}
+            initialPhase={phase}
+            initialStatus={status}
+            initialQueuedAhead={queuedAhead}
+            phases={phases}
+            labels={PHASE_LABELS}
+            key={jobId}
+          />
         )}
       </Page>
     )
