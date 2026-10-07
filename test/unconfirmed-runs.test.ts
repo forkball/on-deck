@@ -6,9 +6,25 @@ import {
   getUnconfirmedRun,
   listUnconfirmedRuns,
   MAX_UNCONFIRMED_PER_USER,
+  picksToKeepUnconfirmed,
   saveUnconfirmedRun,
 } from '../app/data/recommendations/unconfirmed.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
+
+// No database: which picks survive is decided before anything is written.
+describe('picksToKeepUnconfirmed', () => {
+  const picks = ['First', 'Second', 'Third'].map((title) => ({ title, year: 2000, reason: '' }))
+
+  it('keeps every pick of an ordinary run', () => {
+    assert.deepEqual(picksToKeepUnconfirmed(picks, false), picks)
+  })
+
+  // A lucky draw asks for a dozen so the gates have something to drop. Kept
+  // whole, an outage turned "one pick" into a page of twelve.
+  it('keeps only the top-ranked pick of a lucky draw', () => {
+    assert.deepEqual(picksToKeepUnconfirmed(picks, true), [picks[0]])
+  })
+})
 
 // What the model answered when the catalog wouldn't. These rows hold the picks as
 // JSON rather than pointing at catalog entries, which is the whole reason they are

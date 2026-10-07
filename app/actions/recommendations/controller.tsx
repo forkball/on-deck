@@ -481,7 +481,9 @@ export default createController(routes.recommendations, {
           queuedAhead={job.queuedAhead ?? null}
           error={job.error}
           statusHref={routes.recommendations.status.href({ jobId: context.params.jobId })}
-          formHref={routes.recommendations.index.href()}
+          // Back to where the run was asked for: a lucky draw that came back with
+          // nothing is retried from the draw, not from the shortlist form.
+          formHref={job.lucky ? routes.recommendations.luckyPage.href() : routes.recommendations.index.href()}
           displayName={displayLabel(auth.identity)}
         />,
       )

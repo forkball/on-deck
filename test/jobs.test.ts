@@ -163,4 +163,17 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
 
     assert.equal((await getJob(db, first.jobId, userId))?.status, 'queued')
   })
+
+  // The generating page reads this to send a failed draw back to the draw.
+  it('says whether a job is a lucky draw', async () => {
+    await clear()
+    const plain = await enqueue(userId)
+    assert.ok(plain.ok)
+    assert.equal((await getJob(db, plain.jobId, userId))?.lucky, false)
+
+    await clear()
+    const draw = await enqueueJob(db, userId, { ...params, memberIds: [userId], lucky: true })
+    assert.ok(draw.ok)
+    assert.equal((await getJob(db, draw.jobId, userId))?.lucky, true)
+  })
 })

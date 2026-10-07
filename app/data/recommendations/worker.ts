@@ -18,7 +18,7 @@ import { generateRecommendations, type GenerationCheckpoint } from './generate.t
 import type { MediaType } from '../mediaItems.ts'
 import type { RecommendationFilters } from './picks.ts'
 import { saveRunTimings } from './runs.ts'
-import { saveUnconfirmedRun } from './unconfirmed.ts'
+import { picksToKeepUnconfirmed, saveUnconfirmedRun } from './unconfirmed.ts'
 import { startTimings, summarizeTimings, type RunTimings } from './timings.ts'
 import { logger, withLogContext } from '../../log.ts'
 
@@ -129,7 +129,7 @@ export function startGenerationWorker(): GenerationWorker {
             userId: job.userId,
             mediaType: job.params.mediaType as MediaType,
             filters: job.params.filters as RecommendationFilters,
-            picks: latest.picks,
+            picks: picksToKeepUnconfirmed(latest.picks, job.params.lucky === true),
             reason: error.message,
           })
           await completeJob(db, job.id, { kind: 'unconfirmed', unconfirmedRunId })

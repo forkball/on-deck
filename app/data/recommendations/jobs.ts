@@ -54,6 +54,9 @@ export interface GenerationJob {
   // were kept unconfirmed.
   unconfirmedRunId?: number
   prunedOldestRun?: boolean
+  // A lucky draw, read off the params, so the pages around the job can send
+  // someone back to the draw rather than the general form.
+  lucky: boolean
   error?: string
   startedAt: number
   updatedAt: number
@@ -71,6 +74,16 @@ function parsePhases(raw: string): GenerationPhase[] {
   return phases.length > 0 ? phases : PHASE_ORDER
 }
 
+// A row whose params don't parse reads as an ordinary run: the worker refuses
+// it anyway, and the only thing this decides is where a back link points.
+function isLuckyParams(raw: string): boolean {
+  try {
+    return (JSON.parse(raw) as Partial<JobParams>).lucky === true
+  } catch {
+    return false
+  }
+}
+
 function toJob(row: RecommendationJob): GenerationJob {
   return {
     userId: row.user_id,
@@ -80,6 +93,7 @@ function toJob(row: RecommendationJob): GenerationJob {
     runId: row.run_id ?? undefined,
     unconfirmedRunId: row.unconfirmed_run_id ?? undefined,
     prunedOldestRun: row.pruned_oldest_run === 1,
+    lucky: isLuckyParams(row.params),
     error: row.error ?? undefined,
     startedAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),

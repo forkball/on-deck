@@ -10,6 +10,13 @@ import type { Pick, RecommendationFilters } from './picks.ts'
 // around to read — and moving one shouldn't move the other.
 export const MAX_UNCONFIRMED_PER_USER = 3
 
+// Which of the model's picks an unconfirmed run keeps. A lucky draw promises one
+// pick, and it asks for a dozen only so the gates have something to drop; with no
+// gates run, its answer is the top-ranked pick alone, not the whole list.
+export function picksToKeepUnconfirmed(picks: Pick[], lucky: boolean): Pick[] {
+  return lucky ? picks.slice(0, 1) : picks
+}
+
 export interface UnconfirmedRunDetail {
   id: number
   mediaType: MediaType
