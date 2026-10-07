@@ -61,6 +61,10 @@ export function UnconfirmedRunPage(handle: Handle<UnconfirmedRunPageProps>) {
               </p>
             </div>
           )}
+          <p mix={css({ margin: '12px 0 0', color: '#888', fontSize: '13px' })}>
+            We couldn't match this to {mediaTypeUiFor(run.mediaType).catalogName}, so it can't be logged from
+            here.
+          </p>
         </Page>
       )
     }
