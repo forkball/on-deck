@@ -48,9 +48,10 @@ export function UnconfirmedRunPage(handle: Handle<UnconfirmedRunPageProps>) {
           <p mix={css({ margin: 0 })}>{run.reason}</p>
           <p mix={css({ margin: '8px 0 0', fontSize: '13px', color: '#555' })}>
             The run was retried and the catalog still wouldn't answer, so the model's own suggestions were
-            kept rather than thrown away. Nothing has checked that they exist, that the years are right, or
-            that you haven't already logged them — so they can't be added to your log from here. Generating
-            again once the catalog is back will produce a real run.
+            kept rather than thrown away. Anything already logged was left out by matching titles, which can
+            miss a work logged under a different title. Nothing has checked that these exist or that the years
+            are right, so they can't be added to your log from here. Generating again once the catalog is back
+            will produce a real run.
           </p>
         </div>
 

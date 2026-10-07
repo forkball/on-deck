@@ -91,7 +91,8 @@ function UnconfirmedSection(handle: Handle<{ runs: UnconfirmedRunDetail[] }>) {
     <section mix={css({ marginTop: '40px' })}>
       <h2>Unconfirmed</h2>
       <p mix={sectionCaption}>
-        Runs the catalog couldn't be reached for. The model's picks were kept, but nothing has checked them.
+        Runs the catalog couldn't be reached for. The model's picks were kept, but the catalog hasn't
+        confirmed them.
       </p>
       <ul mix={css({ listStyle: 'none', margin: 0, padding: 0 })}>
         {handle.props.runs.map((run) => (

@@ -14,15 +14,41 @@ import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 // No database: which picks survive is decided before anything is written.
 describe('picksToKeepUnconfirmed', () => {
   const picks = ['First', 'Second', 'Third'].map((title) => ({ title, year: 2000, reason: '' }))
+  const nothingLogged = { seen: [], rejected: [] }
 
   it('keeps every pick of an ordinary run', () => {
-    assert.deepEqual(picksToKeepUnconfirmed(picks, false), picks)
+    assert.deepEqual(picksToKeepUnconfirmed(picks, { lucky: false, excluded: nothingLogged }), picks)
   })
 
   // A lucky draw asks for a dozen so the gates have something to drop. Kept
   // whole, an outage turned "one pick" into a page of twelve.
   it('keeps only the top-ranked pick of a lucky draw', () => {
-    assert.deepEqual(picksToKeepUnconfirmed(picks, true), [picks[0]])
+    assert.deepEqual(picksToKeepUnconfirmed(picks, { lucky: true, excluded: nothingLogged }), [picks[0]])
+  })
+
+  // No catalog id to filter on during an outage, so the title is compared.
+  it('leaves out what has been seen or turned down, by title', () => {
+    const kept = picksToKeepUnconfirmed(picks, {
+      lucky: false,
+      excluded: { seen: ['first'], rejected: ['THIRD'] },
+    })
+    assert.deepEqual(
+      kept.map((pick) => pick.title),
+      ['Second'],
+    )
+  })
+
+  it("draws the lucky pick from what's left, not the model's first answer", () => {
+    const kept = picksToKeepUnconfirmed(picks, { lucky: true, excluded: { seen: ['First'], rejected: [] } })
+    assert.deepEqual(
+      kept.map((pick) => pick.title),
+      ['Second'],
+    )
+  })
+
+  it('keeps nothing when every pick is already logged', () => {
+    const excluded = { seen: ['First', 'Second', 'Third'], rejected: [] }
+    assert.deepEqual(picksToKeepUnconfirmed(picks, { lucky: true, excluded }), [])
   })
 })
 

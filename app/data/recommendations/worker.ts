@@ -15,8 +15,9 @@ import {
 } from './jobs.ts'
 import { CatalogUnavailableError, GenerationError } from './errors.ts'
 import { generateRecommendations, type GenerationCheckpoint } from './generate.ts'
-import type { MediaType } from '../mediaItems.ts'
-import type { RecommendationFilters } from './picks.ts'
+import { listUserMediaLog, type MediaType } from '../mediaItems.ts'
+import { buildExclusions } from './exclusions.ts'
+import type { ExcludedTitles, RecommendationFilters } from './picks.ts'
 import { saveRunTimings } from './runs.ts'
 import { picksToKeepUnconfirmed, saveUnconfirmedRun } from './unconfirmed.ts'
 import { startTimings, summarizeTimings, type RunTimings } from './timings.ts'
@@ -36,6 +37,20 @@ const IDLE_POLL_MS = 2000
 // leave the heartbeat too slow to keep up with it. Several beats per window,
 // since a claim only needs one of them to have landed.
 const HEARTBEAT_MS = Math.floor(CLAIM_STALE_MS / 6)
+
+// The run's exclusion list, rebuilt from the members' logs. Same rule a run that
+// reached the catalog uses — the lucky draw's stricter one, or the group's
+// seen-by setting — so an unconfirmed run excludes exactly what a real one would.
+async function excludedTitlesFor(job: ClaimedJob): Promise<ExcludedTitles> {
+  const { memberIds, mediaType, filters, lucky } = job.params
+  const logs = await Promise.all(
+    memberIds.map((memberId) => listUserMediaLog(db, memberId, { type: mediaType as MediaType })),
+  )
+  return buildExclusions(logs, {
+    lucky: lucky === true,
+    seenBy: (filters as RecommendationFilters).seenBy,
+  }).titles
+}
 
 function slotCount(): number {
   const configured = Number(process.env.WORKER_SLOTS)
@@ -125,15 +140,24 @@ export function startGenerationWorker(): GenerationWorker {
 
       if (error instanceof CatalogUnavailableError && latest.picks?.length) {
         try {
-          const unconfirmedRunId = await saveUnconfirmedRun(db, {
-            userId: job.userId,
-            mediaType: job.params.mediaType as MediaType,
-            filters: job.params.filters as RecommendationFilters,
-            picks: picksToKeepUnconfirmed(latest.picks, job.params.lucky === true),
-            reason: error.message,
+          const picks = picksToKeepUnconfirmed(latest.picks, {
+            lucky: job.params.lucky === true,
+            excluded: await excludedTitlesFor(job),
           })
-          await completeJob(db, job.id, { kind: 'unconfirmed', unconfirmedRunId })
-          return
+          // Every pick already logged leaves nothing worth a page. The catalog
+          // being down is still the reason, and still what the failure below says.
+          if (picks.length > 0) {
+            const unconfirmedRunId = await saveUnconfirmedRun(db, {
+              userId: job.userId,
+              mediaType: job.params.mediaType as MediaType,
+              filters: job.params.filters as RecommendationFilters,
+              picks,
+              reason: error.message,
+            })
+            await completeJob(db, job.id, { kind: 'unconfirmed', unconfirmedRunId })
+            return
+          }
+          log.warn('every unconfirmed pick was already logged')
         } catch (saveError) {
           // Falls through to the ordinary failure below: someone waiting on a run
           // that couldn't be salvaged should be told the catalog is down, not that
