@@ -36,26 +36,13 @@ export function UnconfirmedRunPage(handle: Handle<UnconfirmedRunPageProps>) {
         width="wide"
         displayName={displayName}
       >
-        <div
-          mix={css({
-            border: '1px solid #f0c36d',
-            background: '#fdf6e3',
-            borderRadius: '8px',
-            padding: '12px 16px',
-            margin: '16px 0 24px',
-          })}
-        >
-          <p mix={css({ margin: 0 })}>{run.reason}</p>
-          <p mix={css({ margin: '8px 0 0', fontSize: '13px', color: '#555' })}>
-            The run was retried and the catalog still wouldn't answer, so the model's own suggestions were
-            kept rather than thrown away. Anything already logged was left out by matching titles, which can
-            miss a work logged under a different title. Nothing has checked that these exist or that the years
-            are right, so they can't be added to your log from here. Generating again once the catalog is back
-            will produce a real run.
-          </p>
-        </div>
-
-        <p mix={css({ color: '#888', fontSize: '13px' })}>{date}</p>
+        {/* One quiet line rather than a warning box: the heading already says these
+            are unconfirmed, and the page has nothing to act on but the list. The
+            stage that failed is kept as the tooltip, for whoever needs it. */}
+        <p mix={css({ margin: '8px 0 0', color: '#888', fontSize: '13px' })} title={run.reason}>
+          {date} · The catalog couldn't be reached, so these are the model's picks, unchecked. They can't be
+          logged from here.
+        </p>
 
         <ol
           mix={css({
