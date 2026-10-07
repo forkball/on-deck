@@ -1,8 +1,6 @@
 import type { Handle } from 'remix/ui'
 import { clientEntry, css, ref } from 'remix/ui'
 
-import { GenerationFailure } from '../ui/shared/generation-failure.tsx'
-
 // Polls for the stage a run is actually in. Every label comes from the server
 // having entered that stage, so progress can't run backwards or be invented.
 //
@@ -164,15 +162,32 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       const { phases, labels } = handle.props
 
       // What stopped the run, or stopped this page following it. Above the steps,
-      // which stay on screen so it is clear how far the run got.
+      // which stay on screen so it is clear how far the run got. The message is
+      // written where the failure happened and already says what to do about it.
       function notice() {
-        if (failed) return <GenerationFailure message={failed} backHref={handle.props.formHref} />
-        if (gone) return <GenerationFailure message={gone} backHref={handle.props.formHref} />
+        const message =
+          failed ??
+          gone ??
+          (lostContact
+            ? 'Lost contact with the server. Your picks are probably still being put together.'
+            : null)
+        return message ? <p mix={css({ color: '#b91c1c' })}>{message}</p> : null
+      }
+
+      // The way on, under the steps: back to the form for a run that is over, a
+      // reload for one this page has only lost track of.
+      function nextStep() {
+        if (failed || gone) {
+          return (
+            <p>
+              <a href={handle.props.formHref}>Back to recommendations</a>
+            </p>
+          )
+        }
         if (lostContact) {
           return (
-            <p mix={css({ color: '#b91c1c' })}>
-              Lost contact with the server. Your picks are probably still being put together —{' '}
-              <a href="">reload</a> to check.
+            <p>
+              <a href="">Reload to check</a>
             </p>
           )
         }
@@ -241,6 +256,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
         >
           {notice()}
           {panel()}
+          {nextStep()}
         </div>
       )
     }
