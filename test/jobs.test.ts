@@ -87,11 +87,15 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
 
   it('refuses a second while one is queued', async () => {
     await clear()
-    assert.equal((await enqueue(userId)).ok, true)
+    const first = await enqueue(userId)
+    assert.equal(first.ok, true)
 
     const second = await enqueue(userId)
     assert.equal(second.ok, false)
     assert.equal(second.ok === false && second.reason, 'active_job')
+    // Names the job that holds the slot, so the refusal can link to it.
+    assert.ok(first.ok)
+    assert.equal(second.ok === false && second.activeJobId, first.jobId)
   })
 
   // The reason the index exists: a read before the insert cannot close this

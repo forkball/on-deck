@@ -55,6 +55,9 @@ export interface RecommendationsPageProps {
   // controller — see indexPage.
   startLucky?: boolean
   error?: string
+  // A link after the error, where there is somewhere to go about it — the run
+  // already in progress, when that is why this one was refused.
+  errorLink?: { href: string; label: string }
   // Set when the request matched an earlier run the user hasn't taken
   // anything from — see DuplicateNotice.
   duplicate?: {
@@ -184,6 +187,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       lucky,
       startLucky,
       error,
+      errorLink,
       duplicate,
     } = handle.props
     const recsHref = routes.recommendations.index.href()
@@ -212,6 +216,12 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
             })}
           >
             {error}
+            {errorLink && (
+              <>
+                {' '}
+                <a href={errorLink.href}>{errorLink.label}</a>
+              </>
+            )}
           </p>
         )}
 

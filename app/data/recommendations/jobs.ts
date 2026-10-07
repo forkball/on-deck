@@ -134,8 +134,11 @@ export function phasesFor(params: {
   return PHASE_ORDER.filter((phase) => !skipped.has(phase))
 }
 
-// `active_job` when the user already has one queued or running.
-export type EnqueueJobResult = { ok: true; jobId: string } | { ok: false; reason: 'active_job' }
+// `active_job` when the user already has one queued or running, with that job's
+// id so the refusal can point at it. Null if it finished in the moment between.
+export type EnqueueJobResult =
+  | { ok: true; jobId: string }
+  | { ok: false; reason: 'active_job'; activeJobId: string | null }
 
 // The insert is the check. `on conflict do nothing` against the partial unique
 // index (see the 20260816120000 migration) is what makes one-per-user hold under
@@ -157,7 +160,17 @@ export async function enqueueJob(db: Db, userId: number, params: JobParams): Pro
     [id, userId, JSON.stringify(params), phases.join(','), now],
   )
 
-  if (rows.length === 0) return { ok: false, reason: 'active_job' }
+  if (rows.length === 0) {
+    // Read after the refusal rather than before it: the insert is what decides,
+    // and this only names the job that decided it.
+    const active = await pool.query<{ id: string }>(
+      `select id from recommendation_jobs
+        where user_id = $1 and status in ('queued', 'running')
+        limit 1`,
+      [userId],
+    )
+    return { ok: false, reason: 'active_job', activeJobId: active.rows[0]?.id ?? null }
+  }
   return { ok: true, jobId: rows[0].id }
 }
 

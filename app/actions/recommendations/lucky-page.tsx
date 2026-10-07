@@ -17,13 +17,16 @@ export interface LuckyPickPageProps {
   displayName: string
   findPeopleHref: string
   error?: string
+  // See RecommendationsPageProps.errorLink.
+  errorLink?: { href: string; label: string }
 }
 
 // The dedicated home for the "🎲 Draw today's pick" call to action, so it
 // skips the general recommendations page's shortlist-only questions.
 export function LuckyPickPage(handle: Handle<LuckyPickPageProps>) {
   return () => {
-    const { friends, viewerLoggedTypes, mediaType, lucky, displayName, findPeopleHref, error } = handle.props
+    const { friends, viewerLoggedTypes, mediaType, lucky, displayName, findPeopleHref, error, errorLink } =
+      handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
     const luckyPageHref = routes.recommendations.luckyPage.href()
 
@@ -46,6 +49,12 @@ export function LuckyPickPage(handle: Handle<LuckyPickPageProps>) {
             })}
           >
             {error}
+            {errorLink && (
+              <>
+                {' '}
+                <a href={errorLink.href}>{errorLink.label}</a>
+              </>
+            )}
           </p>
         )}
 

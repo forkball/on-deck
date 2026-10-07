@@ -134,6 +134,15 @@ function requestedFriendIds(formData: FormData): number[] {
 // keep their button disabled instead, so only a hand-built request reads this.
 const NO_FRIENDS_PICKED_ERROR = 'Tick at least one friend, or switch to "Just me".'
 
+// Both actions refuse a second run in the same words, pointing at the first one
+// while it is still there to point at.
+const RUN_IN_PROGRESS_ERROR = 'You already have a run in progress — give that one a moment to finish first.'
+
+function runInProgressLink(activeJobId: string | null): RecommendationsPageProps['errorLink'] {
+  if (activeJobId == null) return undefined
+  return { href: routes.recommendations.generating.href({ jobId: activeJobId }), label: 'See its progress' }
+}
+
 // Both actions refuse for the same reason in the same words — an empty log gives
 // the profile nothing to work from, whichever kind of run asked for it.
 function describeMissingLogs(missing: MissingSourceLogs[], viewerId: number): string {
@@ -152,7 +161,7 @@ async function indexPage(
   db: Db,
   user: User,
   mediaType: ActiveMediaType,
-  extras: Pick<RecommendationsPageProps, 'error' | 'duplicate'> = {},
+  extras: Pick<RecommendationsPageProps, 'error' | 'errorLink' | 'duplicate'> = {},
 ) {
   const data = await loadIndexData(db, user, mediaType)
   return <RecommendationsPage {...data} mediaType={mediaType} {...extras} />
@@ -180,7 +189,7 @@ async function luckyDrawPage(
   db: Db,
   user: User,
   mediaType: ActiveMediaType,
-  extras: Pick<LuckyPickPageProps, 'error'> = {},
+  extras: Pick<LuckyPickPageProps, 'error' | 'errorLink'> = {},
 ) {
   const data = await loadLuckyPageData(db, user, mediaType)
   return (
@@ -366,7 +375,8 @@ export default createController(routes.recommendations, {
       if (!enqueued.ok) {
         return context.render(
           await indexPage(db, auth.identity, mediaType, {
-            error: 'You already have a run in progress — give that one a moment to finish first.',
+            error: RUN_IN_PROGRESS_ERROR,
+            errorLink: runInProgressLink(enqueued.activeJobId),
           }),
           { status: 409 },
         )
@@ -384,10 +394,14 @@ export default createController(routes.recommendations, {
       const db = context.get(Database)
       const formData = context.get(FormData)
       const fromLuckyPage = formData.get('origin') === LUCKY_PAGE_ORIGIN
-      const renderFailure = (mediaType: ActiveMediaType, error: string) =>
+      const renderFailure = (
+        mediaType: ActiveMediaType,
+        error: string,
+        errorLink?: RecommendationsPageProps['errorLink'],
+      ) =>
         fromLuckyPage
-          ? luckyDrawPage(db, auth.identity, mediaType, { error })
-          : indexPage(db, auth.identity, mediaType, { error })
+          ? luckyDrawPage(db, auth.identity, mediaType, { error, errorLink })
+          : indexPage(db, auth.identity, mediaType, { error, errorLink })
 
       const mediaType = parseMediaType(formData.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
 
@@ -452,10 +466,7 @@ export default createController(routes.recommendations, {
 
       if (!enqueued.ok) {
         return context.render(
-          await renderFailure(
-            mediaType,
-            'You already have a run in progress — give that one a moment to finish first.',
-          ),
+          await renderFailure(mediaType, RUN_IN_PROGRESS_ERROR, runInProgressLink(enqueued.activeJobId)),
           { status: 409 },
         )
       }
