@@ -3,6 +3,7 @@ import type { Handle } from 'remix/ui'
 import { PHASE_LABELS, type GenerationPhase } from '../../data/recommendations/jobs.ts'
 import { GenerationProgress } from '../../browser/generation-progress.tsx'
 import { Page } from '../../ui/components/page.tsx'
+import { routes } from '../../routes.ts'
 
 export interface GeneratingPageProps {
   jobId: string
@@ -42,6 +43,7 @@ export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
         <GenerationProgress
           statusHref={statusHref}
           formHref={formHref}
+          homeHref={routes.home.href()}
           initialLabel={PHASE_LABELS[phase]}
           initialPhase={phase}
           initialStatus={status}

@@ -60,6 +60,8 @@ export type GenerationProgressProps = {
   // Where a run that came back with nothing sends someone: the form they set the
   // filters on. Passed in because a client entry can't reach routes.ts.
   formHref: string
+  // Offered beside it, for someone done with recommendations for now.
+  homeHref: string
   initialLabel: string
   initialPhase: string
   initialStatus: string
@@ -177,21 +179,17 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       // The way on, under the steps: back to the form for a run that is over, a
       // reload for one this page has only lost track of.
       function nextStep() {
-        if (failed || gone) {
-          return (
-            <p>
-              <a href={handle.props.formHref}>Back to recommendations</a>
-            </p>
-          )
-        }
-        if (lostContact) {
-          return (
-            <p>
+        if (!failed && !gone && !lostContact) return null
+        return (
+          <p mix={css({ display: 'flex', flexWrap: 'wrap', gap: '16px' })}>
+            {lostContact ? (
               <a href="">Reload to check</a>
-            </p>
-          )
-        }
-        return null
+            ) : (
+              <a href={handle.props.formHref}>Back to recommendations</a>
+            )}
+            <a href={handle.props.homeHref}>Home</a>
+          </p>
+        )
       }
 
       function panel() {
