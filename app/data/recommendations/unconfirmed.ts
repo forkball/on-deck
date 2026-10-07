@@ -38,6 +38,8 @@ export interface UnconfirmedRunDetail {
   picks: Pick[]
   reason: string
   createdAt: number
+  // A lucky draw: one pick, shown the way a lucky run shows its pick.
+  isLucky: boolean
 }
 
 // A malformed row reads as empty rather than throwing on a page someone is already
@@ -59,6 +61,7 @@ function parse(row: UnconfirmedRun): UnconfirmedRunDetail {
     picks: parseJson<Pick[]>(row.picks, []),
     reason: row.reason,
     createdAt: Number(row.created_at),
+    isLucky: row.is_lucky === true,
   }
 }
 
@@ -70,6 +73,7 @@ export async function saveUnconfirmedRun(
     filters: RecommendationFilters
     picks: Pick[]
     reason: string
+    lucky?: boolean
   },
 ): Promise<number> {
   const row = await db.create(
@@ -81,6 +85,7 @@ export async function saveUnconfirmedRun(
       picks: JSON.stringify(input.picks),
       reason: input.reason,
       created_at: Date.now(),
+      is_lucky: input.lucky === true,
     },
     { returnRow: true },
   )

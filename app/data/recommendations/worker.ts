@@ -153,6 +153,7 @@ export function startGenerationWorker(): GenerationWorker {
               filters: job.params.filters as RecommendationFilters,
               picks,
               reason: error.message,
+              lucky: job.params.lucky === true,
             })
             await completeJob(db, job.id, { kind: 'unconfirmed', unconfirmedRunId })
             return

@@ -133,4 +133,21 @@ describe('unconfirmed runs', { skip: skipWithoutDatabase }, () => {
 
     assert.deepEqual((await getUnconfirmedRun(db, id, userId))?.picks, [])
   })
+
+  // The page lays a lucky draw out as the lucky pick, which it can only do if
+  // the row says that is what it was.
+  it('remembers whether it was a lucky draw', async () => {
+    const plain = await save(userId, ['Persuasion'])
+    const lucky = await saveUnconfirmedRun(db, {
+      userId,
+      mediaType: 'movie',
+      filters: {},
+      picks: [pick('Aftersun')],
+      reason: "the catalog isn't answering right now",
+      lucky: true,
+    })
+
+    assert.equal((await getUnconfirmedRun(db, plain, userId))?.isLucky, false)
+    assert.equal((await getUnconfirmedRun(db, lucky, userId))?.isLucky, true)
+  })
 })

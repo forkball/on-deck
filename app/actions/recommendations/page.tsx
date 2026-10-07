@@ -98,7 +98,7 @@ function UnconfirmedSection(handle: Handle<{ runs: UnconfirmedRunDetail[] }>) {
         {handle.props.runs.map((run) => (
           <li key={run.id} mix={css({ padding: '8px 0', borderBottom: '1px solid #eee' })}>
             <a href={routes.recommendations.unconfirmed.href({ unconfirmedId: String(run.id) })}>
-              {run.picks.length} {mediaTypeUiFor(run.mediaType).plural}
+              {run.isLucky ? '🎲 Lucky pick' : `${run.picks.length} ${mediaTypeUiFor(run.mediaType).plural}`}
             </a>
             <span mix={css({ color: '#888', fontSize: '13px' })}>
               {' — '}

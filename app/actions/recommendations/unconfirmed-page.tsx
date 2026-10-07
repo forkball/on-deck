@@ -6,6 +6,7 @@ import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { ModelProvided } from './model-provided.tsx'
 import { routes } from '../../routes.ts'
 import type { UnconfirmedRunDetail } from '../../data/recommendations/unconfirmed.ts'
+import { LUCKY_RUN_NAME } from '../../data/recommendations/lucky.ts'
 
 export interface UnconfirmedRunPageProps {
   run: UnconfirmedRunDetail
@@ -27,6 +28,42 @@ export function UnconfirmedRunPage(handle: Handle<UnconfirmedRunPageProps>) {
       month: 'short',
       day: 'numeric',
     })
+
+    // A lucky draw reads as the lucky pick it stands in for: the name, the date and
+    // the one pick with the model's description, laid out as a lucky run lays out
+    // its pick. Still no cover, log button or detail link — there is no catalog
+    // entry behind it, and those would imply one.
+    if (run.isLucky) {
+      const [pick] = run.picks
+      return (
+        <Page
+          heading={LUCKY_RUN_NAME}
+          back={{ href: routes.recommendations.index.href(), label: '← Recommendations' }}
+          width="wide"
+          displayName={displayName}
+        >
+          <p mix={css({ color: '#555' })}>{date}</p>
+          {pick && (
+            <div
+              mix={css({
+                marginTop: '24px',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                padding: '16px',
+              })}
+            >
+              <span mix={css({ fontWeight: 700 })}>{pick.title}</span>
+              {pick.year ? ` (${pick.year})` : ''}
+              <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: '#555' })}>
+                <ModelProvided note="Written by the model from the taste profile this run was built on — not a description from the catalogue.">
+                  {pick.reason}
+                </ModelProvided>
+              </p>
+            </div>
+          )}
+        </Page>
+      )
+    }
 
     return (
       <Page

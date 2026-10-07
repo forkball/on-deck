@@ -245,6 +245,8 @@ export const unconfirmedRuns = table({
     picks: c.text().notNull(),
     reason: c.text().notNull(),
     created_at: c.integer().notNull(),
+    // From a lucky draw — see the 20261007120000 migration.
+    is_lucky: c.boolean().notNull().default(false),
   },
 })
 
