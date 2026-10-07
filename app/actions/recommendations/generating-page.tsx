@@ -3,7 +3,6 @@ import type { Handle } from 'remix/ui'
 import { PHASE_LABELS, type GenerationPhase } from '../../data/recommendations/jobs.ts'
 import { GenerationProgress } from '../../browser/generation-progress.tsx'
 import { Page } from '../../ui/components/page.tsx'
-import { GenerationFailure } from '../../ui/shared/generation-failure.tsx'
 
 export interface GeneratingPageProps {
   jobId: string
@@ -32,26 +31,26 @@ export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
         displayName={displayName}
         head={
           // With the client entry running, this would reload the page under it.
-          <noscript>
-            <meta httpEquiv="refresh" content="3" />
-          </noscript>
+          // Not once the run has failed: there is nothing left to wait for.
+          error ? undefined : (
+            <noscript>
+              <meta httpEquiv="refresh" content="3" />
+            </noscript>
+          )
         }
       >
-        {error ? (
-          <GenerationFailure message={error} backHref={formHref} />
-        ) : (
-          <GenerationProgress
-            statusHref={statusHref}
-            formHref={formHref}
-            initialLabel={PHASE_LABELS[phase]}
-            initialPhase={phase}
-            initialStatus={status}
-            initialQueuedAhead={queuedAhead}
-            phases={phases}
-            labels={PHASE_LABELS}
-            key={jobId}
-          />
-        )}
+        <GenerationProgress
+          statusHref={statusHref}
+          formHref={formHref}
+          initialLabel={PHASE_LABELS[phase]}
+          initialPhase={phase}
+          initialStatus={status}
+          initialQueuedAhead={queuedAhead}
+          initialError={error ?? null}
+          phases={phases}
+          labels={PHASE_LABELS}
+          key={jobId}
+        />
       </Page>
     )
   }

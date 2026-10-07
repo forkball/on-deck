@@ -368,13 +368,22 @@ export async function generateRecommendations(
 
   let results: RecommendationResult[]
   let tally: PickTally | null = null
+  // Saving is only entered once there is something to save. A run that ends with
+  // nothing left fails on the check that emptied it, and the generating page marks
+  // the step it failed on — a cross on "Saving your picks" would blame the wrong one.
+  let saving = false
+  const enterSaving = (): void => {
+    if (saving) return
+    saving = true
+    enterPhase('saving')
+  }
 
   if (checkpoint.verified?.length) {
     const ids = checkpoint.verified.map((entry) => entry.mediaItemId)
     const items = await db.findMany(mediaItems, { where: inList('id', ids) })
     const itemsById = new Map(items.map((item) => [item.id, item]))
 
-    enterPhase('saving')
+    enterSaving()
     results = []
     for (const entry of checkpoint.verified) {
       const item = itemsById.get(entry.mediaItemId)
@@ -387,7 +396,7 @@ export async function generateRecommendations(
     const verified = await verifyPicksAgainstOverviews(await withOverviews(candidates, mediaType), mediaType)
     drops.unverified = candidates.length - verified.length
 
-    enterPhase('saving')
+    if (verified.length > 0) enterSaving()
     // Promise.all keeps pick order, which is the order they're ranked in.
     results = await Promise.all(
       verified.slice(0, lucky ? LUCKY_TARGET_COUNT : TARGET_COUNT).map(async ({ pick, match }) => ({
@@ -448,6 +457,8 @@ export async function generateRecommendations(
     throw new GenerationError(nothingLeftMessage(filters, mediaType))
   }
 
+  // A run of only unmatched picks reaches here without having saved anything yet.
+  enterSaving()
   const runId = await track('run.save', () =>
     saveRun(db, {
       requestingUserId,
