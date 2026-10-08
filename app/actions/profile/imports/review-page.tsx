@@ -929,16 +929,23 @@ function ReviewDrawer(
               <span class="drawer-hint">{count(quickAccepts, 'quick accept', 'quick accepts')} in here</span>
             )}
           </label>
-          {needsConfirm ? (
-            // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
-            <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
-              <span class={buttonFrameClass('primary')} mix={css({ display: 'inline-block' })}>
-                {saveLabel}
-              </span>
-            </label>
-          ) : (
-            saveForm(saveLabel)
-          )}
+          <div mix={css({ display: 'flex', alignItems: 'center', gap: '14px', flex: '0 0 auto' })}>
+            <form method="post" action={routes.profile.imports.discard.href({ batchId })}>
+              <Button type="submit" variant="link">
+                Discard
+              </Button>
+            </form>
+            {needsConfirm ? (
+              // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
+              <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
+                <span class={buttonFrameClass('primary')} mix={css({ display: 'inline-block' })}>
+                  {saveLabel}
+                </span>
+              </label>
+            ) : (
+              saveForm(saveLabel)
+            )}
+          </div>
         </div>
 
         {needsConfirm && (
@@ -1181,11 +1188,6 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   if you want your full history.
                 </p>
               )}
-              <form method="post" action={routes.profile.imports.discard.href({ batchId })} mix={css({ margin: '14px 0 18px' })}>
-                <Button type="submit" variant="link">
-                  Discard this import
-                </Button>
-              </form>
               {(model.conflicts.length > 0 || model.duplicates.length > 0) && (
                 <p mix={css({ fontSize: '13px', color: ACCENT, marginBottom: '20px' })}>
                   The decisions below would change or drop something you already have.
