@@ -101,6 +101,16 @@ export function titlesNameSameWork(a: string, b: string): boolean {
   return true
 }
 
+// What titlesNameSameWork compares: a title's distinct words, in a fixed order. Two
+// titles name the same work exactly when their keys are equal and not empty, so a
+// title checked against a long list — a person's whole log — keys the list once
+// into a Set instead of normalising every pair. Empty for a title with no words.
+export function sameWorkKey(title: string): string {
+  const normalized = normalizeTitle(title)
+  if (!normalized) return ''
+  return [...new Set(normalized.split(' '))].sort().join(' ')
+}
+
 // Whether every word of one title appears in the other. Separate from the above, and
 // never sufficient alone: "The Goldfinch" sits inside "The Goldfinch: A Novel" exactly
 // as "Dune" sits inside "Dune: House Harkonnen". Only the author separates a subtitle

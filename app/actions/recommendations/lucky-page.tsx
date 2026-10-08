@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { LuckyState } from '../../data/recommendations/lucky.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
+import { ErrorNotice, type ErrorLink } from './error-notice.tsx'
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { DrawLuckyForm } from '../../browser/draw-lucky-form.tsx'
 import type { FriendOption } from '../../browser/friend-picker.tsx'
@@ -17,8 +18,7 @@ export interface LuckyPickPageProps {
   displayName: string
   findPeopleHref: string
   error?: string
-  // See RecommendationsPageProps.errorLink.
-  errorLink?: { href: string; label: string }
+  errorLink?: ErrorLink
 }
 
 // The dedicated home for the "🎲 Draw today's pick" call to action, so it
@@ -38,25 +38,7 @@ export function LuckyPickPage(handle: Handle<LuckyPickPageProps>) {
 
         <MediaTabLinks current={mediaType} hrefFor={(type) => `${luckyPageHref}?mediaType=${type}`} />
 
-        {error && (
-          <p
-            mix={css({
-              margin: '0 0 16px',
-              padding: '12px 16px',
-              border: '1px solid #b91c1c',
-              borderRadius: '8px',
-              color: '#b91c1c',
-            })}
-          >
-            {error}
-            {errorLink && (
-              <>
-                {' '}
-                <a href={errorLink.href}>{errorLink.label}</a>
-              </>
-            )}
-          </p>
-        )}
+        {error && <ErrorNotice error={error} link={errorLink} />}
 
         {lucky.pick ? (
           <p mix={css({ margin: 0, color: '#555' })}>

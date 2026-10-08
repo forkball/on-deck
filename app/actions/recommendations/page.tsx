@@ -15,6 +15,7 @@ import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
+import { ErrorNotice, type ErrorLink } from './error-notice.tsx'
 import { RunList } from '../../ui/components/run-list.tsx'
 import type { UnconfirmedRunDetail } from '../../data/recommendations/unconfirmed.ts'
 import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, mediaTypeUiFor, type ActiveMediaType } from '../../mediaTypes.ts'
@@ -55,9 +56,7 @@ export interface RecommendationsPageProps {
   // controller — see indexPage.
   startLucky?: boolean
   error?: string
-  // A link after the error, where there is somewhere to go about it — the run
-  // already in progress, when that is why this one was refused.
-  errorLink?: { href: string; label: string }
+  errorLink?: ErrorLink
   // Set when the request matched an earlier run the user hasn't taken
   // anything from — see DuplicateNotice.
   duplicate?: {
@@ -99,7 +98,8 @@ function UnconfirmedSection(handle: Handle<{ runs: UnconfirmedRunDetail[] }>) {
       </p>
       <ul mix={css({ listStyle: 'none', margin: 0, padding: 0 })}>
         {handle.props.runs.map((run) => (
-          <li key={run.id} mix={css({ padding: '8px 0', borderBottom: '1px solid #eee' })}>
+          // Block, not list-item, so Doodle's "* " marker isn't drawn — see run-list.tsx.
+          <li key={run.id} mix={css({ display: 'block', padding: '8px 0', borderBottom: '1px solid #eee' })}>
             <a href={routes.recommendations.unconfirmed.href({ unconfirmedId: String(run.id) })}>
               {run.isLucky ? '🎲 Lucky pick' : `${run.picks.length} ${mediaTypeUiFor(run.mediaType).plural}`}
             </a>
@@ -205,25 +205,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
 
         {duplicate && <DuplicateNotice duplicate={duplicate} />}
 
-        {error && (
-          <p
-            mix={css({
-              margin: '0 0 16px',
-              padding: '12px 16px',
-              border: '1px solid #b91c1c',
-              borderRadius: '8px',
-              color: '#b91c1c',
-            })}
-          >
-            {error}
-            {errorLink && (
-              <>
-                {' '}
-                <a href={errorLink.href}>{errorLink.label}</a>
-              </>
-            )}
-          </p>
-        )}
+        {error && <ErrorNotice error={error} link={errorLink} />}
 
         <GenerateRecommendationsForm
           friends={friends.map((friend) => ({

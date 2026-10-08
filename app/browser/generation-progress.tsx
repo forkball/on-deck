@@ -68,7 +68,7 @@ export type GenerationProgressProps = {
   initialQueuedAhead: number | null
   // Queued again to wait out a catalog that wasn't answering. Its steps stay on
   // screen, since it has been through them, rather than reading as not started.
-  initialRetrying?: boolean
+  initialRetrying: boolean
   phases: string[]
   labels: Record<string, string>
   // Why the run stopped, when it had already stopped before the page loaded. Set,
@@ -82,13 +82,14 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
     let phase = handle.props.initialPhase
     let queueState = handle.props.initialStatus
     let ahead: number | null = handle.props.initialQueuedAhead
-    let retrying = handle.props.initialRetrying === true
-    // The run failed, in the run's own words. Marks the step it stopped on.
-    let failed: string | null = handle.props.initialError ?? null
-    // The poll lost track of the run, which may well still be going. Said above
-    // the steps, which stay as they were last seen rather than marked failed.
-    let gone: string | null = null
-    let lostContact = false
+    let retrying = handle.props.initialRetrying
+    // Why this page stopped following the run, or null while it still is. Only a
+    // run that `failed` gets its step crossed out: a run that went missing, or that
+    // the page lost contact with, may well still be going, so its steps stay as last
+    // seen. `reload` is the way on for the lost-contact case.
+    let stopped: { message: string; failed: boolean; reload: boolean } | null = handle.props.initialError
+      ? { message: handle.props.initialError, failed: true, reload: false }
+      : null
 
     // handle.update() returns a promise that rejects when there's no renderer to
     // schedule against, and called bare from the loop below that rejection has
@@ -113,7 +114,11 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
           })
 
           if (response.status === 404) {
-            gone = 'This run is no longer available. It may have finished a while ago.'
+            stopped = {
+              message: 'This run is no longer available. It may have finished a while ago.',
+              failed: false,
+              reload: false,
+            }
             render()
             return
           }
@@ -137,7 +142,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
           if (status.error) {
             // The stage it stopped on, so the cross lands on the right step.
             phase = status.phase
-            failed = status.error
+            stopped = { message: status.error, failed: true, reload: false }
             render()
             return
           }
@@ -168,7 +173,11 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
     }
 
     function giveUp() {
-      lostContact = true
+      stopped = {
+        message: 'Lost contact with the server. Your picks are probably still being put together.',
+        failed: false,
+        reload: true,
+      }
       render()
     }
 
@@ -179,15 +188,9 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       // which stay on screen so it is clear how far the run got. The message is
       // written where the failure happened and already says what to do about it.
       function notice() {
-        const message =
-          failed ??
-          gone ??
-          (lostContact
-            ? 'Lost contact with the server. Your picks are probably still being put together.'
-            : null)
-        if (message) return <p mix={css({ color: '#b91c1c' })}>{message}</p>
+        if (stopped) return <p mix={css({ color: '#b91c1c' })}>{stopped.message}</p>
         // Not an error, so not in red: the run is fine and will carry on by itself.
-        if (retrying && queueState === 'queued') {
+        if (retrying) {
           return <p mix={css({ color: '#555' })}>The catalog isn't answering — trying again in a minute.</p>
         }
         return null
@@ -196,10 +199,10 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       // The way on, under the steps: back to the form for a run that is over, a
       // reload for one this page has only lost track of.
       function nextStep() {
-        if (!failed && !gone && !lostContact) return null
+        if (!stopped) return null
         return (
           <p mix={css({ display: 'flex', flexWrap: 'wrap', gap: '16px' })}>
-            {lostContact ? (
+            {stopped.reload ? (
               <a href="">Reload to check</a>
             ) : (
               <a href={handle.props.formHref}>Back to recommendations</a>
@@ -210,7 +213,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       }
 
       function panel() {
-        if (queueState === 'queued' && !failed && !retrying) {
+        if (queueState === 'queued' && !stopped?.failed && !retrying) {
           return (
             <p mix={css({ color: '#555' })}>
               Waiting to start
@@ -227,7 +230,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             {phases.map((step, index) => {
               const done = index < current
               const active = index === current
-              const stoppedHere = active && failed != null
+              const stoppedHere = active && stopped?.failed === true
 
               return (
                 <li
@@ -265,7 +268,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             css({ display: 'contents' }),
             // A run that had already failed when the page loaded has nothing to poll for.
             ref((_node, signal) => {
-              if (!failed) void poll(signal)
+              if (!stopped) void poll(signal)
             }),
           ]}
         >

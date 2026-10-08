@@ -4,14 +4,7 @@ import { css } from 'remix/ui'
 import type { MediaType } from '../../data/mediaItems.ts'
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { ModelProvided } from './model-provided.tsx'
-
-// What a pick the catalog couldn't place carries: only what the model said.
-export interface UnconfirmedPickFields {
-  title: string
-  year: number | null
-  creator?: string
-  reason: string
-}
+import type { UnmatchedPick } from '../../data/recommendations/unmatched.ts'
 
 const REASON_NOTE =
   'Written by the model from the taste profile this run was built on. The catalog has no entry we could match, so nothing has checked it.'
@@ -24,7 +17,7 @@ const REASON_NOTE =
 // The confirmed pick's card with what can't be honest here taken out: no cover, no
 // log button, no detail link, since each would imply a catalog entry. A search of
 // the catalog stands in for them, for someone who wants to look it up themselves.
-export function UnconfirmedPick(handle: Handle<{ pick: UnconfirmedPickFields; mediaType: MediaType }>) {
+export function UnconfirmedPick(handle: Handle<{ pick: UnmatchedPick; mediaType: MediaType }>) {
   return () => {
     const { pick, mediaType } = handle.props
     const ui = mediaTypeUiFor(mediaType)
@@ -53,9 +46,7 @@ export function UnconfirmedPick(handle: Handle<{ pick: UnconfirmedPickFields; me
 }
 
 // A stack of them, spaced as a run's confirmed picks are.
-export function UnconfirmedPickList(
-  handle: Handle<{ picks: UnconfirmedPickFields[]; mediaType: MediaType }>,
-) {
+export function UnconfirmedPickList(handle: Handle<{ picks: UnmatchedPick[]; mediaType: MediaType }>) {
   return () => {
     const { picks, mediaType } = handle.props
     return (

@@ -77,8 +77,7 @@ function parsePhases(raw: string): GenerationPhase[] {
   return phases.length > 0 ? phases : PHASE_ORDER
 }
 
-// A row whose params don't parse reads as an ordinary run: the worker refuses
-// it anyway, and the only thing this decides is where a back link points.
+// Unparseable params read as an ordinary run; the worker refuses those anyway.
 function isLuckyParams(raw: string): boolean {
   try {
     return (JSON.parse(raw) as Partial<JobParams>).lucky === true

@@ -13,26 +13,19 @@ export interface UnconfirmedRunPageProps {
   displayName: string
 }
 
-// What the model said when the catalog couldn't be reached.
-//
-// Deliberately not the recommendation card: no cover, no log button, no link
-// through to a detail page, because there is no catalog entry behind any of this
-// and every one of those controls would imply there was. A title, a year and the
-// reason it was picked is the whole of what we actually have.
+// What the model said when the catalog couldn't be reached. The picks are drawn as
+// UnconfirmedPick, which says why they carry no cover, log button or detail link.
 export function UnconfirmedRunPage(handle: Handle<UnconfirmedRunPageProps>) {
   return () => {
     const { run, displayName } = handle.props
-    const noun = mediaTypeUiFor(run.mediaType).plural
     const date = new Date(run.createdAt).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     })
 
-    // A lucky draw reads as the lucky pick it stands in for: the name, the date and
-    // the one pick with the model's description, laid out as a lucky run lays out
-    // its pick. Still no cover, log button or detail link — there is no catalog
-    // entry behind it, and those would imply one.
+    // A lucky draw reads as the lucky pick it stands in for: its name, the date and
+    // the one pick.
     if (run.isLucky) {
       const [pick] = run.picks
       return (
@@ -56,6 +49,7 @@ export function UnconfirmedRunPage(handle: Handle<UnconfirmedRunPageProps>) {
       )
     }
 
+    const noun = mediaTypeUiFor(run.mediaType).plural
     return (
       <Page
         title={`Unconfirmed ${noun}`}

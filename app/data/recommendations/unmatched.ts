@@ -1,4 +1,4 @@
-import { titlesNameSameWork } from '../titles.ts'
+import { sameWorkKey } from '../titles.ts'
 import type { ExcludedTitles, Pick } from './picks.ts'
 
 // Type-only imports beyond titles.ts, deliberately: this is the rule for which of
@@ -41,23 +41,31 @@ export interface SelectUnmatchedInput {
   slots: number
 }
 
+// The run's exclusion list as a check on a title. Without a catalog id, the title is
+// the only thing a pick can be ruled out by — this and picksToKeepUnconfirmed both
+// rest on it.
+export function excludedByTitle(excluded: ExcludedTitles): (title: string) => boolean {
+  const keys = new Set([...excluded.seen, ...excluded.rejected].map(sameWorkKey))
+  keys.delete('')
+  return (title) => keys.has(sameWorkKey(title))
+}
+
 export function selectUnmatchedPicks(input: SelectUnmatchedInput): UnmatchedPick[] {
   const { candidates, excluded, shownTitles, takenSeries, slots } = input
   if (slots <= 0) return []
 
-  const ruledOut = [...excluded.seen, ...excluded.rejected]
-  const titles = [...shownTitles]
+  const ruledOut = excludedByTitle(excluded)
+  const shown = new Set(shownTitles.map(sameWorkKey))
   const series = new Set(takenSeries)
   const kept: UnmatchedPick[] = []
 
   for (const { pick, seriesKey } of candidates) {
     if (kept.length >= slots) break
-    if (!pick.title.trim()) continue
-    if (ruledOut.some((title) => titlesNameSameWork(pick.title, title))) continue
-    if (titles.some((title) => titlesNameSameWork(pick.title, title))) continue
+    const key = sameWorkKey(pick.title)
+    if (!key || ruledOut(pick.title) || shown.has(key)) continue
     if (seriesKey && series.has(seriesKey)) continue
 
-    titles.push(pick.title)
+    shown.add(key)
     if (seriesKey) series.add(seriesKey)
     kept.push({
       title: pick.title,

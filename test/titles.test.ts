@@ -7,6 +7,7 @@ import {
   normalizeTitle,
   withoutSubtitle,
   titleWordsFitInside,
+  sameWorkKey,
   titlesNameSameWork,
 } from '../app/data/titles.ts'
 
@@ -152,5 +153,27 @@ describe('accents', () => {
   it('leaves the ampersand and the punctuation rules alone', () => {
     assert.equal(normalizeTitle('Fire & Blood'), normalizeTitle('Fire and Blood'))
     assert.equal(normalizeTitle('Spider-Man'), normalizeTitle('Spiderman'))
+  })
+})
+
+// The key has to say "same work" exactly when titlesNameSameWork does, since lists
+// checked by key stand in for comparing every pair.
+describe('sameWorkKey', () => {
+  const pairs: [string, string][] = [
+    ['House Corrino: Dune', 'Dune: House Corrino'],
+    ['Twelfth Night, or What You Will', 'Twelfth Night: Or, What You Will'],
+    ['Fire & Blood', 'Fire and Blood'],
+    ['Dune', 'Dune: House Corrino'],
+    ['Brontë', 'Bronte'],
+    ['The The', 'The'],
+    ['', ''],
+    ['!!!', '???'],
+  ]
+
+  it('agrees with titlesNameSameWork', () => {
+    for (const [a, b] of pairs) {
+      const byKey = sameWorkKey(a) !== '' && sameWorkKey(a) === sameWorkKey(b)
+      assert.equal(byKey, titlesNameSameWork(a, b), `${a} / ${b}`)
+    }
   })
 })

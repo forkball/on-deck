@@ -15,11 +15,11 @@ import {
 } from './jobs.ts'
 import { CatalogUnavailableError, GenerationError } from './errors.ts'
 import { generateRecommendations, type GenerationCheckpoint } from './generate.ts'
-import { listUserMediaLog, type MediaType } from '../mediaItems.ts'
-import { buildExclusions } from './exclusions.ts'
-import type { ExcludedTitles, RecommendationFilters } from './picks.ts'
+import { CIRCUIT_COOLDOWN_MS } from '../catalog/googleBooks.ts'
+import type { MediaType } from '../mediaItems.ts'
+import type { RecommendationFilters } from './picks.ts'
 import { saveRunTimings } from './runs.ts'
-import { picksToKeepUnconfirmed, saveUnconfirmedRun } from './unconfirmed.ts'
+import { saveUnconfirmedRun } from './unconfirmed.ts'
 import { startTimings, summarizeTimings, type RunTimings } from './timings.ts'
 import { logger, withLogContext } from '../../log.ts'
 
@@ -33,29 +33,13 @@ const DEFAULT_SLOTS = 2
 
 const IDLE_POLL_MS = 2000
 
-// How long a run waits before retrying a catalog that wasn't answering. Google
-// Books' circuit stays open for a minute after it trips, so a retry any sooner is
-// refused by the same circuit and spends an attempt on nothing.
-const CATALOG_RETRY_DELAY_MS = 60_000
+// A retry any sooner than the circuit's cooldown is refused by the same open circuit.
+const CATALOG_RETRY_DELAY_MS = CIRCUIT_COOLDOWN_MS
 
 // Derived rather than picked, so lowering the staleness window can't quietly
 // leave the heartbeat too slow to keep up with it. Several beats per window,
 // since a claim only needs one of them to have landed.
 const HEARTBEAT_MS = Math.floor(CLAIM_STALE_MS / 6)
-
-// The run's exclusion list, rebuilt from the members' logs. Same rule a run that
-// reached the catalog uses — the lucky draw's stricter one, or the group's
-// seen-by setting — so an unconfirmed run excludes exactly what a real one would.
-async function excludedTitlesFor(job: ClaimedJob): Promise<ExcludedTitles> {
-  const { memberIds, mediaType, filters, lucky } = job.params
-  const logs = await Promise.all(
-    memberIds.map((memberId) => listUserMediaLog(db, memberId, { type: mediaType as MediaType })),
-  )
-  return buildExclusions(logs, {
-    lucky: lucky === true,
-    seenBy: (filters as RecommendationFilters).seenBy,
-  }).titles
-}
 
 function slotCount(): number {
   const configured = Number(process.env.WORKER_SLOTS)
@@ -92,11 +76,6 @@ export function startGenerationWorker(): GenerationWorker {
       void touchJobClaim(db, job.id).catch(() => {})
     }, HEARTBEAT_MS)
 
-    // The picks as of the last checkpoint. Held here because the catch below needs
-    // them: a run the catalog killed still has the model's answer in hand, and the
-    // claimed job's copy is whatever a previous attempt left behind.
-    let latest = (job.checkpoint ?? {}) as GenerationCheckpoint
-
     try {
       const { memberIds, mediaType, filters, sourceTypes, name, lucky } = job.params
 
@@ -117,10 +96,7 @@ export function startGenerationWorker(): GenerationWorker {
           name,
           (phase) => void setPhase(db, job.id, phase).catch(() => {}),
           job.checkpoint as GenerationCheckpoint,
-          (checkpoint) => {
-            latest = checkpoint
-            void saveCheckpoint(db, job.id, checkpoint).catch(() => {})
-          },
+          (checkpoint) => void saveCheckpoint(db, job.id, checkpoint).catch(() => {}),
           { lucky: lucky === true, jobId: job.id },
         ),
       )
@@ -143,27 +119,20 @@ export function startGenerationWorker(): GenerationWorker {
         return
       }
 
-      if (error instanceof CatalogUnavailableError && latest.picks?.length) {
+      // `keep` is empty when every pick was already logged: nothing worth a page,
+      // and the catalog being down is still what the failure below says.
+      if (error instanceof CatalogUnavailableError && error.keep?.length) {
         try {
-          const picks = picksToKeepUnconfirmed(latest.picks, {
+          const unconfirmedRunId = await saveUnconfirmedRun(db, {
+            userId: job.userId,
+            mediaType: job.params.mediaType as MediaType,
+            filters: job.params.filters as RecommendationFilters,
+            picks: error.keep,
+            reason: error.message,
             lucky: job.params.lucky === true,
-            excluded: await excludedTitlesFor(job),
           })
-          // Every pick already logged leaves nothing worth a page. The catalog
-          // being down is still the reason, and still what the failure below says.
-          if (picks.length > 0) {
-            const unconfirmedRunId = await saveUnconfirmedRun(db, {
-              userId: job.userId,
-              mediaType: job.params.mediaType as MediaType,
-              filters: job.params.filters as RecommendationFilters,
-              picks,
-              reason: error.message,
-              lucky: job.params.lucky === true,
-            })
-            await completeJob(db, job.id, { kind: 'unconfirmed', unconfirmedRunId })
-            return
-          }
-          log.warn('every unconfirmed pick was already logged')
+          await completeJob(db, job.id, { kind: 'unconfirmed', unconfirmedRunId })
+          return
         } catch (saveError) {
           // Falls through to the ordinary failure below: someone waiting on a run
           // that couldn't be salvaged should be told the catalog is down, not that

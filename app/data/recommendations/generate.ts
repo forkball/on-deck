@@ -10,7 +10,7 @@ import { createNotification } from '../notifications.ts'
 import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
 import { recordRunAgainstDailyLimit, runCostFor } from './dailyLimit.ts'
-import { GenerationError } from './errors.ts'
+import { CatalogUnavailableError, GenerationError } from './errors.ts'
 import { buildExclusions } from './exclusions.ts'
 import { phasesFor, type GenerationPhase } from './jobs.ts'
 import {
@@ -49,6 +49,7 @@ import { emptyDrops, logPickTally, type PickTally } from './tally.ts'
 import { finishTranscript, startTranscript } from './transcripts.ts'
 import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
+import { picksToKeepUnconfirmed } from './unconfirmed.ts'
 import { selectUnmatchedPicks, type UnmatchedCandidate } from './unmatched.ts'
 import { logger } from '../../log.ts'
 
@@ -56,7 +57,8 @@ const log = logger('generation')
 
 // Which levers a run was narrowed by, in the words the form used for them, so the
 // advice names the thing there is a control for.
-const FILTER_LABELS: [keyof RecommendationFilters, string][] = [
+// Exported for the run page, which names the same levers in the same words.
+export const FILTER_LABELS: [keyof RecommendationFilters, string][] = [
   ['genre', 'genre'],
   ['decade', 'decade'],
   ['length', 'length'],
@@ -77,11 +79,18 @@ export function nothingLeftMessage(filters: RecommendationFilters, mediaType: Me
     return `Nothing came back that we could confirm this time. Try generating again.`
   }
 
-  const list = set.length === 1 ? set[0] : `${set.slice(0, -1).join(', ')} and ${set[set.length - 1]}`
   return (
-    `No ${noun} made it through the ${list} ${set.length === 1 ? 'filter' : 'filters'}. ` +
+    `No ${noun} made it through the ${joinWithAnd(set)} ${set.length === 1 ? 'filter' : 'filters'}. ` +
     `Try widening ${set.length === 1 ? 'it' : 'them'} and generating again.`
   )
+}
+
+// "genre", "genre and decade", "genre, decade and length" — no serial comma, as the
+// rest of the copy is written.
+export function joinWithAnd(items: string[]): string {
+  return items.length <= 1
+    ? items.join('')
+    : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
 }
 
 // Exported so the page can say how many a run comes back with rather than
@@ -178,7 +187,12 @@ export async function generateRecommendations(
 
   // Both announcements go through here, or a new stage gets measured as part of
   // the last one that forgot to close.
+  // Entering the phase already current is a no-op, so a stage can be entered from
+  // more than one place without being measured or announced twice.
+  let currentPhase: GenerationPhase | null = null
   const enterPhase = (phase: GenerationPhase): void => {
+    if (phase === currentPhase) return
+    currentPhase = phase
     markPhase(phase)
     onPhase(phase)
   }
@@ -258,10 +272,21 @@ export async function generateRecommendations(
     onCheckpoint(checkpoint)
   }
 
+  // The stages that can find the catalog down. Which picks are worth keeping if
+  // they do is decided here, where the exclusions already are — see the worker,
+  // which keeps them as an unconfirmed run.
+  const keepingPicksIfDown = <T>(stage: Promise<T>): Promise<T> =>
+    stage.catch((error: unknown) => {
+      if (error instanceof CatalogUnavailableError) {
+        error.keep = picksToKeepUnconfirmed(picks, { lucky, excluded })
+      }
+      throw error
+    })
+
   enterPhase('matching')
   const fromCatalog = await resolveFromCatalog(mediaType, picks)
 
-  const matchesByPick = await searchForPicks(mediaType, picks, fromCatalog)
+  const matchesByPick = await keepingPicksIfDown(searchForPicks(mediaType, picks, fromCatalog))
 
   // Not capped at TARGET_COUNT: verification below drops some too, so the
   // over-request slack has to reach it.
@@ -355,35 +380,26 @@ export async function generateRecommendations(
     // The same function the job's phase list was built from, so a stage entered
     // here is a stage that list holds.
     if (phasesFor({ mediaType, filters }).includes('genres')) enterPhase('genres')
-    const inGenre = await filterByGenre(candidates, mediaType, filters.genre)
+    const inGenre = await keepingPicksIfDown(filterByGenre(candidates, mediaType, filters.genre))
     drops.genre = candidates.length - inGenre.length
     candidates = inGenre
   }
   if (filters.length) {
     enterPhase('lengths')
-    const atLength = await filterByLength(candidates, mediaType, filters.length)
+    const atLength = await keepingPicksIfDown(filterByLength(candidates, mediaType, filters.length))
     drops.length = candidates.length - atLength.length
     candidates = atLength
   }
 
   let results: RecommendationResult[]
   let tally: PickTally | null = null
-  // Saving is only entered once there is something to save. A run that ends with
-  // nothing left fails on the check that emptied it, and the generating page marks
-  // the step it failed on — a cross on "Saving your picks" would blame the wrong one.
-  let saving = false
-  const enterSaving = (): void => {
-    if (saving) return
-    saving = true
-    enterPhase('saving')
-  }
 
   if (checkpoint.verified?.length) {
     const ids = checkpoint.verified.map((entry) => entry.mediaItemId)
     const items = await db.findMany(mediaItems, { where: inList('id', ids) })
     const itemsById = new Map(items.map((item) => [item.id, item]))
 
-    enterSaving()
+    enterPhase('saving')
     results = []
     for (const entry of checkpoint.verified) {
       const item = itemsById.get(entry.mediaItemId)
@@ -396,7 +412,9 @@ export async function generateRecommendations(
     const verified = await verifyPicksAgainstOverviews(await withOverviews(candidates, mediaType), mediaType)
     drops.unverified = candidates.length - verified.length
 
-    if (verified.length > 0) enterSaving()
+    // Only once there is something to save: a run that ends with nothing left
+    // fails on the check that emptied it, which is the step the page crosses out.
+    if (verified.length > 0) enterPhase('saving')
     // Promise.all keeps pick order, which is the order they're ranked in.
     results = await Promise.all(
       verified.slice(0, lucky ? LUCKY_TARGET_COUNT : TARGET_COUNT).map(async ({ pick, match }) => ({
@@ -457,8 +475,8 @@ export async function generateRecommendations(
     throw new GenerationError(nothingLeftMessage(filters, mediaType))
   }
 
-  // A run of only unmatched picks reaches here without having saved anything yet.
-  enterSaving()
+  // A run of only unmatched picks reaches here without having entered it yet.
+  enterPhase('saving')
   const runId = await track('run.save', () =>
     saveRun(db, {
       requestingUserId,

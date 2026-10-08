@@ -36,6 +36,7 @@ import { LUCKY_PAGE_ORIGIN } from '../../browser/draw-lucky-form.tsx'
 import { GeneratingPage } from './generating-page.tsx'
 import { getUnconfirmedRun, listUnconfirmedRuns } from '../../data/recommendations/unconfirmed.ts'
 import { UnconfirmedRunPage } from './unconfirmed-page.tsx'
+import type { ErrorLink } from './error-notice.tsx'
 import { LuckyPickPage, type LuckyPickPageProps } from './lucky-page.tsx'
 import { RecommendationsPage, type RecommendationsPageProps } from './page.tsx'
 import { RecommendationRunPage } from './run-page.tsx'
@@ -138,7 +139,7 @@ const NO_FRIENDS_PICKED_ERROR = 'Tick at least one friend, or switch to "Just me
 // while it is still there to point at.
 const RUN_IN_PROGRESS_ERROR = 'You already have a run in progress — give that one a moment to finish first.'
 
-function runInProgressLink(activeJobId: string | null): RecommendationsPageProps['errorLink'] {
+function runInProgressLink(activeJobId: string | null): ErrorLink | undefined {
   if (activeJobId == null) return undefined
   return { href: routes.recommendations.generating.href({ jobId: activeJobId }), label: 'See its progress' }
 }
@@ -394,11 +395,7 @@ export default createController(routes.recommendations, {
       const db = context.get(Database)
       const formData = context.get(FormData)
       const fromLuckyPage = formData.get('origin') === LUCKY_PAGE_ORIGIN
-      const renderFailure = (
-        mediaType: ActiveMediaType,
-        error: string,
-        errorLink?: RecommendationsPageProps['errorLink'],
-      ) =>
+      const renderFailure = (mediaType: ActiveMediaType, error: string, errorLink?: ErrorLink) =>
         fromLuckyPage
           ? luckyDrawPage(db, auth.identity, mediaType, { error, errorLink })
           : indexPage(db, auth.identity, mediaType, { error, errorLink })

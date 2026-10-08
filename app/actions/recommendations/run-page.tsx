@@ -2,7 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { GenerationParams, RecommendationRunDetail } from '../../data/recommendations/runs.ts'
-import type { UnmatchedPick } from '../../data/recommendations/unmatched.ts'
+import { FILTER_LABELS, joinWithAnd } from '../../data/recommendations/generate.ts'
 import type { MediaType } from '../../data/mediaItems.ts'
 import { Toast } from '../../ui/components/toast.tsx'
 import { routes } from '../../routes.ts'
@@ -109,36 +109,25 @@ export function describeParams(params: GenerationParams, mediaType: MediaType): 
   return lines
 }
 
-// The levers that need a catalog record to answer, by the name the summary line
-// gives them. Decade and series are absent: an unmatched pick answers those itself,
-// and generate.ts applied them to it.
+// The levers only a catalog record can answer. An unmatched pick answers decade
+// and series itself, and generate.ts applied those to it.
+const CATALOG_LEVERS = new Set(['genre', 'length', 'playerType', 'multiplayerType', 'platform'])
+
 function uncheckedLevers(params: GenerationParams): string[] {
-  const levers: string[] = []
-  if (params.genre) levers.push('genre')
-  if (params.length) levers.push('length')
-  if (params.playerType) levers.push('player type')
-  if (params.multiplayerType) levers.push('multiplayer type')
-  if (params.platform) levers.push('platform')
-  return levers
+  return FILTER_LABELS.filter(
+    ([key]) => CATALOG_LEVERS.has(key) && params[key as keyof GenerationParams] != null,
+  ).map(([, label]) => label)
 }
 
 // The model's picks no catalog entry was found for, below the ones that were.
-//
-// Deliberately not the recommendation card, for the reason the unconfirmed page
-// gives: no cover, no log button, no detail link, because there is no catalog entry
-// behind any of these and each of those controls would imply there was. What it has
-// instead is a way to look for one.
-function UnmatchedSection(
-  handle: Handle<{ picks: UnmatchedPick[]; run: RecommendationRunDetail; alone: boolean }>,
-) {
+function UnmatchedSection(handle: Handle<{ run: RecommendationRunDetail }>) {
   return () => {
-    const { picks, run, alone } = handle.props
+    const { run } = handle.props
+    const picks = run.unmatched
+    const alone = run.results.length === 0
+    const one = picks.length === 1
     const ui = mediaTypeUiFor(run.mediaType)
     const levers = uncheckedLevers(run.params)
-    const leverList =
-      levers.length <= 1
-        ? levers.join('')
-        : `${levers.slice(0, -1).join(', ')} and ${levers[levers.length - 1]}`
 
     return (
       <section mix={css({ marginTop: alone ? '24px' : '40px' })}>
@@ -146,11 +135,11 @@ function UnmatchedSection(
           {alone ? 'Suggested' : 'Also suggested'}, but not found in {ui.catalogName}
         </h2>
         <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
-          The model picked {picks.length === 1 ? 'this' : 'these'}, but {ui.catalogName} has no entry we could
-          match, so nothing has checked that {picks.length === 1 ? 'it exists' : 'they exist'} or that the
-          details are right. {picks.length === 1 ? 'It' : 'They'} can't be logged from here.
+          The model picked {one ? 'this' : 'these'}, but {ui.catalogName} has no entry we could match, so
+          nothing has checked that {one ? 'it exists' : 'they exist'} or that the details are right.{' '}
+          {one ? 'It' : 'They'} can't be logged from here.
           {levers.length > 0 &&
-            ` Your ${leverList} ${levers.length === 1 ? 'filter' : 'filters'} couldn't be checked for ${picks.length === 1 ? 'it' : 'them'} either.`}
+            ` Your ${joinWithAnd(levers)} ${levers.length === 1 ? 'filter' : 'filters'} couldn't be checked for ${one ? 'it' : 'them'} either.`}
         </p>
         <UnconfirmedPickList picks={picks} mediaType={run.mediaType} />
       </section>
@@ -345,9 +334,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
           </ul>
         )}
 
-        {run.unmatched.length > 0 && (
-          <UnmatchedSection picks={run.unmatched} run={run} alone={run.results.length === 0} />
-        )}
+        {run.unmatched.length > 0 && <UnmatchedSection run={run} />}
       </Page>
     )
   }
