@@ -1181,6 +1181,11 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   if you want your full history.
                 </p>
               )}
+              <form method="post" action={routes.profile.imports.discard.href({ batchId })}>
+                <Button type="submit" variant="link">
+                  Discard this import
+                </Button>
+              </form>
               {(model.conflicts.length > 0 || model.duplicates.length > 0) && (
                 <p mix={css({ fontSize: '13px', color: ACCENT, marginBottom: '20px' })}>
                   The decisions below would change or drop something you already have.

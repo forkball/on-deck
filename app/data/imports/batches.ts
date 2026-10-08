@@ -538,6 +538,16 @@ export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult>
   return { saved: writable.length, unchanged: model.counts.unchanged, leftOut: model.counts.leftOut }
 }
 
+// Throws an unsaved import away: the batch and, by cascade, its rows. Staging is
+// all there is to lose — nothing reaches the log until saveBatch — so this never
+// touches a logged interaction. A batch that is saving or done is refused: the
+// first is mid-write, the second is the record that the import happened.
+export async function discardBatch(db: Db, batch: ImportBatch): Promise<boolean> {
+  if (batch.status === 'saving' || batch.status === 'done') return false
+  await db.delete(importBatches, batch.id)
+  return true
+}
+
 // Everything the person could still come back to, newest first.
 export async function listBatches(db: Db, userId: number, limit = 10): Promise<ImportBatch[]> {
   return db.findMany(importBatches, {

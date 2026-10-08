@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { ImportProgress } from '../../../browser/import-progress.tsx'
+import { Button } from '../../../ui/shared/form-controls.tsx'
 import { Page } from '../../../ui/components/page.tsx'
 
 export interface ImportMatchingPageProps {
@@ -12,11 +13,12 @@ export interface ImportMatchingPageProps {
   error?: string
   progressHref: string
   reviewHref: string
+  discardHref: string
 }
 
 export function ImportMatchingPage(handle: Handle<ImportMatchingPageProps>) {
   return () => {
-    const { displayName, total, matched, failed, error, progressHref, reviewHref } = handle.props
+    const { displayName, total, matched, failed, error, progressHref, reviewHref, discardHref } = handle.props
     const percent = total === 0 ? 0 : Math.min(100, Math.round((matched / total) * 100))
 
     return (
@@ -81,6 +83,11 @@ export function ImportMatchingPage(handle: Handle<ImportMatchingPageProps>) {
             />
           </>
         )}
+        <form method="post" action={discardHref}>
+          <Button type="submit" variant="link">
+            Discard this import
+          </Button>
+        </form>
       </Page>
     )
   }

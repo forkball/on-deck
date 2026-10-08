@@ -7,6 +7,7 @@ import { getCatalogProvider, type CatalogSearchResult } from '../../../data/cata
 import {
   acceptBulk,
   confirmRow,
+  discardBatch,
   keepRow,
   loadBatch,
   loadReview,
@@ -25,6 +26,7 @@ import type { ImportBatch, User } from '../../../data/schema.ts'
 import { displayLabel } from '../../../data/users.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import type { ImportBatchContext, ImportRowContext } from '../../../middleware/context.ts'
+import { mediaTypeUiFor } from '../../../mediaTypes.ts'
 import { routes } from '../../../routes.ts'
 import { ImportMatchingPage } from './matching-page.tsx'
 import { ImportReviewPage } from './review-page.tsx'
@@ -92,6 +94,7 @@ export default createController(routes.profile.imports, {
           failed={batch.status === 'failed'}
           error={batch.error ?? undefined}
           progressHref={routes.profile.imports.progress.href({ batchId: batch.id })}
+          discardHref={routes.profile.imports.discard.href({ batchId: batch.id })}
           reviewHref={`${routes.profile.imports.review.href({ batchId: batch.id })}${partial}`}
         />,
       )
@@ -264,6 +267,18 @@ export default createController(routes.profile.imports, {
 
       await saveBatch(context.get(Database), batch)
       return backToReview(batch)
+    },
+
+    // Abandons an import that isn't saved yet, from either the wait or the
+    // review, and lands back on the upload page for its media type.
+    async discard(context: ImportBatchContext) {
+      const found = await findBatch(context)
+      if (!found.ok) return found.response
+      const { batch } = found
+
+      if (!(await discardBatch(context.get(Database), batch))) return backToReview(batch)
+
+      return redirect(mediaTypeUiFor(batch.media_type as MediaType).hrefs.import(), 303)
     },
   },
 })
