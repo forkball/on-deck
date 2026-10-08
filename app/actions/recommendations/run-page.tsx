@@ -16,6 +16,7 @@ import { StarRatingInput } from '../../ui/components/star-rating.tsx'
 import { StatusSelect } from '../../ui/components/status-select.tsx'
 import { decadeComesFromPick, genreMissNeedsLookup } from '../../data/recommendations/matching.ts'
 import { ModelProvided } from './model-provided.tsx'
+import { UnconfirmedPickList } from './unconfirmed-pick.tsx'
 import { PlatformList } from '../../ui/components/platform-list.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { getCatalogProvider } from '../../data/catalog/provider.ts'
@@ -121,9 +122,6 @@ function uncheckedLevers(params: GenerationParams): string[] {
   return levers
 }
 
-const UNMATCHED_REASON_NOTE =
-  'Written by the model from the taste profile this run was built on. The catalog has no entry we could match, so nothing has checked it.'
-
 // The model's picks no catalog entry was found for, below the ones that were.
 //
 // Deliberately not the recommendation card, for the reason the unconfirmed page
@@ -154,36 +152,7 @@ function UnmatchedSection(
           {levers.length > 0 &&
             ` Your ${leverList} ${levers.length === 1 ? 'filter' : 'filters'} couldn't be checked for ${picks.length === 1 ? 'it' : 'them'} either.`}
         </p>
-        <ol
-          mix={css({
-            margin: 0,
-            padding: '0 0 0 20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-          })}
-        >
-          {picks.map((pick) => (
-            <li key={`${pick.title}-${pick.year}`}>
-              <span mix={css({ fontWeight: 700 })}>{pick.title}</span>
-              {pick.year ? ` (${pick.year})` : ''}
-              {pick.creator && <span mix={css({ color: '#555' })}> — {pick.creator}</span>}
-              <p mix={css({ margin: '4px 0 0', fontStyle: 'italic', color: '#555' })}>
-                <ModelProvided note={UNMATCHED_REASON_NOTE}>{pick.reason}</ModelProvided>
-              </p>
-              <p mix={css({ margin: '4px 0 0', fontSize: '13px' })}>
-                <a
-                  href={ui.catalogSearchUrl(pick.title, pick.year)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="tap-area"
-                >
-                  Search {ui.catalogName}
-                </a>
-              </p>
-            </li>
-          ))}
-        </ol>
+        <UnconfirmedPickList picks={picks} mediaType={run.mediaType} />
       </section>
     )
   }
