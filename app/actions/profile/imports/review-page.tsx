@@ -936,8 +936,8 @@ function ReviewDrawer(
               label="Discard"
               cancelLabel="Keep reviewing"
             >
-              The matches and answers you've made here are thrown away. Nothing has been added to your log, and
-              you can upload the file again.
+              The matches and answers you've made here are thrown away. Nothing has been added to your log,
+              and you can upload the file again.
             </DiscardImport>
             {needsConfirm ? (
               // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
