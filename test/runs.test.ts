@@ -166,4 +166,23 @@ describe('recommendation run listings', { skip: skipWithoutDatabase }, () => {
     await pool.query('delete from recommendation_runs where user_id = $1', [outsider])
     await pool.query('delete from users where id = $1', [outsider])
   })
+
+  // A run can now be nothing but these, so the round trip is what the page rests on.
+  it("keeps the picks the catalog couldn't place, and reads none on a run without them", async () => {
+    const unmatched = [
+      { title: 'Engine Summer', year: 1979, creator: 'John Crowley', reason: 'Quiet and strange.' },
+    ]
+    const runId = await saveRun(db, {
+      requestingUserId: viewer,
+      memberUserIds: [viewer],
+      mediaType: 'game',
+      params: { sourceTypes: ['game'] },
+      results: [],
+      unmatched,
+    })
+    assert.deepEqual((await getRecommendationRun(db, runId, viewer))?.unmatched, unmatched)
+
+    const [plain] = await listRecommendationRuns(db, viewer, 'movie')
+    assert.deepEqual((await getRecommendationRun(db, plain.id, viewer))?.unmatched, [])
+  })
 })

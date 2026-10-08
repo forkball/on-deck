@@ -132,7 +132,10 @@ function requireApiKey(): string {
 // Deliberately per-provider rather than on the registry: this one is cheap
 // because searchBooks has a free fallback, and IGDB's revoked-token throw is
 // meant to be recovered by the very next call.
-const circuit = createProviderCircuit('Google Books', 3, 60_000)
+// Exported for the recommendation worker, which waits this long before retrying a
+// run the open circuit refused.
+export const CIRCUIT_COOLDOWN_MS = 60_000
+const circuit = createProviderCircuit('Google Books', 3, CIRCUIT_COOLDOWN_MS)
 
 const SEARCH_MAX_RESULTS = 20
 

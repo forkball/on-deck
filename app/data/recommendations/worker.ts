@@ -15,6 +15,7 @@ import {
 } from './jobs.ts'
 import { CatalogUnavailableError, GenerationError } from './errors.ts'
 import { generateRecommendations, type GenerationCheckpoint } from './generate.ts'
+import { CIRCUIT_COOLDOWN_MS } from '../catalog/googleBooks.ts'
 import type { MediaType } from '../mediaItems.ts'
 import type { RecommendationFilters } from './picks.ts'
 import { saveRunTimings } from './runs.ts'
@@ -31,6 +32,9 @@ const log = logger('generation')
 const DEFAULT_SLOTS = 2
 
 const IDLE_POLL_MS = 2000
+
+// A retry any sooner than the circuit's cooldown is refused by the same open circuit.
+const CATALOG_RETRY_DELAY_MS = CIRCUIT_COOLDOWN_MS
 
 // Derived rather than picked, so lowering the staleness window can't quietly
 // leave the heartbeat too slow to keep up with it. Several beats per window,
@@ -72,11 +76,6 @@ export function startGenerationWorker(): GenerationWorker {
       void touchJobClaim(db, job.id).catch(() => {})
     }, HEARTBEAT_MS)
 
-    // The picks as of the last checkpoint. Held here because the catch below needs
-    // them: a run the catalog killed still has the model's answer in hand, and the
-    // claimed job's copy is whatever a previous attempt left behind.
-    let latest = (job.checkpoint ?? {}) as GenerationCheckpoint
-
     try {
       const { memberIds, mediaType, filters, sourceTypes, name, lucky } = job.params
 
@@ -97,10 +96,7 @@ export function startGenerationWorker(): GenerationWorker {
           name,
           (phase) => void setPhase(db, job.id, phase).catch(() => {}),
           job.checkpoint as GenerationCheckpoint,
-          (checkpoint) => {
-            latest = checkpoint
-            void saveCheckpoint(db, job.id, checkpoint).catch(() => {})
-          },
+          (checkpoint) => void saveCheckpoint(db, job.id, checkpoint).catch(() => {}),
           { lucky: lucky === true, jobId: job.id },
         ),
       )
@@ -119,18 +115,21 @@ export function startGenerationWorker(): GenerationWorker {
       // calls, the checkpoint already holding the picks, so the attempts this job
       // has are worth spending before settling for titles nothing confirmed.
       if (error instanceof CatalogUnavailableError && job.attempt < MAX_ATTEMPTS) {
-        await requeueJob(db, job.id).catch(() => {})
+        await requeueJob(db, job.id, { delayMs: CATALOG_RETRY_DELAY_MS }).catch(() => {})
         return
       }
 
-      if (error instanceof CatalogUnavailableError && latest.picks?.length) {
+      // `keep` is empty when every pick was already logged: nothing worth a page,
+      // and the catalog being down is still what the failure below says.
+      if (error instanceof CatalogUnavailableError && error.keep?.length) {
         try {
           const unconfirmedRunId = await saveUnconfirmedRun(db, {
             userId: job.userId,
             mediaType: job.params.mediaType as MediaType,
             filters: job.params.filters as RecommendationFilters,
-            picks: latest.picks,
+            picks: error.keep,
             reason: error.message,
+            lucky: job.params.lucky === true,
           })
           await completeJob(db, job.id, { kind: 'unconfirmed', unconfirmedRunId })
           return

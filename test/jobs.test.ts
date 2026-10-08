@@ -3,6 +3,7 @@ import { after, before, describe, it } from 'node:test'
 
 import { db, pool } from '../app/data/db.ts'
 import {
+  claimJobs,
   completeJob,
   enqueueJob,
   failJob,
@@ -87,11 +88,15 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
 
   it('refuses a second while one is queued', async () => {
     await clear()
-    assert.equal((await enqueue(userId)).ok, true)
+    const first = await enqueue(userId)
+    assert.equal(first.ok, true)
 
     const second = await enqueue(userId)
     assert.equal(second.ok, false)
     assert.equal(second.ok === false && second.reason, 'active_job')
+    // Names the job that holds the slot, so the refusal can link to it.
+    assert.ok(first.ok)
+    assert.equal(second.ok === false && second.activeJobId, first.jobId)
   })
 
   // The reason the index exists: a read before the insert cannot close this
@@ -161,6 +166,51 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
     await pool.query(`update recommendation_jobs set status='running' where id=$1`, [first.jobId])
     await requeueJob(db, first.jobId)
 
-    assert.equal((await getJob(db, first.jobId, userId))?.status, 'queued')
+    const requeued = await getJob(db, first.jobId, userId)
+    assert.equal(requeued?.status, 'queued')
+    // Picked up again straight away, so not a retry waiting anything out.
+    assert.equal(requeued?.retrying, false)
+  })
+
+  // Retries that went straight back in were all spent inside one outage: workers
+  // poll every two seconds and the catalog's circuit stays open for a minute.
+  it('holds a delayed retry back until its time, and says it is retrying', async () => {
+    await clear()
+    const job = await enqueue(userId)
+    assert.ok(job.ok)
+
+    await pool.query(`update recommendation_jobs set status='running' where id=$1`, [job.jobId])
+    await requeueJob(db, job.jobId, { delayMs: 60_000 })
+    assert.equal((await getJob(db, job.jobId, userId))?.retrying, true)
+
+    const early = await claimJobs(db, 50)
+    assert.ok(!early.some((claimed) => claimed.id === job.jobId), 'claimed before its retry time')
+
+    await pool.query(`update recommendation_jobs set retry_at = $2 where id = $1`, [
+      job.jobId,
+      Date.now() - 1,
+    ])
+    const due = await claimJobs(db, 50)
+    assert.ok(
+      due.some((claimed) => claimed.id === job.jobId),
+      'not claimed once its retry time passed',
+    )
+
+    const running = await getJob(db, job.jobId, userId)
+    assert.equal(running?.status, 'running')
+    assert.equal(running?.retrying, false)
+  })
+
+  // The generating page reads this to send a failed draw back to the draw.
+  it('says whether a job is a lucky draw', async () => {
+    await clear()
+    const plain = await enqueue(userId)
+    assert.ok(plain.ok)
+    assert.equal((await getJob(db, plain.jobId, userId))?.lucky, false)
+
+    await clear()
+    const draw = await enqueueJob(db, userId, { ...params, memberIds: [userId], lucky: true })
+    assert.ok(draw.ok)
+    assert.equal((await getJob(db, draw.jobId, userId))?.lucky, true)
   })
 })

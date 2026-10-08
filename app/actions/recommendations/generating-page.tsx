@@ -1,10 +1,9 @@
 import type { Handle } from 'remix/ui'
-import { css } from 'remix/ui'
 
 import { PHASE_LABELS, type GenerationPhase } from '../../data/recommendations/jobs.ts'
 import { GenerationProgress } from '../../browser/generation-progress.tsx'
 import { Page } from '../../ui/components/page.tsx'
-import { GenerationFailure } from '../../ui/shared/generation-failure.tsx'
+import { routes } from '../../routes.ts'
 
 export interface GeneratingPageProps {
   jobId: string
@@ -12,6 +11,7 @@ export interface GeneratingPageProps {
   phases: GenerationPhase[]
   status: string
   queuedAhead: number | null
+  retrying: boolean
   error?: string
   statusHref: string
   formHref: string
@@ -23,7 +23,7 @@ export interface GeneratingPageProps {
 // with a quieter poll.
 export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
   return () => {
-    const { jobId, phase, phases, status, queuedAhead, error, statusHref, formHref, displayName } =
+    const { jobId, phase, phases, status, queuedAhead, retrying, error, statusHref, formHref, displayName } =
       handle.props
 
     return (
@@ -33,32 +33,28 @@ export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
         displayName={displayName}
         head={
           // With the client entry running, this would reload the page under it.
-          <noscript>
-            <meta httpEquiv="refresh" content="3" />
-          </noscript>
+          // Not once the run has failed: there is nothing left to wait for.
+          error ? undefined : (
+            <noscript>
+              <meta httpEquiv="refresh" content="3" />
+            </noscript>
+          )
         }
       >
-        {error ? (
-          <GenerationFailure message={error} backHref={formHref} />
-        ) : (
-          <>
-            <GenerationProgress
-              statusHref={statusHref}
-              formHref={formHref}
-              initialLabel={PHASE_LABELS[phase]}
-              initialPhase={phase}
-              initialStatus={status}
-              initialQueuedAhead={queuedAhead}
-              phases={phases}
-              labels={PHASE_LABELS}
-              key={jobId}
-            />
-            <p mix={css({ fontSize: '13px', color: '#888' })}>
-              This takes a little while — two of these steps are the model thinking. You can leave this page
-              open; it'll go to your picks on its own.
-            </p>
-          </>
-        )}
+        <GenerationProgress
+          statusHref={statusHref}
+          formHref={formHref}
+          homeHref={routes.home.href()}
+          initialLabel={PHASE_LABELS[phase]}
+          initialPhase={phase}
+          initialStatus={status}
+          initialQueuedAhead={queuedAhead}
+          initialRetrying={retrying}
+          initialError={error ?? null}
+          phases={phases}
+          labels={PHASE_LABELS}
+          key={jobId}
+        />
       </Page>
     )
   }

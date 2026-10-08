@@ -163,6 +163,8 @@ export const recommendationJobs = table({
     timings: c.text(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
+    // When a retry may be claimed — see the 20261008120000 migration.
+    retry_at: c.integer(),
   },
 })
 
@@ -182,6 +184,9 @@ export const recommendationRuns = table({
     // its own — see the 20260821120000 migration.
     is_lucky: c.boolean().notNull().default(false),
     timings: c.text(),
+    // The model's picks no catalog entry could be found for, as JSON — see
+    // data/recommendations/unmatched.ts and the 20261006120000 migration.
+    unmatched_picks: c.text().notNull().default('[]'),
   },
 })
 
@@ -242,6 +247,8 @@ export const unconfirmedRuns = table({
     picks: c.text().notNull(),
     reason: c.text().notNull(),
     created_at: c.integer().notNull(),
+    // From a lucky draw — see the 20261007120000 migration.
+    is_lucky: c.boolean().notNull().default(false),
   },
 })
 

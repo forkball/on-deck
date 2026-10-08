@@ -15,6 +15,7 @@ import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
+import { ErrorNotice, type ErrorLink } from './error-notice.tsx'
 import { RunList } from '../../ui/components/run-list.tsx'
 import type { UnconfirmedRunDetail } from '../../data/recommendations/unconfirmed.ts'
 import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, mediaTypeUiFor, type ActiveMediaType } from '../../mediaTypes.ts'
@@ -55,6 +56,7 @@ export interface RecommendationsPageProps {
   // controller — see indexPage.
   startLucky?: boolean
   error?: string
+  errorLink?: ErrorLink
   // Set when the request matched an earlier run the user hasn't taken
   // anything from — see DuplicateNotice.
   duplicate?: {
@@ -91,13 +93,15 @@ function UnconfirmedSection(handle: Handle<{ runs: UnconfirmedRunDetail[] }>) {
     <section mix={css({ marginTop: '40px' })}>
       <h2>Unconfirmed</h2>
       <p mix={sectionCaption}>
-        Runs the catalog couldn't be reached for. The model's picks were kept, but nothing has checked them.
+        Runs the catalog couldn't be reached for. The model's picks were kept, but the catalog hasn't
+        confirmed them.
       </p>
       <ul mix={css({ listStyle: 'none', margin: 0, padding: 0 })}>
         {handle.props.runs.map((run) => (
-          <li key={run.id} mix={css({ padding: '8px 0', borderBottom: '1px solid #eee' })}>
+          // Block, not list-item, so Doodle's "* " marker isn't drawn — see run-list.tsx.
+          <li key={run.id} mix={css({ display: 'block', padding: '8px 0', borderBottom: '1px solid #eee' })}>
             <a href={routes.recommendations.unconfirmed.href({ unconfirmedId: String(run.id) })}>
-              {run.picks.length} {mediaTypeUiFor(run.mediaType).plural}
+              {run.isLucky ? '🎲 Lucky pick' : `${run.picks.length} ${mediaTypeUiFor(run.mediaType).plural}`}
             </a>
             <span mix={css({ color: '#888', fontSize: '13px' })}>
               {' — '}
@@ -183,6 +187,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       lucky,
       startLucky,
       error,
+      errorLink,
       duplicate,
     } = handle.props
     const recsHref = routes.recommendations.index.href()
@@ -200,19 +205,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
 
         {duplicate && <DuplicateNotice duplicate={duplicate} />}
 
-        {error && (
-          <p
-            mix={css({
-              margin: '0 0 16px',
-              padding: '12px 16px',
-              border: '1px solid #b91c1c',
-              borderRadius: '8px',
-              color: '#b91c1c',
-            })}
-          >
-            {error}
-          </p>
-        )}
+        {error && <ErrorNotice error={error} link={errorLink} />}
 
         <GenerateRecommendationsForm
           friends={friends.map((friend) => ({

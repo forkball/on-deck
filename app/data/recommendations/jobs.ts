@@ -54,6 +54,12 @@ export interface GenerationJob {
   // were kept unconfirmed.
   unconfirmedRunId?: number
   prunedOldestRun?: boolean
+  // A lucky draw, read off the params, so the pages around the job can send
+  // someone back to the draw rather than the general form.
+  lucky: boolean
+  // Back in the queue to wait out a catalog that wasn't answering, as opposed to
+  // a run that hasn't started. The generating page keeps its steps for this one.
+  retrying: boolean
   error?: string
   startedAt: number
   updatedAt: number
@@ -71,6 +77,15 @@ function parsePhases(raw: string): GenerationPhase[] {
   return phases.length > 0 ? phases : PHASE_ORDER
 }
 
+// Unparseable params read as an ordinary run; the worker refuses those anyway.
+function isLuckyParams(raw: string): boolean {
+  try {
+    return (JSON.parse(raw) as Partial<JobParams>).lucky === true
+  } catch {
+    return false
+  }
+}
+
 function toJob(row: RecommendationJob): GenerationJob {
   return {
     userId: row.user_id,
@@ -80,6 +95,8 @@ function toJob(row: RecommendationJob): GenerationJob {
     runId: row.run_id ?? undefined,
     unconfirmedRunId: row.unconfirmed_run_id ?? undefined,
     prunedOldestRun: row.pruned_oldest_run === 1,
+    lucky: isLuckyParams(row.params),
+    retrying: row.status === 'queued' && row.retry_at != null,
     error: row.error ?? undefined,
     startedAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
@@ -120,8 +137,11 @@ export function phasesFor(params: {
   return PHASE_ORDER.filter((phase) => !skipped.has(phase))
 }
 
-// `active_job` when the user already has one queued or running.
-export type EnqueueJobResult = { ok: true; jobId: string } | { ok: false; reason: 'active_job' }
+// `active_job` when the user already has one queued or running, with that job's
+// id so the refusal can point at it. Null if it finished in the moment between.
+export type EnqueueJobResult =
+  | { ok: true; jobId: string }
+  | { ok: false; reason: 'active_job'; activeJobId: string | null }
 
 // The insert is the check. `on conflict do nothing` against the partial unique
 // index (see the 20260816120000 migration) is what makes one-per-user hold under
@@ -143,7 +163,17 @@ export async function enqueueJob(db: Db, userId: number, params: JobParams): Pro
     [id, userId, JSON.stringify(params), phases.join(','), now],
   )
 
-  if (rows.length === 0) return { ok: false, reason: 'active_job' }
+  if (rows.length === 0) {
+    // Read after the refusal rather than before it: the insert is what decides,
+    // and this only names the job that decided it.
+    const active = await pool.query<{ id: string }>(
+      `select id from recommendation_jobs
+        where user_id = $1 and status in ('queued', 'running')
+        limit 1`,
+      [userId],
+    )
+    return { ok: false, reason: 'active_job', activeJobId: active.rows[0]?.id ?? null }
+  }
   return { ok: true, jobId: rows[0].id }
 }
 
@@ -202,11 +232,16 @@ export async function failJob(db: Db, jobId: string, error: string): Promise<voi
   )
 }
 
-export async function requeueJob(db: Db, jobId: string): Promise<void> {
-  await db.updateMany(
-    recommendationJobs,
-    { status: 'queued', claimed_at: undefined, updated_at: Date.now() },
-    { where: { id: jobId } },
+// Back into the queue. `delayMs` holds it there that long before any worker may
+// claim it again, for a retry that is waiting something out rather than starting
+// over — see claimJobs, which skips it until then.
+export async function requeueJob(db: Db, jobId: string, options: { delayMs?: number } = {}): Promise<void> {
+  const now = Date.now()
+  await pool.query(
+    `update recommendation_jobs
+        set status = 'queued', claimed_at = null, retry_at = $2, updated_at = $3
+      where id = $1`,
+    [jobId, options.delayMs ? now + options.delayMs : null, now],
   )
 }
 
@@ -277,10 +312,10 @@ export async function claimJobs(db: Db, limit: number): Promise<ClaimedJob[]> {
     attempts: number
   }>(
     `update recommendation_jobs
-        set status = 'running', claimed_at = $1, attempts = attempts + 1, updated_at = $1
+        set status = 'running', claimed_at = $1, attempts = attempts + 1, retry_at = null, updated_at = $1
       where id in (
         select id from recommendation_jobs
-         where status = 'queued'
+         where status = 'queued' and (retry_at is null or retry_at <= $1)
          order by created_at
          limit $2
          for update skip locked

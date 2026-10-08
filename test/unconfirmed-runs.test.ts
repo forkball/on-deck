@@ -6,9 +6,51 @@ import {
   getUnconfirmedRun,
   listUnconfirmedRuns,
   MAX_UNCONFIRMED_PER_USER,
+  picksToKeepUnconfirmed,
   saveUnconfirmedRun,
 } from '../app/data/recommendations/unconfirmed.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
+
+// No database: which picks survive is decided before anything is written.
+describe('picksToKeepUnconfirmed', () => {
+  const picks = ['First', 'Second', 'Third'].map((title) => ({ title, year: 2000, reason: '' }))
+  const nothingLogged = { seen: [], rejected: [] }
+
+  it('keeps every pick of an ordinary run', () => {
+    assert.deepEqual(picksToKeepUnconfirmed(picks, { lucky: false, excluded: nothingLogged }), picks)
+  })
+
+  // A lucky draw asks for a dozen so the gates have something to drop. Kept
+  // whole, an outage turned "one pick" into a page of twelve.
+  it('keeps only the top-ranked pick of a lucky draw', () => {
+    assert.deepEqual(picksToKeepUnconfirmed(picks, { lucky: true, excluded: nothingLogged }), [picks[0]])
+  })
+
+  // No catalog id to filter on during an outage, so the title is compared.
+  it('leaves out what has been seen or turned down, by title', () => {
+    const kept = picksToKeepUnconfirmed(picks, {
+      lucky: false,
+      excluded: { seen: ['first'], rejected: ['THIRD'] },
+    })
+    assert.deepEqual(
+      kept.map((pick) => pick.title),
+      ['Second'],
+    )
+  })
+
+  it("draws the lucky pick from what's left, not the model's first answer", () => {
+    const kept = picksToKeepUnconfirmed(picks, { lucky: true, excluded: { seen: ['First'], rejected: [] } })
+    assert.deepEqual(
+      kept.map((pick) => pick.title),
+      ['Second'],
+    )
+  })
+
+  it('keeps nothing when every pick is already logged', () => {
+    const excluded = { seen: ['First', 'Second', 'Third'], rejected: [] }
+    assert.deepEqual(picksToKeepUnconfirmed(picks, { lucky: true, excluded }), [])
+  })
+})
 
 // What the model answered when the catalog wouldn't. These rows hold the picks as
 // JSON rather than pointing at catalog entries, which is the whole reason they are
@@ -90,5 +132,22 @@ describe('unconfirmed runs', { skip: skipWithoutDatabase }, () => {
     await pool.query(`update unconfirmed_runs set picks = 'not json' where id = $1`, [id])
 
     assert.deepEqual((await getUnconfirmedRun(db, id, userId))?.picks, [])
+  })
+
+  // The page lays a lucky draw out as the lucky pick, which it can only do if
+  // the row says that is what it was.
+  it('remembers whether it was a lucky draw', async () => {
+    const plain = await save(userId, ['Persuasion'])
+    const lucky = await saveUnconfirmedRun(db, {
+      userId,
+      mediaType: 'movie',
+      filters: {},
+      picks: [pick('Aftersun')],
+      reason: "the catalog isn't answering right now",
+      lucky: true,
+    })
+
+    assert.equal((await getUnconfirmedRun(db, plain, userId))?.isLucky, false)
+    assert.equal((await getUnconfirmedRun(db, lucky, userId))?.isLucky, true)
   })
 })

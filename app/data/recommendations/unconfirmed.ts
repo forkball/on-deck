@@ -3,12 +3,26 @@ import { inList } from 'remix/data-table'
 import type { Db } from '../db.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { unconfirmedRuns, type UnconfirmedRun } from '../schema.ts'
-import type { Pick, RecommendationFilters } from './picks.ts'
+import type { ExcludedTitles, Pick, RecommendationFilters } from './picks.ts'
+import { excludedByTitle } from './unmatched.ts'
 
 // Its own ceiling rather than the runs one. It happens to be the same number, but
 // these answer a different question — how many failed attempts are worth keeping
 // around to read — and moving one shouldn't move the other.
 export const MAX_UNCONFIRMED_PER_USER = 3
+
+// Which of the model's picks an unconfirmed run keeps. With the catalog down there
+// are no catalog ids to exclude by, so the run's exclusion list is checked by
+// title. A lucky draw keeps only its top surviving pick: it promises one, and asks
+// for a dozen only so the gates have something to drop.
+export function picksToKeepUnconfirmed(
+  picks: Pick[],
+  options: { lucky: boolean; excluded: ExcludedTitles },
+): Pick[] {
+  const ruledOut = excludedByTitle(options.excluded)
+  const kept = picks.filter((pick) => !ruledOut(pick.title))
+  return options.lucky ? kept.slice(0, 1) : kept
+}
 
 export interface UnconfirmedRunDetail {
   id: number
@@ -17,6 +31,8 @@ export interface UnconfirmedRunDetail {
   picks: Pick[]
   reason: string
   createdAt: number
+  // A lucky draw: one pick, shown the way a lucky run shows its pick.
+  isLucky: boolean
 }
 
 // A malformed row reads as empty rather than throwing on a page someone is already
@@ -38,6 +54,7 @@ function parse(row: UnconfirmedRun): UnconfirmedRunDetail {
     picks: parseJson<Pick[]>(row.picks, []),
     reason: row.reason,
     createdAt: Number(row.created_at),
+    isLucky: row.is_lucky === true,
   }
 }
 
@@ -49,6 +66,7 @@ export async function saveUnconfirmedRun(
     filters: RecommendationFilters
     picks: Pick[]
     reason: string
+    lucky?: boolean
   },
 ): Promise<number> {
   const row = await db.create(
@@ -60,6 +78,7 @@ export async function saveUnconfirmedRun(
       picks: JSON.stringify(input.picks),
       reason: input.reason,
       created_at: Date.now(),
+      is_lucky: input.lucky === true,
     },
     { returnRow: true },
   )

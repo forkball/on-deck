@@ -95,7 +95,9 @@ does nothing on its own.
     they can be tested directly
   - `app/data/recommendations/` — the generation pipeline: `picks` asks the model,
     `matching` resolves picks to catalog entries, `exclusions` decides what a run
-    may not suggest (database-free, so the rule can be tested directly), `runs`
+    may not suggest (database-free, so the rule can be tested directly),
+    `unmatched` decides which picks no catalog entry was found for a run still
+    shows, as the model gave them (database-free for the same reason), `runs`
     persists them, `generate` orchestrates those, `jobs`/`worker` run it in the
     background, `dailyLimit` caps how many runs one account can generate in 24
     hours (`users.is_admin` is exempt — granted only by `scripts/set-admin.ts`),

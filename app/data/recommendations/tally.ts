@@ -22,6 +22,10 @@ export interface PickTally {
   // run doesn't read as bleeding picks.
   surplus: number
   dropped: PickDrops
+  // Of the unfound and title-mismatched drops, how many the run shows anyway as
+  // the model's own answer — see unmatched.ts. Already counted in `dropped`, so
+  // it plays no part in the accounting below.
+  shownUnmatched?: number
 }
 
 export function emptyDrops(): PickDrops {
@@ -73,6 +77,8 @@ export function summarizePickTally(tally: PickTally): string {
     const count = tally.dropped[key]
     if (count > 0) parts.push(`${label} ${count}`)
   }
+
+  if (tally.shownUnmatched) parts.push(`shown-unmatched ${tally.shownUnmatched}`)
 
   const unaccounted = unaccountedFor(tally)
   if (unaccounted !== 0) parts.push(`UNACCOUNTED ${unaccounted}`)
