@@ -216,6 +216,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                   key={item.id}
                   mix={css({
                     display: 'flex',
+                    flexWrap: 'wrap',
                     gap: '12px',
                     border: '1px solid #ddd',
                     borderRadius: '8px',
@@ -241,7 +242,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                       })}
                     />
                   )}
-                  <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
+                  <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
                     <a href={detailHref} mix={css({ fontWeight: 700 })}>
                       {item.title}
                     </a>
@@ -283,11 +284,6 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                     {/* Empty for everything but games, so no other type
                         renders a gap here. */}
                     <PlatformList platforms={platforms} />
-                    <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: '#555' })}>
-                      <ModelProvided note="Written by the model from the taste profile this run was built on — not a description from the catalogue.">
-                        {reason}
-                      </ModelProvided>
-                    </p>
                   </div>
                   {/* Right-hand column, so the control lines up down the list
                       regardless of how long each title and reason runs. The
@@ -328,6 +324,13 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                       </form>
                     </FloatingDropdown>
                   </div>
+                  {/* Its own full-width row under poster and control, so the
+                      text isn't squeezed into the narrow middle column. */}
+                  <p mix={css({ flex: '1 1 100%', margin: 0, fontStyle: 'italic', color: '#555' })}>
+                    <ModelProvided note="Written by the model from the taste profile this run was built on — not a description from the catalogue.">
+                      {reason}
+                    </ModelProvided>
+                  </p>
                 </li>
               )
             })}
