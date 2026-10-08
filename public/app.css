@@ -418,8 +418,10 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
    dropped without a word — which is why this lives here, like the modal trigger
    and rating chip above. */
 .doodle button.linkish,
-.doodle a.linkish {
+.doodle a.linkish,
+.doodle label.linkish {
   padding: 0;
+  cursor: pointer;
   font-weight: normal;
   font-size: 13px;
   color: #6b6459;
@@ -427,7 +429,8 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 }
 
 .doodle button.linkish:hover,
-.doodle a.linkish:hover {
+.doodle a.linkish:hover,
+.doodle label.linkish:hover {
   color: #3c3c3c;
 }
 

@@ -3,6 +3,7 @@ import { css } from 'remix/ui'
 
 import { ImportProgress } from '../../../browser/import-progress.tsx'
 import { Page } from '../../../ui/components/page.tsx'
+import { DiscardImport } from './discard-import.tsx'
 
 export interface ImportMatchingPageProps {
   displayName: string
@@ -12,11 +13,12 @@ export interface ImportMatchingPageProps {
   error?: string
   progressHref: string
   reviewHref: string
+  discardHref: string
 }
 
 export function ImportMatchingPage(handle: Handle<ImportMatchingPageProps>) {
   return () => {
-    const { displayName, total, matched, failed, error, progressHref, reviewHref } = handle.props
+    const { displayName, total, matched, failed, error, progressHref, reviewHref, discardHref } = handle.props
     const percent = total === 0 ? 0 : Math.min(100, Math.round((matched / total) * 100))
 
     return (
@@ -81,6 +83,9 @@ export function ImportMatchingPage(handle: Handle<ImportMatchingPageProps>) {
             />
           </>
         )}
+        <DiscardImport href={discardHref} label="Discard this import" cancelLabel="Keep waiting">
+          Nothing has been added to your log. You can upload the file again.
+        </DiscardImport>
       </Page>
     )
   }

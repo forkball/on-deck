@@ -572,6 +572,18 @@ export async function activeBatch(db: Db, userId: number, mediaType: MediaType):
   return batch ?? null
 }
 
+// Throws an unsaved import away: the batch and, by cascade, its rows. Staging is
+// all there is to lose — nothing reaches the log until saveBatch — so this never
+// touches a logged interaction. A failed batch can go too; one saving or done
+// cannot: the first is mid-write, the second is the record the import happened.
+const DISCARDABLE = [...UNFINISHED, 'failed']
+
+export async function discardBatch(db: Db, batch: ImportBatch): Promise<boolean> {
+  if (!DISCARDABLE.includes(batch.status)) return false
+  await db.delete(importBatches, batch.id)
+  return true
+}
+
 // Every import still matching or waiting for review, newest first.
 export async function activeBatches(db: Db, userId: number): Promise<ImportBatch[]> {
   return db.findMany(importBatches, {

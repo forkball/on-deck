@@ -31,6 +31,7 @@ import { count } from '../../../ui/shared/count.ts'
 import { Field } from '../../../ui/shared/field.tsx'
 import { StarRatingDisplay } from '../../../ui/components/star-rating.tsx'
 import { Button, buttonFrameClass, type ButtonVariant, TextInput } from '../../../ui/shared/form-controls.tsx'
+import { DiscardImport } from './discard-import.tsx'
 
 export interface ImportReviewPageProps {
   displayName: string
@@ -929,16 +930,26 @@ function ReviewDrawer(
               <span class="drawer-hint">{count(quickAccepts, 'quick accept', 'quick accepts')} in here</span>
             )}
           </label>
-          {needsConfirm ? (
-            // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
-            <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
-              <span class={buttonFrameClass('primary')} mix={css({ display: 'inline-block' })}>
-                {saveLabel}
-              </span>
-            </label>
-          ) : (
-            saveForm(saveLabel)
-          )}
+          <div mix={css({ display: 'flex', alignItems: 'center', gap: '14px', flex: '0 0 auto' })}>
+            <DiscardImport
+              href={routes.profile.imports.discard.href({ batchId })}
+              label="Discard"
+              cancelLabel="Keep reviewing"
+            >
+              The matches and answers you've made here are thrown away. Nothing has been added to your log,
+              and you can upload the file again.
+            </DiscardImport>
+            {needsConfirm ? (
+              // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
+              <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer' })}>
+                <span class={buttonFrameClass('primary')} mix={css({ display: 'inline-block' })}>
+                  {saveLabel}
+                </span>
+              </label>
+            ) : (
+              saveForm(saveLabel)
+            )}
+          </div>
         </div>
 
         {needsConfirm && (

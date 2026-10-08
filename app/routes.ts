@@ -69,6 +69,7 @@ export const routes = route({
       bulk: post(':batchId/bulk'),
       conflicts: post(':batchId/conflicts'),
       save: post(':batchId/save'),
+      discard: post(':batchId/discard'),
     }),
     importBooks: route('import-books', {
       index: get('/'),
