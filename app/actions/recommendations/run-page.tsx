@@ -242,7 +242,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                       })}
                     />
                   )}
-                  <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
+                  <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
                     <a href={detailHref} mix={css({ fontWeight: 700 })}>
                       {item.title}
                     </a>
