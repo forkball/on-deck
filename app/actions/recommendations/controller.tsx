@@ -490,6 +490,7 @@ export default createController(routes.recommendations, {
           phases={job.phases}
           status={job.status}
           queuedAhead={job.queuedAhead ?? null}
+          retrying={job.retrying}
           error={job.error}
           statusHref={routes.recommendations.status.href({ jobId: context.params.jobId })}
           // Back to where the run was asked for: a lucky draw that came back with
@@ -511,6 +512,7 @@ export default createController(routes.recommendations, {
       return Response.json({
         status: job.status,
         queuedAhead: job.queuedAhead ?? null,
+        retrying: job.retrying,
         phase: job.phase,
         label: PHASE_LABELS[job.phase],
         done: finished != null,

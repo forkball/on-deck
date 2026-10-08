@@ -57,6 +57,9 @@ export interface GenerationJob {
   // A lucky draw, read off the params, so the pages around the job can send
   // someone back to the draw rather than the general form.
   lucky: boolean
+  // Back in the queue to wait out a catalog that wasn't answering, as opposed to
+  // a run that hasn't started. The generating page keeps its steps for this one.
+  retrying: boolean
   error?: string
   startedAt: number
   updatedAt: number
@@ -94,6 +97,7 @@ function toJob(row: RecommendationJob): GenerationJob {
     unconfirmedRunId: row.unconfirmed_run_id ?? undefined,
     prunedOldestRun: row.pruned_oldest_run === 1,
     lucky: isLuckyParams(row.params),
+    retrying: row.status === 'queued' && row.retry_at != null,
     error: row.error ?? undefined,
     startedAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
@@ -229,11 +233,16 @@ export async function failJob(db: Db, jobId: string, error: string): Promise<voi
   )
 }
 
-export async function requeueJob(db: Db, jobId: string): Promise<void> {
-  await db.updateMany(
-    recommendationJobs,
-    { status: 'queued', claimed_at: undefined, updated_at: Date.now() },
-    { where: { id: jobId } },
+// Back into the queue. `delayMs` holds it there that long before any worker may
+// claim it again, for a retry that is waiting something out rather than starting
+// over — see claimJobs, which skips it until then.
+export async function requeueJob(db: Db, jobId: string, options: { delayMs?: number } = {}): Promise<void> {
+  const now = Date.now()
+  await pool.query(
+    `update recommendation_jobs
+        set status = 'queued', claimed_at = null, retry_at = $2, updated_at = $3
+      where id = $1`,
+    [jobId, options.delayMs ? now + options.delayMs : null, now],
   )
 }
 
@@ -304,10 +313,10 @@ export async function claimJobs(db: Db, limit: number): Promise<ClaimedJob[]> {
     attempts: number
   }>(
     `update recommendation_jobs
-        set status = 'running', claimed_at = $1, attempts = attempts + 1, updated_at = $1
+        set status = 'running', claimed_at = $1, attempts = attempts + 1, retry_at = null, updated_at = $1
       where id in (
         select id from recommendation_jobs
-         where status = 'queued'
+         where status = 'queued' and (retry_at is null or retry_at <= $1)
          order by created_at
          limit $2
          for update skip locked

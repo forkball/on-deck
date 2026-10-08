@@ -163,6 +163,8 @@ export const recommendationJobs = table({
     timings: c.text(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
+    // When a retry may be claimed — see the 20261008120000 migration.
+    retry_at: c.integer(),
   },
 })
 

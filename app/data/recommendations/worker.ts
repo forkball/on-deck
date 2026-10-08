@@ -33,6 +33,11 @@ const DEFAULT_SLOTS = 2
 
 const IDLE_POLL_MS = 2000
 
+// How long a run waits before retrying a catalog that wasn't answering. Google
+// Books' circuit stays open for a minute after it trips, so a retry any sooner is
+// refused by the same circuit and spends an attempt on nothing.
+const CATALOG_RETRY_DELAY_MS = 60_000
+
 // Derived rather than picked, so lowering the staleness window can't quietly
 // leave the heartbeat too slow to keep up with it. Several beats per window,
 // since a claim only needs one of them to have landed.
@@ -134,7 +139,7 @@ export function startGenerationWorker(): GenerationWorker {
       // calls, the checkpoint already holding the picks, so the attempts this job
       // has are worth spending before settling for titles nothing confirmed.
       if (error instanceof CatalogUnavailableError && job.attempt < MAX_ATTEMPTS) {
-        await requeueJob(db, job.id).catch(() => {})
+        await requeueJob(db, job.id, { delayMs: CATALOG_RETRY_DELAY_MS }).catch(() => {})
         return
       }
 

@@ -66,6 +66,9 @@ export type GenerationProgressProps = {
   initialPhase: string
   initialStatus: string
   initialQueuedAhead: number | null
+  // Queued again to wait out a catalog that wasn't answering. Its steps stay on
+  // screen, since it has been through them, rather than reading as not started.
+  initialRetrying?: boolean
   phases: string[]
   labels: Record<string, string>
   // Why the run stopped, when it had already stopped before the page loaded. Set,
@@ -79,6 +82,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
     let phase = handle.props.initialPhase
     let queueState = handle.props.initialStatus
     let ahead: number | null = handle.props.initialQueuedAhead
+    let retrying = handle.props.initialRetrying === true
     // The run failed, in the run's own words. Marks the step it stopped on.
     let failed: string | null = handle.props.initialError ?? null
     // The poll lost track of the run, which may well still be going. Said above
@@ -123,6 +127,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             status: string
             phase: string
             queuedAhead: number | null
+            retrying?: boolean
             done: boolean
             href: string | null
             error: string | null
@@ -142,7 +147,14 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             return
           }
 
-          if (status.status !== queueState || status.phase !== phase || status.queuedAhead !== ahead) {
+          const nowRetrying = status.retrying === true
+          if (
+            status.status !== queueState ||
+            status.phase !== phase ||
+            status.queuedAhead !== ahead ||
+            nowRetrying !== retrying
+          ) {
+            retrying = nowRetrying
             queueState = status.status
             phase = status.phase
             ahead = status.queuedAhead
@@ -173,7 +185,12 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
           (lostContact
             ? 'Lost contact with the server. Your picks are probably still being put together.'
             : null)
-        return message ? <p mix={css({ color: '#b91c1c' })}>{message}</p> : null
+        if (message) return <p mix={css({ color: '#b91c1c' })}>{message}</p>
+        // Not an error, so not in red: the run is fine and will carry on by itself.
+        if (retrying && queueState === 'queued') {
+          return <p mix={css({ color: '#555' })}>The catalog isn't answering — trying again in a minute.</p>
+        }
+        return null
       }
 
       // The way on, under the steps: back to the form for a run that is over, a
@@ -193,7 +210,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       }
 
       function panel() {
-        if (queueState === 'queued' && !failed) {
+        if (queueState === 'queued' && !failed && !retrying) {
           return (
             <p mix={css({ color: '#555' })}>
               Waiting to start
