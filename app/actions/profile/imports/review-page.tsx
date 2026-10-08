@@ -31,6 +31,7 @@ import { count } from '../../../ui/shared/count.ts'
 import { Field } from '../../../ui/shared/field.tsx'
 import { StarRatingDisplay } from '../../../ui/components/star-rating.tsx'
 import { Button, buttonFrameClass, type ButtonVariant, TextInput } from '../../../ui/shared/form-controls.tsx'
+import { DiscardImport } from './discard-import.tsx'
 
 export interface ImportReviewPageProps {
   displayName: string
@@ -691,7 +692,6 @@ function groupAnchor(key: SectionKey): string {
 // hidden checkbox opens it, and its state survives in-place reloads.
 const DRAWER_TOGGLE = 'import-drawer-toggle'
 const CONFIRM_TOGGLE = 'import-confirm-toggle'
-const DISCARD_TOGGLE = 'import-discard-toggle'
 
 // Checked means "not the default": open on a phone, closed on desktop.
 const drawerOpen = `&:has(#${DRAWER_TOGGLE}:checked)`
@@ -931,14 +931,17 @@ function ReviewDrawer(
             )}
           </label>
           <div mix={css({ display: 'flex', alignItems: 'center', gap: '14px', flex: '0 0 auto' })}>
-            {/* Opens the Modal below, which holds the form: a stray click here
-                would otherwise throw the whole review away. */}
-            <label for={DISCARD_TOGGLE} mix={css({ cursor: 'pointer', color: '#6b6459', textDecoration: 'underline' })}>
-              Discard
-            </label>
+            <DiscardImport
+              href={routes.profile.imports.discard.href({ batchId })}
+              label="Discard"
+              cancelLabel="Keep reviewing"
+            >
+              The matches and answers you've made here are thrown away. Nothing has been added to your log, and
+              you can upload the file again.
+            </DiscardImport>
             {needsConfirm ? (
               // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
-              <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer', flex: '0 0 auto' })}>
+              <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer' })}>
                 <span class={buttonFrameClass('primary')} mix={css({ display: 'inline-block' })}>
                   {saveLabel}
                 </span>
@@ -948,26 +951,6 @@ function ReviewDrawer(
             )}
           </div>
         </div>
-
-        <Modal id={DISCARD_TOGGLE} closeButton={false} title="Discard this import?">
-          <p mix={css({ margin: '0 0 16px' })}>
-            The matches and answers you've made here are thrown away. Nothing has been added to your log, and
-            you can upload the file again.
-          </p>
-          <div mix={css({ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' })}>
-            <form method="post" action={routes.profile.imports.discard.href({ batchId })}>
-              <Button type="submit" variant="danger">
-                Yes, discard it
-              </Button>
-            </form>
-            <label
-              for={DISCARD_TOGGLE}
-              mix={css({ cursor: 'pointer', color: '#6b6459', textDecoration: 'underline' })}
-            >
-              Keep reviewing
-            </label>
-          </div>
-        </Modal>
 
         {needsConfirm && (
           <Modal

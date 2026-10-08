@@ -276,7 +276,10 @@ export default createController(routes.profile.imports, {
       if (!found.ok) return found.response
       const { batch } = found
 
-      if (!(await discardBatch(context.get(Database), batch))) return backToReview(batch)
+      // Refused only once saving has begun, so show sends it wherever it now belongs.
+      if (!(await discardBatch(context.get(Database), batch))) {
+        return redirect(routes.profile.imports.show.href({ batchId: batch.id }), 303)
+      }
 
       return redirect(mediaTypeUiFor(batch.media_type as MediaType).hrefs.import(), 303)
     },
