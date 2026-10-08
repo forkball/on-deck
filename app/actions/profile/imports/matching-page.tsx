@@ -3,7 +3,10 @@ import { css } from 'remix/ui'
 
 import { ImportProgress } from '../../../browser/import-progress.tsx'
 import { Button } from '../../../ui/shared/form-controls.tsx'
+import { Modal } from '../../../ui/components/modal.tsx'
 import { Page } from '../../../ui/components/page.tsx'
+
+const DISCARD_TOGGLE = 'import-discard-toggle'
 
 export interface ImportMatchingPageProps {
   displayName: string
@@ -83,11 +86,27 @@ export function ImportMatchingPage(handle: Handle<ImportMatchingPageProps>) {
             />
           </>
         )}
-        <form method="post" action={discardHref} mix={css({ margin: '14px 0 18px' })}>
-          <Button type="submit" variant="link">
-            Discard this import
-          </Button>
-        </form>
+        <label for={DISCARD_TOGGLE} mix={css({ cursor: 'pointer', color: '#6b6459', textDecoration: 'underline' })}>
+          Discard this import
+        </label>
+        <Modal id={DISCARD_TOGGLE} closeButton={false} title="Discard this import?">
+          <p mix={css({ margin: '0 0 16px' })}>
+            Nothing has been added to your log. You can upload the file again.
+          </p>
+          <div mix={css({ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' })}>
+            <form method="post" action={discardHref}>
+              <Button type="submit" variant="danger">
+                Yes, discard it
+              </Button>
+            </form>
+            <label
+              for={DISCARD_TOGGLE}
+              mix={css({ cursor: 'pointer', color: '#6b6459', textDecoration: 'underline' })}
+            >
+              Keep waiting
+            </label>
+          </div>
+        </Modal>
       </Page>
     )
   }
