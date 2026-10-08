@@ -83,7 +83,7 @@ export function ImportMatchingPage(handle: Handle<ImportMatchingPageProps>) {
             />
           </>
         )}
-        <form method="post" action={discardHref}>
+        <form method="post" action={discardHref} mix={css({ margin: '14px 0 18px' })}>
           <Button type="submit" variant="link">
             Discard this import
           </Button>

@@ -1181,7 +1181,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   if you want your full history.
                 </p>
               )}
-              <form method="post" action={routes.profile.imports.discard.href({ batchId })}>
+              <form method="post" action={routes.profile.imports.discard.href({ batchId })} mix={css({ margin: '14px 0 18px' })}>
                 <Button type="submit" variant="link">
                   Discard this import
                 </Button>
