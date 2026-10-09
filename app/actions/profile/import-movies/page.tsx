@@ -5,6 +5,7 @@ import { routes } from '../../../routes.ts'
 import { LetterboxdImportForm } from '../../../browser/letterboxd-import-form.tsx'
 import { Page } from '../../../ui/components/page.tsx'
 import { Toast } from '../../../ui/components/toast.tsx'
+import { Link } from '../../../ui/shared/form-controls.tsx'
 
 export interface LetterboxdImportPageProps {
   displayName: string
@@ -41,8 +42,8 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
               fontSize: '14px',
             })}
           >
-            You have an import waiting. <a href={pendingHref}>Pick it back up</a> — uploading again starts
-            over.
+            You have an import waiting. <Link href={pendingHref}>Pick it back up</Link> — uploading again
+            starts over.
           </div>
         )}
 
@@ -70,8 +71,8 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
         {syncAvailable && (
           <p mix={css({ fontSize: '13px', color: 'var(--muted)' })}>
             New films are handled separately:{' '}
-            <a href={routes.profile.edit.index.href()}>connect your Letterboxd account in settings</a> and
-            they arrive on their own.
+            <Link href={routes.profile.edit.index.href()}>connect your Letterboxd account in settings</Link>{' '}
+            and they arrive on their own.
           </p>
         )}
       </Page>

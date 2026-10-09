@@ -19,7 +19,7 @@ import { ErrorNotice, type ErrorLink } from './error-notice.tsx'
 import { RunList } from '../../ui/components/run-list.tsx'
 import type { UnconfirmedRunDetail } from '../../data/recommendations/unconfirmed.ts'
 import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, mediaTypeUiFor, type ActiveMediaType } from '../../mediaTypes.ts'
-import { Button } from '../../ui/shared/form-controls.tsx'
+import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
@@ -103,9 +103,9 @@ function UnconfirmedSection(handle: Handle<{ runs: UnconfirmedRunDetail[] }>) {
             key={run.id}
             mix={css({ display: 'block', padding: '8px 0', borderBottom: '1px solid var(--rule-soft)' })}
           >
-            <a href={routes.recommendations.unconfirmed.href({ unconfirmedId: String(run.id) })}>
+            <Link href={routes.recommendations.unconfirmed.href({ unconfirmedId: String(run.id) })}>
               {run.isLucky ? '🎲 Lucky pick' : `${run.picks.length} ${mediaTypeUiFor(run.mediaType).plural}`}
-            </a>
+            </Link>
             <span mix={css({ color: 'var(--muted)', fontSize: '13px' })}>
               {' — '}
               {new Date(run.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
@@ -137,7 +137,7 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
           <strong>You already have a recommendation like this.</strong>
         </p>
         <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>
-          Those exact settings produced <a href={href}>{duplicate.name || 'an earlier run'}</a> on{' '}
+          Those exact settings produced <Link href={href}>{duplicate.name || 'an earlier run'}</Link> on{' '}
           {new Date(duplicate.createdAt).toLocaleDateString()}, and you haven't logged anything from it yet.
           Generating again will replace it with a different set of picks.
         </p>
@@ -270,7 +270,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
           {runs.length === 0 ? (
             <p>
               Nothing yet — log a few {ui.plural} on your{' '}
-              <a href={routes.profile.index.href()}>profile page</a>, then get recommendations above.
+              <Link href={routes.profile.index.href()}>profile page</Link>, then get recommendations above.
             </p>
           ) : (
             <RunList runs={runs} returnTo={routes.recommendations.index.href()} />

@@ -140,15 +140,20 @@ does nothing on its own.
   pages drifted into putting their titles at different heights.
 - Every visible control renders through `app/ui/shared/form-controls.tsx`:
   `Button` (with a `variant` rather than a class string), `ButtonLink`,
-  `TextInput`, `Select` and `Textarea`, plus `buttonFrameClass` for a `<span>`
-  or `<summary>` that has to look like a button. Checkboxes and radios come
+  `Link` (every `<a>`, also with a `variant`, and `external` for a new tab),
+  `ToggleLabel` (a `<label>` that opens a modal or drawer), `TextInput`,
+  `Select` and `Textarea`, plus `buttonFrameClass` for a `<span>`
+  or `<summary>` that has to look like a button. A text control is named by
+  a `Field` — with `labelHidden` when the page around it already says what
+  it is, such as a search box, so a screen reader still gets a name. Checkboxes and radios come
   only as `CheckboxOption`/`RadioOption` — the control with its label and an
   optional `hint` under it — inside a `ChoiceGroup` (`<fieldset>` + `<legend>`)
   when several answer one question; there is no bare `Checkbox` to lay a label
   beside by hand. Their look is in `public/app.css`, because DoodleCSS is unlayered and
   a `css()` rule can't beat it. `test/form-controls.test.tsx` fails on a raw
-  `<button>`, `<input>`, `<select>` or `<textarea>` anywhere else; hidden inputs
-  and the invisible toggles CSS reads (tabs, modal, carousel) are listed there
+  `<button>`, `<input>`, `<select>`, `<textarea>`, `<a>` or `<label>` anywhere
+  else; hidden inputs, the invisible toggles CSS reads (tabs, modal, carousel)
+  and the components that own a `<label>` of their own are listed there
   with the reason. A call site's `mix` is for layout; a different look is a new
   variant — a `css()` look rule loses to Doodle's unlayered one and does nothing.
 - Colours come from the custom properties at the top of `public/app.css`

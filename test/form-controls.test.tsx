@@ -10,11 +10,14 @@ import {
   buttonFrameClass,
   CheckboxOption,
   ChoiceGroup,
+  Link,
   RadioOption,
   Select,
   Textarea,
   TextInput,
+  ToggleLabel,
 } from '../app/ui/shared/form-controls.tsx'
+import { Field } from '../app/ui/shared/field.tsx'
 
 describe('form controls', () => {
   it('maps a button variant to the class app.css draws it with', async () => {
@@ -66,6 +69,54 @@ describe('form controls', () => {
     )
     assert.equal(buttonFrameClass('primary'), 'doodle-border primary')
     assert.equal(buttonFrameClass('default', 'compact'), 'doodle-border compact')
+  })
+
+  it('maps a link variant to its class, and opens an external one in a new tab', async () => {
+    assert.equal(await renderToString(<Link href="/x">Log</Link>), '<a href="/x">Log</a>')
+    assert.equal(
+      await renderToString(
+        <Link href="/x" variant="wrap" tapArea>
+          x
+        </Link>,
+      ),
+      '<a href="/x" class="wrap-link tap-area">x</a>',
+    )
+    const external = await renderToString(
+      <Link href="https://example.com" external>
+        TMDB
+      </Link>,
+    )
+    for (const attribute of ['target="_blank"', 'rel="noopener noreferrer"']) {
+      assert.ok(external.includes(attribute), `${attribute} in ${external}`)
+    }
+  })
+
+  it('draws a toggle label as a link or on a button frame', async () => {
+    assert.equal(
+      await renderToString(
+        <ToggleLabel for="t" variant="link">
+          Go back
+        </ToggleLabel>,
+      ),
+      '<label for="t" class="toggle-label linkish">Go back</label>',
+    )
+    assert.equal(
+      await renderToString(
+        <ToggleLabel for="t" variant="primary">
+          Save
+        </ToggleLabel>,
+      ),
+      '<label for="t" class="modal-trigger toggle-label"><span class="doodle-border primary">Save</span></label>',
+    )
+  })
+
+  it('keeps a hidden field label for screen readers', async () => {
+    const html = await renderToString(
+      <Field label="Search people" labelHidden>
+        <TextInput name="q" />
+      </Field>,
+    )
+    assert.match(html, /<span class="visually-hidden[^"]*"[^>]*>Search people<\/span>/)
   })
 
   it('fixes each input to its type', async () => {
@@ -192,6 +243,20 @@ function openingTag(source: string, start: number): string {
   return source.slice(start)
 }
 
+// Links and labels, likewise: every <a> goes through Link, and every <label>
+// through Field, a choice option or ToggleLabel. These components own a
+// <label> of their own as part of how they work — the tab strip, a modal's
+// trigger, the stars — and the drop zone wraps its hidden file input in one.
+const OWNS_LABELS = new Set([
+  'app/ui/shared/field.tsx',
+  'app/ui/components/modal.tsx',
+  'app/ui/components/tabs.tsx',
+  'app/ui/components/image-carousel.tsx',
+  'app/ui/components/star-rating.tsx',
+  'app/ui/components/expandable-text.tsx',
+  'app/browser/letterboxd-import-form.tsx',
+])
+
 describe('raw form controls', () => {
   it('render only through app/ui/shared/form-controls.tsx', () => {
     const root = join(import.meta.dirname, '..')
@@ -211,12 +276,19 @@ describe('raw form controls', () => {
         const line = source.slice(0, match.index).split('\n').length
         found.push(`${file}:${line} <${match[1]}>`)
       }
+
+      // `<a` then whitespace or `>`, so `<abbr>` and `<area>` don't match.
+      for (const match of source.matchAll(/<(a|label)[\s>]/g)) {
+        if (match[1] === 'label' && OWNS_LABELS.has(file)) continue
+        const line = source.slice(0, match.index).split('\n').length
+        found.push(`${file}:${line} <${match[1]}>`)
+      }
     }
 
     assert.deepEqual(
       found,
       [],
-      'use Button, TextInput, Select, Textarea, CheckboxOption or RadioOption instead',
+      'use Button, Link, TextInput, Select, Textarea, Field, CheckboxOption, RadioOption or ToggleLabel instead',
     )
   })
 })

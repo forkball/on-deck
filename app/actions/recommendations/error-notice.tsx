@@ -1,5 +1,6 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
+import { Link } from '../../ui/shared/form-controls.tsx'
 
 // A link after the message, where there is somewhere to go about it — the run
 // already in progress, when that is why this one was refused.
@@ -27,7 +28,7 @@ export function ErrorNotice(handle: Handle<{ error: string; link?: ErrorLink }>)
         {link && (
           <>
             {' '}
-            <a href={link.href}>{link.label}</a>
+            <Link href={link.href}>{link.label}</Link>
           </>
         )}
       </p>

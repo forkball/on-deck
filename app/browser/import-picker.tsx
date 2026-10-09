@@ -3,6 +3,7 @@ import { clientEntry, css, on, ref } from 'remix/ui'
 import { count } from '../ui/shared/count.ts'
 import { postInPlace } from './shared/submit-in-place.ts'
 import { Button, TextInput } from '../ui/shared/form-controls.tsx'
+import { Field } from '../ui/shared/field.tsx'
 
 export type ImportPickerProps = {
   // Hrefs are built on the server so the route contract stays the one source of
@@ -243,15 +244,14 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                 </p>
               )}
 
-              <TextInput
-                value={query}
-                placeholder="Search the catalog…"
-                autocomplete="off"
-                mix={[
-                  css({ width: '100%', marginBottom: '6px' }),
-                  on('input', (event) => search((event.target as HTMLInputElement).value)),
-                ]}
-              />
+              <Field label="Search the catalog" labelHidden mix={css({ marginBottom: '6px' })}>
+                <TextInput
+                  value={query}
+                  placeholder="Search the catalog…"
+                  autocomplete="off"
+                  mix={on('input', (event) => search((event.target as HTMLInputElement).value))}
+                />
+              </Field>
               <p mix={css({ fontSize: '13px', color: 'var(--muted)', margin: '0 0 14px' })}>
                 {loading ? 'Searching…' : data ? resultsLine(data) : 'No results'}
               </p>

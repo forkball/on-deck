@@ -6,6 +6,7 @@ import type { LuckyPick } from '../data/recommendations/lucky.ts'
 import { mediaTypeUiFor } from '../mediaTypes.ts'
 import { routes } from '../routes.ts'
 import { withReturnTo } from '../ui/backLink.ts'
+import { Link } from '../ui/shared/form-controls.tsx'
 
 // What the day's pick is called, wherever it is named. Exported because the
 // home page heads its own column with it (see showLabel) and two copies of the
@@ -46,13 +47,13 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
     return (
       <div mix={css({ ...LUCKY_CARD_BOX, display: 'flex', gap: '14px' })}>
         {posterUrl ? (
-          <a href={pickHref} mix={css({ flex: '0 0 auto' })}>
+          <Link variant="wrap" href={pickHref} mix={css({ flex: '0 0 auto' })}>
             <img
               src={posterUrl}
               alt={`${pick.title} poster`}
               mix={css({ width: '72px', borderRadius: '4px', display: 'block' })}
             />
-          </a>
+          </Link>
         ) : (
           <div
             mix={css({
@@ -78,9 +79,7 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
             </p>
           )}
           <p mix={css({ margin: 0 })}>
-            <a href={pickHref} mix={css({ fontWeight: 700 })}>
-              {pick.title}
-            </a>
+            <Link href={pickHref}>{pick.title}</Link>
             {releaseYear ? ` (${releaseYear})` : ''}{' '}
             <span mix={css({ color: 'var(--muted)', fontSize: '13px' })}>· {ui.singular}</span>
           </p>

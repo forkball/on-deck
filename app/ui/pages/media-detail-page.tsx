@@ -21,7 +21,7 @@ import { stripPublisherPromo } from '../../data/catalog/blurb.ts'
 import { catalogPageFor } from '../../data/catalog/links.ts'
 import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { backLinkFrom, withReturnTo } from '../backLink.ts'
-import { Button, TextInput } from '../shared/form-controls.tsx'
+import { Button, Link, TextInput } from '../shared/form-controls.tsx'
 
 export interface MediaDetailPageProps {
   mediaType: ActiveMediaType
@@ -399,21 +399,19 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                       })}
                     >
                       <input type="hidden" name="return_to" value={returnTo} />
-                      <TextInput
-                        name="catalog_link"
-                        placeholder={ui.rematchPlaceholder}
-                        mix={css({ flex: '1 1 240px' })}
-                      />
+                      <Field
+                        label={`${ui.catalogName} link`}
+                        labelHidden
+                        mix={css({ flex: '1 1 240px', width: 'auto' })}
+                      >
+                        <TextInput name="catalog_link" placeholder={ui.rematchPlaceholder} />
+                      </Field>
                       <Button type="submit">Fix match</Button>
                     </form>
                     <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
-                      <a
-                        href={ui.catalogSearchUrl(item.title, releaseYear)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
+                      <Link href={ui.catalogSearchUrl(item.title, releaseYear)} external>
                         Look up "{item.title}" on {ui.catalogName}
-                      </a>
+                      </Link>
                     </p>
                     <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
                       This entry is shared: fixing the match repoints it for everyone who logged this{' '}
@@ -429,9 +427,9 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                     sitting between the panels. */}
               {catalogPage && (
                 <p mix={css({ margin: 0, fontSize: '14px' })}>
-                  <a href={catalogPage.url} target="_blank" rel="noopener noreferrer" class="tap-area">
+                  <Link href={catalogPage.url} external tapArea>
                     View on {catalogPage.name}
-                  </a>
+                  </Link>
                 </p>
               )}
             </div>

@@ -5,6 +5,7 @@ import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import type { RecommendationRunSummary } from '../../data/recommendations/runs.ts'
 import { routes } from '../../routes.ts'
 import { withReturnTo } from '../backLink.ts'
+import { Link } from '../shared/form-controls.tsx'
 
 // 'list' is a full-width row, everything on one line, the way the
 // recommendations index has always shown a run. 'feed' is the home page's
@@ -57,11 +58,11 @@ export function RunListItem(handle: Handle<RunListItemProps>) {
               }),
         })}
       >
-        <a href={runHref(run.id, returnTo)}>
+        <Link href={runHref(run.id, returnTo)}>
           {run.isLucky && '🎲 '}
           <strong>{run.name || date}</strong>
           {!feed && (run.name ? <> — {date}</> : <> — {run.groupLabel}</>)}
-        </a>
+        </Link>
 
         {/* Who made it, then when and with whom — the two lines the stacked row
             breaks out, since the link above is only the run's name.
@@ -74,7 +75,7 @@ export function RunListItem(handle: Handle<RunListItemProps>) {
           <>
             <p mix={css({ margin: '2px 0 0' })}>
               {run.owner ? (
-                <a href={routes.users.show.href({ userId: String(run.owner.id) })}>{run.owner.label}</a>
+                <Link href={routes.users.show.href({ userId: String(run.owner.id) })}>{run.owner.label}</Link>
               ) : (
                 'You'
               )}{' '}

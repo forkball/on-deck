@@ -19,7 +19,7 @@ import { Field } from '../shared/field.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { PlatformList } from '../components/platform-list.tsx'
 import { withReturnTo } from '../backLink.ts'
-import { Button } from '../shared/form-controls.tsx'
+import { Button, Link } from '../shared/form-controls.tsx'
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
@@ -117,14 +117,14 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                     })}
                   >
                     {posterUrl ? (
-                      <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
+                      <Link variant="wrap" href={detailHref} mix={css({ flex: '0 0 auto' })}>
                         <img
                           src={posterUrl}
                           alt={`${item.title} poster`}
                           loading="lazy"
                           mix={css({ width: '60px', borderRadius: '4px', display: 'block' })}
                         />
-                      </a>
+                      </Link>
                     ) : (
                       <div
                         mix={css({
@@ -137,9 +137,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                       />
                     )}
                     <div mix={css({ flex: '1 1 auto' })}>
-                      <a href={detailHref} mix={css({ fontWeight: 700 })}>
-                        {item.title}
-                      </a>
+                      <Link href={detailHref}>{item.title}</Link>
                       {releaseYear ? ` (${releaseYear})` : ''}
                       {/* Searching "Strata" returns one from 1981 and one from 2011, and
                           the card showed neither author — so the two were the same row to

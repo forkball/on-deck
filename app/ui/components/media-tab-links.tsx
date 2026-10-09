@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import { Link } from '../shared/form-controls.tsx'
 
 const PLACEHOLDER_TYPES: string[] = []
 
@@ -29,7 +30,6 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
     const tab = (type: ActiveMediaType) =>
       css({
         padding: '0 0 8px',
-        textDecoration: 'none',
         borderBottom: '2px solid transparent',
         '--tab-hue': MEDIA_TYPE_UI[type].hue,
       })
@@ -45,16 +45,17 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
         })}
       >
         {ACTIVE_MEDIA_TYPES.map((type) => (
-          <a
+          <Link
             key={type}
             href={hrefFor(type)}
             rmx-document=""
-            class="tap-area media-tab"
+            variant="tab"
+            tapArea
             aria-current={current === type ? 'page' : undefined}
             mix={tab(type)}
           >
             {MEDIA_TYPE_UI[type].tabLabel}
-          </a>
+          </Link>
         ))}
         {PLACEHOLDER_TYPES.map((label) => (
           <span key={label} mix={css({ padding: '0 0 8px', color: 'var(--rule)' })} title="Coming soon">

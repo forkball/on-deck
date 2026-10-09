@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { NotificationSummary } from '../../data/notifications.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
+import { Link } from '../../ui/shared/form-controls.tsx'
 
 export interface NotificationsPageProps {
   notifications: NotificationSummary[]
@@ -61,7 +62,7 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
                       nothing matching to patch the redirected page into, so the
                       tap appears to do nothing and the list is left stale.
                     */}
-                  <a
+                  <Link
                     href={routes.notifications.read.href({ notificationId: String(notification.id) })}
                     rmx-document=""
                   >
@@ -70,7 +71,7 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
                       ? 'started following you'
                       : 'ran recommendations you can view'}{' '}
                     — {date}
-                  </a>
+                  </Link>
                   {!notification.read && (
                     <span
                       mix={css({

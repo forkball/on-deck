@@ -9,6 +9,7 @@ import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { DrawLuckyForm } from '../../browser/draw-lucky-form.tsx'
 import type { FriendOption } from '../../browser/friend-picker.tsx'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import { Link } from '../../ui/shared/form-controls.tsx'
 
 export interface LuckyPickPageProps {
   friends: FriendOption[]
@@ -43,7 +44,10 @@ export function LuckyPickPage(handle: Handle<LuckyPickPageProps>) {
         {lucky.pick ? (
           <p mix={css({ margin: 0, color: 'var(--soft)' })}>
             You've already drawn today's pick —{' '}
-            <a href={routes.recommendations.show.href({ runId: String(lucky.pick.runId) })}>take a look</a>.
+            <Link href={routes.recommendations.show.href({ runId: String(lucky.pick.runId) })}>
+              take a look
+            </Link>
+            .
           </p>
         ) : (
           <DrawLuckyForm

@@ -7,6 +7,7 @@ import { UnconfirmedPick, UnconfirmedPickList } from './unconfirmed-pick.tsx'
 import { routes } from '../../routes.ts'
 import type { UnconfirmedRunDetail } from '../../data/recommendations/unconfirmed.ts'
 import { LUCKY_RUN_NAME } from '../../data/recommendations/lucky.ts'
+import { Link } from '../../ui/shared/form-controls.tsx'
 
 export interface UnconfirmedRunPageProps {
   run: UnconfirmedRunDetail
@@ -69,7 +70,7 @@ export function UnconfirmedRunPage(handle: Handle<UnconfirmedRunPageProps>) {
         <UnconfirmedPickList picks={run.picks} mediaType={run.mediaType} />
 
         <p mix={css({ marginTop: '24px' })}>
-          <a href={routes.recommendations.index.href()}>Generate a new run</a>
+          <Link href={routes.recommendations.index.href()}>Generate a new run</Link>
         </p>
       </Page>
     )

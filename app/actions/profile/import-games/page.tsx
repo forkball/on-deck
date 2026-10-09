@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import type { SteamImportResult } from '../../../data/imports/steam.ts'
 import { routes } from '../../../routes.ts'
 import { Page } from '../../../ui/components/page.tsx'
-import { Button } from '../../../ui/shared/form-controls.tsx'
+import { Button, Link } from '../../../ui/shared/form-controls.tsx'
 
 export interface SteamImportPageProps {
   displayName: string
@@ -60,7 +60,7 @@ function ImportSummary(handle: Handle<{ result: SteamImportResult }>) {
           </section>
         )}
         <p mix={css({ marginTop: '24px' })}>
-          <a href={routes.profile.index.href()}>Back to your profile →</a>
+          <Link href={routes.profile.index.href()}>Back to your profile →</Link>
         </p>
       </>
     )
@@ -106,7 +106,7 @@ export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
               Steam rather than uploaded.
             </p>
             <p>
-              <a href={routes.profile.edit.index.href()}>Connect Steam in settings →</a>
+              <Link href={routes.profile.edit.index.href()}>Connect Steam in settings →</Link>
             </p>
           </>
         )}

@@ -5,7 +5,7 @@ import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../components/page.tsx'
-import { Button } from '../shared/form-controls.tsx'
+import { Button, Link } from '../shared/form-controls.tsx'
 
 export interface FollowListPageProps {
   title: string
@@ -66,9 +66,9 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
                 >
                   <div mix={css({ minWidth: 0, overflowWrap: 'break-word' })}>
                     {canView ? (
-                      <a href={routes.users.show.href({ userId: String(user.id) })} class="tap-area">
+                      <Link href={routes.users.show.href({ userId: String(user.id) })} tapArea>
                         <strong>{displayLabel(user)}</strong>
-                      </a>
+                      </Link>
                     ) : (
                       <strong>{displayLabel(user)}</strong>
                     )}

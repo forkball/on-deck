@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import { NotificationBell } from '../../browser/notification-bell.tsx'
 import { ProfileMenu } from '../../browser/profile-menu.tsx'
 import { routes } from '../../routes.ts'
+import { Link } from '../shared/form-controls.tsx'
 
 // The widest a page gets: Page's `wide` column matches it, so wide content
 // lines up with the nav above it.
@@ -31,13 +32,9 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
             padding: '16px 24px',
           })}
         >
-          <a
-            href={routes.home.href()}
-            class="tap-area brand"
-            mix={css({ fontWeight: 700, textDecoration: 'none' })}
-          >
+          <Link href={routes.home.href()} variant="brand" tapArea>
             On Deck
-          </a>
+          </Link>
           {authed ? (
             <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: 'auto' })}>
               <NotificationBell
@@ -61,12 +58,12 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
             </div>
           ) : (
             <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: 'auto' })}>
-              <a href={routes.auth.login.index.href()} class="tap-area">
+              <Link href={routes.auth.login.index.href()} tapArea>
                 Log in
-              </a>
-              <a href={routes.auth.signup.index.href()} class="tap-area">
+              </Link>
+              <Link href={routes.auth.signup.index.href()} tapArea>
                 Sign up
-              </a>
+              </Link>
             </div>
           )}
         </div>

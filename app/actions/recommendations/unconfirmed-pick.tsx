@@ -5,6 +5,7 @@ import type { MediaType } from '../../data/mediaItems.ts'
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { ModelProvided } from './model-provided.tsx'
 import type { UnmatchedPick } from '../../data/recommendations/unmatched.ts'
+import { Link } from '../../ui/shared/form-controls.tsx'
 
 const REASON_NOTE =
   'Written by the model from the taste profile this run was built on. The catalog has no entry we could match, so nothing has checked it.'
@@ -31,14 +32,9 @@ export function UnconfirmedPick(handle: Handle<{ pick: UnmatchedPick; mediaType:
           <ModelProvided note={REASON_NOTE}>{pick.reason}</ModelProvided>
         </p>
         <p mix={css({ margin: '8px 0 0', fontSize: '13px' })}>
-          <a
-            href={ui.catalogSearchUrl(pick.title, pick.year)}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="tap-area"
-          >
+          <Link href={ui.catalogSearchUrl(pick.title, pick.year)} external tapArea>
             Search {ui.catalogName}
-          </a>
+          </Link>
         </p>
       </div>
     )

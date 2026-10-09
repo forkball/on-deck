@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import { routes } from '../../../routes.ts'
 import { LetterboxdImportForm } from '../../../browser/letterboxd-import-form.tsx'
 import { Page } from '../../../ui/components/page.tsx'
+import { Link } from '../../../ui/shared/form-controls.tsx'
 
 export interface GoodreadsImportPageProps {
   displayName: string
@@ -19,8 +20,8 @@ export function GoodreadsImportPage(handle: Handle<GoodreadsImportPageProps>) {
       <Page heading="Import from Goodreads" displayName={displayName}>
         {pendingHref && (
           <div mix={css({ fontSize: '14px', marginBottom: '12px' })}>
-            You have an import waiting. <a href={pendingHref}>Pick it back up</a> — uploading again starts
-            over.
+            You have an import waiting. <Link href={pendingHref}>Pick it back up</Link> — uploading again
+            starts over.
           </div>
         )}
 

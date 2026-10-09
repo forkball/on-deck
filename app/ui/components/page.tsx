@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { BackLink } from '../backLink.ts'
 import { Document } from './document.tsx'
 import { Nav, NAV_WIDTH } from './nav.tsx'
+import { Link } from '../shared/form-controls.tsx'
 
 // The three column widths a page comes in. `wide` is the nav's own width, for
 // pages whose content is itself wide — tabs, result grids, a poster beside its
@@ -50,9 +51,9 @@ export function Page(handle: Handle<PageProps>) {
         <main mix={MAIN_STYLES[width]}>
           {back && (
             <p mix={backStyle}>
-              <a href={back.href} class="tap-area">
+              <Link href={back.href} tapArea>
                 {back.label}
-              </a>
+              </Link>
             </p>
           )}
           {heading !== undefined && <h1>{heading}</h1>}

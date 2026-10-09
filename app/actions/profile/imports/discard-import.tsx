@@ -2,7 +2,7 @@ import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { Modal } from '../../../ui/components/modal.tsx'
-import { Button } from '../../../ui/shared/form-controls.tsx'
+import { Button, ToggleLabel } from '../../../ui/shared/form-controls.tsx'
 
 const DISCARD_TOGGLE = 'import-discard-toggle'
 
@@ -17,9 +17,9 @@ export function DiscardImport(
 
     return (
       <div>
-        <label for={DISCARD_TOGGLE} class="linkish">
+        <ToggleLabel for={DISCARD_TOGGLE} variant="link">
           {label}
-        </label>
+        </ToggleLabel>
         <Modal id={DISCARD_TOGGLE} closeButton={false} title="Discard this import?">
           <p mix={css({ margin: '0 0 16px' })}>{children}</p>
           <div mix={css({ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' })}>
@@ -28,9 +28,9 @@ export function DiscardImport(
                 Yes, discard it
               </Button>
             </form>
-            <label for={DISCARD_TOGGLE} class="linkish">
+            <ToggleLabel for={DISCARD_TOGGLE} variant="link">
               {cancelLabel}
-            </label>
+            </ToggleLabel>
           </div>
         </Modal>
       </div>

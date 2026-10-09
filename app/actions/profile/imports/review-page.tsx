@@ -30,7 +30,13 @@ import { Collapsible } from '../../../ui/shared/collapsible.tsx'
 import { count } from '../../../ui/shared/count.ts'
 import { Field } from '../../../ui/shared/field.tsx'
 import { StarRatingDisplay } from '../../../ui/components/star-rating.tsx'
-import { Button, buttonFrameClass, type ButtonVariant, TextInput } from '../../../ui/shared/form-controls.tsx'
+import {
+  Button,
+  Link,
+  TextInput,
+  ToggleLabel,
+  type ButtonVariant,
+} from '../../../ui/shared/form-controls.tsx'
 import { DiscardImport } from './discard-import.tsx'
 
 export interface ImportReviewPageProps {
@@ -714,6 +720,7 @@ const drawerStyle = css({
   '& .drawer-arrow::before': { content: '"▲"' },
   // Here, not in its own css(): each css() is its own cascade layer.
   '& .drawer-row': { display: 'flex', alignItems: 'center', gap: '8px 12px', padding: '8px 0 4px' },
+  '& .drawer-label': { fontSize: '13px', color: 'var(--soft)' },
   [`${drawerOpen} .drawer-panel`]: { display: 'block' },
   [`${drawerOpen} .drawer-arrow::before`]: { content: '"▼"' },
   // Points at the checklist's accepts only while they're out of sight.
@@ -783,9 +790,9 @@ function LastLine(handle: Handle<{ batchId: string; last: LastAction }>) {
         </>
       )
       end = (
-        <a href={`#${one ? rowAnchor(only!.id) : groupAnchor(last.section)}`} class="linkish">
+        <Link href={`#${one ? rowAnchor(only!.id) : groupAnchor(last.section)}`} variant="subtle">
           Show {one ? 'it' : 'them'}
-        </a>
+        </Link>
       )
     }
 
@@ -889,9 +896,9 @@ function ReviewDrawer(
                   {section.open ? '○' : '✓'}
                 </span>
                 {section.open ? (
-                  <a href={section.href} mix={css({ flex: '1 1 auto' })}>
+                  <Link href={section.href} mix={css({ flex: '1 1 auto' })}>
                     {section.title}
-                  </a>
+                  </Link>
                 ) : (
                   <span mix={css({ flex: '1 1 auto', color: 'var(--muted)' })}>{section.title}</span>
                 )}
@@ -916,17 +923,10 @@ function ReviewDrawer(
         </div>
 
         <div class="drawer-row">
-          <label
+          <ToggleLabel
             for={DRAWER_TOGGLE}
-            class="tap-area"
-            mix={css({
-              flex: '1 1 auto',
-              minWidth: 0,
-              whiteSpace: 'nowrap',
-              cursor: 'pointer',
-              fontSize: '13px',
-              color: 'var(--soft)',
-            })}
+            class="tap-area drawer-label"
+            mix={css({ flex: '1 1 auto', minWidth: 0, whiteSpace: 'nowrap' })}
           >
             <span
               class="drawer-arrow"
@@ -937,7 +937,7 @@ function ReviewDrawer(
             {quickAccepts > 0 && (
               <span class="drawer-hint">{count(quickAccepts, 'quick accept', 'quick accepts')} in here</span>
             )}
-          </label>
+          </ToggleLabel>
           <div mix={css({ display: 'flex', alignItems: 'center', gap: '14px', flex: '0 0 auto' })}>
             <DiscardImport
               href={routes.profile.imports.discard.href({ batchId })}
@@ -948,12 +948,10 @@ function ReviewDrawer(
               and you can upload the file again.
             </DiscardImport>
             {needsConfirm ? (
-              // Opens the Modal below; styled on the span because DoodleCSS pads <label>.
-              <label for={CONFIRM_TOGGLE} mix={css({ cursor: 'pointer' })}>
-                <span class={buttonFrameClass('primary')} mix={css({ display: 'inline-block' })}>
-                  {saveLabel}
-                </span>
-              </label>
+              // Opens the Modal below.
+              <ToggleLabel for={CONFIRM_TOGGLE} variant="primary">
+                {saveLabel}
+              </ToggleLabel>
             ) : (
               saveForm(saveLabel)
             )}
@@ -982,12 +980,9 @@ function ReviewDrawer(
               })}
             >
               {saveForm(confirmLabel)}
-              <label
-                for={CONFIRM_TOGGLE}
-                mix={css({ cursor: 'pointer', color: 'var(--muted)', textDecoration: 'underline' })}
-              >
+              <ToggleLabel for={CONFIRM_TOGGLE} variant="link">
                 Go back
-              </label>
+              </ToggleLabel>
             </div>
           </Modal>
         )}
@@ -1109,9 +1104,9 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   {model.uncertain.map(({ row, item }) => (
                     <li key={row.id} mix={css({ marginBottom: '4px' })}>
                       {item ? (
-                        <a href={hrefs.show(item.id)}>
+                        <Link href={hrefs.show(item.id)}>
                           {item.title} {item.releaseYear ?? ''}
-                        </a>
+                        </Link>
                       ) : (
                         row.title
                       )}
@@ -1133,9 +1128,9 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
               </Collapsible>
             )}
             <p>
-              <a href={routes.profile.watched.href()}>See my log</a>
+              <Link href={routes.profile.watched.href()}>See my log</Link>
               {' · '}
-              <a href={routes.profile.importMovies.index.href()}>Import another file</a>
+              <Link href={routes.profile.importMovies.index.href()}>Import another file</Link>
             </p>
 
             {/* An export is a snapshot; the feed keeps it current. Offered, not done for them. */}

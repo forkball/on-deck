@@ -1,5 +1,6 @@
 import type { Handle } from 'remix/ui'
 import { clientEntry, css, ref } from 'remix/ui'
+import { Link } from '../ui/shared/form-controls.tsx'
 
 // Polls for the stage a run is actually in. Every label comes from the server
 // having entered that stage, so progress can't run backwards or be invented.
@@ -205,11 +206,11 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
         return (
           <p mix={css({ display: 'flex', flexWrap: 'wrap', gap: '16px' })}>
             {stopped.reload ? (
-              <a href="">Reload to check</a>
+              <Link href="">Reload to check</Link>
             ) : (
-              <a href={handle.props.formHref}>Back to recommendations</a>
+              <Link href={handle.props.formHref}>Back to recommendations</Link>
             )}
-            <a href={handle.props.homeHref}>Home</a>
+            <Link href={handle.props.homeHref}>Home</Link>
           </p>
         )
       }

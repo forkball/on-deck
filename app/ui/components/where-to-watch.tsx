@@ -10,7 +10,7 @@ import {
 } from '../../data/watchRegion.ts'
 import { routes } from '../../routes.ts'
 import { FloatingDropdown } from './floating-dropdown.tsx'
-import { Button } from '../shared/form-controls.tsx'
+import { Button, Link } from '../shared/form-controls.tsx'
 
 export interface WhereToWatchProps {
   // What the JustWatch link searches for.
@@ -111,9 +111,9 @@ export function WhereToWatch(handle: Handle<WhereToWatchProps>) {
             about renting or buying. It is also the credit TMDB's terms ask
             for wherever this data appears, so it names JustWatch outright. */}
         <p mix={css({ margin: '4px 0 0', fontSize: '14px' })}>
-          <a href={justWatchSearchUrl(region, title)} target="_blank" rel="noopener noreferrer">
+          <Link href={justWatchSearchUrl(region, title)} external>
             See all options on JustWatch
-          </a>
+          </Link>
         </p>
       </section>
     )

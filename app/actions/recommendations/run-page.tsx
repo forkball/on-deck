@@ -23,7 +23,7 @@ import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
 import { statusBadgeColor, statusLabelsFor } from '../../interactionStatus.ts'
 import { backLinkFrom, withReturnTo } from '../../ui/backLink.ts'
-import { Button } from '../../ui/shared/form-controls.tsx'
+import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 const SOURCE_LABELS: Record<MediaType, string> = {
   movie: 'Movie taste',
@@ -225,13 +225,13 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                   })}
                 >
                   {posterUrl ? (
-                    <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
+                    <Link variant="wrap" href={detailHref} mix={css({ flex: '0 0 auto' })}>
                       <img
                         src={posterUrl}
                         alt={`${item.title} poster`}
                         mix={css({ width: '60px', borderRadius: '4px', display: 'block' })}
                       />
-                    </a>
+                    </Link>
                   ) : (
                     <div
                       mix={css({
@@ -244,9 +244,7 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                     />
                   )}
                   <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
-                    <a href={detailHref} mix={css({ fontWeight: 700 })}>
-                      {item.title}
-                    </a>
+                    <Link href={detailHref}>{item.title}</Link>
                     {releaseYear ? ` (${releaseYear})` : ''}
                     {interaction && (
                       <div mix={css({ marginTop: '4px' })}>

@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import { routes } from '../../../routes.ts'
 import { Page } from '../../../ui/components/page.tsx'
 import { Field } from '../../../ui/shared/field.tsx'
-import { Button, TextInput } from '../../../ui/shared/form-controls.tsx'
+import { Button, Link, TextInput } from '../../../ui/shared/form-controls.tsx'
 
 export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
   return () => {
@@ -30,7 +30,7 @@ export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
           </Button>
         </form>
         <p>
-          Need an account? <a href={routes.auth.signup.index.href()}>Sign up</a>
+          Need an account? <Link href={routes.auth.signup.index.href()}>Sign up</Link>
         </p>
       </Page>
     )

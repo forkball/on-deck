@@ -16,7 +16,7 @@ import { Page } from '../../ui/components/page.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
-import { Button } from '../../ui/shared/form-controls.tsx'
+import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
@@ -99,7 +99,7 @@ function LoggedList(
         </ul>
         {seeAllHref && total > log.length && (
           <p mix={css({ marginTop: '16px' })}>
-            <a href={seeAllHref}>See all {total} →</a>
+            <Link href={seeAllHref}>See all {total} →</Link>
           </p>
         )}
       </>
@@ -156,13 +156,13 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
             </>
           ) : (
             <>
-              <a href={routes.users.following.href({ userId: String(user.id) })}>
+              <Link href={routes.users.following.href({ userId: String(user.id) })}>
                 {followingCount} following
-              </a>{' '}
+              </Link>{' '}
               ·{' '}
-              <a href={routes.users.followers.href({ userId: String(user.id) })}>
+              <Link href={routes.users.followers.href({ userId: String(user.id) })}>
                 {followersCount} follower{followersCount === 1 ? '' : 's'}
-              </a>
+              </Link>
             </>
           )}
         </p>

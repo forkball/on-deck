@@ -6,7 +6,7 @@ import type { FeedCursor, FeedItem } from '../data/feed.ts'
 import type { LuckyState } from '../data/recommendations/lucky.ts'
 import { luckyRecommendationsHref, routes } from '../routes.ts'
 import { Page } from '../ui/components/page.tsx'
-import { ButtonLink } from '../ui/shared/form-controls.tsx'
+import { ButtonLink, Link } from '../ui/shared/form-controls.tsx'
 import { LUCKY_CARD_BOX, LUCKY_PICK_LABEL, LuckyPickCard } from './lucky-pick-card.tsx'
 import { FEED_LIST_ID, FeedList } from './activity-feed.tsx'
 
@@ -136,7 +136,7 @@ function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
             <Empty>Quiet so far — nothing logged yet.</Empty>
           ) : (
             <Empty>
-              Nothing here yet — <a href={routes.users.search.href()}>find people</a> to follow.
+              Nothing here yet — <Link href={routes.users.search.href()}>find people</Link> to follow.
             </Empty>
           )}
         </Section>
@@ -172,9 +172,9 @@ function Pitch() {
         >
           Log in
         </ButtonLink>
-        <a href={routes.auth.signup.index.href()} class="tap-area">
+        <Link href={routes.auth.signup.index.href()} tapArea>
           Sign up
-        </a>
+        </Link>
       </div>
     </>
   )

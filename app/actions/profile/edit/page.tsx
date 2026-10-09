@@ -10,7 +10,14 @@ import { PasswordConfirmModal } from '../../../ui/components/password-confirm-mo
 import { Field } from '../../../ui/shared/field.tsx'
 import { Tabs } from '../../../ui/components/tabs.tsx'
 import { Connections, type ConnectionsProps } from './connections.tsx'
-import { Button, CheckboxOption, Select, TextInput, Textarea } from '../../../ui/shared/form-controls.tsx'
+import {
+  Button,
+  CheckboxOption,
+  Link,
+  Select,
+  Textarea,
+  TextInput,
+} from '../../../ui/shared/form-controls.tsx'
 
 // The three things this page holds have nothing to do with each other beyond
 // belonging to the same account, and each is its own form with its own submit —
@@ -190,9 +197,9 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
                     <Button type="submit" variant="primary">
                       Save changes
                     </Button>
-                    <a href={routes.profile.password.index.href()} mix={css({ marginLeft: 'auto' })}>
+                    <Link href={routes.profile.password.index.href()} mix={css({ marginLeft: 'auto' })}>
                       Change password
-                    </a>
+                    </Link>
                   </div>
                 </form>
               ),

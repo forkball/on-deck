@@ -3,7 +3,7 @@ import { css } from 'remix/ui'
 
 import { routes } from '../../../routes.ts'
 import { Field } from '../../../ui/shared/field.tsx'
-import { Button, TextInput } from '../../../ui/shared/form-controls.tsx'
+import { Button, Link, TextInput } from '../../../ui/shared/form-controls.tsx'
 
 // The accounts On Deck reads from, on the page where the rest of the account
 // lives. They used to sit on their own import pages — beside the uploader that
@@ -145,8 +145,8 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
             {!historyImported && (
               <p mix={css({ margin: '12px 0 0', fontSize: '13px', color: 'var(--soft)' })}>
                 <strong>Your earlier films aren't here yet.</strong>{' '}
-                <a href={routes.profile.importMovies.index.href()}>Import your Letterboxd export</a> to bring
-                them across.
+                <Link href={routes.profile.importMovies.index.href()}>Import your Letterboxd export</Link> to
+                bring them across.
               </p>
             )}
 
@@ -176,7 +176,7 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
             <p mix={NOTE}>
               Follows what you log from the moment you connect — new diary entries, with their rating and
               review. Nothing from before, and no lists or watchlist. Your existing films come from the{' '}
-              <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
+              <Link href={routes.profile.importMovies.index.href()}>Letterboxd import</Link>.
             </p>
             <form
               method="post"
@@ -238,8 +238,8 @@ function SteamBlock(handle: Handle<{ connection: SteamConnection }>) {
             )}
             <p mix={NOTE}>
               Unlike Letterboxd, nothing is read until you ask for it —{' '}
-              <a href={routes.profile.importGames.index.href()}>import your library</a> to bring your games
-              across.
+              <Link href={routes.profile.importGames.index.href()}>import your library</Link> to bring your
+              games across.
             </p>
             <form
               method="post"
@@ -268,9 +268,9 @@ function SteamBlock(handle: Handle<{ connection: SteamConnection }>) {
               is a document navigation, not a data fetch.
             */}
             <p mix={css({ marginTop: '12px' })}>
-              <a href={routes.profile.steam.connect.href()} rmx-document="" class="tap-area">
+              <Link href={routes.profile.steam.connect.href()} rmx-document="" tapArea>
                 Sign in through Steam →
-              </a>
+              </Link>
             </p>
           </>
         )}
