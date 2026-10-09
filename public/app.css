@@ -17,7 +17,11 @@
    on --paper: --muted at 5.5 replaces #888, which was 3.3.
 
    --accent is the one colour that means "you can act on this": links, the
-   primary button, the active tab, the focus ring. The four media-type hues
+   primary button, the active tab, the focus ring. It is a dusty video-store
+   blue, and --marquee the faded gold that goes with it, as on the back wall
+   of a rental shop: a nod, not a logo. Gold is too light to read as text on
+   the paper (1.7:1), so it is only ever a fill or a line: the brand's ticket,
+   a tab's underline, selected text. The four media-type hues
    mark which kind of thing a card or tab is; MEDIA_TYPE_UI names them, so
    code picks one by type rather than by hex. */
 :root {
@@ -30,8 +34,10 @@
   --soft: #5a534b;
   --text: #3c3c3c;
   --ink: #1c1c1c;
-  --accent: #3e5c76;
-  --accent-strong: #2f4a61;
+  --accent: #2b4c7e;
+  --accent-strong: #1f3a63;
+  --marquee: #e8b931;
+  --marquee-soft: #f3d27a;
   --danger: #b91c1c;
   --success: #15803d;
   --movie: #a2442f;
@@ -44,6 +50,27 @@
    heading, so nothing on a page said which words go somewhere. */
 .doodle a {
   color: var(--accent);
+}
+
+/* The wordmark as a torn ticket stub: soft gold, blue type, notched at both
+   ends and set a little off square. The mask cuts the notches, so the shape
+   holds whatever the text's width. Here because `.doodle a` sets the colour
+   unlayered. */
+.doodle a.brand {
+  display: inline-block;
+  padding: 2px 12px;
+  color: var(--accent);
+  background: var(--marquee-soft);
+  border-radius: 2px;
+  transform: rotate(-2deg);
+  mask:
+    radial-gradient(circle 5px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 5px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+}
+
+::selection {
+  background: var(--marquee-soft);
+  color: var(--ink);
 }
 
 /* The media-type tabs that are links (MediaTabLinks): quiet until current,

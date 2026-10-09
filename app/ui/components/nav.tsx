@@ -14,7 +14,13 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
     const { authed, displayName } = handle.props
 
     return (
-      <nav mix={css({ borderBottom: '1px solid var(--rule)', fontSize: '14px' })}>
+      <nav
+        mix={css({
+          borderTop: '4px solid var(--accent)',
+          borderBottom: '1px solid var(--rule)',
+          fontSize: '14px',
+        })}
+      >
         <div
           mix={css({
             display: 'flex',
@@ -27,7 +33,7 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
         >
           <a
             href={routes.home.href()}
-            class="tap-area"
+            class="tap-area brand"
             mix={css({ fontWeight: 700, textDecoration: 'none' })}
           >
             On Deck
