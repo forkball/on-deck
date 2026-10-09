@@ -159,7 +159,7 @@ does nothing on its own.
 - Colours come from the custom properties at the top of `public/app.css`
   (`var(--muted)`, `var(--rule)`, `var(--accent)`…), not hex literals at call
   sites. That is how ~50 copies of `#888`, which fails contrast on the cream
-  paper, had accumulated. A media type's colour is `MEDIA_TYPE_UI[type].hue`.
+  paper, had accumulated. A media type's colour is `MEDIA_TYPE_UI[type].hue`, for marking a card; tabs stay one colour.
 - Tests live in `test/`, usually one file per module under test
   (`import-review.test.ts` covers `data/imports/review.ts`), though a few cover
   a pair — `lucky.test.ts` holds both `lucky` and `exclusions`. `npm test` runs

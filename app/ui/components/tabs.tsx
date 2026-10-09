@@ -21,9 +21,6 @@ export interface TabDefinition {
   id: string
   label: string
   panel: RemixNode
-  // The active tab's text and underline. Unless given, the text is the accent
-  // and the underline the marquee gold; media tabs pass their type's hue.
-  color?: string
 }
 
 export interface TabsProps {
@@ -58,13 +55,13 @@ function tabsStyle(idPrefix: string, tabs: TabDefinition[]): CSSStyle {
     },
   }
 
-  for (const { id, color } of tabs) {
+  for (const { id } of tabs) {
     style[`& .panel-${id}`] = { display: 'none' }
     style[`&:has(#${idPrefix}-tab-${id}:checked) .panel-${id}`] = { display: 'block' }
     style[`&:has(#${idPrefix}-tab-${id}:checked) label[for="${idPrefix}-tab-${id}"]`] = {
-      color: color ?? 'var(--accent)',
+      color: 'var(--accent)',
       fontWeight: 700,
-      borderBottomColor: color ?? 'var(--marquee)',
+      borderBottomColor: 'var(--marquee)',
     }
   }
 

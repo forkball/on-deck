@@ -25,14 +25,8 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
     const { current, hrefFor } = handle.props
 
     // Colour and weight are in public/app.css (`a.media-tab`): `.doodle a` is
-    // unlayered, so a css() colour here is dropped. What this sets is the
-    // type's hue, which that rule reads for the current tab.
-    const tab = (type: ActiveMediaType) =>
-      css({
-        padding: '0 0 8px',
-        borderBottom: '2px solid transparent',
-        '--tab-hue': MEDIA_TYPE_UI[type].hue,
-      })
+    // unlayered, so a css() colour here is dropped.
+    const tab = css({ padding: '0 0 8px', borderBottom: '2px solid transparent' })
 
     return (
       <div
@@ -52,7 +46,7 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
             variant="tab"
             tapArea
             aria-current={current === type ? 'page' : undefined}
-            mix={tab(type)}
+            mix={tab}
           >
             {MEDIA_TYPE_UI[type].tabLabel}
           </Link>

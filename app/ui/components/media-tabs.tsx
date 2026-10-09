@@ -34,7 +34,6 @@ export function MediaTabs(handle: Handle<MediaTabsProps>) {
       ...ACTIVE_MEDIA_TYPES.map((type) => ({
         id: MEDIA_TYPE_UI[type].slug,
         label: capitalize(MEDIA_TYPE_UI[type].slug),
-        color: MEDIA_TYPE_UI[type].hue,
         // A wired-up media type whose caller hasn't supplied a panel would
         // otherwise render as a blank tab, which reads as broken rather than
         // unfinished.

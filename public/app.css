@@ -24,7 +24,7 @@
    of a rental shop: a nod, not a logo. Gold is too light to read as text on
    the paper (1.7:1), so it is only ever a fill or a line: the brand's ticket,
    a tab's underline, selected text. The four media-type hues
-   mark which kind of thing a card or tab is; MEDIA_TYPE_UI names them, so
+   mark which kind of thing a card is; MEDIA_TYPE_UI names them, so
    code picks one by type rather than by hex. */
 :root {
   --paper: #fdf7f1;
@@ -115,7 +115,9 @@
 }
 
 /* The media-type tabs that are links (MediaTabLinks): quiet until current,
-   then bold in the type's own hue, which the component sets as --tab-hue.
+   then the same as every other tab (tabs.tsx) — bold blue over a gold line.
+   Not the type's own hue: four colours along one tab strip read as four
+   different controls. The hue is for marking a card, where it stands alone.
    Here because `.doodle a` would otherwise make every one of them a bold
    accent link. */
 .doodle a.media-tab {
@@ -125,9 +127,9 @@
 }
 
 .doodle a.media-tab[aria-current] {
-  color: var(--tab-hue, var(--accent));
+  color: var(--accent);
   font-weight: bold;
-  border-bottom-color: var(--tab-hue, var(--accent));
+  border-bottom-color: var(--marquee);
 }
 
 /* Focus in the accent too, so it reads as the app's own rather than as a
