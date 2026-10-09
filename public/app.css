@@ -23,8 +23,8 @@
    blue, and --marquee-soft the faded gold that goes with it, as on the back
    wall of a rental shop: a nod, not a logo. Gold is too light to read as text
    or a thin line on the paper, so it is only ever a fill: the brand's ticket
-   and selected text. The four media-type hues
-   mark which kind of thing a card is; MEDIA_TYPE_UI names them, so
+   and selected text. The four media-type tokens
+   (placeholders for now) mark which kind of thing a card is; MEDIA_TYPE_UI names them, so
    code picks one by type rather than by hex. */
 :root {
   --paper: #fdf7f1;
@@ -41,10 +41,15 @@
   --marquee-soft: #f3d27a;
   --danger: #b91c1c;
   --success: #15803d;
-  --movie: #a2442f;
-  --tv: #6a4c93;
-  --book: #2f6b4f;
-  --game: #9a6210;
+  /* Media-type colours are not chosen yet. Each type has its own token, so
+     cards and the type tag are already marked by type and get their colour
+     here in one place; until then all four share this neutral placeholder.
+     Whatever replaces it only ever draws a line or a dot, never text. */
+  --media-placeholder: #b8ab96;
+  --movie: var(--media-placeholder);
+  --tv: var(--media-placeholder);
+  --book: var(--media-placeholder);
+  --game: var(--media-placeholder);
 }
 
 /* Links take the accent. Doodle makes them bold #1c1c1c, the same ink as a

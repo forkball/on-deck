@@ -30,7 +30,8 @@ interface MediaTypeUi {
   slug: string
   tabLabel: string
   // The type's colour: a custom property from public/app.css, so a page marks
-  // a card as this type without knowing the hex.
+  // a card or the type tag without knowing the hex. All four are one
+  // placeholder until the colours are chosen; that is app.css's to change.
   hue: string
   singular: string
   plural: string

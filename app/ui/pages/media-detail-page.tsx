@@ -22,6 +22,7 @@ import { catalogPageFor } from '../../data/catalog/links.ts'
 import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { backLinkFrom, withReturnTo } from '../backLink.ts'
 import { Button, Link, TextInput } from '../shared/form-controls.tsx'
+import { MediaTypeTag } from '../components/media-type-tag.tsx'
 
 export interface MediaDetailPageProps {
   mediaType: ActiveMediaType
@@ -302,6 +303,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
             })}
           >
             <div mix={css({ display: 'flex', flexDirection: 'column', gap: '8px', [PHONE]: { order: 2 } })}>
+              <MediaTypeTag type={mediaType} />
               <h1 mix={css({ margin: '0 0 4px' })}>{item.title}</h1>
               {tagline && (
                 <p mix={css({ margin: 0, color: 'var(--soft)', fontStyle: 'italic' })}>{tagline}</p>
