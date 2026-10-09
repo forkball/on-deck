@@ -37,7 +37,6 @@
   --text: #3c3c3c;
   --ink: #1c1c1c;
   --accent: #2b4c7e;
-  --accent-strong: #1f3a63;
   --marquee-soft: #f3d27a;
   --danger: #b91c1c;
   --success: #15803d;
@@ -249,14 +248,10 @@
 
 /* A secondary button's label follows its frame into the accent, so hover
    says "this one" in the same colour as the line around it. Only the plain
-   frame: every other variant (primary, danger, the text-like ones) states its
-   own colours below and keeps them. */
-.doodle
-  button:not(.primary, .danger, .linkish, .bare, .checkline, .plain, .menu-choice, .menu-link):hover:not(
-    :disabled
-  ),
-.doodle
-  button:not(.primary, .danger, .linkish, .bare, .checkline, .plain, .menu-choice, .menu-link):focus-visible,
+   frame — Button's default variant, class `secondary` — so every other
+   variant keeps the colours it states below. */
+.doodle button.secondary:hover:not(:disabled),
+.doodle button.secondary:focus-visible,
 .doodle .doodle-border:not(.primary):hover,
 .doodle .doodle-border:not(.primary):focus-visible {
   color: var(--accent);
@@ -264,11 +259,16 @@
 
 /* Primary: the hand-drawn shape filled with the accent, so the one action a
    form exists for is the one solid thing on it. `fill` paints the image's
-   middle too. Listed with hover and focus because the generic hover rule
-   above outranks a bare `.primary` and would swap the fill back to an
-   outline, leaving paper-coloured text on paper. */
+   middle too. Hover and focus are listed because the generic hover rule above
+   swaps every button's frame for the outline one, which would leave
+   paper-coloured text on paper; they keep the same image and darken it, so
+   there is no second image to fetch on first hover. */
 .doodle button.primary,
-.doodle .doodle-border.primary {
+.doodle .doodle-border.primary,
+.doodle button.primary:hover:not(:disabled),
+.doodle .doodle-border.primary:hover,
+.doodle button.primary:focus-visible,
+.doodle .doodle-border.primary:focus-visible {
   border-image: url(/button-primary.svg) 10 fill / 10px stretch;
   color: var(--paper);
 }
@@ -277,8 +277,7 @@
 .doodle .doodle-border.primary:hover,
 .doodle button.primary:focus-visible,
 .doodle .doodle-border.primary:focus-visible {
-  border-image: url(/button-primary-hover.svg) 10 fill / 10px stretch;
-  color: var(--paper);
+  filter: brightness(0.82);
 }
 
 .doodle button.primary:focus-visible,
@@ -341,12 +340,15 @@
   padding: 0 14px;
 }
 
-/* The floating-action variant is deliberately larger. Listed after the rule
-   above at equal specificity so it wins, and unlayered like the rest —
-   the css() rules the components use are layered, and layered always loses
-   to unlayered no matter the specificity. */
-.doodle .modal-fab {
+/* The floating-action trigger (Modal's `fab`) is deliberately larger, and
+   floats over the page, so it carries its own paper and shadow. More specific
+   than the rule above, and unlayered like the rest — a css() rule on the span
+   would be layered and lose to it. */
+.doodle label.modal-fab > .doodle-border {
   padding: 14px 22px;
+  text-align: center;
+  background-color: var(--paper);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
 /* The other half of a form row: a <select> or text <input> beside a button
@@ -589,7 +591,8 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
    and rating chip above. */
 .doodle button.linkish,
 .doodle a.linkish,
-.doodle label.linkish {
+.doodle label.linkish,
+.doodle span.linkish {
   padding: 0;
   cursor: pointer;
   font-weight: normal;
@@ -600,7 +603,8 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 
 .doodle button.linkish:hover,
 .doodle a.linkish:hover,
-.doodle label.linkish:hover {
+.doodle label.linkish:hover,
+.doodle summary:hover > span.linkish {
   color: var(--text);
 }
 

@@ -18,7 +18,8 @@ import type { Handle, Props, RemixNode } from 'remix/ui'
 // site's layout styles and event handlers reach the element unchanged.
 
 export type ButtonVariant =
-  // The hand-drawn frame. The default; no class.
+  // The hand-drawn frame. The default; `secondary` is what app.css turns
+  // blue on hover, so a new variant never picks that up by accident.
   | 'default'
   // Dark frame at rest: the one action a form exists for.
   | 'primary'
@@ -43,7 +44,7 @@ export type ButtonVariant =
   | 'plain'
 
 const VARIANT_CLASS: Record<ButtonVariant, string | undefined> = {
-  default: undefined,
+  default: 'secondary',
   primary: 'primary',
   danger: 'danger',
   link: 'linkish',
@@ -163,6 +164,8 @@ type ToggleLabelProps = Props<'label'> & {
   // and the frame has to sit on the element without the padding. `plain`: no
   // look of its own, for a toggle whose content is the look (the review drawer).
   variant?: 'link' | 'button' | 'primary' | 'plain'
+  // The invisible touch target app.css draws around small controls on a phone.
+  tapArea?: boolean
 }
 
 // A <label> that works a CSS-only toggle — opens a Modal, the import review's
@@ -171,16 +174,22 @@ type ToggleLabelProps = Props<'label'> & {
 // same place as a button rather than one written at each call site.
 export function ToggleLabel(handle: Handle<ToggleLabelProps>) {
   return () => {
-    const { variant = 'plain', children, class: className, ...rest } = handle.props
+    const { variant = 'plain', tapArea, children, class: className, ...rest } = handle.props
     if (variant === 'button' || variant === 'primary') {
       return (
-        <label {...rest} class={joinClasses('modal-trigger', 'toggle-label', className)}>
+        <label
+          {...rest}
+          class={joinClasses('modal-trigger', 'toggle-label', tapArea && 'tap-area', className)}
+        >
           <span class={buttonFrameClass(variant === 'primary' ? 'primary' : 'default')}>{children}</span>
         </label>
       )
     }
     return (
-      <label {...rest} class={joinClasses('toggle-label', variant === 'link' && 'linkish', className)}>
+      <label
+        {...rest}
+        class={joinClasses('toggle-label', variant === 'link' && 'linkish', tapArea && 'tap-area', className)}
+      >
         {children}
       </label>
     )

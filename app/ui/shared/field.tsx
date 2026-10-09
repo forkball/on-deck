@@ -67,7 +67,7 @@ export function Field(handle: Handle<FieldProps>) {
     return (
       // `field` is for app.css, which zeroes the vertical padding DoodleCSS
       // gives every <label> — see the note there.
-      <label class="field" mix={mix ? [fieldStyle, ...(Array.isArray(mix) ? mix : [mix])] : fieldStyle}>
+      <label class="field" mix={[fieldStyle, mix]}>
         <span class={labelHidden ? 'visually-hidden' : 'field-label'} mix={labelTextStyle}>
           {label}
         </span>

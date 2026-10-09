@@ -50,7 +50,8 @@ export interface ImportReviewPageProps {
   error?: string
 }
 
-const ACCENT = 'var(--accent)'
+// The accent line under a card's choices, saying what the choice will do.
+const verdictNote = css({ fontSize: '13.5px', color: 'var(--accent)', margin: '10px 0 8px' })
 
 // Placeholder for a row id in the hrefs handed to the picker.
 const ROW_TOKEN = '__row__'
@@ -112,7 +113,7 @@ function Flag(handle: Handle<{ title: string; count: number; children?: RemixNod
       <section
         mix={css({
           border: '1px solid var(--rule)',
-          borderLeft: `4px solid ${ACCENT}`,
+          borderLeft: `4px solid var(--accent)`,
           borderRadius: '8px',
           background: 'var(--paper-tint)',
           padding: '16px 18px',
@@ -347,7 +348,7 @@ function DuplicateCard(
           <>
             {pair(`Row ${verdict.anchor.index}`, verdict.anchor.title, verdict.anchor.year)}
             {pair(`Row ${verdict.move.index}`, verdict.move.title, verdict.move.year)}
-            <p mix={css({ fontSize: '13.5px', color: ACCENT, margin: '10px 0 8px' })}>
+            <p mix={verdictNote}>
               Your two rows disagree on the year, so these are almost certainly different {plural}. Row{' '}
               {verdict.anchor.index} matches its own year, so row {verdict.move.index} is the one to move.
             </p>
@@ -382,7 +383,7 @@ function DuplicateCard(
               verdict.drop.year,
               formatDate(verdict.drop.consumedAt),
             )}
-            <p mix={css({ fontSize: '13.5px', color: ACCENT, margin: '10px 0 8px' })}>
+            <p mix={verdictNote}>
               Same title and year in both rows, so this looks like one {singular} logged twice — a rewatch,
               most likely.
             </p>
@@ -576,11 +577,7 @@ function AnsweredList(
                       <span mix={css({ flex: '1 1 auto', minWidth: 0 })}>
                         <Answer entry={entry} />
                       </span>
-                      <span
-                        mix={css({ color: 'var(--muted)', fontSize: '13px', textDecoration: 'underline' })}
-                      >
-                        Change
-                      </span>
+                      <span class="linkish">Change</span>
                     </summary>
                     {section === 'not_found' ? (
                       <NotFoundCard batchId={batchId} row={row} />
@@ -724,7 +721,7 @@ const drawerStyle = css({
   [`${drawerOpen} .drawer-panel`]: { display: 'block' },
   [`${drawerOpen} .drawer-arrow::before`]: { content: '"▼"' },
   // Points at the checklist's accepts only while they're out of sight.
-  '& .drawer-hint': { display: 'block', paddingLeft: '19px', color: ACCENT, fontSize: '12px' },
+  '& .drawer-hint': { display: 'block', paddingLeft: '19px', color: 'var(--accent)', fontSize: '12px' },
   [`${drawerOpen} .drawer-hint`]: { display: 'none' },
   '@media (min-width: 720px)': {
     '& .drawer-panel': { display: 'block' },
@@ -925,7 +922,8 @@ function ReviewDrawer(
         <div class="drawer-row">
           <ToggleLabel
             for={DRAWER_TOGGLE}
-            class="tap-area drawer-label"
+            tapArea
+            class="drawer-label"
             mix={css({ flex: '1 1 auto', minWidth: 0, whiteSpace: 'nowrap' })}
           >
             <span
@@ -1196,7 +1194,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 </p>
               )}
               {(model.conflicts.length > 0 || model.duplicates.length > 0) && (
-                <p mix={css({ fontSize: '13px', color: ACCENT, marginBottom: '20px' })}>
+                <p mix={css({ fontSize: '13px', color: 'var(--accent)', marginBottom: '20px' })}>
                   The decisions below would change or drop something you already have.
                 </p>
               )}

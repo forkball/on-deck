@@ -21,7 +21,10 @@ import { Field } from '../app/ui/shared/field.tsx'
 
 describe('form controls', () => {
   it('maps a button variant to the class app.css draws it with', async () => {
-    assert.equal(await renderToString(<Button>Go</Button>), '<button type="button">Go</button>')
+    assert.equal(
+      await renderToString(<Button>Go</Button>),
+      '<button type="button" class="secondary">Go</button>',
+    )
     assert.equal(
       await renderToString(<Button variant="link">Undo</Button>),
       '<button type="button" class="linkish">Undo</button>',
@@ -245,11 +248,11 @@ function openingTag(source: string, start: number): string {
 
 // Links and labels, likewise: every <a> goes through Link, and every <label>
 // through Field, a choice option or ToggleLabel. These components own a
-// <label> of their own as part of how they work — the tab strip, a modal's
-// trigger, the stars — and the drop zone wraps its hidden file input in one.
+// <label> of their own as part of how they work — the tab strip, the
+// carousel's arrows, the stars — and the drop zone wraps its hidden file input
+// in one.
 const OWNS_LABELS = new Set([
   'app/ui/shared/field.tsx',
-  'app/ui/components/modal.tsx',
   'app/ui/components/tabs.tsx',
   'app/ui/components/image-carousel.tsx',
   'app/ui/components/star-rating.tsx',
