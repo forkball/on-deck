@@ -8,14 +8,13 @@ import { Toast } from '../../ui/components/toast.tsx'
 import { routes } from '../../routes.ts'
 import { seenByLabel } from '../../ui/shared/seen-by.ts'
 import { Page } from '../../ui/components/page.tsx'
-import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { MediaItemCard } from '../../ui/components/media-item-card.tsx'
 import { decadeComesFromPick, genreMissNeedsLookup } from '../../data/recommendations/matching.ts'
 import { ModelProvided } from './model-provided.tsx'
 import { UnconfirmedPickList } from './unconfirmed-pick.tsx'
 import { getCatalogProvider } from '../../data/catalog/provider.ts'
-import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
-import { backLinkFrom, withReturnTo } from '../../ui/backLink.ts'
+import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
+import { backLinkFrom } from '../../ui/backLink.ts'
 
 const SOURCE_LABELS: Record<MediaType, string> = {
   movie: 'Movie taste',
@@ -194,32 +193,21 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
               gap: '16px',
             })}
           >
-            {run.results.map(({ item, reason, interaction }) => {
-              const itemType = parseMediaType(item.type) ?? DEFAULT_MEDIA_TYPE
-              // Where a log submitted from this row comes back to, and what
-              // the detail link offers as a way back.
-              const runHref = routes.recommendations.show.href({ runId: String(run.id) })
-              return (
-                <MediaItemCard
-                  key={item.id}
-                  item={item}
-                  mediaType={itemType}
-                  interaction={interaction}
-                  detailHref={withReturnTo(MEDIA_TYPE_UI[itemType].hrefs.show(item.id), runHref)}
-                  returnTo={runHref}
-                  // The author, director or studio, as search shows it. Films and
-                  // TV only have it once a detail lookup has run, so a pick that
-                  // has never been opened can go without.
-                  subtitle={parseMediaMetadata(item.metadata).creator}
-                >
-                  <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: 'var(--soft)' })}>
-                    <ModelProvided note="Written by the model from the taste profile this run was built on — not a description from the catalogue.">
-                      {reason}
-                    </ModelProvided>
-                  </p>
-                </MediaItemCard>
-              )
-            })}
+            {run.results.map(({ item, reason, interaction }) => (
+              <MediaItemCard
+                key={item.id}
+                item={item}
+                mediaType={parseMediaType(item.type) ?? DEFAULT_MEDIA_TYPE}
+                interaction={interaction}
+                returnTo={routes.recommendations.show.href({ runId: String(run.id) })}
+              >
+                <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: 'var(--soft)' })}>
+                  <ModelProvided note="Written by the model from the taste profile this run was built on — not a description from the catalogue.">
+                    {reason}
+                  </ModelProvided>
+                </p>
+              </MediaItemCard>
+            ))}
           </ul>
         )}
 

@@ -11,7 +11,6 @@ import { Toast } from '../components/toast.tsx'
 import { Page } from '../components/page.tsx'
 import { MediaItemCard } from '../components/media-item-card.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
-import { withReturnTo } from '../backLink.ts'
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
@@ -88,21 +87,14 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
               })}
             >
               {results.map((item) => {
-                const { creator, overview } = parseMediaMetadata(item.metadata)
+                const { overview } = parseMediaMetadata(item.metadata)
                 return (
                   <MediaItemCard
                     key={item.id}
                     item={item}
                     mediaType={mediaType}
                     interaction={interactionsByItemId.get(item.id)}
-                    detailHref={withReturnTo(ui.hrefs.show(item.id), returnTo)}
                     returnTo={returnTo}
-                    // Searching "Strata" returns one from 1981 and one from 2011, and
-                    // the card showed neither author — so the two were the same row to
-                    // read. Rendered for every medium rather than books alone: TMDB
-                    // rarely fills it, in which case nothing shows, and IGDB nearly
-                    // always does.
-                    subtitle={creator}
                     lazyImage
                   >
                     {overview && (

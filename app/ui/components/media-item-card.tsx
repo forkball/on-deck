@@ -9,11 +9,12 @@ import { FrameForm } from '../../browser/frame-form.tsx'
 import { FloatingDropdown } from './floating-dropdown.tsx'
 import { PencilIcon, PlusIcon } from './log-icons.tsx'
 import { NotesField } from './notes-field.tsx'
-import { PlatformList } from './platform-list.tsx'
+import { PlatformList, chipStyle } from './platform-list.tsx'
 import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from './star-rating.tsx'
 import { StatusSelect } from './status-select.tsx'
 import { Field } from '../shared/field.tsx'
 import { Button, Link } from '../shared/form-controls.tsx'
+import { withReturnTo } from '../backLink.ts'
 
 function capitalize(tag: string): string {
   return tag.replace(/^./, (c) => c.toUpperCase())
@@ -31,21 +32,19 @@ export function MediaItemCard(
     item: MediaItem
     mediaType: ActiveMediaType
     interaction: UserMediaInteraction | null | undefined
-    // Where the title and cover go, carrying the way back.
-    detailHref: string
-    // Where a log submitted from the card comes back to.
+    // Where a log submitted from the card comes back to, and what the detail
+    // link offers as a way back.
     returnTo: string
-    // Under the title: the author, director or studio, where the page shows one.
-    subtitle?: RemixNode
     children?: RemixNode
     // For a long list whose lower rows start hidden.
     lazyImage?: boolean
   }>,
 ) {
   return () => {
-    const { item, mediaType, interaction, detailHref, returnTo, subtitle, children, lazyImage } = handle.props
-    const { releaseYear, posterUrl, tags, platforms } = parseMediaMetadata(item.metadata)
+    const { item, mediaType, interaction, returnTo, children, lazyImage } = handle.props
+    const { releaseYear, posterUrl, creator, tags, platforms } = parseMediaMetadata(item.metadata)
     const ui = MEDIA_TYPE_UI[mediaType]
+    const detailHref = withReturnTo(ui.hrefs.show(item.id), returnTo)
 
     return (
       <li
@@ -83,8 +82,12 @@ export function MediaItemCard(
             <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
               <Link href={detailHref}>{item.title}</Link>
               {releaseYear ? ` (${releaseYear})` : ''}
-              {subtitle && (
-                <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>{subtitle}</div>
+              {/* Searching "Strata" returns one from 1981 and one from 2011, and
+                  without the author the two were the same row to read. Films and
+                  TV only have it once a detail lookup has run, so a pick nobody
+                  has opened can go without. */}
+              {creator && (
+                <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>{creator}</div>
               )}
             </div>
             {/* Beside the title rather than in a column of its own, so the text
@@ -150,13 +153,13 @@ export function MediaItemCard(
             >
               {interaction && (
                 <span
-                  mix={css({
-                    fontSize: '11px',
-                    padding: '2px 8px',
-                    borderRadius: '999px',
-                    border: `1px solid ${statusBadgeColor(interaction.status)}`,
-                    color: statusBadgeColor(interaction.status),
-                  })}
+                  mix={[
+                    chipStyle,
+                    css({
+                      borderColor: statusBadgeColor(interaction.status),
+                      color: statusBadgeColor(interaction.status),
+                    }),
+                  ]}
                 >
                   {statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}
                 </span>
@@ -164,16 +167,7 @@ export function MediaItemCard(
               {interaction?.rating != null && <StarRatingDisplay value={interaction.rating} />}
               {interaction?.disliked && <DislikedDisplay />}
               {tags.map((tag) => (
-                <span
-                  key={tag}
-                  mix={css({
-                    fontSize: '11px',
-                    padding: '2px 8px',
-                    borderRadius: '999px',
-                    border: '1px solid var(--rule)',
-                    color: 'var(--soft)',
-                  })}
-                >
+                <span key={tag} mix={chipStyle}>
                   {capitalize(tag)}
                 </span>
               ))}

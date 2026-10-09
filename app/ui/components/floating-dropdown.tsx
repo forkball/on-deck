@@ -27,8 +27,8 @@ export function FloatingDropdown(
     return (
       <details mix={css({ position: 'relative', display: 'inline-block' })}>
         <summary
-          // `compact` is sized in app.css: `.doodle-border` is unlayered, so a
-          // css() mix can't set its border width.
+          // `icon` and `compact` are sized in app.css: `.doodle-border` is
+          // unlayered, so a css() mix can't set its border width.
           class={buttonFrameClass('default', icon ? 'icon' : compact ? 'compact' : undefined)}
           aria-label={icon ? triggerLabel : undefined}
           title={icon ? triggerLabel : undefined}
