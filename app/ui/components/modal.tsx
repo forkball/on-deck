@@ -41,6 +41,9 @@ export function Modal(
     // Omitted when nothing opens this by hand — see PasswordConfirmModal,
     // which is opened by a form submit or by the server rendering it open.
     triggerLabel?: string
+    // Drawn in place of the label, which becomes the trigger's accessible name
+    // and tooltip — as FloatingDropdown's `icon`.
+    triggerIcon?: RemixNode
     title?: string
     fab?: boolean
     // Renders already open. The server needs this to put a rejected modal
@@ -53,7 +56,16 @@ export function Modal(
   }>,
 ) {
   return () => {
-    const { id, triggerLabel, title, fab, defaultOpen, closeButton = true, children } = handle.props
+    const {
+      id,
+      triggerLabel,
+      triggerIcon,
+      title,
+      fab,
+      defaultOpen,
+      closeButton = true,
+      children,
+    } = handle.props
 
     return (
       <div mix={css(modalStyle(id))}>
@@ -63,10 +75,13 @@ export function Modal(
           <ToggleLabel
             for={id}
             variant="button"
+            icon={!!triggerIcon}
+            aria-label={triggerIcon ? triggerLabel : undefined}
+            title={triggerIcon ? triggerLabel : undefined}
             class={fab ? 'modal-fab' : undefined}
             mix={fab ? css({ position: 'fixed', bottom: '24px', right: '24px', zIndex: 900 }) : undefined}
           >
-            {triggerLabel}
+            {triggerIcon ?? triggerLabel}
           </ToggleLabel>
         )}
 

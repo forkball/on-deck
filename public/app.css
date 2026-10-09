@@ -720,6 +720,15 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   line-height: 1.3;
 }
 
+/* An icon-only trigger (FloatingDropdown's `icon`, Modal's `triggerIcon`) — a
+   square around the glyph, with the compact border so the frame doesn't
+   swallow the icon. */
+.doodle .doodle-border.icon {
+  border-width: 5px;
+  padding: 4px;
+  line-height: 0;
+}
+
 /* A choice in a dropdown list, as a row rather than a button: the where-to-watch
    country picker, where each country is its own submit button. Doodle gives
    every button a sketched border and centred text, unlayered, so this undoes

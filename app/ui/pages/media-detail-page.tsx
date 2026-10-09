@@ -7,6 +7,7 @@ import { statusLabelsFor } from '../../interactionStatus.ts'
 import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
 import { Page } from '../components/page.tsx'
+import { PencilIcon, PlusIcon } from '../components/log-icons.tsx'
 import { ExpandableText } from '../components/expandable-text.tsx'
 import { ImageCarousel } from '../components/image-carousel.tsx'
 import { Modal } from '../components/modal.tsx'
@@ -218,7 +219,8 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                       space-between for exactly this. */}
               <Modal
                 id={`edit-${mediaType}-${item.id}`}
-                triggerLabel={interaction ? 'Edit' : 'Log'}
+                triggerLabel={interaction ? 'Edit log' : 'Log'}
+                triggerIcon={interaction ? <PencilIcon /> : <PlusIcon />}
                 title={item.title}
               >
                 <form

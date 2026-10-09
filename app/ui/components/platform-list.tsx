@@ -10,7 +10,8 @@ const listStyle = css({
   marginTop: '4px',
 })
 
-const chipStyle = css({
+// The small rounded label a card's genres and platforms share.
+export const chipStyle = css({
   fontSize: '11px',
   padding: '2px 8px',
   borderRadius: '999px',
