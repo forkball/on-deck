@@ -166,6 +166,9 @@ type ToggleLabelProps = Props<'label'> & {
   variant?: 'link' | 'button' | 'primary' | 'plain'
   // The invisible touch target app.css draws around small controls on a phone.
   tapArea?: boolean
+  // `button` or `primary` holding only an icon: the square frame FloatingDropdown's
+  // icon trigger has. The label then needs an aria-label to have a name.
+  icon?: boolean
 }
 
 // A <label> that works a CSS-only toggle — opens a Modal, the import review's
@@ -174,14 +177,18 @@ type ToggleLabelProps = Props<'label'> & {
 // same place as a button rather than one written at each call site.
 export function ToggleLabel(handle: Handle<ToggleLabelProps>) {
   return () => {
-    const { variant = 'plain', tapArea, children, class: className, ...rest } = handle.props
+    const { variant = 'plain', tapArea, icon, children, class: className, ...rest } = handle.props
     if (variant === 'button' || variant === 'primary') {
       return (
         <label
           {...rest}
           class={joinClasses('modal-trigger', 'toggle-label', tapArea && 'tap-area', className)}
         >
-          <span class={buttonFrameClass(variant === 'primary' ? 'primary' : 'default')}>{children}</span>
+          <span
+            class={buttonFrameClass(variant === 'primary' ? 'primary' : 'default', icon ? 'icon' : undefined)}
+          >
+            {children}
+          </span>
         </label>
       )
     }

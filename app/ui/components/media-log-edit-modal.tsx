@@ -5,6 +5,7 @@ import type { UserMediaInteraction } from '../../data/schema.ts'
 import type { ActiveMediaType } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
+import { PencilIcon } from './log-icons.tsx'
 import { Modal } from './modal.tsx'
 import { NotesField } from './notes-field.tsx'
 import { StarRatingInput } from './star-rating.tsx'
@@ -28,7 +29,12 @@ export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
     const { interaction, title, returnTo, mediaType } = handle.props
 
     return (
-      <Modal id={`edit-log-${interaction.id}`} triggerLabel="Edit" title={title}>
+      <Modal
+        id={`edit-log-${interaction.id}`}
+        triggerLabel="Edit log"
+        triggerIcon={<PencilIcon />}
+        title={title}
+      >
         <form
           id={`edit-log-form-${interaction.id}`}
           method="post"

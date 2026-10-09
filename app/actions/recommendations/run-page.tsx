@@ -1,4 +1,4 @@
-import type { Handle, RemixNode } from 'remix/ui'
+import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { GenerationParams, RecommendationRunDetail } from '../../data/recommendations/runs.ts'
@@ -12,6 +12,7 @@ import { Field } from '../../ui/shared/field.tsx'
 import { seenByLabel } from '../../ui/shared/seen-by.ts'
 import { Page } from '../../ui/components/page.tsx'
 import { FloatingDropdown } from '../../ui/components/floating-dropdown.tsx'
+import { PencilIcon, PlusIcon } from '../../ui/components/log-icons.tsx'
 import { StarRatingInput } from '../../ui/components/star-rating.tsx'
 import { StatusSelect } from '../../ui/components/status-select.tsx'
 import { decadeComesFromPick, genreMissNeedsLookup } from '../../data/recommendations/matching.ts'
@@ -351,40 +352,4 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
       </Page>
     )
   }
-}
-
-// The log control's two states, drawn at the notification bell's weight.
-function TriggerIcon(handle: Handle<{ children?: RemixNode }>) {
-  return () => (
-    <svg
-      viewBox="0 0 24 24"
-      width="22"
-      height="22"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.8"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      mix={css({ display: 'block' })}
-    >
-      {handle.props.children}
-    </svg>
-  )
-}
-
-function PlusIcon() {
-  return () => (
-    <TriggerIcon>
-      <path d="M12 5v14M5 12h14" />
-    </TriggerIcon>
-  )
-}
-
-function PencilIcon() {
-  return () => (
-    <TriggerIcon>
-      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </TriggerIcon>
-  )
 }

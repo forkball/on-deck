@@ -12,6 +12,7 @@ import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
 import { Toast } from '../components/toast.tsx'
 import { Page } from '../components/page.tsx'
 import { FloatingDropdown } from '../components/floating-dropdown.tsx'
+import { PencilIcon, PlusIcon } from '../components/log-icons.tsx'
 import { NotesField } from '../components/notes-field.tsx'
 import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
 import { StatusSelect } from '../components/status-select.tsx'
@@ -202,7 +203,10 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                       )}
 
                       <div mix={css({ marginTop: '8px' })}>
-                        <FloatingDropdown triggerLabel={interaction ? 'Edit' : '+ Add to list'}>
+                        <FloatingDropdown
+                          triggerLabel={interaction ? 'Edit log' : 'Add to list'}
+                          icon={interaction ? <PencilIcon /> : <PlusIcon />}
+                        >
                           <form
                             method="post"
                             action={ui.hrefs.log(item.id)}
