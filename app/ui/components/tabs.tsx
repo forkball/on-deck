@@ -61,7 +61,7 @@ function tabsStyle(idPrefix: string, tabs: TabDefinition[]): CSSStyle {
     style[`&:has(#${idPrefix}-tab-${id}:checked) label[for="${idPrefix}-tab-${id}"]`] = {
       color: 'var(--accent)',
       fontWeight: 700,
-      borderBottomColor: 'var(--marquee)',
+      borderBottomColor: 'var(--accent)',
     }
   }
 
