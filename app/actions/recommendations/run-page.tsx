@@ -262,24 +262,6 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                         </span>
                       </div>
                     )}
-                    {tags.length > 0 && (
-                      <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' })}>
-                        {tags.map((tag) => (
-                          <span
-                            key={tag}
-                            mix={css({
-                              fontSize: '11px',
-                              padding: '2px 8px',
-                              borderRadius: '999px',
-                              border: '1px solid var(--rule)',
-                              color: 'var(--soft)',
-                            })}
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                     {/* Empty for everything but games, so no other type
                         renders a gap here. */}
                     <PlatformList platforms={platforms} />
@@ -332,6 +314,26 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                       {reason}
                     </ModelProvided>
                   </p>
+                  {/* Under the reason rather than beside the poster: a long
+                      tag list stretched the card and pushed the reason down. */}
+                  {tags.length > 0 && (
+                    <div mix={css({ flex: '1 1 100%', display: 'flex', flexWrap: 'wrap', gap: '4px' })}>
+                      {tags.map((tag) => (
+                        <span
+                          key={tag}
+                          mix={css({
+                            fontSize: '11px',
+                            padding: '2px 8px',
+                            borderRadius: '999px',
+                            border: '1px solid var(--rule)',
+                            color: 'var(--soft)',
+                          })}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </li>
               )
             })}
