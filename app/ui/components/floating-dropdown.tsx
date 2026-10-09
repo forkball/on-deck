@@ -16,17 +16,22 @@ export function FloatingDropdown(
     // A trigger that sits beside a heading rather than in a row of buttons:
     // the same sketched border, drawn at half the width.
     compact?: boolean
+    // Drawn in place of the label, which becomes the trigger's accessible name
+    // and tooltip — for a row too narrow to spare the words.
+    icon?: RemixNode
   }>,
 ) {
   return () => {
-    const { triggerLabel, children, align = 'left', compact } = handle.props
+    const { triggerLabel, children, align = 'left', compact, icon } = handle.props
 
     return (
       <details mix={css({ position: 'relative', display: 'inline-block' })}>
         <summary
           // `compact` is sized in app.css: `.doodle-border` is unlayered, so a
           // css() mix can't set its border width.
-          class={buttonFrameClass('default', compact ? 'compact' : undefined)}
+          class={buttonFrameClass('default', icon ? 'icon' : compact ? 'compact' : undefined)}
+          aria-label={icon ? triggerLabel : undefined}
+          title={icon ? triggerLabel : undefined}
           mix={css({
             cursor: 'pointer',
             listStyle: 'none',
@@ -34,7 +39,7 @@ export function FloatingDropdown(
             '&::-webkit-details-marker': { display: 'none' },
           })}
         >
-          {triggerLabel}
+          {icon ?? triggerLabel}
         </summary>
         <div
           mix={css({
