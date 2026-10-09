@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import { Link } from '../shared/form-controls.tsx'
 
 const PLACEHOLDER_TYPES: string[] = []
 
@@ -23,43 +24,35 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
   return () => {
     const { current, hrefFor } = handle.props
 
-    const tab = css({
-      padding: '0 0 8px',
-      textDecoration: 'none',
-      color: '#888',
-      borderBottom: '2px solid transparent',
-    })
-    const activeTab = css({
-      padding: '0 0 8px',
-      textDecoration: 'none',
-      color: '#3c3c3c',
-      fontWeight: 700,
-      borderBottom: '2px solid #3c3c3c',
-    })
+    // Colour and weight are in public/app.css (`a.media-tab`): `.doodle a` is
+    // unlayered, so a css() colour here is dropped.
+    const tab = css({ padding: '0 0 8px', borderBottom: '2px solid transparent' })
 
     return (
       <div
         mix={css({
           display: 'flex',
           gap: '20px',
-          borderBottom: '1px solid #ddd',
+          borderBottom: '1px solid var(--rule)',
           marginTop: '20px',
           marginBottom: '20px',
         })}
       >
         {ACTIVE_MEDIA_TYPES.map((type) => (
-          <a
+          <Link
             key={type}
             href={hrefFor(type)}
             rmx-document=""
-            class="tap-area"
-            mix={current === type ? activeTab : tab}
+            variant="tab"
+            tapArea
+            aria-current={current === type ? 'page' : undefined}
+            mix={tab}
           >
             {MEDIA_TYPE_UI[type].tabLabel}
-          </a>
+          </Link>
         ))}
         {PLACEHOLDER_TYPES.map((label) => (
-          <span key={label} mix={css({ padding: '0 0 8px', color: '#ccc' })} title="Coming soon">
+          <span key={label} mix={css({ padding: '0 0 8px', color: 'var(--rule)' })} title="Coming soon">
             {label}
           </span>
         ))}

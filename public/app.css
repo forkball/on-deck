@@ -1,14 +1,149 @@
 /* App-level interaction states layered on top of the vendored DoodleCSS,
    which ships with focus-visible styling but no hover/idle distinction —
    every bordered control uses the same dark hand-drawn stroke all the time.
-   Here the border starts light and only turns dark on hover or focus, so idle
-   controls read as quieter.
+   Here the border starts a warm grey (#948a7d, 3.2:1 on the paper — enough
+   to read as a control, the 3:1 a control's outline needs) and turns the
+   accent blue on hover or focus, so idle controls read as quieter and the
+   one being used reads as the app's.
 
    Buttons and one-line fields draw DoodleCSS's button.svg path, and textareas
    its border.svg path, at a 2px stroke rather than the vendored 3: at 3 a form
    read as a stack of heavy boxes. Same path and same 10px slice, so every box —
    and the one-height row of a field beside a button — is unchanged; only the
    line thins. Fieldsets keep the vendored weight. */
+
+/* The palette. Every colour the app sets comes from here, so a page reads as
+   one piece and a change is made once. The neutrals are warm, taken from the
+   cream DoodleCSS paints the page with, rather than the cool greys that had
+   collected call site by call site. Each text colour clears WCAG AA (4.5:1)
+   on --paper: --muted at 5.5 replaces #888, which was 3.3.
+
+   --accent is the one colour that means "you can act on this": links, the
+   primary button, the active tab, the focus ring. It is a dusty video-store
+   blue, and --marquee-soft the faded gold that goes with it, as on the back
+   wall of a rental shop: a nod, not a logo. Gold is too light to read as text
+   or a thin line on the paper, so it is only ever a fill: the brand's ticket
+   and selected text. The four media-type tokens
+   (placeholders for now) mark which kind of thing a card is; MEDIA_TYPE_UI names them, so
+   code picks one by type rather than by hex. */
+:root {
+  --paper: #fdf7f1;
+  --paper-tint: #fbf4ea;
+  --paper-sunk: #efe6db;
+  --rule-soft: #eee4d6;
+  --rule: #d9cfbe;
+  --muted: #6b6459;
+  --soft: #5a534b;
+  --text: #3c3c3c;
+  --ink: #1c1c1c;
+  --accent: #2b4c7e;
+  --marquee-soft: #f3d27a;
+  --danger: #b91c1c;
+  --success: #15803d;
+  /* Media-type colours are not chosen yet. Each type has its own token, so
+     cards and the type tag are already marked by type and get their colour
+     here in one place; until then all four share this neutral placeholder.
+     Whatever replaces it only ever draws a line or a dot, never text. */
+  --media-placeholder: #b8ab96;
+  --movie: var(--media-placeholder);
+  --tv: var(--media-placeholder);
+  --book: var(--media-placeholder);
+  --game: var(--media-placeholder);
+}
+
+/* Links take the accent. Doodle makes them bold #1c1c1c, the same ink as a
+   heading, so nothing on a page said which words go somewhere. */
+.doodle a {
+  color: var(--accent);
+}
+
+/* Read by a screen reader, not drawn: Field's `labelHidden`. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Link `small`: the default link at a size that sits beside a heading. */
+.doodle a.small-link {
+  font-size: 13px;
+}
+
+/* Link (form-controls.tsx) `wrap`: around a poster, an icon or a row that has
+   its own look, so the link adds none. */
+.doodle a.wrap-link {
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: none;
+}
+
+/* ToggleLabel: a <label> that opens a modal or drawer is a control, so it
+   gets the pointer a control gets. The button-shaped ones draw their frame on
+   an inline-block span inside, the way a modal trigger does. */
+.doodle label.toggle-label {
+  cursor: pointer;
+}
+
+.doodle label.toggle-label > .doodle-border {
+  display: inline-block;
+}
+
+/* The wordmark as a torn ticket stub: soft gold, blue type, notched at both
+   ends and set a little off square. The mask cuts the notches, so the shape
+   holds whatever the text's width. Here because `.doodle a` sets the colour
+   unlayered. */
+.doodle a.brand {
+  display: inline-block;
+  font-weight: bold;
+  text-decoration: none;
+  padding: 2px 12px;
+  color: var(--accent);
+  background: var(--marquee-soft);
+  border-radius: 2px;
+  transform: rotate(-2deg);
+  mask:
+    radial-gradient(circle 5px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 5px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+}
+
+::selection {
+  background: var(--marquee-soft);
+  color: var(--ink);
+}
+
+/* The media-type tabs that are links (MediaTabLinks): quiet until current,
+   then the same as every other tab (tabs.tsx) — bold blue over a blue line.
+   Not the type's own hue: four colours along one tab strip read as four
+   different controls. The hue is for marking a card, where it stands alone.
+   Here because `.doodle a` would otherwise make every one of them a bold
+   accent link. */
+.doodle a.media-tab {
+  color: var(--muted);
+  font-weight: normal;
+  text-decoration: none;
+}
+
+.doodle a.media-tab[aria-current] {
+  color: var(--accent);
+  font-weight: bold;
+  border-bottom-color: var(--accent);
+}
+
+/* Focus in the accent too, so it reads as the app's own rather than as a
+   darker border. Doodle's dashed outline and offset stay. */
+.doodle button:focus-visible,
+.doodle textarea:focus-visible,
+.doodle input:focus-visible,
+.doodle select:focus-visible,
+.doodle .menu-link:focus-visible {
+  outline-color: var(--accent);
+}
 
 .doodle button,
 .doodle .doodle-border,
@@ -22,8 +157,8 @@
 }
 
 /* Checkboxes and radios follow the same rule as every other field: a 2px line,
-   light while idle, dark on hover or focus. Checked is dark too — the `*` alone
-   is a small mark, and the darker ring is what makes the chosen option in a
+   grey while idle, blue on hover or focus. Checked is blue too — the `*` alone
+   is a small mark, and the coloured ring is what makes the chosen option in a
    group read as chosen at a glance. Same shapes and slices as DoodleCSS's own
    checkbox.svg and radio.svg.
 
@@ -32,7 +167,7 @@
    checkbox. A 12px border brings it back to 24. That draws the 16px slice at
    three quarters, so radio.svg's stroke is 2.67 to land on 2px. */
 /* The images serve the import review's checkline buttons too — a submit drawn
-   as a checkbox, dark once ticked. Each `.radio` selector outranks its
+   as a checkbox, blue once ticked. Each `.radio` selector outranks its
    checkbox counterpart, so a radio-shaped box never takes the square image. */
 .doodle input[type='checkbox'],
 .doodle .checkline-box {
@@ -92,7 +227,7 @@
 
 /* Grey text under the fade would be faded twice; the opacity alone says it. */
 .doodle button:disabled {
-  color: #3c3c3c;
+  color: var(--text);
 }
 
 .doodle input[type='checkbox']:disabled:not(:checked)::after,
@@ -111,9 +246,43 @@
   border-image: url(/button.svg) 10 10 10 10 stretch stretch;
 }
 
+/* A secondary button's label follows its frame into the accent, so hover
+   says "this one" in the same colour as the line around it. Only the plain
+   frame — Button's default variant, class `secondary` — so every other
+   variant keeps the colours it states below. */
+.doodle button.secondary:hover:not(:disabled),
+.doodle button.secondary:focus-visible,
+.doodle .doodle-border:not(.primary):hover,
+.doodle .doodle-border:not(.primary):focus-visible {
+  color: var(--accent);
+}
+
+/* Primary: the hand-drawn shape filled with the accent, so the one action a
+   form exists for is the one solid thing on it. `fill` paints the image's
+   middle too. Hover and focus are listed because the generic hover rule above
+   swaps every button's frame for the outline one, which would leave
+   paper-coloured text on paper; they keep the same image and darken it, so
+   there is no second image to fetch on first hover. */
 .doodle button.primary,
-.doodle .doodle-border.primary {
-  border-image: url(/button.svg) 10 10 10 10 stretch stretch;
+.doodle .doodle-border.primary,
+.doodle button.primary:hover:not(:disabled),
+.doodle .doodle-border.primary:hover,
+.doodle button.primary:focus-visible,
+.doodle .doodle-border.primary:focus-visible {
+  border-image: url(/button-primary.svg) 10 fill / 10px stretch;
+  color: var(--paper);
+}
+
+.doodle button.primary:hover:not(:disabled),
+.doodle .doodle-border.primary:hover,
+.doodle button.primary:focus-visible,
+.doodle .doodle-border.primary:focus-visible {
+  filter: brightness(0.82);
+}
+
+.doodle button.primary:focus-visible,
+.doodle .doodle-border.primary:focus-visible {
+  outline-color: var(--paper);
 }
 
 .doodle fieldset:hover {
@@ -156,7 +325,7 @@
   font-family: 'Short Stack', cursive;
   font-size: 1em;
   font-weight: normal;
-  color: #3c3c3c;
+  color: var(--text);
   /* The two a real <button> gets from the browser: centred text, and no
      underline — which a link has, and every ButtonLink was taking off at its
      own call site before this. */
@@ -171,12 +340,15 @@
   padding: 0 14px;
 }
 
-/* The floating-action variant is deliberately larger. Listed after the rule
-   above at equal specificity so it wins, and unlayered like the rest —
-   the css() rules the components use are layered, and layered always loses
-   to unlayered no matter the specificity. */
-.doodle .modal-fab {
+/* The floating-action trigger (Modal's `fab`) is deliberately larger, and
+   floats over the page, so it carries its own paper and shadow. More specific
+   than the rule above, and unlayered like the rest — a css() rule on the span
+   would be layered and lose to it. */
+.doodle label.modal-fab > .doodle-border {
   padding: 14px 22px;
+  text-align: center;
+  background-color: var(--paper);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
 /* The other half of a form row: a <select> or text <input> beside a button
@@ -207,8 +379,8 @@
    can't put the caret back over the text. Pixels, not em: the caret is a fixed
    size and doesn't scale with the text.
 
-   Its colour follows the border's too: light while idle, the vendored dark one
-   on hover or focus, at the same moment the border turns dark. Only the image
+   Its colour follows the border's too: grey while idle, the blue one (caret.svg)
+   on hover or focus, at the same moment the border turns blue. Only the image
    is swapped, so DoodleCSS's position and no-repeat still apply. */
 .doodle select:not([multiple]) {
   --caret-inset: 10px;
@@ -221,7 +393,7 @@
 
 .doodle select:not([multiple]):hover:not(:disabled),
 .doodle select:not([multiple]):focus-visible {
-  background-image: url(/vendor/doodle/caret.svg);
+  background-image: url(/caret.svg);
 }
 
 /* Padding gets them to the same height while Short Stack is rendering, but the
@@ -307,7 +479,7 @@
 .doodle .choice-group-hint {
   font-size: 12px;
   line-height: 1.4;
-  color: #888;
+  color: var(--muted);
 }
 
 .doodle .choice-hint {
@@ -337,14 +509,14 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #888;
+  color: var(--muted);
 }
 
 .doodle .choice-legend.subsection {
   margin: 0 0 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--text);
 }
 
 .doodle .choice-options {
@@ -404,7 +576,7 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 /* Destructive actions (delete log). Needs the element selector to outrank
    DoodleCSS's own `.doodle button { color: #3c3c3c }`. */
 .doodle button.danger {
-  color: #c33;
+  color: var(--danger);
 }
 
 .doodle button.danger:hover:not(:disabled) {
@@ -419,19 +591,21 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
    and rating chip above. */
 .doodle button.linkish,
 .doodle a.linkish,
-.doodle label.linkish {
+.doodle label.linkish,
+.doodle span.linkish {
   padding: 0;
   cursor: pointer;
   font-weight: normal;
   font-size: 13px;
-  color: #6b6459;
+  color: var(--muted);
   text-decoration: underline;
 }
 
 .doodle button.linkish:hover,
 .doodle a.linkish:hover,
-.doodle label.linkish:hover {
-  color: #3c3c3c;
+.doodle label.linkish:hover,
+.doodle summary:hover > span.linkish {
+  color: var(--text);
 }
 
 /* Buttons that read as text or an icon rather than a control. Unlayered, like
@@ -461,7 +635,7 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 .doodle .menu-link {
   padding: 4px 8px;
   font-weight: normal;
-  color: #1c1c1c;
+  color: var(--ink);
   text-decoration: none;
   text-align: left;
   line-height: normal;
@@ -474,7 +648,7 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 }
 
 .doodle .menu-link:focus-visible {
-  outline: 2px dashed #3c3c3c;
+  outline: 2px dashed var(--text);
   outline-offset: 0;
 }
 
@@ -488,16 +662,16 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 
 .doodle button.bare {
   padding: 4px 8px;
-  color: #888;
+  color: var(--muted);
 }
 
 .doodle button.bare:hover:not(:disabled),
 .doodle button.checkline:hover:not(:disabled) {
-  color: #3c3c3c;
+  color: var(--text);
 }
 
 /* A submit drawn as a checkbox (or radio, with .radio on the box), wearing the
-   same images as the real ones above: light idle, dark on hover or once ticked.
+   same images as the real ones above: grey idle, blue on hover or once ticked.
    While posting it shows the state it is heading to. */
 .doodle button.checkline {
   display: inline-flex;
@@ -505,7 +679,7 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   gap: 6px;
   padding: 2px 0;
   font-size: 13px;
-  color: #6b6459;
+  color: var(--muted);
   text-align: left;
 }
 
@@ -562,11 +736,11 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 
 .doodle button.menu-choice:hover,
 .doodle button.menu-choice:focus-visible {
-  background-color: #efe6db;
+  background-color: var(--paper-sunk);
 }
 
 .doodle button.menu-choice:focus-visible {
-  outline: 2px solid #3c3c3c;
+  outline: 2px solid var(--text);
   outline-offset: -2px;
 }
 

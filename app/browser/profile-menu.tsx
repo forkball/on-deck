@@ -1,5 +1,5 @@
 import { clientEntry, css, ref } from 'remix/ui'
-import { Button } from '../ui/shared/form-controls.tsx'
+import { Button, Link } from '../ui/shared/form-controls.tsx'
 
 export type ProfileMenuLink = {
   href: string
@@ -60,8 +60,8 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
               marginTop: '4px',
               minWidth: '180px',
               padding: '8px',
-              backgroundColor: '#fdf7f1',
-              border: '1px solid #3c3c3c',
+              backgroundColor: 'var(--paper)',
+              border: '1px solid var(--text)',
               borderRadius: '8px',
               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
               // On a touch screen the rows are 44px (app.css), and touch: a gap
@@ -70,12 +70,12 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
             },
             // Log out is the one action in a list of places to go, so a line
             // sets it apart: the menu's 4px gap above it, 4px below, the same
-            // #ddd the tab underlines use.
+            // --rule the tab underlines use.
             '& .menu form': {
               margin: 0,
               marginTop: '4px',
               paddingTop: '4px',
-              borderTop: '1px solid #ddd',
+              borderTop: '1px solid var(--rule)',
             },
             // Log out is drawn as one of the links (menu-link, in app.css), though
             // it has to be a form button. Width is the one thing css() can set.
@@ -107,9 +107,9 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
         </summary>
         <div class="menu">
           {links.map((link) => (
-            <a key={link.href} href={link.href} class="menu-link">
+            <Link key={link.href} href={link.href} variant="menu">
               {link.label}
-            </a>
+            </Link>
           ))}
           <form method="post" action={logoutHref}>
             <Button type="submit" variant="menu-link">

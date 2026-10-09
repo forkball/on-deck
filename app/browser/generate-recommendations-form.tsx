@@ -58,7 +58,7 @@ const sectionLabel = css({
   fontWeight: 700,
   letterSpacing: '0.04em',
   textTransform: 'uppercase',
-  color: '#888',
+  color: 'var(--muted)',
 })
 
 const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
@@ -163,17 +163,21 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         marginLeft: '10px',
         padding: '2px 8px',
         borderRadius: '999px',
-        border: '1px solid #ccc',
+        border: '1px solid var(--rule)',
         fontSize: '11px',
-        color: '#555',
+        color: 'var(--soft)',
       })
 
       // Settings falls into sections — what taste picks are drawn from, what
       // narrows them, and what only a group has — each under a heading that
       // reads as part of the panel rather than a second caps section label.
       const settingsSection = css({ display: 'flex', flexDirection: 'column', gap: '8px' })
-      const sectionDivider = css({ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e5e5e5' })
-      const settingsHeading = css({ margin: 0, fontSize: '14px', fontWeight: 600, color: '#333' })
+      const sectionDivider = css({
+        marginTop: '16px',
+        paddingTop: '16px',
+        borderTop: '1px dashed var(--rule-soft)',
+      })
+      const settingsHeading = css({ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--text)' })
       // auto-fill rather than auto-fit, so a section with one field keeps the
       // same column width as one with five instead of stretching it across.
       const settingsGrid = css({
@@ -196,7 +200,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               flexDirection: 'column',
               gap: '20px',
               width: '100%',
-              border: '1px solid #ddd',
+              border: '1px solid var(--rule)',
               borderRadius: '8px',
               padding: '20px',
             }),
@@ -284,7 +288,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
           <input type="hidden" name="mediaType" value={mediaType} />
 
-          <div mix={[css({ borderTop: '1px solid #eee', paddingTop: '16px' }), onlyForShortlist]}>
+          <div mix={[css({ borderTop: '1px solid var(--rule-soft)', paddingTop: '16px' }), onlyForShortlist]}>
             <details
               open={settingsOpen}
               mix={on('toggle', (event) => {
@@ -473,14 +477,14 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
           {isLucky
             ? luckyBlockedBy.length > 0 && (
-                <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
+                <p mix={css({ margin: 0, fontSize: '13px', color: 'var(--danger)' })}>
                   {luckyBlockedBy.map((member) => member.label).join(', ')}{' '}
                   {luckyBlockedBy.length === 1 && luckyBlockedBy[0].label === 'You' ? 'have' : 'has'} nothing{' '}
                   {mediaTypeLabel} logged to draw from.
                 </p>
               )
             : (!hasSource || blockedBy.length > 0) && (
-                <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
+                <p mix={css({ margin: 0, fontSize: '13px', color: 'var(--danger)' })}>
                   {!hasSource
                     ? 'Pick at least one taste to base picks on, under Settings.'
                     : blockedBy
@@ -494,7 +498,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 </p>
               )}
 
-          <Button type="submit" disabled={disabled} mix={css({ width: '100%' })}>
+          <Button type="submit" variant="primary" disabled={disabled} mix={css({ width: '100%' })}>
             {submitting
               ? isLucky
                 ? 'Drawing…'

@@ -49,7 +49,7 @@ export const DrawLuckyForm = clientEntry<DrawLuckyFormProps>(import.meta.url, fu
             flexDirection: 'column',
             gap: '20px',
             width: '100%',
-            border: '1px solid #ddd',
+            border: '1px solid var(--rule)',
             borderRadius: '8px',
             padding: '20px',
           }),
@@ -90,14 +90,14 @@ export const DrawLuckyForm = clientEntry<DrawLuckyFormProps>(import.meta.url, fu
         <input type="hidden" name="origin" value={LUCKY_PAGE_ORIGIN} />
 
         {blockedBy.length > 0 && (
-          <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
+          <p mix={css({ margin: 0, fontSize: '13px', color: 'var(--danger)' })}>
             {blockedBy.map((member) => member.label).join(', ')}{' '}
             {blockedBy.length === 1 && blockedBy[0].label === 'You' ? 'have' : 'has'} nothing {itemNoun}{' '}
             logged to draw from.
           </p>
         )}
 
-        <Button type="submit" disabled={disabled} mix={css({ width: '100%' })}>
+        <Button type="submit" variant="primary" disabled={disabled} mix={css({ width: '100%' })}>
           {submitting ? 'Drawing…' : `🎲 Draw today's pick`}
         </Button>
       </form>

@@ -6,7 +6,7 @@ import type { FeedCursor, FeedItem } from '../data/feed.ts'
 import type { LuckyState } from '../data/recommendations/lucky.ts'
 import { luckyRecommendationsHref, routes } from '../routes.ts'
 import { Page } from '../ui/components/page.tsx'
-import { ButtonLink } from '../ui/shared/form-controls.tsx'
+import { ButtonLink, Link } from '../ui/shared/form-controls.tsx'
 import { LUCKY_CARD_BOX, LUCKY_PICK_LABEL, LuckyPickCard } from './lucky-pick-card.tsx'
 import { FEED_LIST_ID, FeedList } from './activity-feed.tsx'
 
@@ -56,7 +56,7 @@ function Section(handle: Handle<{ title: string; children?: RemixNode }>) {
 
 // The empty state every list here shares: one quiet line, and a way out of it.
 function Empty(handle: Handle<{ children?: RemixNode }>) {
-  return () => <p mix={css({ margin: 0, color: '#555' })}>{handle.props.children}</p>
+  return () => <p mix={css({ margin: 0, color: 'var(--soft)' })}>{handle.props.children}</p>
 }
 
 // Opens the dedicated lucky-pick page rather than drawing on the spot — a
@@ -68,7 +68,7 @@ function LuckyPickCta() {
       <p mix={css({ margin: 0 })}>
         <strong>Nothing drawn yet today.</strong>
       </p>
-      <p mix={css({ margin: '6px 0 0', color: '#555' })}>
+      <p mix={css({ margin: '6px 0 0', color: 'var(--soft)' })}>
         One thing to watch, read or play — no filters, nothing to decide.
       </p>
       {/* rmx-document forces a full document load — see media-tab-links.tsx. */}
@@ -113,7 +113,12 @@ function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
               <FeedList items={feed} />
               <p
                 id={FEED_STATUS_ID}
-                mix={css({ margin: '12px 0 0', fontSize: '12px', color: '#888', textAlign: 'center' })}
+                mix={css({
+                  margin: '12px 0 0',
+                  fontSize: '12px',
+                  color: 'var(--muted)',
+                  textAlign: 'center',
+                })}
               >
                 {feedCursor ? '' : FEED_END_TEXT}
               </p>
@@ -131,7 +136,7 @@ function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
             <Empty>Quiet so far — nothing logged yet.</Empty>
           ) : (
             <Empty>
-              Nothing here yet — <a href={routes.users.search.href()}>find people</a> to follow.
+              Nothing here yet — <Link href={routes.users.search.href()}>find people</Link> to follow.
             </Empty>
           )}
         </Section>
@@ -167,9 +172,9 @@ function Pitch() {
         >
           Log in
         </ButtonLink>
-        <a href={routes.auth.signup.index.href()} class="tap-area">
+        <Link href={routes.auth.signup.index.href()} tapArea>
           Sign up
-        </a>
+        </Link>
       </div>
     </>
   )

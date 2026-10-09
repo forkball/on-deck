@@ -1,6 +1,6 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
-import { buttonFrameClass } from '../shared/form-controls.tsx'
+import { ToggleLabel } from '../shared/form-controls.tsx'
 
 type CSSStyle = Parameters<typeof css>[0]
 
@@ -33,10 +33,8 @@ function modalStyle(id: string): CSSStyle {
 // which put modal state in the URL — after submitting and being redirected
 // away, Back returned to the fragment and silently reopened the modal.
 //
-// The trigger's look lives on an inner <span>, not the <label>: DoodleCSS
-// sets `.doodle label { padding: .25em 0 }` outside any @layer, and unlayered
-// rules beat layered ones regardless of specificity, so padding set on the
-// label itself is silently discarded.
+// The trigger is a ToggleLabel drawn as a button; the fab's larger frame,
+// paper and shadow are `label.modal-fab` in app.css.
 export function Modal(
   handle: Handle<{
     id: string
@@ -62,39 +60,20 @@ export function Modal(
         <input type="checkbox" id={id} class="modal-toggle" checked={defaultOpen} />
 
         {triggerLabel && (
-          <label
+          <ToggleLabel
             for={id}
-            class="modal-trigger"
-            mix={css(
-              fab
-                ? { position: 'fixed', bottom: '24px', right: '24px', zIndex: 900, cursor: 'pointer' }
-                : { cursor: 'pointer' },
-            )}
+            variant="button"
+            class={fab ? 'modal-fab' : undefined}
+            mix={fab ? css({ position: 'fixed', bottom: '24px', right: '24px', zIndex: 900 }) : undefined}
           >
-            {/* Padding comes from app.css, which states one box for every
-                button; setting it here would be layered and lose to it. */}
-            <span
-              class={buttonFrameClass('default', fab ? 'modal-fab' : undefined)}
-              mix={css(
-                fab
-                  ? {
-                      display: 'inline-block',
-                      textAlign: 'center',
-                      backgroundColor: '#fdf7f1',
-                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.3)',
-                    }
-                  : { display: 'inline-block' },
-              )}
-            >
-              {triggerLabel}
-            </span>
-          </label>
+            {triggerLabel}
+          </ToggleLabel>
         )}
 
         <div class="modal-overlay">
           <div
             mix={css({
-              backgroundColor: '#fdf7f1',
+              backgroundColor: 'var(--paper)',
               borderRadius: '8px',
               padding: '24px',
               maxWidth: '480px',
@@ -114,9 +93,9 @@ export function Modal(
             >
               {title && <h3 mix={css({ margin: 0 })}>{title}</h3>}
               {closeButton && (
-                <label for={id} class="tap-area" mix={css({ cursor: 'pointer' })}>
+                <ToggleLabel for={id} tapArea>
                   <span mix={css({ fontSize: '20px' })}>✕</span>
-                </label>
+                </ToggleLabel>
               )}
             </div>
             {children}

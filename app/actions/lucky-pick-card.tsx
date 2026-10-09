@@ -6,6 +6,7 @@ import type { LuckyPick } from '../data/recommendations/lucky.ts'
 import { mediaTypeUiFor } from '../mediaTypes.ts'
 import { routes } from '../routes.ts'
 import { withReturnTo } from '../ui/backLink.ts'
+import { Link } from '../ui/shared/form-controls.tsx'
 
 // What the day's pick is called, wherever it is named. Exported because the
 // home page heads its own column with it (see showLabel) and two copies of the
@@ -16,7 +17,7 @@ export const LUCKY_PICK_LABEL = "Today's lucky pick"
 // action in the same slot when nothing has been drawn — the two have to be the
 // same box, or the empty state visibly steps out of the filled one.
 export const LUCKY_CARD_BOX = {
-  border: '1px solid #ddd',
+  border: '1px solid var(--rule)',
   borderRadius: '8px',
   padding: '16px',
 } as const
@@ -46,38 +47,43 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
     return (
       <div mix={css({ ...LUCKY_CARD_BOX, display: 'flex', gap: '14px' })}>
         {posterUrl ? (
-          <a href={pickHref} mix={css({ flex: '0 0 auto' })}>
+          <Link variant="wrap" href={pickHref} mix={css({ flex: '0 0 auto' })}>
             <img
               src={posterUrl}
               alt={`${pick.title} poster`}
               mix={css({ width: '72px', borderRadius: '4px', display: 'block' })}
             />
-          </a>
+          </Link>
         ) : (
           <div
             mix={css({
               width: '72px',
               height: '108px',
               flex: '0 0 auto',
-              border: '1px solid #ddd',
+              border: '1px solid var(--rule)',
               borderRadius: '4px',
             })}
           />
         )}
         <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
           {showLabel && (
-            <p mix={css({ margin: '0 0 6px', fontSize: '12px', letterSpacing: '0.04em', color: '#888' })}>
+            <p
+              mix={css({
+                margin: '0 0 6px',
+                fontSize: '12px',
+                letterSpacing: '0.04em',
+                color: 'var(--muted)',
+              })}
+            >
               {LUCKY_PICK_LABEL}
             </p>
           )}
           <p mix={css({ margin: 0 })}>
-            <a href={pickHref} mix={css({ fontWeight: 700 })}>
-              {pick.title}
-            </a>
+            <Link href={pickHref}>{pick.title}</Link>
             {releaseYear ? ` (${releaseYear})` : ''}{' '}
-            <span mix={css({ color: '#888', fontSize: '13px' })}>· {ui.singular}</span>
+            <span mix={css({ color: 'var(--muted)', fontSize: '13px' })}>· {ui.singular}</span>
           </p>
-          <p mix={css({ margin: '6px 0 0', color: '#555' })}>{pick.reason}</p>
+          <p mix={css({ margin: '6px 0 0', color: 'var(--soft)' })}>{pick.reason}</p>
         </div>
       </div>
     )

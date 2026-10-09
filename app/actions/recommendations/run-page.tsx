@@ -23,7 +23,7 @@ import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
 import { statusBadgeColor, statusLabelsFor } from '../../interactionStatus.ts'
 import { backLinkFrom, withReturnTo } from '../../ui/backLink.ts'
-import { Button } from '../../ui/shared/form-controls.tsx'
+import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 const SOURCE_LABELS: Record<MediaType, string> = {
   movie: 'Movie taste',
@@ -134,7 +134,7 @@ function UnmatchedSection(handle: Handle<{ run: RecommendationRunDetail }>) {
         <h2>
           {alone ? 'Suggested' : 'Also suggested'}, but not found in {ui.catalogName}
         </h2>
-        <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })}>
+        <p mix={css({ margin: '0 0 16px', fontSize: '13px', color: 'var(--muted)' })}>
           The model picked {one ? 'this' : 'these'}, but {ui.catalogName} has no entry we could match, so
           nothing has checked that {one ? 'it exists' : 'they exist'} or that the details are right.{' '}
           {one ? 'It' : 'They'} can't be logged from here.
@@ -178,11 +178,11 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
         {prunedOldestRun && (
           <Toast message="You can keep up to 3 recommendation runs at a time, so your oldest one was removed." />
         )}
-        <p mix={css({ color: '#555' })}>
+        <p mix={css({ color: 'var(--soft)' })}>
           {date}
           {run.name && ` — Recommendations for ${forLabel}`}
         </p>
-        <p mix={css({ color: '#888', fontSize: '13px' })}>
+        <p mix={css({ color: 'var(--muted)', fontSize: '13px' })}>
           {paramLines.map((line, index) => (
             <span key={line.text}>
               {index > 0 && ' · '}
@@ -218,34 +218,33 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                     display: 'flex',
                     flexWrap: 'wrap',
                     gap: '12px',
-                    border: '1px solid #ddd',
+                    border: '1px solid var(--rule)',
+                    borderLeft: `4px solid ${itemUi.hue}`,
                     borderRadius: '8px',
                     padding: '16px',
                   })}
                 >
                   {posterUrl ? (
-                    <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
+                    <Link variant="wrap" href={detailHref} mix={css({ flex: '0 0 auto' })}>
                       <img
                         src={posterUrl}
                         alt={`${item.title} poster`}
                         mix={css({ width: '60px', borderRadius: '4px', display: 'block' })}
                       />
-                    </a>
+                    </Link>
                   ) : (
                     <div
                       mix={css({
                         width: '60px',
                         height: '90px',
                         flex: '0 0 auto',
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--rule)',
                         borderRadius: '4px',
                       })}
                     />
                   )}
                   <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
-                    <a href={detailHref} mix={css({ fontWeight: 700 })}>
-                      {item.title}
-                    </a>
+                    <Link href={detailHref}>{item.title}</Link>
                     {releaseYear ? ` (${releaseYear})` : ''}
                     {interaction && (
                       <div mix={css({ marginTop: '4px' })}>
@@ -272,8 +271,8 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                               fontSize: '11px',
                               padding: '2px 8px',
                               borderRadius: '999px',
-                              border: '1px solid #ccc',
-                              color: '#555',
+                              border: '1px solid var(--rule)',
+                              color: 'var(--soft)',
                             })}
                           >
                             {tag}
@@ -319,14 +318,16 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                           </div>
                           <NotesField defaultValue={interaction?.notes} />
                         </div>
-                        <Button type="submit">Save</Button>
+                        <Button type="submit" variant="primary">
+                          Save
+                        </Button>
                         <FrameForm />
                       </form>
                     </FloatingDropdown>
                   </div>
                   {/* Its own full-width row under poster and control, so the
                       text isn't squeezed into the narrow middle column. */}
-                  <p mix={css({ flex: '1 1 100%', margin: 0, fontStyle: 'italic', color: '#555' })}>
+                  <p mix={css({ flex: '1 1 100%', margin: 0, fontStyle: 'italic', color: 'var(--soft)' })}>
                     <ModelProvided note="Written by the model from the taste profile this run was built on — not a description from the catalogue.">
                       {reason}
                     </ModelProvided>

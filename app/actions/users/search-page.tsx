@@ -6,7 +6,7 @@ import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
-import { Button } from '../../ui/shared/form-controls.tsx'
+import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 export interface UserSearchPageProps {
   query: string
@@ -56,16 +56,16 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   gap: '12px',
-                  border: '1px solid #ddd',
+                  border: '1px solid var(--rule)',
                   borderRadius: '8px',
                   padding: '12px 16px',
                 })}
               >
                 <div mix={css({ minWidth: 0, overflowWrap: 'break-word' })}>
                   {canView ? (
-                    <a href={routes.users.show.href({ userId: String(user.id) })}>
+                    <Link href={routes.users.show.href({ userId: String(user.id) })}>
                       <strong>{displayLabel(user)}</strong>
-                    </a>
+                    </Link>
                   ) : (
                     <strong>{displayLabel(user)}</strong>
                   )}

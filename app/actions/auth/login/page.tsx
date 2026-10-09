@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import { routes } from '../../../routes.ts'
 import { Page } from '../../../ui/components/page.tsx'
 import { Field } from '../../../ui/shared/field.tsx'
-import { Button, TextInput } from '../../../ui/shared/form-controls.tsx'
+import { Button, Link, TextInput } from '../../../ui/shared/form-controls.tsx'
 
 export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
   return () => {
@@ -12,7 +12,7 @@ export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
 
     return (
       <Page heading="Log in" width="narrow">
-        {error && <p mix={css({ color: '#b91c1c' })}>{error}</p>}
+        {error && <p mix={css({ color: 'var(--danger)' })}>{error}</p>}
         <form
           method="post"
           action={routes.auth.login.action.href()}
@@ -25,10 +25,12 @@ export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
           <Field label="Password">
             <TextInput type="password" name="password" required />
           </Field>
-          <Button type="submit">Log in</Button>
+          <Button type="submit" variant="primary">
+            Log in
+          </Button>
         </form>
         <p>
-          Need an account? <a href={routes.auth.signup.index.href()}>Sign up</a>
+          Need an account? <Link href={routes.auth.signup.index.href()}>Sign up</Link>
         </p>
       </Page>
     )

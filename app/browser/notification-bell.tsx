@@ -1,4 +1,5 @@
 import { clientEntry, css, ref } from 'remix/ui'
+import { Link } from '../ui/shared/form-controls.tsx'
 
 export type NotificationBellProps = {
   href: string
@@ -42,16 +43,16 @@ export const NotificationBell = clientEntry<NotificationBellProps>(
       const { href, countHref } = handle.props
 
       return (
-        <a
+        <Link
           href={href}
           aria-label="Notifications"
-          class="tap-area"
+          variant="wrap"
+          tapArea
           mix={[
             css({
               position: 'relative',
               display: 'inline-flex',
               alignItems: 'center',
-              textDecoration: 'none',
             }),
             ref((node, signal) => {
               const refresh = () => {
@@ -97,7 +98,7 @@ export const NotificationBell = clientEntry<NotificationBellProps>(
                 minWidth: '15px',
                 padding: '1px 4px',
                 borderRadius: '999px',
-                backgroundColor: '#b91c1c',
+                backgroundColor: 'var(--danger)',
                 color: '#fff',
                 fontSize: '10px',
                 fontWeight: 700,
@@ -108,7 +109,7 @@ export const NotificationBell = clientEntry<NotificationBellProps>(
               {count > 9 ? '9+' : count}
             </span>
           )}
-        </a>
+        </Link>
       )
     }
   },

@@ -7,6 +7,7 @@ import { UnconfirmedPick, UnconfirmedPickList } from './unconfirmed-pick.tsx'
 import { routes } from '../../routes.ts'
 import type { UnconfirmedRunDetail } from '../../data/recommendations/unconfirmed.ts'
 import { LUCKY_RUN_NAME } from '../../data/recommendations/lucky.ts'
+import { Link } from '../../ui/shared/form-controls.tsx'
 
 export interface UnconfirmedRunPageProps {
   run: UnconfirmedRunDetail
@@ -35,13 +36,13 @@ export function UnconfirmedRunPage(handle: Handle<UnconfirmedRunPageProps>) {
           width="wide"
           displayName={displayName}
         >
-          <p mix={css({ color: '#555' })}>{date}</p>
+          <p mix={css({ color: 'var(--soft)' })}>{date}</p>
           {pick && (
             <div mix={css({ marginTop: '24px' })}>
               <UnconfirmedPick pick={pick} mediaType={run.mediaType} />
             </div>
           )}
-          <p mix={css({ margin: '12px 0 0', color: '#888', fontSize: '13px' })}>
+          <p mix={css({ margin: '12px 0 0', color: 'var(--muted)', fontSize: '13px' })}>
             We couldn't match this to {mediaTypeUiFor(run.mediaType).catalogName}, so it can't be logged from
             here.
           </p>
@@ -61,7 +62,7 @@ export function UnconfirmedRunPage(handle: Handle<UnconfirmedRunPageProps>) {
         {/* One quiet line rather than a warning box: the heading already says these
             are unconfirmed, and the page has nothing to act on but the list. The
             stage that failed is kept as the tooltip, for whoever needs it. */}
-        <p mix={css({ margin: '8px 0 0', color: '#888', fontSize: '13px' })} title={run.reason}>
+        <p mix={css({ margin: '8px 0 0', color: 'var(--muted)', fontSize: '13px' })} title={run.reason}>
           {date} · The catalog couldn't be reached, so these are the model's picks, unchecked. They can't be
           logged from here.
         </p>
@@ -69,7 +70,7 @@ export function UnconfirmedRunPage(handle: Handle<UnconfirmedRunPageProps>) {
         <UnconfirmedPickList picks={run.picks} mediaType={run.mediaType} />
 
         <p mix={css({ marginTop: '24px' })}>
-          <a href={routes.recommendations.index.href()}>Generate a new run</a>
+          <Link href={routes.recommendations.index.href()}>Generate a new run</Link>
         </p>
       </Page>
     )

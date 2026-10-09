@@ -1,5 +1,6 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
+import { Link } from '../../ui/shared/form-controls.tsx'
 
 // A link after the message, where there is somewhere to go about it — the run
 // already in progress, when that is why this one was refused.
@@ -18,16 +19,16 @@ export function ErrorNotice(handle: Handle<{ error: string; link?: ErrorLink }>)
         mix={css({
           margin: '0 0 16px',
           padding: '12px 16px',
-          border: '1px solid #b91c1c',
+          border: '1px solid var(--danger)',
           borderRadius: '8px',
-          color: '#b91c1c',
+          color: 'var(--danger)',
         })}
       >
         {error}
         {link && (
           <>
             {' '}
-            <a href={link.href}>{link.label}</a>
+            <Link href={link.href}>{link.label}</Link>
           </>
         )}
       </p>

@@ -1,6 +1,14 @@
 import type { Handle } from 'remix/ui'
 import { css, on } from 'remix/ui'
-import { Button, CheckboxOption, ChoiceGroup, RadioOption, TextInput } from '../ui/shared/form-controls.tsx'
+import {
+  Button,
+  CheckboxOption,
+  ChoiceGroup,
+  Link,
+  RadioOption,
+  TextInput,
+} from '../ui/shared/form-controls.tsx'
+import { Field } from '../ui/shared/field.tsx'
 
 export type FriendOption = {
   id: number
@@ -58,7 +66,7 @@ export function FriendPicker(handle: Handle<FriendPickerProps>) {
           hint={
             friends.length === 0 && (
               <>
-                <a href={findPeopleHref}>Find and follow people</a> to build a group.
+                <Link href={findPeopleHref}>Find and follow people</Link> to build a group.
               </>
             )
           }
@@ -91,14 +99,18 @@ export function FriendPicker(handle: Handle<FriendPickerProps>) {
               marginTop: '12px',
             })}
           >
-            <TextInput
-              placeholder="Search friends…"
-              value={search}
-              mix={on('input', (event) => onSearchChange((event.target as HTMLInputElement).value))}
-            />
+            <Field label="Search friends" labelHidden>
+              <TextInput
+                placeholder="Search friends…"
+                value={search}
+                mix={on('input', (event) => onSearchChange((event.target as HTMLInputElement).value))}
+              />
+            </Field>
 
             {filtered.length === 0 && (
-              <p mix={css({ margin: 0, fontSize: '13px', color: '#888' })}>No friends match "{search}".</p>
+              <p mix={css({ margin: 0, fontSize: '13px', color: 'var(--muted)' })}>
+                No friends match "{search}".
+              </p>
             )}
 
             <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
@@ -127,7 +139,7 @@ export function FriendPicker(handle: Handle<FriendPickerProps>) {
                 >
                   ← Prev
                 </Button>
-                <span mix={css({ color: '#888' })}>
+                <span mix={css({ color: 'var(--muted)' })}>
                   Page {clampedPage} of {totalPages}
                 </span>
                 <Button

@@ -1,5 +1,6 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
+import { Link } from '../shared/form-controls.tsx'
 
 export interface PaginationProps {
   page: number
@@ -18,11 +19,11 @@ export function Pagination(handle: Handle<PaginationProps>) {
 
     return (
       <div mix={css({ display: 'flex', justifyContent: 'space-between', marginTop: '24px' })}>
-        {page > 1 ? <a href={pageHref(page - 1)}>{prevLabel}</a> : <span />}
-        <span mix={css({ color: '#888', fontSize: '13px' })}>
+        {page > 1 ? <Link href={pageHref(page - 1)}>{prevLabel}</Link> : <span />}
+        <span mix={css({ color: 'var(--muted)', fontSize: '13px' })}>
           Page {page} of {totalPages}
         </span>
-        {page < totalPages ? <a href={pageHref(page + 1)}>{nextLabel}</a> : <span />}
+        {page < totalPages ? <Link href={pageHref(page + 1)}>{nextLabel}</Link> : <span />}
       </div>
     )
   }

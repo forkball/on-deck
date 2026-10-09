@@ -24,7 +24,7 @@ export function ModelProvided(handle: Handle<ModelProvidedProps>) {
     const { note, children } = handle.props
 
     return (
-      <span title={note} mix={css({ borderBottom: '1px dotted #999', cursor: 'help' })}>
+      <span title={note} mix={css({ borderBottom: '1px dotted var(--muted)', cursor: 'help' })}>
         {children}
       </span>
     )

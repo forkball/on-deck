@@ -16,7 +16,7 @@ import { Page } from '../../ui/components/page.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
-import { Button } from '../../ui/shared/form-controls.tsx'
+import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
@@ -44,11 +44,18 @@ function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>)
         <summary mix={css({ cursor: 'pointer' })}>
           <h2 mix={css({ display: 'inline' })}>{label}</h2>
         </summary>
-        <div mix={css({ border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginTop: '12px' })}>
+        <div
+          mix={css({
+            border: '1px solid var(--rule)',
+            borderRadius: '8px',
+            padding: '16px',
+            marginTop: '12px',
+          })}
+        >
           {summary ? (
             <p mix={css({ margin: 0 })}>{summary}</p>
           ) : (
-            <p mix={css({ margin: 0, color: '#555' })}>Nothing written yet.</p>
+            <p mix={css({ margin: 0, color: 'var(--soft)' })}>Nothing written yet.</p>
           )}
         </div>
       </details>
@@ -92,7 +99,7 @@ function LoggedList(
         </ul>
         {seeAllHref && total > log.length && (
           <p mix={css({ marginTop: '16px' })}>
-            <a href={seeAllHref}>See all {total} →</a>
+            <Link href={seeAllHref}>See all {total} →</Link>
           </p>
         )}
       </>
@@ -142,20 +149,20 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
     return (
       <Page title={label} displayName={displayName}>
         <h1 mix={css({ marginBottom: '4px', overflowWrap: 'break-word' })}>{label}</h1>
-        <p mix={css({ margin: '0 0 12px', color: '#555' })}>
+        <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>
           {locked ? (
             <>
               {followingCount} following · {followersCount} follower{followersCount === 1 ? '' : 's'}
             </>
           ) : (
             <>
-              <a href={routes.users.following.href({ userId: String(user.id) })}>
+              <Link href={routes.users.following.href({ userId: String(user.id) })}>
                 {followingCount} following
-              </a>{' '}
+              </Link>{' '}
               ·{' '}
-              <a href={routes.users.followers.href({ userId: String(user.id) })}>
+              <Link href={routes.users.followers.href({ userId: String(user.id) })}>
                 {followersCount} follower{followersCount === 1 ? '' : 's'}
-              </a>
+              </Link>
             </>
           )}
         </p>

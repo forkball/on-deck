@@ -3,7 +3,7 @@ import { css } from 'remix/ui'
 
 import { routes } from '../../routes.ts'
 import { Field, hintStyle } from '../shared/field.tsx'
-import { Textarea } from '../shared/form-controls.tsx'
+import { Link, Textarea } from '../shared/form-controls.tsx'
 
 // The note field, wherever something is logged — four places now, which is why
 // the control and the line under it live together rather than being spelled out
@@ -40,7 +40,7 @@ export function NotesField(handle: Handle<{ defaultValue?: string | null }>) {
           "attached to this field" rather than "starting a new one". */}
       <p mix={[hintStyle, css({ marginTop: '1px' })]}>
         Notes feed your taste profile unless you've turned them off in{' '}
-        <a href={routes.profile.edit.index.href()}>settings</a>.
+        <Link href={routes.profile.edit.index.href()}>settings</Link>.
       </p>
     </div>
   )

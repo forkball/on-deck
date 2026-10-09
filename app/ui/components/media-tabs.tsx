@@ -37,12 +37,12 @@ export function MediaTabs(handle: Handle<MediaTabsProps>) {
         // A wired-up media type whose caller hasn't supplied a panel would
         // otherwise render as a blank tab, which reads as broken rather than
         // unfinished.
-        panel: panels[type] ?? <p mix={css({ color: '#888' })}>Nothing to show here yet.</p>,
+        panel: panels[type] ?? <p mix={css({ color: 'var(--muted)' })}>Nothing to show here yet.</p>,
       })),
       ...PLACEHOLDER_MEDIA_TYPES.map((type) => ({
         id: type,
         label: capitalize(type),
-        panel: <p mix={css({ color: '#888' })}>{capitalize(type)} logging is coming soon.</p>,
+        panel: <p mix={css({ color: 'var(--muted)' })}>{capitalize(type)} logging is coming soon.</p>,
       })),
     ]
 

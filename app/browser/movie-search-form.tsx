@@ -8,6 +8,7 @@ import {
   type Suggestion,
 } from './shared/suggestions.ts'
 import { Button, TextInput } from '../ui/shared/form-controls.tsx'
+import { Field } from '../ui/shared/field.tsx'
 
 export type MovieSearchFormProps = {
   query: string
@@ -77,30 +78,32 @@ export const MovieSearchForm = clientEntry<MovieSearchFormProps>(
               }),
             ]}
           >
-            <TextInput
-              name="q"
-              value={query}
-              autocomplete="off"
-              placeholder={placeholder}
-              mix={[
-                css({ display: 'block', width: '100%' }),
-                on('input', (event) => {
-                  query = (event.target as HTMLInputElement).value
-                  fetcher.query(query)
-                  handle.update()
-                }),
-                on('keydown', (event) => {
-                  if (event.key !== 'Escape') return
-                  suggestState = EMPTY_SUGGEST_STATE
-                  handle.update()
-                }),
-              ]}
-            />
+            <Field label="Search" labelHidden>
+              <TextInput
+                name="q"
+                value={query}
+                autocomplete="off"
+                placeholder={placeholder}
+                mix={[
+                  on('input', (event) => {
+                    query = (event.target as HTMLInputElement).value
+                    fetcher.query(query)
+                    handle.update()
+                  }),
+                  on('keydown', (event) => {
+                    if (event.key !== 'Escape') return
+                    suggestState = EMPTY_SUGGEST_STATE
+                    handle.update()
+                  }),
+                ]}
+              />
+            </Field>
             {suggestState.open && <SuggestionDropdown state={suggestState} onSelect={selectSuggestion} />}
           </div>
 
           <Button
             type="submit"
+            variant="primary"
             disabled={submitting}
             mix={css({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' })}
           >

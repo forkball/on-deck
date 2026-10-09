@@ -3,7 +3,7 @@ import { css } from 'remix/ui'
 
 import { routes } from '../../../routes.ts'
 import { Field } from '../../../ui/shared/field.tsx'
-import { Button, TextInput } from '../../../ui/shared/form-controls.tsx'
+import { Button, Link, TextInput } from '../../../ui/shared/form-controls.tsx'
 
 // The accounts On Deck reads from, on the page where the rest of the account
 // lives. They used to sit on their own import pages — beside the uploader that
@@ -50,15 +50,15 @@ export interface ConnectionsProps {
 }
 
 const PANEL = css({
-  border: '1px solid #d9cfbe',
+  border: '1px solid var(--rule)',
   borderRadius: '8px',
   padding: '16px 18px',
   marginBottom: '16px',
 })
 
-const NOTE = css({ fontSize: '13px', color: '#888' })
+const NOTE = css({ fontSize: '13px', color: 'var(--muted)' })
 
-const ERROR = css({ color: '#b91c1c' })
+const ERROR = css({ color: 'var(--danger)' })
 
 // Matches how dates read elsewhere (run-list, the import review): the viewer's
 // own locale, since this is a day they chose rather than a timestamp.
@@ -75,7 +75,7 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
         <h3 mix={css({ marginTop: 0, fontSize: '15px' })}>Letterboxd</h3>
 
         {error && <p mix={ERROR}>{error}</p>}
-        {notice && <p mix={css({ margin: '0 0 12px', color: '#555' })}>{notice}</p>}
+        {notice && <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>{notice}</p>}
 
         {/* Connected and disconnected are two states, not one form with a
             different button on it: the field is for naming a diary that isn't
@@ -101,7 +101,7 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
             {/* The date is the whole point: "what's new" is only meaningful
                 if the panel says new since when. Members connected before that
                 was recorded fall back to naming the diary alone. */}
-            <p mix={css({ margin: '0 0 12px', color: '#555' })}>
+            <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>
               {connectedAt == null ? (
                 <>
                   Following <code>{username}</code>.
@@ -143,10 +143,10 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
                 history, and somebody whose export held four has the opposite.
                 It goes away for good once a batch is saved. */}
             {!historyImported && (
-              <p mix={css({ margin: '12px 0 0', fontSize: '13px', color: '#555' })}>
+              <p mix={css({ margin: '12px 0 0', fontSize: '13px', color: 'var(--soft)' })}>
                 <strong>Your earlier films aren't here yet.</strong>{' '}
-                <a href={routes.profile.importMovies.index.href()}>Import your Letterboxd export</a> to bring
-                them across.
+                <Link href={routes.profile.importMovies.index.href()}>Import your Letterboxd export</Link> to
+                bring them across.
               </p>
             )}
 
@@ -176,7 +176,7 @@ function LetterboxdBlock(handle: Handle<{ connection: LetterboxdConnection }>) {
             <p mix={NOTE}>
               Follows what you log from the moment you connect — new diary entries, with their rating and
               review. Nothing from before, and no lists or watchlist. Your existing films come from the{' '}
-              <a href={routes.profile.importMovies.index.href()}>Letterboxd import</a>.
+              <Link href={routes.profile.importMovies.index.href()}>Letterboxd import</Link>.
             </p>
             <form
               method="post"
@@ -220,7 +220,7 @@ function SteamBlock(handle: Handle<{ connection: SteamConnection }>) {
             {/* The name when Steam gives one, with the id kept underneath in
                 small print: the name answers "is this my account", and the id
                 is what to quote when something needs identifying exactly. */}
-            <p mix={css({ margin: '0 0 4px', color: '#555' })}>
+            <p mix={css({ margin: '0 0 4px', color: 'var(--soft)' })}>
               {persona ? (
                 <>
                   Connected as <strong>{persona}</strong>.
@@ -232,14 +232,14 @@ function SteamBlock(handle: Handle<{ connection: SteamConnection }>) {
               )}
             </p>
             {persona && (
-              <p mix={css({ margin: '0 0 12px', fontSize: '12px', color: '#888' })}>
+              <p mix={css({ margin: '0 0 12px', fontSize: '12px', color: 'var(--muted)' })}>
                 <code>{steamId}</code>
               </p>
             )}
             <p mix={NOTE}>
               Unlike Letterboxd, nothing is read until you ask for it —{' '}
-              <a href={routes.profile.importGames.index.href()}>import your library</a> to bring your games
-              across.
+              <Link href={routes.profile.importGames.index.href()}>import your library</Link> to bring your
+              games across.
             </p>
             <form
               method="post"
@@ -251,7 +251,7 @@ function SteamBlock(handle: Handle<{ connection: SteamConnection }>) {
           </>
         ) : (
           <>
-            <p mix={css({ margin: '0 0 12px', color: '#555' })}>
+            <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>
               Sign in through Steam to import the games you own. On Deck only reads which games you own and
               how long you've played them — it can't post or change anything on your account.
             </p>
@@ -268,9 +268,9 @@ function SteamBlock(handle: Handle<{ connection: SteamConnection }>) {
               is a document navigation, not a data fetch.
             */}
             <p mix={css({ marginTop: '12px' })}>
-              <a href={routes.profile.steam.connect.href()} rmx-document="" class="tap-area">
+              <Link href={routes.profile.steam.connect.href()} rmx-document="" tapArea>
                 Sign in through Steam →
-              </a>
+              </Link>
             </p>
           </>
         )}
@@ -288,7 +288,7 @@ export function Connections(handle: Handle<ConnectionsProps>) {
     return (
       <section mix={css({ maxWidth: '480px' })}>
         <h2 mix={css({ marginTop: 0 })}>Connected accounts</h2>
-        <p mix={css({ margin: '0 0 16px', color: '#555' })}>
+        <p mix={css({ margin: '0 0 16px', color: 'var(--soft)' })}>
           Libraries On Deck reads from. Disconnecting one stops the reading — it leaves everything already in
           your log exactly where it is.
         </p>

@@ -5,6 +5,7 @@ import { routes } from '../../../routes.ts'
 import { LetterboxdImportForm } from '../../../browser/letterboxd-import-form.tsx'
 import { Page } from '../../../ui/components/page.tsx'
 import { Toast } from '../../../ui/components/toast.tsx'
+import { Link } from '../../../ui/shared/form-controls.tsx'
 
 export interface LetterboxdImportPageProps {
   displayName: string
@@ -32,27 +33,27 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
         {pendingHref && (
           <div
             mix={css({
-              border: '1px solid #d9cfbe',
-              borderLeft: '4px solid #3E5C76',
+              border: '1px solid var(--rule)',
+              borderLeft: '4px solid var(--accent)',
               borderRadius: '8px',
-              background: '#fbf4ea',
+              background: 'var(--paper-tint)',
               padding: '12px 14px',
               marginBottom: '18px',
               fontSize: '14px',
             })}
           >
-            You have an import waiting. <a href={pendingHref}>Pick it back up</a> — uploading again starts
-            over.
+            You have an import waiting. <Link href={pendingHref}>Pick it back up</Link> — uploading again
+            starts over.
           </div>
         )}
 
-        <p mix={css({ color: '#555' })}>
+        <p mix={css({ color: 'var(--soft)' })}>
           {syncAvailable && BACKFILL_LEAD}
           Export your data from Letterboxd (Settings → Data → Export) and upload the <code>.zip</code>{' '}
           unopened — ratings and reviews both come across in one import.
         </p>
 
-        <p mix={css({ fontSize: '13px', color: '#888' })}>
+        <p mix={css({ fontSize: '13px', color: 'var(--muted)' })}>
           Letterboxd's app doesn't always deliver the export. If it doesn't arrive, export from letterboxd.com
           in a browser instead.
         </p>
@@ -63,15 +64,15 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
           error={error}
         />
 
-        <p mix={css({ fontSize: '13px', color: '#3E5C76' })}>
+        <p mix={css({ fontSize: '13px', color: 'var(--accent)' })}>
           Nothing is saved until you've seen what we matched.
         </p>
 
         {syncAvailable && (
-          <p mix={css({ fontSize: '13px', color: '#888' })}>
+          <p mix={css({ fontSize: '13px', color: 'var(--muted)' })}>
             New films are handled separately:{' '}
-            <a href={routes.profile.edit.index.href()}>connect your Letterboxd account in settings</a> and
-            they arrive on their own.
+            <Link href={routes.profile.edit.index.href()}>connect your Letterboxd account in settings</Link>{' '}
+            and they arrive on their own.
           </p>
         )}
       </Page>

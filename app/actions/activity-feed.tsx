@@ -84,7 +84,7 @@ const GROUP_STYLE = css({
     cursor: 'pointer',
     listStyle: 'none',
     fontSize: '14px',
-    color: '#555',
+    color: 'var(--soft)',
   },
   '& > details > summary::-webkit-details-marker': { display: 'none' },
   // The title's phrases are flex items, so a long one wraps between them —
@@ -94,14 +94,14 @@ const GROUP_STYLE = css({
   '& > details[open] > summary .chevron': { transform: 'rotate(90deg)' },
   // Grows to fill the gap on a wide screen; shrinks to nothing rather than
   // forcing the date onto the title's line where there isn't room.
-  '& .rule': { flex: '1 1 12px', minWidth: '12px', borderTop: '1px dashed #bbb' },
+  '& .rule': { flex: '1 1 12px', minWidth: '12px', borderTop: '1px dashed var(--rule)' },
   // marginLeft: auto is a second way to the same edge: if the row wraps and
   // the date ends up alone on its own line, the rule has nothing to grow
   // against, so this is what still sends the date to the right.
-  '& .when': { color: '#888', fontSize: '12px', whiteSpace: 'nowrap', marginLeft: 'auto' },
+  '& .when': { color: 'var(--muted)', fontSize: '12px', whiteSpace: 'nowrap', marginLeft: 'auto' },
   '& .count': {
     padding: '1px 8px',
-    border: '1px solid #ccc',
+    border: '1px solid var(--rule)',
     borderRadius: '999px',
     fontSize: '12px',
   },
@@ -126,7 +126,7 @@ const GROUP_BODY_STYLE = css({
   listStyle: 'none',
   margin: '12px 0 0',
   padding: '0 0 0 12px',
-  borderLeft: '2px solid #eee',
+  borderLeft: '2px solid var(--rule-soft)',
   display: 'flex',
   flexDirection: 'column',
   gap: '12px',

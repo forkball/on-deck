@@ -18,7 +18,8 @@ import type { Handle, Props, RemixNode } from 'remix/ui'
 // site's layout styles and event handlers reach the element unchanged.
 
 export type ButtonVariant =
-  // The hand-drawn frame. The default; no class.
+  // The hand-drawn frame. The default; `secondary` is what app.css turns
+  // blue on hover, so a new variant never picks that up by accident.
   | 'default'
   // Dark frame at rest: the one action a form exists for.
   | 'primary'
@@ -43,7 +44,7 @@ export type ButtonVariant =
   | 'plain'
 
 const VARIANT_CLASS: Record<ButtonVariant, string | undefined> = {
-  default: undefined,
+  default: 'secondary',
   primary: 'primary',
   danger: 'danger',
   link: 'linkish',
@@ -95,6 +96,103 @@ export function ButtonLink(handle: Handle<Props<'a'>>) {
   return () => {
     const { class: className, ...rest } = handle.props
     return <a {...rest} class={buttonFrameClass('default', className)} />
+  }
+}
+
+export type LinkVariant =
+  // A link in running text: the accent, bold. The default; no class.
+  | 'default'
+  // The default at a smaller size, for a link that sits beside a heading as
+  // its secondary action ("Import from Letterboxd" by "What I've watched").
+  | 'small'
+  // The small underlined sentence Button's `link` variant is, as a real link:
+  // the review's "jump to" under a duplicate. Same `linkish` class, same look.
+  | 'subtle'
+  // A link around something with a look of its own — a poster, a bell icon, a
+  // whole row. Takes its colour and weight from what it wraps, no underline.
+  | 'wrap'
+  // The site's wordmark in the nav, drawn as a ticket stub.
+  | 'brand'
+  // A row in a menu of places to go: the profile menu. Shares `menu-link`
+  // with Button's menu-link variant, so the links and Log out are one look.
+  | 'menu'
+  // A media-type tab that fetches its page (MediaTabLinks). Quiet until it is
+  // the current one, which `aria-current` marks.
+  | 'tab'
+
+const LINK_CLASS: Record<LinkVariant, string | undefined> = {
+  default: undefined,
+  small: 'small-link',
+  subtle: 'linkish',
+  wrap: 'wrap-link',
+  brand: 'brand',
+  menu: 'menu-link',
+  tab: 'media-tab',
+}
+
+type LinkProps = Props<'a'> & {
+  variant?: LinkVariant
+  // Opens in a new tab, without handing that tab a handle back to this one.
+  external?: boolean
+  // The invisible touch target app.css draws around small links on a phone.
+  tapArea?: boolean
+}
+
+// Every link in the app. Their look lives in public/app.css, for the reason
+// the buttons' does: DoodleCSS's `.doodle a { color; font-weight: bold }` is
+// unlayered, so a css() colour or weight at the call site is dropped without a
+// word — which is how links ended up carrying `fontWeight: 700` that did
+// nothing. A call site's `mix` is for layout.
+export function Link(handle: Handle<LinkProps>) {
+  return () => {
+    const { variant = 'default', external, tapArea, class: className, ...rest } = handle.props
+    return (
+      <a
+        {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+        {...rest}
+        class={joinClasses(LINK_CLASS[variant], tapArea && 'tap-area', className)}
+      />
+    )
+  }
+}
+
+type ToggleLabelProps = Props<'label'> & {
+  // The id of the invisible checkbox this opens or closes.
+  for: string
+  // `link`: the small underlined sentence, like Button's `link`. `button` and
+  // `primary`: drawn as that button, on a span, since DoodleCSS pads a <label>
+  // and the frame has to sit on the element without the padding. `plain`: no
+  // look of its own, for a toggle whose content is the look (the review drawer).
+  variant?: 'link' | 'button' | 'primary' | 'plain'
+  // The invisible touch target app.css draws around small controls on a phone.
+  tapArea?: boolean
+}
+
+// A <label> that works a CSS-only toggle — opens a Modal, the import review's
+// drawer — rather than naming a field. Field and the choice options own the
+// labels that name things; this is the other kind, so it gets a look from the
+// same place as a button rather than one written at each call site.
+export function ToggleLabel(handle: Handle<ToggleLabelProps>) {
+  return () => {
+    const { variant = 'plain', tapArea, children, class: className, ...rest } = handle.props
+    if (variant === 'button' || variant === 'primary') {
+      return (
+        <label
+          {...rest}
+          class={joinClasses('modal-trigger', 'toggle-label', tapArea && 'tap-area', className)}
+        >
+          <span class={buttonFrameClass(variant === 'primary' ? 'primary' : 'default')}>{children}</span>
+        </label>
+      )
+    }
+    return (
+      <label
+        {...rest}
+        class={joinClasses('toggle-label', variant === 'link' && 'linkish', tapArea && 'tap-area', className)}
+      >
+        {children}
+      </label>
+    )
   }
 }
 

@@ -19,7 +19,7 @@ import { Field } from '../shared/field.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { PlatformList } from '../components/platform-list.tsx'
 import { withReturnTo } from '../backLink.ts'
-import { Button } from '../shared/form-controls.tsx'
+import { Button, Link } from '../shared/form-controls.tsx'
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
@@ -84,7 +84,9 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
           <section>
             <h2>
               Results{' '}
-              <span mix={css({ fontSize: '14px', fontWeight: 400, color: '#888' })}>({results.length})</span>
+              <span mix={css({ fontSize: '14px', fontWeight: 400, color: 'var(--muted)' })}>
+                ({results.length})
+              </span>
             </h2>
             <ul
               id="search-results"
@@ -109,35 +111,33 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                     mix={css({
                       display: 'flex',
                       gap: '12px',
-                      border: '1px solid #ddd',
+                      border: '1px solid var(--rule)',
                       borderRadius: '8px',
                       padding: '16px',
                     })}
                   >
                     {posterUrl ? (
-                      <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
+                      <Link variant="wrap" href={detailHref} mix={css({ flex: '0 0 auto' })}>
                         <img
                           src={posterUrl}
                           alt={`${item.title} poster`}
                           loading="lazy"
                           mix={css({ width: '60px', borderRadius: '4px', display: 'block' })}
                         />
-                      </a>
+                      </Link>
                     ) : (
                       <div
                         mix={css({
                           width: '60px',
                           height: '90px',
                           flex: '0 0 auto',
-                          border: '1px solid #ddd',
+                          border: '1px solid var(--rule)',
                           borderRadius: '4px',
                         })}
                       />
                     )}
                     <div mix={css({ flex: '1 1 auto' })}>
-                      <a href={detailHref} mix={css({ fontWeight: 700 })}>
-                        {item.title}
-                      </a>
+                      <Link href={detailHref}>{item.title}</Link>
                       {releaseYear ? ` (${releaseYear})` : ''}
                       {/* Searching "Strata" returns one from 1981 and one from 2011, and
                           the card showed neither author — so the two were the same row to
@@ -145,7 +145,9 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                           rarely fills it, in which case nothing shows, and IGDB nearly
                           always does. */}
                       {creator && (
-                        <div mix={css({ fontSize: '13px', color: '#555', marginTop: '2px' })}>{creator}</div>
+                        <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>
+                          {creator}
+                        </div>
                       )}
                       {tags.length > 0 && (
                         <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' })}>
@@ -156,8 +158,8 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                                 fontSize: '11px',
                                 padding: '2px 8px',
                                 borderRadius: '999px',
-                                border: '1px solid #ccc',
-                                color: '#555',
+                                border: '1px solid var(--rule)',
+                                color: 'var(--soft)',
                               })}
                             >
                               {capitalize(tag)}
@@ -170,7 +172,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                         <p
                           mix={css({
                             fontSize: '13px',
-                            color: '#555',
+                            color: 'var(--soft)',
                             margin: '6px 0 0',
                             lineHeight: 1.4,
                           })}
@@ -186,7 +188,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                             gap: '8px',
                             margin: '4px 0 0',
                             fontSize: '13px',
-                            color: '#555',
+                            color: 'var(--soft)',
                           })}
                         >
                           {statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}
@@ -229,7 +231,9 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                               </div>
                               <NotesField defaultValue={interaction?.notes} />
                             </div>
-                            <Button type="submit">Save</Button>
+                            <Button type="submit" variant="primary">
+                              Save
+                            </Button>
                             <FrameForm />
                           </form>
                         </FloatingDropdown>

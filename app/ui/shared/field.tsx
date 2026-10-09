@@ -1,4 +1,4 @@
-import type { Handle, RemixNode } from 'remix/ui'
+import type { Handle, Props, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
 // Rendered on both sides, so it lives in app/ui/shared — the narrow slice of
@@ -38,9 +38,9 @@ export const fieldStyle = css({
   },
 })
 
-const labelTextStyle = css({ fontSize: '13px', color: '#555' })
-export const hintStyle = css({ display: 'block', margin: '4px 0 0', fontSize: '12px', color: '#888' })
-const errorStyle = css({ display: 'block', margin: '4px 0 0', fontSize: '12px', color: '#b91c1c' })
+const labelTextStyle = css({ fontSize: '13px', color: 'var(--soft)' })
+export const hintStyle = css({ display: 'block', margin: '4px 0 0', fontSize: '12px', color: 'var(--muted)' })
+const errorStyle = css({ display: 'block', margin: '4px 0 0', fontSize: '12px', color: 'var(--danger)' })
 
 export interface FieldProps {
   label: string
@@ -50,19 +50,25 @@ export interface FieldProps {
   // Why this field was rejected, rendered under the control. Sits inside the
   // <label> so a screen reader reads it with the field it belongs to.
   error?: string
+  // For a control whose purpose its surroundings already show — a search box
+  // under a "Search movies" heading. The label is still there for a screen
+  // reader, which a placeholder is not; it just isn't drawn.
+  labelHidden?: boolean
+  // Layout only, as on every control: where the field sits in its row.
+  mix?: Props<'label'>['mix']
 }
 
 // The single way to render a labelled control. Every text input, select and
 // textarea in the app goes through this so they can't drift apart.
 export function Field(handle: Handle<FieldProps>) {
   return () => {
-    const { label, children, hint, error } = handle.props
+    const { label, children, hint, error, labelHidden, mix } = handle.props
 
     return (
       // `field` is for app.css, which zeroes the vertical padding DoodleCSS
       // gives every <label> — see the note there.
-      <label class="field" mix={fieldStyle}>
-        <span class="field-label" mix={labelTextStyle}>
+      <label class="field" mix={[fieldStyle, mix]}>
+        <span class={labelHidden ? 'visually-hidden' : 'field-label'} mix={labelTextStyle}>
           {label}
         </span>
         {children}

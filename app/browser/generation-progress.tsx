@@ -1,5 +1,6 @@
 import type { Handle } from 'remix/ui'
 import { clientEntry, css, ref } from 'remix/ui'
+import { Link } from '../ui/shared/form-controls.tsx'
 
 // Polls for the stage a run is actually in. Every label comes from the server
 // having entered that stage, so progress can't run backwards or be invented.
@@ -25,7 +26,7 @@ const stepStyle = css({
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
-  color: '#888',
+  color: 'var(--muted)',
   fontSize: '14px',
 })
 
@@ -33,7 +34,7 @@ const activeStepStyle = css({
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
-  color: '#111',
+  color: 'var(--ink)',
   fontSize: '14px',
   fontWeight: 'bold',
 })
@@ -42,7 +43,7 @@ const failedStepStyle = css({
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
-  color: '#b91c1c',
+  color: 'var(--danger)',
   fontSize: '14px',
   fontWeight: 'bold',
 })
@@ -51,7 +52,7 @@ const doneStepStyle = css({
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
-  color: '#15803d',
+  color: 'var(--success)',
   fontSize: '14px',
 })
 
@@ -188,10 +189,12 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       // which stay on screen so it is clear how far the run got. The message is
       // written where the failure happened and already says what to do about it.
       function notice() {
-        if (stopped) return <p mix={css({ color: '#b91c1c' })}>{stopped.message}</p>
+        if (stopped) return <p mix={css({ color: 'var(--danger)' })}>{stopped.message}</p>
         // Not an error, so not in red: the run is fine and will carry on by itself.
         if (retrying) {
-          return <p mix={css({ color: '#555' })}>The catalog isn't answering — trying again in a minute.</p>
+          return (
+            <p mix={css({ color: 'var(--soft)' })}>The catalog isn't answering — trying again in a minute.</p>
+          )
         }
         return null
       }
@@ -203,11 +206,11 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
         return (
           <p mix={css({ display: 'flex', flexWrap: 'wrap', gap: '16px' })}>
             {stopped.reload ? (
-              <a href="">Reload to check</a>
+              <Link href="">Reload to check</Link>
             ) : (
-              <a href={handle.props.formHref}>Back to recommendations</a>
+              <Link href={handle.props.formHref}>Back to recommendations</Link>
             )}
-            <a href={handle.props.homeHref}>Home</a>
+            <Link href={handle.props.homeHref}>Home</Link>
           </p>
         )
       }
@@ -215,7 +218,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       function panel() {
         if (queueState === 'queued' && !stopped?.failed && !retrying) {
           return (
-            <p mix={css({ color: '#555' })}>
+            <p mix={css({ color: 'var(--soft)' })}>
               Waiting to start
               {ahead != null && ahead > 0 ? ` — ${ahead} ${ahead === 1 ? 'run' : 'runs'} ahead of yours` : ''}
               …

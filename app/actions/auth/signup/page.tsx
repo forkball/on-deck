@@ -5,7 +5,7 @@ import { USERNAME_HINT, USERNAME_MAX_LENGTH } from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
 import { Page } from '../../../ui/components/page.tsx'
 import { Field } from '../../../ui/shared/field.tsx'
-import { Button, TextInput } from '../../../ui/shared/form-controls.tsx'
+import { Button, Link, TextInput } from '../../../ui/shared/form-controls.tsx'
 
 export interface SignupPageProps {
   // Keyed by field name, so each message lands under the input it's about.
@@ -38,10 +38,12 @@ export function SignupPage(handle: Handle<SignupPageProps>) {
               defaultValue={values?.display_name ?? ''}
             />
           </Field>
-          <Button type="submit">Create account</Button>
+          <Button type="submit" variant="primary">
+            Create account
+          </Button>
         </form>
         <p>
-          Already have an account? <a href={routes.auth.login.index.href()}>Log in</a>
+          Already have an account? <Link href={routes.auth.login.index.href()}>Log in</Link>
         </p>
       </Page>
     )

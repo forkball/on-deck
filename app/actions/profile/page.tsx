@@ -18,7 +18,7 @@ import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
 import { PROFILE_TABS } from './edit/page.tsx'
-import { Button } from '../../ui/shared/form-controls.tsx'
+import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
@@ -119,12 +119,19 @@ function TasteProfileSummary(
         <summary class="tap-area" mix={css({ cursor: 'pointer' })}>
           <h2 mix={css({ display: 'inline' })}>{label}</h2>
         </summary>
-        <div mix={css({ border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginTop: '12px' })}>
+        <div
+          mix={css({
+            border: '1px solid var(--rule)',
+            borderRadius: '8px',
+            padding: '16px',
+            marginTop: '12px',
+          })}
+        >
           {summary ? (
             <>
               <p mix={css({ margin: 0 })}>{summary}</p>
               {updatedAt && (
-                <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
+                <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: 'var(--muted)' })}>
                   Written from {source}, as your log stood on {new Date(updatedAt).toLocaleDateString()}. It's
                   rewritten next time you generate, if you've logged anything since.
                 </p>
@@ -132,13 +139,13 @@ function TasteProfileSummary(
             </>
           ) : (
             <>
-              <p mix={css({ margin: 0, color: '#555' })}>
-                Nothing yet — <a href={routes.recommendations.index.href()}>get recommendations</a> to have
-                one written from what you've logged.
+              <p mix={css({ margin: 0, color: 'var(--soft)' })}>
+                Nothing yet — <Link href={routes.recommendations.index.href()}>get recommendations</Link> to
+                have one written from what you've logged.
               </p>
               {/* Said in the future tense here, because there's nothing yet to
                   describe — but it's still what the button below would read. */}
-              <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
+              <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: 'var(--muted)' })}>
                 It'll be written from {source}.
               </p>
             </>
@@ -154,9 +161,9 @@ function TasteProfileSummary(
               '@media (pointer: coarse)': { paddingBottom: '4px' },
             })}
           >
-            <a href={routes.profile.edit.index.href()} class="tap-area">
+            <Link href={routes.profile.edit.index.href()} tapArea>
               Change what it's written from →
-            </a>
+            </Link>
           </p>
 
           <form
@@ -170,7 +177,7 @@ function TasteProfileSummary(
               Rebuild now
             </Button>
             {(nothingLogged || rebuildsLeft != null) && (
-              <span mix={css({ fontSize: '12px', color: '#888' })}>
+              <span mix={css({ fontSize: '12px', color: 'var(--muted)' })}>
                 {nothingLogged
                   ? `Nothing logged to write one from`
                   : outOfRebuilds
@@ -203,7 +210,7 @@ function LoggedList(
     if (log.length === 0) {
       return (
         <p>
-          Nothing logged yet — <a href={emptyHref}>{emptyLabel}</a> to get started.
+          Nothing logged yet — <Link href={emptyHref}>{emptyLabel}</Link> to get started.
         </p>
       )
     }
@@ -239,7 +246,7 @@ function LoggedList(
         </ul>
         {seeAllHref && total > log.length && (
           <p mix={css({ marginTop: '16px' })}>
-            <a href={seeAllHref}>See all →</a>
+            <Link href={seeAllHref}>See all →</Link>
           </p>
         )}
       </>
@@ -278,21 +285,21 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
         ) : saved ? (
           <Toast message="Saved." />
         ) : null}
-        <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
-          <a href={routes.profile.following.href()}>{followingCount} following</a> ·{' '}
-          <a href={routes.profile.followers.href()}>
+        <p mix={css({ margin: '-8px 0 16px', color: 'var(--soft)' })}>
+          <Link href={routes.profile.following.href()}>{followingCount} following</Link> ·{' '}
+          <Link href={routes.profile.followers.href()}>
             {followersCount} follower{followersCount === 1 ? '' : 's'}
-          </a>
+          </Link>
         </p>
 
         {waitingImports.map((waiting) => (
           <p
             key={waiting.href}
             mix={css({
-              border: '1px solid #d9cfbe',
-              borderLeft: '4px solid #3E5C76',
+              border: '1px solid var(--rule)',
+              borderLeft: '4px solid var(--accent)',
               borderRadius: '8px',
-              background: '#fbf4ea',
+              background: 'var(--paper-tint)',
               padding: '10px 14px',
               margin: '0 0 16px',
               fontSize: '14px',
@@ -300,11 +307,11 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           >
             {waiting.matching ? (
               <>
-                Your {waiting.noun} import is still matching. <a href={waiting.href}>See progress</a>
+                Your {waiting.noun} import is still matching. <Link href={waiting.href}>See progress</Link>
               </>
             ) : (
               <>
-                Your {waiting.noun} import is waiting for review. <a href={waiting.href}>Continue it</a>
+                Your {waiting.noun} import is waiting for review. <Link href={waiting.href}>Continue it</Link>
               </>
             )}
           </p>
@@ -351,13 +358,9 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                       })}
                     >
                       <h2>What I've {ui.pastParticiple}</h2>
-                      <a
-                        href={source.href}
-                        class="tap-area"
-                        mix={css({ fontSize: '13px', textAlign: 'right' })}
-                      >
+                      <Link href={source.href} variant="small" tapArea mix={css({ textAlign: 'right' })}>
                         {source.label}
-                      </a>
+                      </Link>
                     </div>
                   ) : (
                     <h2>What I've {ui.pastParticiple}</h2>

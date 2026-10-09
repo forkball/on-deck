@@ -3,6 +3,7 @@ import { clientEntry, css, on, ref } from 'remix/ui'
 import { count } from '../ui/shared/count.ts'
 import { postInPlace } from './shared/submit-in-place.ts'
 import { Button, TextInput } from '../ui/shared/form-controls.tsx'
+import { Field } from '../ui/shared/field.tsx'
 
 export type ImportPickerProps = {
   // Hrefs are built on the server so the route contract stays the one source of
@@ -211,7 +212,7 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
           >
             <div
               mix={css({
-                background: '#fdf7f1',
+                background: 'var(--paper)',
                 borderRadius: '8px',
                 padding: '24px',
                 maxWidth: '560px',
@@ -237,22 +238,21 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
               </div>
 
               {data && (
-                <p mix={css({ fontSize: '13.5px', color: '#555', margin: '4px 0 14px' })}>
+                <p mix={css({ fontSize: '13.5px', color: 'var(--soft)', margin: '4px 0 14px' })}>
                   Your row: <b mix={css({ fontWeight: 400 })}>{data.title}</b>
                   {data.year ? ` · ${data.year}` : ''}
                 </p>
               )}
 
-              <TextInput
-                value={query}
-                placeholder="Search the catalog…"
-                autocomplete="off"
-                mix={[
-                  css({ width: '100%', marginBottom: '6px' }),
-                  on('input', (event) => search((event.target as HTMLInputElement).value)),
-                ]}
-              />
-              <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 14px' })}>
+              <Field label="Search the catalog" labelHidden mix={css({ marginBottom: '6px' })}>
+                <TextInput
+                  value={query}
+                  placeholder="Search the catalog…"
+                  autocomplete="off"
+                  mix={on('input', (event) => search((event.target as HTMLInputElement).value))}
+                />
+              </Field>
+              <p mix={css({ fontSize: '13px', color: 'var(--muted)', margin: '0 0 14px' })}>
                 {loading ? 'Searching…' : data ? resultsLine(data) : 'No results'}
               </p>
               <div
@@ -292,7 +292,7 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                             display: 'block',
                             width: '100%',
                             aspectRatio: '2 / 3',
-                            background: '#f0e9df',
+                            background: 'var(--paper-sunk)',
                             borderRadius: '3px',
                           })}
                         />
@@ -302,8 +302,8 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                           position: 'absolute',
                           top: '4px',
                           left: '4px',
-                          background: '#fdf7f1',
-                          border: '1px solid #3c3c3c',
+                          background: 'var(--paper)',
+                          border: '1px solid var(--text)',
                           borderRadius: '4px',
                           fontSize: '11px',
                           padding: '0 5px',
@@ -334,15 +334,16 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
                       )}
                     </span>
                     <span mix={css({ fontSize: '13.5px', lineHeight: 1.25 })}>
-                      {candidate.title} <span mix={css({ color: '#888' })}>{candidate.year ?? ''}</span>
+                      {candidate.title}{' '}
+                      <span mix={css({ color: 'var(--muted)' })}>{candidate.year ?? ''}</span>
                     </span>
                     {candidate.externalId === data?.suggestedExternalId && (
-                      <span mix={css({ fontSize: '12px', color: '#3E5C76', lineHeight: 1.25 })}>
+                      <span mix={css({ fontSize: '12px', color: 'var(--accent)', lineHeight: 1.25 })}>
                         Our match
                       </span>
                     )}
                     {candidate.creator && (
-                      <span mix={css({ fontSize: '12px', color: '#888', lineHeight: 1.25 })}>
+                      <span mix={css({ fontSize: '12px', color: 'var(--muted)', lineHeight: 1.25 })}>
                         {candidate.creator}
                       </span>
                     )}
@@ -352,7 +353,7 @@ export const ImportPicker = clientEntry<ImportPickerProps>(import.meta.url, func
               <p
                 mix={css({
                   fontSize: '12px',
-                  color: '#8d8579',
+                  color: 'var(--muted)',
                   margin: '18px 0 0',
                   textAlign: 'right',
                   '@media (hover: none)': { display: 'none' },

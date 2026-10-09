@@ -10,7 +10,7 @@ import {
 } from '../../data/watchRegion.ts'
 import { routes } from '../../routes.ts'
 import { FloatingDropdown } from './floating-dropdown.tsx'
-import { Button } from '../shared/form-controls.tsx'
+import { Button, Link } from '../shared/form-controls.tsx'
 
 export interface WhereToWatchProps {
   // What the JustWatch link searches for.
@@ -44,7 +44,7 @@ export function WhereToWatch(handle: Handle<WhereToWatchProps>) {
       // about where to get the title rather than about the title.
       <section
         mix={css({
-          border: '1px solid #ddd',
+          border: '1px solid var(--rule)',
           borderRadius: '8px',
           padding: '12px 16px 16px',
         })}
@@ -94,7 +94,7 @@ export function WhereToWatch(handle: Handle<WhereToWatchProps>) {
         {groups.length > 0 ? (
           groups.map((group) => (
             <div mix={css({ display: 'flex', alignItems: 'center', gap: '12px', margin: '0 0 8px' })}>
-              <span mix={css({ width: '64px', flex: '0 0 auto', color: '#555', fontSize: '14px' })}>
+              <span mix={css({ width: '64px', flex: '0 0 auto', color: 'var(--soft)', fontSize: '14px' })}>
                 {group.label}
               </span>
               <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '8px' })}>
@@ -105,15 +105,15 @@ export function WhereToWatch(handle: Handle<WhereToWatchProps>) {
             </div>
           ))
         ) : (
-          <p mix={css({ margin: '0 0 8px', color: '#555' })}>Not streaming in {country} right now.</p>
+          <p mix={css({ margin: '0 0 8px', color: 'var(--soft)' })}>Not streaming in {country} right now.</p>
         )}
         {/* Shown even when nothing above is: "not streaming" says nothing
             about renting or buying. It is also the credit TMDB's terms ask
             for wherever this data appears, so it names JustWatch outright. */}
         <p mix={css({ margin: '4px 0 0', fontSize: '14px' })}>
-          <a href={justWatchSearchUrl(region, title)} target="_blank" rel="noopener noreferrer">
+          <Link href={justWatchSearchUrl(region, title)} external>
             See all options on JustWatch
-          </a>
+          </Link>
         </p>
       </section>
     )
