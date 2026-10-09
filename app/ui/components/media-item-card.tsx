@@ -86,34 +86,6 @@ export function MediaItemCard(
               {subtitle && (
                 <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>{subtitle}</div>
               )}
-              {interaction && (
-                <div
-                  mix={css({
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginTop: '4px',
-                    fontSize: '13px',
-                    color: 'var(--soft)',
-                  })}
-                >
-                  <span
-                    mix={css({
-                      display: 'inline-block',
-                      padding: '2px 8px',
-                      borderRadius: '999px',
-                      fontSize: '11px',
-                      border: `1px solid ${statusBadgeColor(interaction.status)}`,
-                      color: statusBadgeColor(interaction.status),
-                    })}
-                  >
-                    {statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}
-                  </span>
-                  {interaction.rating != null && <StarRatingDisplay value={interaction.rating} />}
-                  {interaction.disliked && <DislikedDisplay />}
-                </div>
-              )}
             </div>
             {/* Beside the title rather than in a column of its own, so the text
                 underneath runs the full width under both. The panel hangs from
@@ -162,8 +134,35 @@ export function MediaItemCard(
             </div>
           </div>
           {children}
-          {tags.length > 0 && (
-            <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' })}>
+          {/* The log status leads the pills: one row of labels about the work,
+              rather than a status squeezed between the title and the text. */}
+          {(interaction || tags.length > 0) && (
+            <div
+              mix={css({
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: '4px',
+                marginTop: '8px',
+                fontSize: '13px',
+                color: 'var(--soft)',
+              })}
+            >
+              {interaction && (
+                <span
+                  mix={css({
+                    fontSize: '11px',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    border: `1px solid ${statusBadgeColor(interaction.status)}`,
+                    color: statusBadgeColor(interaction.status),
+                  })}
+                >
+                  {statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}
+                </span>
+              )}
+              {interaction?.rating != null && <StarRatingDisplay value={interaction.rating} />}
+              {interaction?.disliked && <DislikedDisplay />}
               {tags.map((tag) => (
                 <span
                   key={tag}

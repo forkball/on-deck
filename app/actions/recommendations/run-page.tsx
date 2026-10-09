@@ -8,6 +8,7 @@ import { Toast } from '../../ui/components/toast.tsx'
 import { routes } from '../../routes.ts'
 import { seenByLabel } from '../../ui/shared/seen-by.ts'
 import { Page } from '../../ui/components/page.tsx'
+import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { MediaItemCard } from '../../ui/components/media-item-card.tsx'
 import { decadeComesFromPick, genreMissNeedsLookup } from '../../data/recommendations/matching.ts'
 import { ModelProvided } from './model-provided.tsx'
@@ -206,6 +207,10 @@ export function RecommendationRunPage(handle: Handle<RecommendationRunPageProps>
                   interaction={interaction}
                   detailHref={withReturnTo(MEDIA_TYPE_UI[itemType].hrefs.show(item.id), runHref)}
                   returnTo={runHref}
+                  // The author, director or studio, as search shows it. Films and
+                  // TV only have it once a detail lookup has run, so a pick that
+                  // has never been opened can go without.
+                  subtitle={parseMediaMetadata(item.metadata).creator}
                 >
                   <p mix={css({ margin: '8px 0 0', fontStyle: 'italic', color: 'var(--soft)' })}>
                     <ModelProvided note="Written by the model from the taste profile this run was built on — not a description from the catalogue.">
