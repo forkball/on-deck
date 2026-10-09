@@ -5,22 +5,13 @@ import type { getUserInteractionForItem } from '../../data/mediaItems.ts'
 import type { MediaItem } from '../../data/schema.ts'
 import { MediaTabLinks } from '../components/media-tab-links.tsx'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
-import { statusLabelsFor } from '../../interactionStatus.ts'
-import { FrameForm } from '../../browser/frame-form.tsx'
 import { LazyList } from '../../browser/lazy-list.tsx'
 import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
 import { Toast } from '../components/toast.tsx'
 import { Page } from '../components/page.tsx'
-import { FloatingDropdown } from '../components/floating-dropdown.tsx'
-import { PencilIcon, PlusIcon } from '../components/log-icons.tsx'
-import { NotesField } from '../components/notes-field.tsx'
-import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
-import { StatusSelect } from '../components/status-select.tsx'
-import { Field } from '../shared/field.tsx'
+import { MediaItemCard } from '../components/media-item-card.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
-import { PlatformList } from '../components/platform-list.tsx'
 import { withReturnTo } from '../backLink.ts'
-import { Button, Link } from '../shared/form-controls.tsx'
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
@@ -31,10 +22,6 @@ export interface MediaSearchPageProps {
   interactionsByItemId: Map<number, Awaited<ReturnType<typeof getUserInteractionForItem>>>
   message?: string
   displayName: string
-}
-
-function capitalize(tag: string): string {
-  return tag.replace(/^./, (c) => c.toUpperCase())
 }
 
 // Two lines of blurb, give or take. Cut on the server rather than clamped in CSS
@@ -101,149 +88,36 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
               })}
             >
               {results.map((item) => {
-                const { releaseYear, posterUrl, platforms, tags, creator, overview } = parseMediaMetadata(
-                  item.metadata,
-                )
-                const detailHref = withReturnTo(ui.hrefs.show(item.id), returnTo)
-                const interaction = interactionsByItemId.get(item.id)
+                const { creator, overview } = parseMediaMetadata(item.metadata)
                 return (
-                  <li
+                  <MediaItemCard
                     key={item.id}
-                    mix={css({
-                      display: 'flex',
-                      gap: '12px',
-                      border: '1px solid var(--rule)',
-                      borderRadius: '8px',
-                      padding: '16px',
-                    })}
+                    item={item}
+                    mediaType={mediaType}
+                    interaction={interactionsByItemId.get(item.id)}
+                    detailHref={withReturnTo(ui.hrefs.show(item.id), returnTo)}
+                    returnTo={returnTo}
+                    // Searching "Strata" returns one from 1981 and one from 2011, and
+                    // the card showed neither author — so the two were the same row to
+                    // read. Rendered for every medium rather than books alone: TMDB
+                    // rarely fills it, in which case nothing shows, and IGDB nearly
+                    // always does.
+                    subtitle={creator}
+                    lazyImage
                   >
-                    {posterUrl ? (
-                      <Link variant="wrap" href={detailHref} mix={css({ flex: '0 0 auto' })}>
-                        <img
-                          src={posterUrl}
-                          alt={`${item.title} poster`}
-                          loading="lazy"
-                          mix={css({ width: '60px', borderRadius: '4px', display: 'block' })}
-                        />
-                      </Link>
-                    ) : (
-                      <div
+                    {overview && (
+                      <p
                         mix={css({
-                          width: '60px',
-                          height: '90px',
-                          flex: '0 0 auto',
-                          border: '1px solid var(--rule)',
-                          borderRadius: '4px',
+                          fontSize: '13px',
+                          color: 'var(--soft)',
+                          margin: '8px 0 0',
+                          lineHeight: 1.4,
                         })}
-                      />
+                      >
+                        {summarize(overview)}
+                      </p>
                     )}
-                    <div mix={css({ flex: '1 1 auto' })}>
-                      <Link href={detailHref}>{item.title}</Link>
-                      {releaseYear ? ` (${releaseYear})` : ''}
-                      {/* Searching "Strata" returns one from 1981 and one from 2011, and
-                          the card showed neither author — so the two were the same row to
-                          read. Rendered for every medium rather than books alone: TMDB
-                          rarely fills it, in which case nothing shows, and IGDB nearly
-                          always does. */}
-                      {creator && (
-                        <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>
-                          {creator}
-                        </div>
-                      )}
-                      {tags.length > 0 && (
-                        <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' })}>
-                          {tags.map((tag) => (
-                            <span
-                              key={tag}
-                              mix={css({
-                                fontSize: '11px',
-                                padding: '2px 8px',
-                                borderRadius: '999px',
-                                border: '1px solid var(--rule)',
-                                color: 'var(--soft)',
-                              })}
-                            >
-                              {capitalize(tag)}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <PlatformList platforms={platforms} />
-                      {overview && (
-                        <p
-                          mix={css({
-                            fontSize: '13px',
-                            color: 'var(--soft)',
-                            margin: '6px 0 0',
-                            lineHeight: 1.4,
-                          })}
-                        >
-                          {summarize(overview)}
-                        </p>
-                      )}
-                      {interaction && (
-                        <p
-                          mix={css({
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            margin: '4px 0 0',
-                            fontSize: '13px',
-                            color: 'var(--soft)',
-                          })}
-                        >
-                          {statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}
-                          {interaction.rating != null && (
-                            <>
-                              <StarRatingDisplay value={interaction.rating} /> ({interaction.rating})
-                            </>
-                          )}
-                          {interaction.disliked && <DislikedDisplay />}
-                        </p>
-                      )}
-
-                      <div mix={css({ marginTop: '8px' })}>
-                        <FloatingDropdown
-                          triggerLabel={interaction ? 'Edit log' : 'Add to list'}
-                          icon={interaction ? <PencilIcon /> : <PlusIcon />}
-                        >
-                          <form
-                            method="post"
-                            action={ui.hrefs.log(item.id)}
-                            mix={css({ display: 'flex', flexDirection: 'column', gap: '10px' })}
-                          >
-                            <input type="hidden" name="return_to" value={returnTo} />
-                            <Field label={`Add to ${ui.singular} list`}>
-                              <StatusSelect
-                                mediaType={mediaType}
-                                name="status"
-                                defaultValue={interaction?.status ?? 'want_to_consume'}
-                              />
-                            </Field>
-                            <div
-                              class="watched-only-fields"
-                              mix={css({ flexDirection: 'column', gap: '10px' })}
-                            >
-                              <div>
-                                <p mix={css({ margin: '0 0 4px' })}>Rating</p>
-                                <StarRatingInput
-                                  name="rating"
-                                  idPrefix={`rating-${item.id}`}
-                                  defaultValue={interaction?.rating ?? null}
-                                  disliked={interaction?.disliked ?? null}
-                                />
-                              </div>
-                              <NotesField defaultValue={interaction?.notes} />
-                            </div>
-                            <Button type="submit" variant="primary">
-                              Save
-                            </Button>
-                            <FrameForm />
-                          </form>
-                        </FloatingDropdown>
-                      </div>
-                    </div>
-                  </li>
+                  </MediaItemCard>
                 )
               })}
             </ul>
