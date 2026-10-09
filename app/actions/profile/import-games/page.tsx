@@ -25,19 +25,19 @@ function ImportSummary(handle: Handle<{ result: SteamImportResult }>) {
 
     return (
       <>
-        <p mix={css({ color: '#15803d' })}>
+        <p mix={css({ color: 'var(--success)' })}>
           Imported {result.imported} games — {result.played} you've played, {result.unplayed} you own but
           haven't started.
         </p>
         {result.skipped > 0 && (
-          <p mix={css({ fontSize: '13px', color: '#888' })}>
+          <p mix={css({ fontSize: '13px', color: 'var(--muted)' })}>
             Skipped {result.skipped} non-game items in your library, like soundtracks, demos and server tools.
           </p>
         )}
         {result.notFound.length > 0 && (
           <section mix={css({ marginTop: '24px' })}>
             <h2>Couldn't match {result.notFound.length}</h2>
-            <p mix={css({ fontSize: '13px', color: '#888' })}>
+            <p mix={css({ fontSize: '13px', color: 'var(--muted)' })}>
               These are in your Steam library but had no confident match in the games catalog — usually
               something listed there under a different name. You can add any of them by searching for it.
             </p>
@@ -76,30 +76,32 @@ export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
 
     return (
       <Page heading="Import from Steam" displayName={displayName}>
-        {error && <p mix={css({ color: '#b91c1c' })}>{error}</p>}
+        {error && <p mix={css({ color: 'var(--danger)' })}>{error}</p>}
 
         {result ? (
           <ImportSummary result={result} />
         ) : steamId ? (
           <>
-            <p mix={css({ color: '#555' })}>
+            <p mix={css({ color: 'var(--soft)' })}>
               Connected to Steam account <code>{steamId}</code>. Importing brings in the games you own, using
               your Steam playtime to tell them apart: anything you've played is logged as played, and anything
               you've never launched goes on your want-to-play list.
             </p>
-            <p mix={css({ fontSize: '13px', color: '#888' })}>
+            <p mix={css({ fontSize: '13px', color: 'var(--muted)' })}>
               A large library takes a few minutes — each game is looked up individually. Leave the tab open
               until it finishes.
             </p>
             <div mix={css({ marginTop: '16px' })}>
               <form method="post" action={routes.profile.importGames.upload.href()}>
-                <Button type="submit">Import my library</Button>
+                <Button type="submit" variant="primary">
+                  Import my library
+                </Button>
               </form>
             </div>
           </>
         ) : (
           <>
-            <p mix={css({ color: '#555' })}>
+            <p mix={css({ color: 'var(--soft)' })}>
               No Steam account connected yet. Importing your library needs one, since the library is read from
               Steam rather than uploaded.
             </p>

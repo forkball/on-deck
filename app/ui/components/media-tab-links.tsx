@@ -23,26 +23,23 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
   return () => {
     const { current, hrefFor } = handle.props
 
-    const tab = css({
-      padding: '0 0 8px',
-      textDecoration: 'none',
-      color: '#888',
-      borderBottom: '2px solid transparent',
-    })
-    const activeTab = css({
-      padding: '0 0 8px',
-      textDecoration: 'none',
-      color: '#3c3c3c',
-      fontWeight: 700,
-      borderBottom: '2px solid #3c3c3c',
-    })
+    // Colour and weight are in public/app.css (`a.media-tab`): `.doodle a` is
+    // unlayered, so a css() colour here is dropped. What this sets is the
+    // type's hue, which that rule reads for the current tab.
+    const tab = (type: ActiveMediaType) =>
+      css({
+        padding: '0 0 8px',
+        textDecoration: 'none',
+        borderBottom: '2px solid transparent',
+        '--tab-hue': MEDIA_TYPE_UI[type].hue,
+      })
 
     return (
       <div
         mix={css({
           display: 'flex',
           gap: '20px',
-          borderBottom: '1px solid #ddd',
+          borderBottom: '1px solid var(--rule)',
           marginTop: '20px',
           marginBottom: '20px',
         })}
@@ -52,14 +49,15 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
             key={type}
             href={hrefFor(type)}
             rmx-document=""
-            class="tap-area"
-            mix={current === type ? activeTab : tab}
+            class="tap-area media-tab"
+            aria-current={current === type ? 'page' : undefined}
+            mix={tab(type)}
           >
             {MEDIA_TYPE_UI[type].tabLabel}
           </a>
         ))}
         {PLACEHOLDER_TYPES.map((label) => (
-          <span key={label} mix={css({ padding: '0 0 8px', color: '#ccc' })} title="Coming soon">
+          <span key={label} mix={css({ padding: '0 0 8px', color: 'var(--rule)' })} title="Coming soon">
             {label}
           </span>
         ))}

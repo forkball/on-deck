@@ -59,7 +59,7 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     gap: '12px',
-                    border: '1px solid #ddd',
+                    border: '1px solid var(--rule)',
                     borderRadius: '8px',
                     padding: '12px 16px',
                   })}
@@ -75,7 +75,7 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
                   </div>
 
                   {isViewer ? (
-                    <span mix={css({ fontSize: '13px', color: '#555', flexShrink: 0 })}>You</span>
+                    <span mix={css({ fontSize: '13px', color: 'var(--soft)', flexShrink: 0 })}>You</span>
                   ) : (
                     <form
                       method="post"

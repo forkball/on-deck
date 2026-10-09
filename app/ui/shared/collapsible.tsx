@@ -6,7 +6,7 @@ import { css } from 'remix/ui'
 
 const summaryStyle = css({ cursor: 'pointer' })
 const boxedBodyStyle = css({
-  border: '1px solid #ddd',
+  border: '1px solid var(--rule)',
   borderRadius: '8px',
   padding: '16px',
   marginTop: '12px',

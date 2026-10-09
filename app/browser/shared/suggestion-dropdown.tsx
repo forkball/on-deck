@@ -24,8 +24,8 @@ export function SuggestionDropdown(
           left: 0,
           right: 0,
           zIndex: 20,
-          backgroundColor: '#fdf7f1',
-          border: '1px solid #3c3c3c',
+          backgroundColor: 'var(--paper)',
+          border: '1px solid var(--text)',
           borderRadius: '8px',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
           maxHeight: '320px',
@@ -39,7 +39,7 @@ export function SuggestionDropdown(
               alignItems: 'center',
               gap: '8px',
               padding: '12px',
-              color: '#888',
+              color: 'var(--muted)',
               fontSize: '13px',
             })}
           >
@@ -62,7 +62,7 @@ export function SuggestionDropdown(
             Searching…
           </div>
         ) : state.suggestions.length === 0 ? (
-          <div mix={css({ padding: '12px', color: '#888', fontSize: '13px' })}>No matches.</div>
+          <div mix={css({ padding: '12px', color: 'var(--muted)', fontSize: '13px' })}>No matches.</div>
         ) : (
           state.suggestions.map((suggestion) => (
             <Button
@@ -93,7 +93,7 @@ export function SuggestionDropdown(
               <span mix={css({ flex: '1 1 auto', minWidth: 0 })}>
                 {suggestion.label}
                 {suggestion.sublabel && (
-                  <span mix={css({ marginLeft: '6px', fontSize: '12px', color: '#888' })}>
+                  <span mix={css({ marginLeft: '6px', fontSize: '12px', color: 'var(--muted)' })}>
                     {suggestion.sublabel}
                   </span>
                 )}

@@ -45,7 +45,7 @@ export function RunListItem(handle: Handle<RunListItemProps>) {
           // marker on `.doodle ul li` at a specificity nothing here can beat,
           // and a list item that isn't display: list-item has nowhere to put one.
           display: 'flex',
-          border: '1px solid #ddd',
+          border: '1px solid var(--rule)',
           borderRadius: '8px',
           ...(feed
             ? { flexDirection: 'column', padding: '10px 12px' }
@@ -80,7 +80,7 @@ export function RunListItem(handle: Handle<RunListItemProps>) {
               )}{' '}
               generated a {mediaTypeUiFor(run.mediaType).attributive} recommendation
             </p>
-            <p mix={css({ margin: '2px 0 0', fontSize: '12px', color: '#888' })}>
+            <p mix={css({ margin: '2px 0 0', fontSize: '12px', color: 'var(--muted)' })}>
               {run.name ? `${date} — ` : ''}
               {run.groupLabel}
             </p>

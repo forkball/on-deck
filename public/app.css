@@ -10,6 +10,67 @@
    and the one-height row of a field beside a button — is unchanged; only the
    line thins. Fieldsets keep the vendored weight. */
 
+/* The palette. Every colour the app sets comes from here, so a page reads as
+   one piece and a change is made once. The neutrals are warm, taken from the
+   cream DoodleCSS paints the page with, rather than the cool greys that had
+   collected call site by call site. Each text colour clears WCAG AA (4.5:1)
+   on --paper: --muted at 5.5 replaces #888, which was 3.3.
+
+   --accent is the one colour that means "you can act on this": links, the
+   primary button, the active tab, the focus ring. The four media-type hues
+   mark which kind of thing a card or tab is; MEDIA_TYPE_UI names them, so
+   code picks one by type rather than by hex. */
+:root {
+  --paper: #fdf7f1;
+  --paper-tint: #fbf4ea;
+  --paper-sunk: #efe6db;
+  --rule-soft: #eee4d6;
+  --rule: #d9cfbe;
+  --muted: #6b6459;
+  --soft: #5a534b;
+  --text: #3c3c3c;
+  --ink: #1c1c1c;
+  --accent: #3e5c76;
+  --accent-strong: #2f4a61;
+  --danger: #b91c1c;
+  --success: #15803d;
+  --movie: #a2442f;
+  --tv: #6a4c93;
+  --book: #2f6b4f;
+  --game: #9a6210;
+}
+
+/* Links take the accent. Doodle makes them bold #1c1c1c, the same ink as a
+   heading, so nothing on a page said which words go somewhere. */
+.doodle a {
+  color: var(--accent);
+}
+
+/* The media-type tabs that are links (MediaTabLinks): quiet until current,
+   then bold in the type's own hue, which the component sets as --tab-hue.
+   Here because `.doodle a` would otherwise make every one of them a bold
+   accent link. */
+.doodle a.media-tab {
+  color: var(--muted);
+  font-weight: normal;
+}
+
+.doodle a.media-tab[aria-current] {
+  color: var(--tab-hue, var(--accent));
+  font-weight: bold;
+  border-bottom-color: var(--tab-hue, var(--accent));
+}
+
+/* Focus in the accent too, so it reads as the app's own rather than as a
+   darker border. Doodle's dashed outline and offset stay. */
+.doodle button:focus-visible,
+.doodle textarea:focus-visible,
+.doodle input:focus-visible,
+.doodle select:focus-visible,
+.doodle .menu-link:focus-visible {
+  outline-color: var(--accent);
+}
+
 .doodle button,
 .doodle .doodle-border,
 .doodle select,
@@ -92,7 +153,7 @@
 
 /* Grey text under the fade would be faded twice; the opacity alone says it. */
 .doodle button:disabled {
-  color: #3c3c3c;
+  color: var(--text);
 }
 
 .doodle input[type='checkbox']:disabled:not(:checked)::after,
@@ -111,9 +172,28 @@
   border-image: url(/button.svg) 10 10 10 10 stretch stretch;
 }
 
+/* Primary: the hand-drawn shape filled with the accent, so the one action a
+   form exists for is the one solid thing on it. `fill` paints the image's
+   middle too. Listed with hover and focus because the generic hover rule
+   above outranks a bare `.primary` and would swap the fill back to an
+   outline, leaving paper-coloured text on paper. */
 .doodle button.primary,
 .doodle .doodle-border.primary {
-  border-image: url(/button.svg) 10 10 10 10 stretch stretch;
+  border-image: url(/button-primary.svg) 10 fill / 10px stretch;
+  color: var(--paper);
+}
+
+.doodle button.primary:hover:not(:disabled),
+.doodle .doodle-border.primary:hover,
+.doodle button.primary:focus-visible,
+.doodle .doodle-border.primary:focus-visible {
+  border-image: url(/button-primary-hover.svg) 10 fill / 10px stretch;
+  color: var(--paper);
+}
+
+.doodle button.primary:focus-visible,
+.doodle .doodle-border.primary:focus-visible {
+  outline-color: var(--paper);
 }
 
 .doodle fieldset:hover {
@@ -156,7 +236,7 @@
   font-family: 'Short Stack', cursive;
   font-size: 1em;
   font-weight: normal;
-  color: #3c3c3c;
+  color: var(--text);
   /* The two a real <button> gets from the browser: centred text, and no
      underline — which a link has, and every ButtonLink was taking off at its
      own call site before this. */
@@ -307,7 +387,7 @@
 .doodle .choice-group-hint {
   font-size: 12px;
   line-height: 1.4;
-  color: #888;
+  color: var(--muted);
 }
 
 .doodle .choice-hint {
@@ -337,14 +417,14 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #888;
+  color: var(--muted);
 }
 
 .doodle .choice-legend.subsection {
   margin: 0 0 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--text);
 }
 
 .doodle .choice-options {
@@ -404,7 +484,7 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 /* Destructive actions (delete log). Needs the element selector to outrank
    DoodleCSS's own `.doodle button { color: #3c3c3c }`. */
 .doodle button.danger {
-  color: #c33;
+  color: var(--danger);
 }
 
 .doodle button.danger:hover:not(:disabled) {
@@ -424,14 +504,14 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   cursor: pointer;
   font-weight: normal;
   font-size: 13px;
-  color: #6b6459;
+  color: var(--muted);
   text-decoration: underline;
 }
 
 .doodle button.linkish:hover,
 .doodle a.linkish:hover,
 .doodle label.linkish:hover {
-  color: #3c3c3c;
+  color: var(--text);
 }
 
 /* Buttons that read as text or an icon rather than a control. Unlayered, like
@@ -461,7 +541,7 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 .doodle .menu-link {
   padding: 4px 8px;
   font-weight: normal;
-  color: #1c1c1c;
+  color: var(--ink);
   text-decoration: none;
   text-align: left;
   line-height: normal;
@@ -474,7 +554,7 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 }
 
 .doodle .menu-link:focus-visible {
-  outline: 2px dashed #3c3c3c;
+  outline: 2px dashed var(--text);
   outline-offset: 0;
 }
 
@@ -488,12 +568,12 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 
 .doodle button.bare {
   padding: 4px 8px;
-  color: #888;
+  color: var(--muted);
 }
 
 .doodle button.bare:hover:not(:disabled),
 .doodle button.checkline:hover:not(:disabled) {
-  color: #3c3c3c;
+  color: var(--text);
 }
 
 /* A submit drawn as a checkbox (or radio, with .radio on the box), wearing the
@@ -505,7 +585,7 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   gap: 6px;
   padding: 2px 0;
   font-size: 13px;
-  color: #6b6459;
+  color: var(--muted);
   text-align: left;
 }
 
@@ -562,11 +642,11 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 
 .doodle button.menu-choice:hover,
 .doodle button.menu-choice:focus-visible {
-  background-color: #efe6db;
+  background-color: var(--paper-sunk);
 }
 
 .doodle button.menu-choice:focus-visible {
-  outline: 2px solid #3c3c3c;
+  outline: 2px solid var(--text);
   outline-offset: -2px;
 }
 

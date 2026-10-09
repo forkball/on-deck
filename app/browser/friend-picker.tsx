@@ -98,7 +98,9 @@ export function FriendPicker(handle: Handle<FriendPickerProps>) {
             />
 
             {filtered.length === 0 && (
-              <p mix={css({ margin: 0, fontSize: '13px', color: '#888' })}>No friends match "{search}".</p>
+              <p mix={css({ margin: 0, fontSize: '13px', color: 'var(--muted)' })}>
+                No friends match "{search}".
+              </p>
             )}
 
             <div mix={css({ display: 'flex', flexDirection: 'column', gap: '4px' })}>
@@ -127,7 +129,7 @@ export function FriendPicker(handle: Handle<FriendPickerProps>) {
                 >
                   ← Prev
                 </Button>
-                <span mix={css({ color: '#888' })}>
+                <span mix={css({ color: 'var(--muted)' })}>
                   Page {clampedPage} of {totalPages}
                 </span>
                 <Button

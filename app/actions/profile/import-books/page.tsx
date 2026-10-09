@@ -24,7 +24,7 @@ export function GoodreadsImportPage(handle: Handle<GoodreadsImportPageProps>) {
           </div>
         )}
 
-        <p mix={css({ color: '#555' })}>
+        <p mix={css({ color: 'var(--soft)' })}>
           Export your library from Goodreads (My Books → Import and export → Export Library) and upload the{' '}
           <code>goodreads_library_export.csv</code> it emails you. Your read, currently-reading and
           want-to-read shelves all come across, and so does anything you wrote in a review.
@@ -36,7 +36,7 @@ export function GoodreadsImportPage(handle: Handle<GoodreadsImportPageProps>) {
           error={error}
         />
 
-        <p mix={css({ fontSize: '13px', color: '#3E5C76' })}>
+        <p mix={css({ fontSize: '13px', color: 'var(--accent)' })}>
           Nothing is saved until you've seen what we matched.
         </p>
       </Page>

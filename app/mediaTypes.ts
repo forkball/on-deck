@@ -29,6 +29,9 @@ interface StatusVerbs {
 interface MediaTypeUi {
   slug: string
   tabLabel: string
+  // The type's colour: a custom property from public/app.css, so a page marks
+  // a tab or card as this type without knowing the hex.
+  hue: string
   singular: string
   plural: string
   attributive: string
@@ -67,6 +70,7 @@ export const MEDIA_TYPE_UI = {
   movie: {
     slug: 'movies',
     tabLabel: 'Movies',
+    hue: 'var(--movie)',
     singular: 'movie',
     plural: 'movies',
     attributive: 'movie',
@@ -95,6 +99,7 @@ export const MEDIA_TYPE_UI = {
   tv: {
     slug: 'tv',
     tabLabel: 'TV',
+    hue: 'var(--tv)',
     singular: 'TV show',
     plural: 'TV shows',
     attributive: 'TV',
@@ -122,6 +127,7 @@ export const MEDIA_TYPE_UI = {
   book: {
     slug: 'books',
     tabLabel: 'Books',
+    hue: 'var(--book)',
     singular: 'book',
     plural: 'books',
     attributive: 'book',
@@ -151,6 +157,7 @@ export const MEDIA_TYPE_UI = {
   game: {
     slug: 'games',
     tabLabel: 'Games',
+    hue: 'var(--game)',
     singular: 'game',
     plural: 'games',
     attributive: 'game',

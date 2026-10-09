@@ -65,7 +65,7 @@ export function ExpandableText(handle: Handle<ExpandableTextProps>) {
     const toggle = css({
       cursor: 'pointer',
       fontSize: '13px',
-      color: '#555',
+      color: 'var(--soft)',
       textDecoration: 'underline',
     })
 

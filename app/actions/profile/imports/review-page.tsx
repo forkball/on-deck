@@ -44,7 +44,7 @@ export interface ImportReviewPageProps {
   error?: string
 }
 
-const ACCENT = '#3E5C76'
+const ACCENT = 'var(--accent)'
 
 // Placeholder for a row id in the hrefs handed to the picker.
 const ROW_TOKEN = '__row__'
@@ -78,7 +78,7 @@ function Poster(handle: Handle<{ url: string | null; size?: number }>) {
       height: `${Math.round(size * 1.45)}px`,
       flex: '0 0 auto',
       borderRadius: '3px',
-      background: '#f0e9df',
+      background: 'var(--paper-sunk)',
       objectFit: 'cover',
     })
 
@@ -93,7 +93,7 @@ function Rated(handle: Handle<{ values: LogValues }>) {
     const { rating, disliked } = handle.props.values
 
     if (disliked) return <span>Not for me</span>
-    if (rating == null) return <span mix={css({ color: '#888' })}>unrated</span>
+    if (rating == null) return <span mix={css({ color: 'var(--muted)' })}>unrated</span>
     return <StarRatingDisplay value={rating} />
   }
 }
@@ -105,16 +105,16 @@ function Flag(handle: Handle<{ title: string; count: number; children?: RemixNod
     return (
       <section
         mix={css({
-          border: '1px solid #d9cfbe',
+          border: '1px solid var(--rule)',
           borderLeft: `4px solid ${ACCENT}`,
           borderRadius: '8px',
-          background: '#fbf4ea',
+          background: 'var(--paper-tint)',
           padding: '16px 18px',
           marginBottom: '18px',
         })}
       >
         <h2 mix={css({ margin: '0 0 4px' })}>
-          {title} <span mix={css({ color: '#888', fontSize: '14px' })}>({count})</span>
+          {title} <span mix={css({ color: 'var(--muted)', fontSize: '14px' })}>({count})</span>
         </h2>
         {children}
       </section>
@@ -131,7 +131,7 @@ function Card(handle: Handle<{ children?: RemixNode; attention?: boolean; id?: s
         id={id}
         mix={css({
           scrollMarginTop: '12px',
-          border: `1px solid ${attention ? '#e3c9a3' : '#e2d8c8'}`,
+          border: `1px solid ${attention ? '#e3c9a3' : 'var(--rule)'}`,
           borderRadius: '8px',
           background: attention ? '#fdf6ec' : '#fffcf8',
           padding: '11px 13px',
@@ -236,7 +236,7 @@ function ConflictCard(handle: Handle<{ batchId: string; entry: ConflictEntry; pa
         <span
           mix={css({
             flex: '0 0 68px',
-            color: '#8d8579',
+            color: 'var(--muted)',
             fontSize: '11px',
             letterSpacing: '.07em',
             textTransform: 'uppercase',
@@ -253,7 +253,7 @@ function ConflictCard(handle: Handle<{ batchId: string; entry: ConflictEntry; pa
           {values.notes ? (
             <span mix={highlight('notes')}> · has a note</span>
           ) : (
-            <span mix={css({ color: '#888' })}> · no note</span>
+            <span mix={css({ color: 'var(--muted)' })}> · no note</span>
           )}
         </span>
       </div>
@@ -264,7 +264,8 @@ function ConflictCard(handle: Handle<{ batchId: string; entry: ConflictEntry; pa
         <div mix={css({ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' })}>
           <Poster url={entry.item.posterUrl} size={32} />
           <span>
-            {entry.item.title} <span mix={css({ color: '#888' })}>{entry.item.releaseYear ?? ''}</span>
+            {entry.item.title}{' '}
+            <span mix={css({ color: 'var(--muted)' })}>{entry.item.releaseYear ?? ''}</span>
           </span>
         </div>
         {line('On Deck', entry.existing)}
@@ -315,10 +316,10 @@ function DuplicateCard(
           marginBottom: '2px',
         })}
       >
-        <span mix={css({ flex: '0 0 58px', color: '#8d8579', fontSize: '11px' })}>{tag}</span>
+        <span mix={css({ flex: '0 0 58px', color: 'var(--muted)', fontSize: '11px' })}>{tag}</span>
         <span mix={css({ flex: '1 1 auto', minWidth: 0 })}>
-          {title} <span mix={css({ color: '#888' })}>{year ?? 'no year'}</span>
-          {extra ? <span mix={css({ color: '#888' })}> · {extra}</span> : null}
+          {title} <span mix={css({ color: 'var(--muted)' })}>{year ?? 'no year'}</span>
+          {extra ? <span mix={css({ color: 'var(--muted)' })}> · {extra}</span> : null}
         </span>
       </div>
     )
@@ -329,7 +330,7 @@ function DuplicateCard(
           <Poster url={item.posterUrl} size={32} />
           <span>
             Both matched to <b>{item.title}</b>{' '}
-            <span mix={css({ color: '#888' })}>
+            <span mix={css({ color: 'var(--muted)' })}>
               {item.releaseYear ?? ''}
               {item.creator ? ` · ${item.creator}` : ''}
             </span>
@@ -425,7 +426,7 @@ function UncertainCard(
       <Card attention id={rowAnchor(row.id)}>
         <div>
           {row.title} {/* The no-year section's heading already says it. */}
-          <span mix={css({ color: '#888' })}>
+          <span mix={css({ color: 'var(--muted)' })}>
             {row.reason === 'no_year' ? null : (row.year ?? 'no year')}
           </span>
         </div>
@@ -439,9 +440,9 @@ function UncertainCard(
             rowGap: '4px',
             margin: '8px 0 0',
             padding: '6px 10px',
-            background: '#f5ede1',
+            background: 'var(--paper-sunk)',
             borderRadius: '6px',
-            color: '#888',
+            color: 'var(--muted)',
             fontSize: '13px',
           })}
         >
@@ -499,7 +500,7 @@ function NotFoundCard(handle: Handle<{ batchId: string; row: ReviewRow['row']; n
     return (
       <Card id={rowAnchor(row.id)}>
         <div>
-          {row.title} <span mix={css({ color: '#888' })}>{row.year ?? 'no year'}</span>
+          {row.title} <span mix={css({ color: 'var(--muted)' })}>{row.year ?? 'no year'}</span>
         </div>
         <Actions>
           <PickerButton rowId={row.id} label="Find it" variant="primary" />
@@ -535,7 +536,7 @@ function AnsweredList(
 
     return (
       <div mix={css({ margin: '0 0 10px', fontSize: '14px' })}>
-        <Collapsible summary={<span mix={css({ color: '#6b6459' })}>{entries.length} answered</span>}>
+        <Collapsible summary={<span mix={css({ color: 'var(--muted)' })}>{entries.length} answered</span>}>
           {accepted && (
             <div mix={css({ margin: '6px 0 2px' })}>
               <BulkAccept batchId={batchId} {...accepted} />
@@ -547,7 +548,7 @@ function AnsweredList(
               const dropped = row.state === 'skipped'
               return (
                 // A block, so DoodleCSS's "* " list marker doesn't show.
-                <li key={row.id} mix={css({ display: 'block', borderBottom: '1px solid #eee4d6' })}>
+                <li key={row.id} mix={css({ display: 'block', borderBottom: '1px solid var(--rule-soft)' })}>
                   <details data-close-on-submit>
                     <summary
                       mix={css({
@@ -562,14 +563,16 @@ function AnsweredList(
                     >
                       <span
                         aria-hidden="true"
-                        mix={css({ width: '1em', color: dropped ? '#a8a097' : '#15803d' })}
+                        mix={css({ width: '1em', color: dropped ? 'var(--muted)' : 'var(--success)' })}
                       >
                         {dropped ? '✕' : '✓'}
                       </span>
                       <span mix={css({ flex: '1 1 auto', minWidth: 0 })}>
                         <Answer entry={entry} />
                       </span>
-                      <span mix={css({ color: '#6b6459', fontSize: '13px', textDecoration: 'underline' })}>
+                      <span
+                        mix={css({ color: 'var(--muted)', fontSize: '13px', textDecoration: 'underline' })}
+                      >
                         Change
                       </span>
                     </summary>
@@ -596,7 +599,7 @@ function Answer(handle: Handle<{ entry: ReviewRow }>) {
     return (
       <>
         {row.title}
-        <span mix={css({ color: '#888' })}>
+        <span mix={css({ color: 'var(--muted)' })}>
           {row.state === 'skipped' ? ' · left out' : item ? ` → ${answeredMatch(row.title, item)}` : ''}
           {row.remembered && ' · as last time'}
         </span>
@@ -623,7 +626,7 @@ function ChoiceLabel(handle: Handle<{ choice: CandidateLike }>) {
       <>
         <span class="checkline-box radio" aria-hidden="true" />
         <span>
-          <span mix={css({ color: '#3c3c3c' })}>{releaseYear ?? 'Undated'}</span>
+          <span mix={css({ color: 'var(--text)' })}>{releaseYear ?? 'Undated'}</span>
           {creator && ` · ${creator}`}
         </span>
       </>
@@ -644,10 +647,12 @@ function MatchedAnswers(
         <div mix={css({ display: 'flex', gap: '10px', alignItems: 'center', margin: '8px 0 0' })}>
           <Poster url={item?.posterUrl ?? null} size={32} />
           <span mix={css({ fontSize: '14px', minWidth: 0 })}>
-            <span mix={css({ color: '#8d8579', fontSize: '12px' })}>Matched to </span>
+            <span mix={css({ color: 'var(--muted)', fontSize: '12px' })}>Matched to </span>
             {sameTitle ? null : `${item?.title ?? 'nothing'} `}
-            <span mix={css({ color: sameTitle ? 'inherit' : '#888' })}>{item?.releaseYear ?? ''}</span>
-            {item?.creator ? <span mix={css({ color: '#888' })}> · {item.creator}</span> : null}
+            <span mix={css({ color: sameTitle ? 'inherit' : 'var(--muted)' })}>
+              {item?.releaseYear ?? ''}
+            </span>
+            {item?.creator ? <span mix={css({ color: 'var(--muted)' })}> · {item.creator}</span> : null}
           </span>
         </div>
 
@@ -699,8 +704,8 @@ const drawerStyle = css({
   position: 'sticky',
   bottom: 0,
   zIndex: 10,
-  background: '#FDF7F1',
-  borderTop: '1px solid #ddd',
+  background: 'var(--paper)',
+  borderTop: '1px solid var(--rule)',
   boxShadow: '0 -6px 12px -10px rgba(0, 0, 0, 0.35)',
   marginTop: '24px',
   padding: '8px 0',
@@ -737,7 +742,7 @@ interface DrawerSection {
 function LastLine(handle: Handle<{ batchId: string; last: LastAction }>) {
   return () => {
     const { batchId, last } = handle.props
-    const muted = css({ color: '#888' })
+    const muted = css({ color: 'var(--muted)' })
     const undo = (action: string, fields: Record<string, string>) => (
       <form method="post" action={action} data-in-place>
         {Object.entries(fields).map(([name, value]) => (
@@ -791,12 +796,15 @@ function LastLine(handle: Handle<{ batchId: string; last: LastAction }>) {
           alignItems: 'baseline',
           gap: '8px',
           fontSize: '13px',
-          color: '#555',
+          color: 'var(--soft)',
           padding: '8px 0 6px',
-          borderBottom: '1px solid #eee4d6',
+          borderBottom: '1px solid var(--rule-soft)',
         })}
       >
-        <span aria-hidden="true" mix={css({ width: '1em', color: mark === '✓' ? '#15803d' : '#a8a097' })}>
+        <span
+          aria-hidden="true"
+          mix={css({ width: '1em', color: mark === '✓' ? 'var(--success)' : 'var(--muted)' })}
+        >
           {mark}
         </span>
         <span
@@ -871,12 +879,12 @@ function ReviewDrawer(
                   gap: '4px 8px',
                   padding: '4px 0',
                   fontSize: '14px',
-                  borderBottom: '1px solid #eee4d6',
+                  borderBottom: '1px solid var(--rule-soft)',
                 })}
               >
                 <span
                   aria-hidden="true"
-                  mix={css({ width: '1em', color: section.open ? '#b3aa9c' : '#15803d' })}
+                  mix={css({ width: '1em', color: section.open ? 'var(--muted)' : 'var(--success)' })}
                 >
                   {section.open ? '○' : '✓'}
                 </span>
@@ -885,9 +893,9 @@ function ReviewDrawer(
                     {section.title}
                   </a>
                 ) : (
-                  <span mix={css({ flex: '1 1 auto', color: '#888' })}>{section.title}</span>
+                  <span mix={css({ flex: '1 1 auto', color: 'var(--muted)' })}>{section.title}</span>
                 )}
-                <span mix={css({ color: '#888', fontSize: '13px', whiteSpace: 'nowrap' })}>
+                <span mix={css({ color: 'var(--muted)', fontSize: '13px', whiteSpace: 'nowrap' })}>
                   {section.open === 0
                     ? `all ${section.total} done`
                     : section.key === 'not_found'
@@ -917,13 +925,13 @@ function ReviewDrawer(
               whiteSpace: 'nowrap',
               cursor: 'pointer',
               fontSize: '13px',
-              color: '#555',
+              color: 'var(--soft)',
             })}
           >
             <span
               class="drawer-arrow"
               aria-hidden="true"
-              mix={css({ marginRight: '6px', color: '#8d8579' })}
+              mix={css({ marginRight: '6px', color: 'var(--muted)' })}
             />
             {progress}
             {quickAccepts > 0 && (
@@ -976,7 +984,7 @@ function ReviewDrawer(
               {saveForm(confirmLabel)}
               <label
                 for={CONFIRM_TOGGLE}
-                mix={css({ cursor: 'pointer', color: '#6b6459', textDecoration: 'underline' })}
+                mix={css({ cursor: 'pointer', color: 'var(--muted)', textDecoration: 'underline' })}
               >
                 Go back
               </label>
@@ -1079,8 +1087,8 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
         {saved ? (
           <>
             <h1>Saved {count(counts.save, singular, plural)} to your log</h1>
-            <p mix={css({ color: '#15803d' })}>They're in your log now.</p>
-            <ul mix={css({ color: '#555' })}>
+            <p mix={css({ color: 'var(--success)' })}>They're in your log now.</p>
+            <ul mix={css({ color: 'var(--soft)' })}>
               <li>{model.confidentCount} matched without help</li>
               {model.confirmedCount > 0 && <li>{model.confirmedCount} you checked or picked</li>}
               {model.uncertain.length > 0 && (
@@ -1093,7 +1101,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
             {/* Named, with a link to each, so a wrong match can still be fixed. */}
             {model.uncertain.length > 0 && (
               <Collapsible summary={`The ${model.uncertain.length} saved as we matched them`} boxed>
-                <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 8px' })}>
+                <p mix={css({ fontSize: '13px', color: 'var(--muted)', margin: '0 0 8px' })}>
                   We weren't sure about these. If one is the wrong {singular}, open it, remove it from your
                   log, and log the right one.
                 </p>
@@ -1118,7 +1126,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   {model.leftOutRows.map((row) => (
                     <li key={row.id} mix={css({ marginBottom: '4px' })}>
                       {row.title} {row.year ?? ''}{' '}
-                      <span mix={css({ color: '#888' })}>· {leftOutReason(row.state)}</span>
+                      <span mix={css({ color: 'var(--muted)' })}>· {leftOutReason(row.state)}</span>
                     </li>
                   ))}
                 </ul>
@@ -1134,14 +1142,14 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
             {offerFeed && (
               <section
                 mix={css({
-                  border: '1px solid #d9cfbe',
+                  border: '1px solid var(--rule)',
                   borderRadius: '8px',
                   padding: '16px 18px',
                   marginTop: '24px',
                 })}
               >
                 <h2 mix={css({ marginTop: 0, fontSize: '15px' })}>Keep it up to date?</h2>
-                <p mix={css({ fontSize: '13px', color: '#555', marginTop: 0 })}>
+                <p mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: 0 })}>
                   This file is a snapshot. Connect your diary and what you log on Letterboxd from here on
                   follows on its own.
                 </p>
@@ -1166,7 +1174,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
             {/* One wrapper, so the drawer keeps its position (and open state) across reloads. */}
             <div>
               <h1>Review before saving</h1>
-              {error ? <p mix={css({ color: '#b91c1c' })}>{error}</p> : null}
+              {error ? <p mix={css({ color: 'var(--danger)' })}>{error}</p> : null}
               <p mix={css({ fontSize: '15px', margin: '0 0 4px' })}>
                 {counts.total} rows.{' '}
                 {header.alreadyLogged > 0 && `${header.alreadyLogged} already in your log, `}
@@ -1200,7 +1208,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
 
               {model.conflicts.length > 0 && (
                 <Flag title="Already in your log" count={model.conflicts.length}>
-                  <p mix={css({ fontSize: '14px', color: '#555', margin: '0 0 12px' })}>
+                  <p mix={css({ fontSize: '14px', color: 'var(--soft)', margin: '0 0 12px' })}>
                     You've logged these before, and the import disagrees. Rows matching what you already have
                     aren't listed — there's nothing to decide.
                   </p>
@@ -1216,7 +1224,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       marginBottom: '14px',
                     })}
                   >
-                    <span mix={css({ fontSize: '13px', color: '#8d8579' })}>
+                    <span mix={css({ fontSize: '13px', color: 'var(--muted)' })}>
                       For all {model.conflicts.length}
                     </span>
                     <Button
@@ -1247,7 +1255,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     ))}
                   </div>
                   <LazyList listId="import-conflicts" initial={CONFLICTS_VISIBLE} step={CONFLICTS_VISIBLE} />
-                  <p mix={css({ fontSize: '13px', color: '#888', margin: '10px 0 0' })}>
+                  <p mix={css({ fontSize: '13px', color: 'var(--muted)', margin: '10px 0 0' })}>
                     Only the fields that differ are highlighted.
                   </p>
                 </Flag>
@@ -1255,7 +1263,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
 
               {model.duplicates.length > 0 && (
                 <Flag title={`Two rows, one ${singular}`} count={model.duplicates.length}>
-                  <p mix={css({ fontSize: '14px', color: '#555', margin: '0 0 12px' })}>
+                  <p mix={css({ fontSize: '14px', color: 'var(--soft)', margin: '0 0 12px' })}>
                     Two rows landed on the same {singular}, and your log keeps one entry per {singular}.
                     Usually that means they're two different {plural} sharing a name and one row matched
                     wrong.
@@ -1270,7 +1278,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                       pastParticiple={pastParticiple}
                     />
                   ))}
-                  <p mix={css({ fontSize: '13px', color: '#888', margin: '10px 0 0' })}>
+                  <p mix={css({ fontSize: '13px', color: 'var(--muted)', margin: '10px 0 0' })}>
                     Until you decide, the weaker match of each pair is held back rather than overwriting the
                     other.
                   </p>
@@ -1281,9 +1289,11 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                 <>
                   <h2>
                     Worth a look{' '}
-                    <span mix={css({ color: '#888', fontSize: '14px' })}>({model.uncertain.length})</span>
+                    <span mix={css({ color: 'var(--muted)', fontSize: '14px' })}>
+                      ({model.uncertain.length})
+                    </span>
                   </h2>
-                  <p mix={css({ fontSize: '13px', color: '#888', marginBottom: '10px' })}>
+                  <p mix={css({ fontSize: '13px', color: 'var(--muted)', marginBottom: '10px' })}>
                     Least certain first. These save as matched unless you say otherwise. Leave out keeps one
                     out of your log; your file isn't changed.
                   </p>
@@ -1295,12 +1305,14 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                     >
                       <h3 mix={css({ margin: '14px 0 2px', fontSize: '16px' })}>
                         {group.title}{' '}
-                        <span mix={css({ color: '#888', fontSize: '13px', fontWeight: 400 })}>
+                        <span mix={css({ color: 'var(--muted)', fontSize: '13px', fontWeight: 400 })}>
                           ({group.entries.length})
                         </span>
                       </h3>
                       {group.blurb && (
-                        <p mix={css({ fontSize: '13px', color: '#888', margin: '0 0 8px' })}>{group.blurb}</p>
+                        <p mix={css({ fontSize: '13px', color: 'var(--muted)', margin: '0 0 8px' })}>
+                          {group.blurb}
+                        </p>
                       )}
                       <AnsweredList
                         batchId={batchId}
@@ -1335,9 +1347,11 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
                   <hr />
                   <h2 id={groupAnchor('not_found')} mix={css({ scrollMarginTop: '12px' })}>
                     Couldn't find{' '}
-                    <span mix={css({ color: '#888', fontSize: '14px' })}>({model.notFound.length})</span>
+                    <span mix={css({ color: 'var(--muted)', fontSize: '14px' })}>
+                      ({model.notFound.length})
+                    </span>
                   </h2>
-                  <p mix={css({ fontSize: '13px', color: '#888', marginBottom: '10px' })}>
+                  <p mix={css({ fontSize: '13px', color: 'var(--muted)', marginBottom: '10px' })}>
                     No catalog result under that name. <b>These won't be saved</b> unless you track them down.
                   </p>
                   <AnsweredList

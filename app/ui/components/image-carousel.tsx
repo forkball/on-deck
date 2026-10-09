@@ -20,9 +20,9 @@ const carouselStyle = css({
   '&:has(input:nth-of-type(2):checked) > .carousel-track': { transform: 'translateX(-100%)' },
   '&:has(input:nth-of-type(3):checked) > .carousel-track': { transform: 'translateX(-200%)' },
   // The dot for the current slide, and the arrows that would leave the strip.
-  '&:has(input:nth-of-type(1):checked) .carousel-dots > label:nth-of-type(1)': { background: '#3c3c3c' },
-  '&:has(input:nth-of-type(2):checked) .carousel-dots > label:nth-of-type(2)': { background: '#3c3c3c' },
-  '&:has(input:nth-of-type(3):checked) .carousel-dots > label:nth-of-type(3)': { background: '#3c3c3c' },
+  '&:has(input:nth-of-type(1):checked) .carousel-dots > label:nth-of-type(1)': { background: 'var(--text)' },
+  '&:has(input:nth-of-type(2):checked) .carousel-dots > label:nth-of-type(2)': { background: 'var(--text)' },
+  '&:has(input:nth-of-type(3):checked) .carousel-dots > label:nth-of-type(3)': { background: 'var(--text)' },
   // Only the current slide's arrows show, so each points at a fixed neighbour.
   '& .carousel-nav': { display: 'none' },
   '&:has(input:nth-of-type(1):checked) .carousel-nav-0': { display: 'block' },
@@ -68,7 +68,7 @@ const slideStyle = css({
   width: '100%',
   aspectRatio: '16 / 9',
   objectFit: 'cover',
-  background: '#eee',
+  background: 'var(--rule-soft)',
   // No border-radius — DoodleCSS styles `.doodle img` unlayered, so it would be
   // dead code. Slides keep the same hand-drawn frame as every other image.
 })
@@ -86,7 +86,7 @@ const dotStyle = css({
   width: '10px',
   height: '10px',
   borderRadius: '999px',
-  border: '1px solid #3c3c3c',
+  border: '1px solid var(--text)',
   background: 'transparent',
   cursor: 'pointer',
 })
@@ -101,7 +101,7 @@ const arrowStyle = css({
   lineHeight: '34px',
   textAlign: 'center',
   borderRadius: '999px',
-  border: '1px solid #3c3c3c',
+  border: '1px solid var(--text)',
   background: 'rgba(253, 247, 241, 0.9)',
   cursor: 'pointer',
   userSelect: 'none',

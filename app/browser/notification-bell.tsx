@@ -97,7 +97,7 @@ export const NotificationBell = clientEntry<NotificationBellProps>(
                 minWidth: '15px',
                 padding: '1px 4px',
                 borderRadius: '999px',
-                backgroundColor: '#b91c1c',
+                backgroundColor: 'var(--danger)',
                 color: '#fff',
                 fontSize: '10px',
                 fontWeight: 700,

@@ -93,8 +93,8 @@ const CHOICE_GROUP = {
   '& label': {
     display: 'inline-block',
     borderRadius: '999px',
-    border: '1px solid #ccc',
-    color: '#666',
+    border: '1px solid var(--rule)',
+    color: 'var(--soft)',
     cursor: 'pointer',
     // Off the same constant as the stars it sits beside, so the two can't drift.
     // `box-sizing: border-box` makes this the outer height, and line-height less
@@ -104,13 +104,13 @@ const CHOICE_GROUP = {
     whiteSpace: 'nowrap',
   },
   '& label:hover': {
-    borderColor: '#999',
-    color: '#3c3c3c',
+    borderColor: 'var(--muted)',
+    color: 'var(--text)',
   },
   '& input:checked + label': {
-    borderColor: '#3c3c3c',
-    backgroundColor: '#3c3c3c',
-    color: '#fdf9f0',
+    borderColor: 'var(--text)',
+    backgroundColor: 'var(--text)',
+    color: 'var(--paper)',
   },
 } as const
 
@@ -193,7 +193,7 @@ export function StarRatingInput(
           })}
         </span>
 
-        <span mix={css({ fontSize: '13px', color: '#888' })}>or</span>
+        <span mix={css({ fontSize: '13px', color: 'var(--muted)' })}>or</span>
 
         {/* Same radio group as the stars, so picking this deselects them. It
             sits outside the strip above, whose `input:checked ~ label` fill

@@ -56,7 +56,7 @@ function Section(handle: Handle<{ title: string; children?: RemixNode }>) {
 
 // The empty state every list here shares: one quiet line, and a way out of it.
 function Empty(handle: Handle<{ children?: RemixNode }>) {
-  return () => <p mix={css({ margin: 0, color: '#555' })}>{handle.props.children}</p>
+  return () => <p mix={css({ margin: 0, color: 'var(--soft)' })}>{handle.props.children}</p>
 }
 
 // Opens the dedicated lucky-pick page rather than drawing on the spot — a
@@ -68,7 +68,7 @@ function LuckyPickCta() {
       <p mix={css({ margin: 0 })}>
         <strong>Nothing drawn yet today.</strong>
       </p>
-      <p mix={css({ margin: '6px 0 0', color: '#555' })}>
+      <p mix={css({ margin: '6px 0 0', color: 'var(--soft)' })}>
         One thing to watch, read or play — no filters, nothing to decide.
       </p>
       {/* rmx-document forces a full document load — see media-tab-links.tsx. */}
@@ -113,7 +113,12 @@ function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
               <FeedList items={feed} />
               <p
                 id={FEED_STATUS_ID}
-                mix={css({ margin: '12px 0 0', fontSize: '12px', color: '#888', textAlign: 'center' })}
+                mix={css({
+                  margin: '12px 0 0',
+                  fontSize: '12px',
+                  color: 'var(--muted)',
+                  textAlign: 'center',
+                })}
               >
                 {feedCursor ? '' : FEED_END_TEXT}
               </p>

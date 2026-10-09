@@ -42,7 +42,7 @@ function FileUploadIcon() {
           width: '18px',
           height: '18px',
           borderRadius: '50%',
-          backgroundColor: '#1c1c1c',
+          backgroundColor: 'var(--ink)',
         })}
       >
         <svg viewBox="0 0 24 24" width="11" height="11">
@@ -128,7 +128,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
             }),
           ]}
         >
-          {error && !submitting && <p mix={css({ margin: 0, color: '#b91c1c' })}>{error}</p>}
+          {error && !submitting && <p mix={css({ margin: 0, color: 'var(--danger)' })}>{error}</p>}
 
           <label
             mix={[
@@ -139,7 +139,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
                 justifyContent: 'center',
                 gap: space[2],
                 padding: `${space[12]} ${space[4]}`,
-                border: `2px dashed ${dragActive ? '#1c1c1c' : '#ccc'}`,
+                border: `2px dashed ${dragActive ? 'var(--ink)' : 'var(--rule)'}`,
                 borderRadius: '8px',
                 backgroundColor: dragActive ? '#f0ece4' : 'transparent',
                 cursor: submitting ? 'default' : 'pointer',
@@ -201,7 +201,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
               display: 'flex',
               justifyContent: 'space-between',
               fontSize: '12px',
-              color: '#888',
+              color: 'var(--muted)',
             })}
           >
             <span>Supported format: {formatLabel}</span>
@@ -214,7 +214,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
                 display: 'flex',
                 alignItems: 'center',
                 gap: space[2],
-                border: '1px solid #ddd',
+                border: '1px solid var(--rule)',
                 borderRadius: '8px',
                 padding: `${space[2]} ${space[3]}`,
               })}
@@ -232,7 +232,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
                   {fileName}
                 </div>
                 {fileSize != null && (
-                  <div mix={css({ fontSize: '12px', color: '#888' })}>{formatFileSize(fileSize)}</div>
+                  <div mix={css({ fontSize: '12px', color: 'var(--muted)' })}>{formatFileSize(fileSize)}</div>
                 )}
               </div>
               {!submitting && (
@@ -257,6 +257,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
           >
             <Button
               type="submit"
+              variant="primary"
               disabled={submitting}
               mix={css({
                 display: 'inline-flex',

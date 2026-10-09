@@ -32,7 +32,7 @@ export function LuckyPickPage(handle: Handle<LuckyPickPageProps>) {
 
     return (
       <Page title="Today's lucky pick" heading="🎲 Today's lucky pick" displayName={displayName}>
-        <p mix={css({ margin: 0, color: '#555' })}>
+        <p mix={css({ margin: 0, color: 'var(--soft)' })}>
           One thing to watch, read or play — no filters, nothing to decide.
         </p>
 
@@ -41,7 +41,7 @@ export function LuckyPickPage(handle: Handle<LuckyPickPageProps>) {
         {error && <ErrorNotice error={error} link={errorLink} />}
 
         {lucky.pick ? (
-          <p mix={css({ margin: 0, color: '#555' })}>
+          <p mix={css({ margin: 0, color: 'var(--soft)' })}>
             You've already drawn today's pick —{' '}
             <a href={routes.recommendations.show.href({ runId: String(lucky.pick.runId) })}>take a look</a>.
           </p>

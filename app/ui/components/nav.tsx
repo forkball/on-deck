@@ -14,7 +14,7 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
     const { authed, displayName } = handle.props
 
     return (
-      <nav mix={css({ borderBottom: '1px solid #ccc', fontSize: '14px' })}>
+      <nav mix={css({ borderBottom: '1px solid var(--rule)', fontSize: '14px' })}>
         <div
           mix={css({
             display: 'flex',

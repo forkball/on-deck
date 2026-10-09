@@ -29,23 +29,23 @@ export function ImportMatchingPage(handle: Handle<ImportMatchingPageProps>) {
       >
         {failed ? (
           <>
-            <p mix={css({ color: '#b91c1c' })}>{error ?? 'Something went wrong while matching.'}</p>
-            <p mix={css({ color: '#555' })}>
+            <p mix={css({ color: 'var(--danger)' })}>{error ?? 'Something went wrong while matching.'}</p>
+            <p mix={css({ color: 'var(--soft)' })}>
               Nothing was written to your log — upload the file again to start over.
             </p>
           </>
         ) : (
           <>
-            <p mix={css({ color: '#555' })}>Looking each row up in the catalog.</p>
+            <p mix={css({ color: 'var(--soft)' })}>Looking each row up in the catalog.</p>
 
             {/* Server-rendered at the count the page was requested with, so
                   this says something true before any script runs. */}
             <div
               mix={css({
                 height: '14px',
-                border: '1px solid #cfc5b6',
+                border: '1px solid var(--rule)',
                 borderRadius: '999px',
-                background: '#f3ece2',
+                background: 'var(--paper-sunk)',
                 overflow: 'hidden',
               })}
             >
@@ -57,18 +57,18 @@ export function ImportMatchingPage(handle: Handle<ImportMatchingPageProps>) {
             </div>
             <p
               id="import-progress-label"
-              mix={css({ fontSize: '13px', color: '#888', margin: '8px 0 18px' })}
+              mix={css({ fontSize: '13px', color: 'var(--muted)', margin: '8px 0 18px' })}
             >
               {matched} of {total} rows
             </p>
 
             <div
               mix={css({
-                border: '1px solid #ddd',
+                border: '1px solid var(--rule)',
                 borderRadius: '8px',
                 padding: '10px 14px',
                 fontSize: '14px',
-                color: '#555',
+                color: 'var(--soft)',
               })}
             >
               You can close this page. Matching finishes in the background, and the results wait for you on

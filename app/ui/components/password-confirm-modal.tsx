@@ -37,7 +37,7 @@ export function PasswordConfirmModal(handle: Handle<PasswordConfirmModalProps>) 
     return (
       <>
         <Modal id={MODAL_ID} title="Confirm it's you" defaultOpen={defaultOpen}>
-          <p mix={css({ margin: '0 0 12px', fontSize: '14px', color: '#555' })}>
+          <p mix={css({ margin: '0 0 12px', fontSize: '14px', color: 'var(--soft)' })}>
             Enter your current password to {action}.
           </p>
           <Field label="Current password" error={error}>

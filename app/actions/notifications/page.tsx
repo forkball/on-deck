@@ -47,7 +47,7 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     gap: '12px',
-                    border: '1px solid #ddd',
+                    border: '1px solid var(--rule)',
                     borderRadius: '8px',
                     padding: '12px 16px',
                     backgroundColor: notification.read ? 'transparent' : 'rgba(21, 128, 61, 0.06)',
@@ -76,7 +76,7 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
                       mix={css({
                         fontSize: '11px',
                         fontWeight: 700,
-                        color: '#15803d',
+                        color: 'var(--success)',
                         flex: '0 0 auto',
                       })}
                     >

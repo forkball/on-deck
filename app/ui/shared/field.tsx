@@ -38,9 +38,9 @@ export const fieldStyle = css({
   },
 })
 
-const labelTextStyle = css({ fontSize: '13px', color: '#555' })
-export const hintStyle = css({ display: 'block', margin: '4px 0 0', fontSize: '12px', color: '#888' })
-const errorStyle = css({ display: 'block', margin: '4px 0 0', fontSize: '12px', color: '#b91c1c' })
+const labelTextStyle = css({ fontSize: '13px', color: 'var(--soft)' })
+export const hintStyle = css({ display: 'block', margin: '4px 0 0', fontSize: '12px', color: 'var(--muted)' })
+const errorStyle = css({ display: 'block', margin: '4px 0 0', fontSize: '12px', color: 'var(--danger)' })
 
 export interface FieldProps {
   label: string

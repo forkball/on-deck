@@ -61,7 +61,7 @@ function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSetting
     return (
       <section mix={css({ maxWidth: '480px' })}>
         <h2 mix={css({ marginTop: 0 })}>What my taste profiles are written from</h2>
-        <p mix={css({ margin: '0 0 16px', color: '#555' })}>
+        <p mix={css({ margin: '0 0 16px', color: 'var(--soft)' })}>
           Unlike the bio above, these do change your recommendations — they decide what gets read of your log
           when a taste profile is written.
         </p>
@@ -96,9 +96,11 @@ function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSetting
           </CheckboxOption>
 
           <div>
-            <Button type="submit">Save taste settings</Button>
+            <Button type="submit" variant="primary">
+              Save taste settings
+            </Button>
           </div>
-          <span mix={css({ fontSize: '12px', color: '#888' })}>
+          <span mix={css({ fontSize: '12px', color: 'var(--muted)' })}>
             Changing these doesn't rewrite anything on its own. Each profile is rewritten next time you
             generate recommendations, or straight away with the Rebuild button beside it on your profile.
           </span>
@@ -185,7 +187,9 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
                     defaultOpen={confirming}
                   />
                   <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px' })}>
-                    <Button type="submit">Save changes</Button>
+                    <Button type="submit" variant="primary">
+                      Save changes
+                    </Button>
                     <a href={routes.profile.password.index.href()} mix={css({ marginLeft: 'auto' })}>
                       Change password
                     </a>

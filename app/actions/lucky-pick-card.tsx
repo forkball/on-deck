@@ -16,7 +16,7 @@ export const LUCKY_PICK_LABEL = "Today's lucky pick"
 // action in the same slot when nothing has been drawn — the two have to be the
 // same box, or the empty state visibly steps out of the filled one.
 export const LUCKY_CARD_BOX = {
-  border: '1px solid #ddd',
+  border: '1px solid var(--rule)',
   borderRadius: '8px',
   padding: '16px',
 } as const
@@ -59,14 +59,21 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
               width: '72px',
               height: '108px',
               flex: '0 0 auto',
-              border: '1px solid #ddd',
+              border: '1px solid var(--rule)',
               borderRadius: '4px',
             })}
           />
         )}
         <div mix={css({ flex: '1 1 auto', minWidth: 0 })}>
           {showLabel && (
-            <p mix={css({ margin: '0 0 6px', fontSize: '12px', letterSpacing: '0.04em', color: '#888' })}>
+            <p
+              mix={css({
+                margin: '0 0 6px',
+                fontSize: '12px',
+                letterSpacing: '0.04em',
+                color: 'var(--muted)',
+              })}
+            >
               {LUCKY_PICK_LABEL}
             </p>
           )}
@@ -75,9 +82,9 @@ export function LuckyPickCard(handle: Handle<LuckyPickCardProps>) {
               {pick.title}
             </a>
             {releaseYear ? ` (${releaseYear})` : ''}{' '}
-            <span mix={css({ color: '#888', fontSize: '13px' })}>· {ui.singular}</span>
+            <span mix={css({ color: 'var(--muted)', fontSize: '13px' })}>· {ui.singular}</span>
           </p>
-          <p mix={css({ margin: '6px 0 0', color: '#555' })}>{pick.reason}</p>
+          <p mix={css({ margin: '6px 0 0', color: 'var(--soft)' })}>{pick.reason}</p>
         </div>
       </div>
     )

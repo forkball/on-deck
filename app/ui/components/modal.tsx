@@ -80,7 +80,7 @@ export function Modal(
                   ? {
                       display: 'inline-block',
                       textAlign: 'center',
-                      backgroundColor: '#fdf7f1',
+                      backgroundColor: 'var(--paper)',
                       boxShadow: '0 4px 14px rgba(0, 0, 0, 0.3)',
                     }
                   : { display: 'inline-block' },
@@ -94,7 +94,7 @@ export function Modal(
         <div class="modal-overlay">
           <div
             mix={css({
-              backgroundColor: '#fdf7f1',
+              backgroundColor: 'var(--paper)',
               borderRadius: '8px',
               padding: '24px',
               maxWidth: '480px',

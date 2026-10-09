@@ -21,6 +21,9 @@ export interface TabDefinition {
   id: string
   label: string
   panel: RemixNode
+  // The active tab's text and underline. The accent unless given: media tabs
+  // pass their type's hue.
+  color?: string
 }
 
 export interface TabsProps {
@@ -36,7 +39,7 @@ export interface TabsProps {
 // Base and active styles share one object: two css() calls land in two @layers
 // ordered by declaration, not specificity, so a later base beats an earlier
 // active override.
-function tabsStyle(idPrefix: string, ids: string[]): CSSStyle {
+function tabsStyle(idPrefix: string, tabs: TabDefinition[]): CSSStyle {
   const style: Record<string, unknown> = {
     position: 'relative',
     marginTop: '40px',
@@ -50,18 +53,18 @@ function tabsStyle(idPrefix: string, ids: string[]): CSSStyle {
     '& label': {
       cursor: 'pointer',
       padding: '0 0 8px',
-      color: '#888',
+      color: 'var(--muted)',
       borderBottom: '2px solid transparent',
     },
   }
 
-  for (const id of ids) {
+  for (const { id, color = 'var(--accent)' } of tabs) {
     style[`& .panel-${id}`] = { display: 'none' }
     style[`&:has(#${idPrefix}-tab-${id}:checked) .panel-${id}`] = { display: 'block' }
     style[`&:has(#${idPrefix}-tab-${id}:checked) label[for="${idPrefix}-tab-${id}"]`] = {
-      color: '#3c3c3c',
+      color,
       fontWeight: 700,
-      borderBottomColor: '#3c3c3c',
+      borderBottomColor: color,
     }
   }
 
@@ -77,7 +80,7 @@ export function Tabs(handle: Handle<TabsProps>) {
     const activeId = active && ids.includes(active) ? active : ids[0]
 
     return (
-      <div mix={css(tabsStyle(idPrefix, ids))}>
+      <div mix={css(tabsStyle(idPrefix, tabs))}>
         {tabs.map((tab) => (
           <input
             key={tab.id}
@@ -92,7 +95,7 @@ export function Tabs(handle: Handle<TabsProps>) {
           mix={css({
             display: 'flex',
             gap: '20px',
-            borderBottom: '1px solid #ddd',
+            borderBottom: '1px solid var(--rule)',
             marginBottom: '16px',
           })}
         >

@@ -44,11 +44,18 @@ function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>)
         <summary mix={css({ cursor: 'pointer' })}>
           <h2 mix={css({ display: 'inline' })}>{label}</h2>
         </summary>
-        <div mix={css({ border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginTop: '12px' })}>
+        <div
+          mix={css({
+            border: '1px solid var(--rule)',
+            borderRadius: '8px',
+            padding: '16px',
+            marginTop: '12px',
+          })}
+        >
           {summary ? (
             <p mix={css({ margin: 0 })}>{summary}</p>
           ) : (
-            <p mix={css({ margin: 0, color: '#555' })}>Nothing written yet.</p>
+            <p mix={css({ margin: 0, color: 'var(--soft)' })}>Nothing written yet.</p>
           )}
         </div>
       </details>
@@ -142,7 +149,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
     return (
       <Page title={label} displayName={displayName}>
         <h1 mix={css({ marginBottom: '4px', overflowWrap: 'break-word' })}>{label}</h1>
-        <p mix={css({ margin: '0 0 12px', color: '#555' })}>
+        <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>
           {locked ? (
             <>
               {followingCount} following · {followersCount} follower{followersCount === 1 ? '' : 's'}

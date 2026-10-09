@@ -25,7 +25,7 @@ const stepStyle = css({
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
-  color: '#888',
+  color: 'var(--muted)',
   fontSize: '14px',
 })
 
@@ -33,7 +33,7 @@ const activeStepStyle = css({
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
-  color: '#111',
+  color: 'var(--ink)',
   fontSize: '14px',
   fontWeight: 'bold',
 })
@@ -42,7 +42,7 @@ const failedStepStyle = css({
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
-  color: '#b91c1c',
+  color: 'var(--danger)',
   fontSize: '14px',
   fontWeight: 'bold',
 })
@@ -51,7 +51,7 @@ const doneStepStyle = css({
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
-  color: '#15803d',
+  color: 'var(--success)',
   fontSize: '14px',
 })
 
@@ -188,10 +188,12 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       // which stay on screen so it is clear how far the run got. The message is
       // written where the failure happened and already says what to do about it.
       function notice() {
-        if (stopped) return <p mix={css({ color: '#b91c1c' })}>{stopped.message}</p>
+        if (stopped) return <p mix={css({ color: 'var(--danger)' })}>{stopped.message}</p>
         // Not an error, so not in red: the run is fine and will carry on by itself.
         if (retrying) {
-          return <p mix={css({ color: '#555' })}>The catalog isn't answering — trying again in a minute.</p>
+          return (
+            <p mix={css({ color: 'var(--soft)' })}>The catalog isn't answering — trying again in a minute.</p>
+          )
         }
         return null
       }
@@ -215,7 +217,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       function panel() {
         if (queueState === 'queued' && !stopped?.failed && !retrying) {
           return (
-            <p mix={css({ color: '#555' })}>
+            <p mix={css({ color: 'var(--soft)' })}>
               Waiting to start
               {ahead != null && ahead > 0 ? ` — ${ahead} ${ahead === 1 ? 'run' : 'runs'} ahead of yours` : ''}
               …

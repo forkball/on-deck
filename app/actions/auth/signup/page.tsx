@@ -38,7 +38,9 @@ export function SignupPage(handle: Handle<SignupPageProps>) {
               defaultValue={values?.display_name ?? ''}
             />
           </Field>
-          <Button type="submit">Create account</Button>
+          <Button type="submit" variant="primary">
+            Create account
+          </Button>
         </form>
         <p>
           Already have an account? <a href={routes.auth.login.index.href()}>Log in</a>

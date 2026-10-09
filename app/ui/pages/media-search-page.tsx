@@ -84,7 +84,9 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
           <section>
             <h2>
               Results{' '}
-              <span mix={css({ fontSize: '14px', fontWeight: 400, color: '#888' })}>({results.length})</span>
+              <span mix={css({ fontSize: '14px', fontWeight: 400, color: 'var(--muted)' })}>
+                ({results.length})
+              </span>
             </h2>
             <ul
               id="search-results"
@@ -109,7 +111,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                     mix={css({
                       display: 'flex',
                       gap: '12px',
-                      border: '1px solid #ddd',
+                      border: '1px solid var(--rule)',
                       borderRadius: '8px',
                       padding: '16px',
                     })}
@@ -129,7 +131,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                           width: '60px',
                           height: '90px',
                           flex: '0 0 auto',
-                          border: '1px solid #ddd',
+                          border: '1px solid var(--rule)',
                           borderRadius: '4px',
                         })}
                       />
@@ -145,7 +147,9 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                           rarely fills it, in which case nothing shows, and IGDB nearly
                           always does. */}
                       {creator && (
-                        <div mix={css({ fontSize: '13px', color: '#555', marginTop: '2px' })}>{creator}</div>
+                        <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>
+                          {creator}
+                        </div>
                       )}
                       {tags.length > 0 && (
                         <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' })}>
@@ -156,8 +160,8 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                                 fontSize: '11px',
                                 padding: '2px 8px',
                                 borderRadius: '999px',
-                                border: '1px solid #ccc',
-                                color: '#555',
+                                border: '1px solid var(--rule)',
+                                color: 'var(--soft)',
                               })}
                             >
                               {capitalize(tag)}
@@ -170,7 +174,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                         <p
                           mix={css({
                             fontSize: '13px',
-                            color: '#555',
+                            color: 'var(--soft)',
                             margin: '6px 0 0',
                             lineHeight: 1.4,
                           })}
@@ -186,7 +190,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                             gap: '8px',
                             margin: '4px 0 0',
                             fontSize: '13px',
-                            color: '#555',
+                            color: 'var(--soft)',
                           })}
                         >
                           {statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}
@@ -229,7 +233,9 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                               </div>
                               <NotesField defaultValue={interaction?.notes} />
                             </div>
-                            <Button type="submit">Save</Button>
+                            <Button type="submit" variant="primary">
+                              Save
+                            </Button>
                             <FrameForm />
                           </form>
                         </FloatingDropdown>

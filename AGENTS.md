@@ -151,6 +151,10 @@ does nothing on its own.
   and the invisible toggles CSS reads (tabs, modal, carousel) are listed there
   with the reason. A call site's `mix` is for layout; a different look is a new
   variant — a `css()` look rule loses to Doodle's unlayered one and does nothing.
+- Colours come from the custom properties at the top of `public/app.css`
+  (`var(--muted)`, `var(--rule)`, `var(--accent)`…), not hex literals at call
+  sites. That is how ~50 copies of `#888`, which fails contrast on the cream
+  paper, had accumulated. A media type's colour is `MEDIA_TYPE_UI[type].hue`.
 - Tests live in `test/`, usually one file per module under test
   (`import-review.test.ts` covers `data/imports/review.ts`), though a few cover
   a pair — `lucky.test.ts` holds both `lucky` and `exclusions`. `npm test` runs

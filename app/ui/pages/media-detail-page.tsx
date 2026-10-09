@@ -117,7 +117,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
       // No heading: the title sits beside the poster, in the layout below.
       <Page title={item.title} back={backLink} width="wide" displayName={displayName}>
         {rematched && (
-          <p mix={css({ color: '#2a7' })}>
+          <p mix={css({ color: 'var(--success)' })}>
             {merged
               ? `Merged into the existing correct entry for this ${ui.itemNoun} — logs from everyone who had it under the wrong entry now live here too.`
               : `Updated to match the correct ${ui.itemNoun} on ${ui.catalogName}.`}
@@ -160,11 +160,11 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                   height: '330px',
                   flex: '0 0 auto',
                   borderRadius: '8px',
-                  border: '1px solid #ddd',
+                  border: '1px solid var(--rule)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#888',
+                  color: 'var(--muted)',
                   textAlign: 'center',
                   padding: '16px',
                   [PHONE]: { order: 1 },
@@ -175,7 +175,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
             )}
             <div
               mix={css({
-                border: '1px solid #ddd',
+                border: '1px solid var(--rule)',
                 borderRadius: '8px',
                 padding: '16px',
                 display: 'flex',
@@ -207,7 +207,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                     )}
                   </>
                 ) : (
-                  <p mix={css({ margin: 0, color: '#555' })}>You haven't logged this one yet.</p>
+                  <p mix={css({ margin: 0, color: 'var(--soft)' })}>You haven't logged this one yet.</p>
                 )}
               </div>
 
@@ -281,6 +281,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                   )}
                   <Button
                     type="submit"
+                    variant="primary"
                     form={`edit-${mediaType}-form-${item.id}`}
                     mix={css({ marginLeft: 'auto' })}
                   >
@@ -302,23 +303,27 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
           >
             <div mix={css({ display: 'flex', flexDirection: 'column', gap: '8px', [PHONE]: { order: 2 } })}>
               <h1 mix={css({ margin: '0 0 4px' })}>{item.title}</h1>
-              {tagline && <p mix={css({ margin: 0, color: '#555', fontStyle: 'italic' })}>{tagline}</p>}
+              {tagline && (
+                <p mix={css({ margin: 0, color: 'var(--soft)', fontStyle: 'italic' })}>{tagline}</p>
+              )}
               {creator && (
-                <p mix={css({ margin: 0, color: '#555' })}>
+                <p mix={css({ margin: 0, color: 'var(--soft)' })}>
                   {creators.length > 1 ? ui.creditLabelPlural : ui.creditLabel}: <strong>{creator}</strong>
                 </p>
               )}
               {/* The year leads the details rather than riding in the title,
                     where a show's "(2008–2013)" wrapped the heading. */}
               {(years || genres || length) && (
-                <p mix={css({ margin: 0, color: '#555' })}>
+                <p mix={css({ margin: 0, color: 'var(--soft)' })}>
                   {[years, genres, length].filter(Boolean).join(' · ')}
                 </p>
               )}
               {seriesNames.length > 0 && (
-                <p mix={css({ margin: 0, color: '#555' })}>Part of {seriesNames.join(' / ')}</p>
+                <p mix={css({ margin: 0, color: 'var(--soft)' })}>Part of {seriesNames.join(' / ')}</p>
               )}
-              {showFacts.length > 0 && <p mix={css({ margin: 0, color: '#555' })}>{showFacts.join(' · ')}</p>}
+              {showFacts.length > 0 && (
+                <p mix={css({ margin: 0, color: 'var(--soft)' })}>{showFacts.join(' · ')}</p>
+              )}
               <PlatformList platforms={platforms} />
             </div>
             <div mix={css({ '& > p': { margin: 0 }, [PHONE]: { order: 3 } })}>
@@ -344,7 +349,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                 // as the title's details and then a few distinct panels.
                 <section
                   mix={css({
-                    border: '1px solid #ddd',
+                    border: '1px solid var(--rule)',
                     borderRadius: '8px',
                     padding: '12px 16px 16px',
                   })}
@@ -365,8 +370,8 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                   >
                     {cast.map((member) => (
                       <>
-                        <dt mix={css({ margin: 0, color: '#333' })}>{member.name}</dt>
-                        <dd mix={css({ margin: 0, color: '#777', fontSize: '14px' })}>
+                        <dt mix={css({ margin: 0, color: 'var(--text)' })}>{member.name}</dt>
+                        <dd mix={css({ margin: 0, color: 'var(--muted)', fontSize: '14px' })}>
                           {member.character ?? ''}
                         </dd>
                       </>
@@ -377,7 +382,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
               {watch && <WhereToWatch {...watch} title={item.title} returnTo={returnTo} />}
 
               {canRematch && (
-                <div mix={css({ color: '#555' })}>
+                <div mix={css({ color: 'var(--soft)' })}>
                   {/* Held open when the last attempt failed: collapsing would hide
                       both the error and the field it refers to, leaving the page
                       looking like nothing happened. */}
@@ -414,7 +419,9 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                       This entry is shared: fixing the match repoints it for everyone who logged this{' '}
                       {ui.itemNoun}.
                     </p>
-                    {rematchError && <p mix={css({ color: '#c33', margin: '8px 0 0' })}>{rematchError}</p>}
+                    {rematchError && (
+                      <p mix={css({ color: 'var(--danger)', margin: '8px 0 0' })}>{rematchError}</p>
+                    )}
                   </Collapsible>
                 </div>
               )}

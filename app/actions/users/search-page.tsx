@@ -56,7 +56,7 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   gap: '12px',
-                  border: '1px solid #ddd',
+                  border: '1px solid var(--rule)',
                   borderRadius: '8px',
                   padding: '12px 16px',
                 })}

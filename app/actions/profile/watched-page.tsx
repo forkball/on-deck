@@ -70,7 +70,7 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
         </form>
 
         {movieLog.length === 0 && (
-          <p mix={css({ color: '#555' })}>
+          <p mix={css({ color: 'var(--soft)' })}>
             Nothing in your {ui.attributive} log
             {status ? ` under "${statusLabelsFor(mediaType)[status]}"` : ''}.
           </p>

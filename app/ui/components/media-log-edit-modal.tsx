@@ -71,7 +71,12 @@ export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
             </Button>
             <FrameForm />
           </form>
-          <Button type="submit" form={`edit-log-form-${interaction.id}`} mix={css({ marginLeft: 'auto' })}>
+          <Button
+            type="submit"
+            variant="primary"
+            form={`edit-log-form-${interaction.id}`}
+            mix={css({ marginLeft: 'auto' })}
+          >
             Save
           </Button>
         </div>

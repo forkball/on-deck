@@ -68,7 +68,7 @@ export interface RecommendationsPageProps {
   }
 }
 
-const sectionCaption = css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })
+const sectionCaption = css({ margin: '0 0 16px', fontSize: '13px', color: 'var(--muted)' })
 
 // A run list section that only appears once it has something to show —
 // "Recommendations from others" and "Lucky picks" both work this way. Past
@@ -99,11 +99,14 @@ function UnconfirmedSection(handle: Handle<{ runs: UnconfirmedRunDetail[] }>) {
       <ul mix={css({ listStyle: 'none', margin: 0, padding: 0 })}>
         {handle.props.runs.map((run) => (
           // Block, not list-item, so Doodle's "* " marker isn't drawn — see run-list.tsx.
-          <li key={run.id} mix={css({ display: 'block', padding: '8px 0', borderBottom: '1px solid #eee' })}>
+          <li
+            key={run.id}
+            mix={css({ display: 'block', padding: '8px 0', borderBottom: '1px solid var(--rule-soft)' })}
+          >
             <a href={routes.recommendations.unconfirmed.href({ unconfirmedId: String(run.id) })}>
               {run.isLucky ? '🎲 Lucky pick' : `${run.picks.length} ${mediaTypeUiFor(run.mediaType).plural}`}
             </a>
-            <span mix={css({ color: '#888', fontSize: '13px' })}>
+            <span mix={css({ color: 'var(--muted)', fontSize: '13px' })}>
               {' — '}
               {new Date(run.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
             </span>
@@ -124,7 +127,7 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
     return (
       <div
         mix={css({
-          border: '1px solid #ddd',
+          border: '1px solid var(--rule)',
           borderRadius: '8px',
           padding: '16px',
           marginBottom: '24px',
@@ -133,7 +136,7 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
         <p mix={css({ margin: '0 0 8px' })}>
           <strong>You already have a recommendation like this.</strong>
         </p>
-        <p mix={css({ margin: '0 0 12px', color: '#555' })}>
+        <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>
           Those exact settings produced <a href={href}>{duplicate.name || 'an earlier run'}</a> on{' '}
           {new Date(duplicate.createdAt).toLocaleDateString()}, and you haven't logged anything from it yet.
           Generating again will replace it with a different set of picks.
@@ -195,10 +198,10 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
 
     return (
       <Page heading="Recommendations" width="wide" displayName={displayName}>
-        <p mix={css({ margin: 0, color: '#555' })}>
+        <p mix={css({ margin: 0, color: 'var(--soft)' })}>
           Rewrites your {ui.attributive} taste profile from what you've logged, then finds picks to try next.
         </p>
-        <p mix={css({ margin: '4px 0 0', color: '#888', fontSize: '13px' })}>
+        <p mix={css({ margin: '4px 0 0', color: 'var(--muted)', fontSize: '13px' })}>
           Only your last {MAX_RUNS_PER_USER} runs are kept — generating a new one deletes the oldest.
         </p>
         <MediaTabLinks current={mediaType} hrefFor={(type) => `${recsHref}?mediaType=${type}`} />

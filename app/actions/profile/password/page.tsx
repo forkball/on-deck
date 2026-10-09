@@ -60,7 +60,9 @@ export function ProfilePasswordPage(handle: Handle<ProfilePasswordPageProps>) {
             defaultOpen={confirming}
           />
           <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px' })}>
-            <Button type="submit">Change password</Button>
+            <Button type="submit" variant="primary">
+              Change password
+            </Button>
           </div>
         </form>
       </Page>
