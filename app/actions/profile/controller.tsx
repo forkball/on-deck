@@ -38,12 +38,10 @@ import { loadMediaSummaries } from '../../data/mediaSummary.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
-import { routes } from '../../routes.ts'
+import { routes, titleSettingsHref } from '../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
 import { parseInteractionStatus } from '../../interactionStatus.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
-import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
-import { titleSettingsHref } from './edit/page.tsx'
 import { ProfilePage } from './page.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
 import { safeReturnPath } from '../../ui/backLink.ts'
@@ -58,26 +56,22 @@ export default createController(routes.profile, {
       const auth = context.get(Auth)
 
       const db = context.get(Database)
-      const tab = context.url.searchParams.get('tab')
-      const activeTab = tab === TITLES_TAB ? TITLES_TAB : (parseMediaType(tab) ?? DEFAULT_MEDIA_TYPE)
+      const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
       // Only the log waits on the feed; everything else loads alongside it. The
       // title check waits too, so whatever the feed just logged can earn one.
-      const [[media, [check, worn]], followingCount, followersCount, rebuildAllowance, batches] =
-        await Promise.all([
-          syncLetterboxdBeforeReading(db, auth.identity).then(() =>
-            Promise.all([
-              loadMediaSummaries(db, auth.identity.id, RECENT_COUNT),
-              checkTitleUnlocksQuietly(db, auth.identity.id).then((result) =>
-                Promise.all([result, loadWornTitle(db, auth.identity.id)]),
-              ),
-            ]),
-          ),
-          countFollowing(db, auth.identity.id),
-          countFollowers(db, auth.identity.id),
-          getProfileRebuildAllowance(db, auth.identity),
-          activeBatches(db, auth.identity.id),
-        ])
+      const [[media, worn], followingCount, followersCount, rebuildAllowance, batches] = await Promise.all([
+        syncLetterboxdBeforeReading(db, auth.identity).then(() =>
+          Promise.all([
+            loadMediaSummaries(db, auth.identity.id, RECENT_COUNT),
+            checkTitleUnlocksQuietly(db, auth.identity.id).then(() => loadWornTitle(db, auth.identity.id)),
+          ]),
+        ),
+        countFollowing(db, auth.identity.id),
+        countFollowers(db, auth.identity.id),
+        getProfileRebuildAllowance(db, auth.identity),
+        activeBatches(db, auth.identity.id),
+      ])
       // Unfinished imports, so there's a way back to one. Linked straight to the
       // review page: client navigation follows the show route's redirect but
       // leaves its URL in the address bar.
@@ -110,13 +104,6 @@ export default createController(routes.profile, {
           waitingImports={waitingImports}
           displayName={displayLabel(auth.identity)}
           title={composeTitle(worn.adjective, worn.noun)}
-          worn={worn}
-          titleSaved={context.url.searchParams.get('titleSaved') === '1'}
-          credits={(check?.progress ?? []).map(({ title, current }) => ({
-            title,
-            earned: check?.unlocked.has(title.key) ?? false,
-            current,
-          }))}
         />,
       )
     },

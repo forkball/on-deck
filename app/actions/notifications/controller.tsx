@@ -12,8 +12,7 @@ import { notifications } from '../../data/schema.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
-import { routes } from '../../routes.ts'
-import { titleSettingsHref } from '../profile/edit/page.tsx'
+import { routes, titleSettingsHref } from '../../routes.ts'
 import { NotificationsPage } from './page.tsx'
 
 export default createController(routes.notifications, {

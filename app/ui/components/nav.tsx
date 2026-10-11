@@ -3,7 +3,7 @@ import { css } from 'remix/ui'
 
 import { NotificationBell } from '../../browser/notification-bell.tsx'
 import { ProfileMenu } from '../../browser/profile-menu.tsx'
-import { routes } from '../../routes.ts'
+import { routes, titleSettingsHref } from '../../routes.ts'
 import { Link } from '../shared/form-controls.tsx'
 
 // The widest a page gets: Page's `wide` column matches it, so wide content
@@ -48,6 +48,7 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
                   { href: routes.users.search.href(), label: 'People' },
                   { href: routes.recommendations.index.href(), label: 'Recommendations' },
                   { href: routes.profile.index.href(), label: 'Profile' },
+                  { href: titleSettingsHref(), label: 'Titles' },
                   // Its own entry rather than something to find behind the
                   // profile: it holds the connected accounts, and this is the
                   // only link to it.

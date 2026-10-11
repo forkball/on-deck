@@ -147,3 +147,13 @@ export const routes = route({
 export function luckyRecommendationsHref(): string {
   return routes.recommendations.luckyPage.href()
 }
+
+// The settings tab your titles are chosen on, and where to send someone for
+// them. Spelled once here because the nav's menu links to it, and the nav is
+// shared UI that can't reach into a page for it; the settings page names its
+// tab from this too.
+export const TITLES_SETTINGS_TAB = 'titles'
+
+export function titleSettingsHref(): string {
+  return `${routes.profile.edit.index.href()}?tab=${TITLES_SETTINGS_TAB}`
+}
