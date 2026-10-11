@@ -103,9 +103,7 @@ function WearTile(handle: Handle<{ title: TitleDefinition; picking: Picking }>) 
           type="submit"
           variant="plain"
           aria-pressed={worn ? 'true' : 'false'}
-          title={
-            worn ? `Take off ${title.word}` : `Wear ${title.word} as your ${slotName} — ${title.requirement}`
-          }
+          title={worn ? `Take off ${title.word}` : `Wear ${title.word} as your ${slotName}`}
           mix={tileButtonStyle}
         >
           <span mix={[tileStyle, earnedStyle, worn ? wornStyle : undefined]}>
@@ -119,6 +117,74 @@ function WearTile(handle: Handle<{ title: TitleDefinition; picking: Picking }>) 
     )
   }
 }
+
+// What earns a credit, and how far along you are or that you have it. Opened by
+// a locked tile, someone else's tile, or an earned tile's ⓘ.
+function CreditModal(
+  handle: Handle<{ id: string; title: TitleDefinition; earned: boolean; current?: number }>,
+) {
+  return () => {
+    const { id, title, earned, current } = handle.props
+    return (
+      <Modal id={id} title={title.word} small>
+        <p mix={css({ margin: '0 0 12px' })}>{title.requirement}.</p>
+        {earned ? (
+          <p mix={css({ margin: 0, color: 'var(--success)', fontWeight: 700 })}>✓ Earned</p>
+        ) : current != null ? (
+          <>
+            <ProgressBar current={current} goal={title.goal} />
+            <p mix={css({ margin: '6px 0 0', fontSize: '13px', color: 'var(--muted)' })}>
+              {Math.min(current, title.goal)} of {title.goal} so far
+            </p>
+          </>
+        ) : (
+          <p mix={css({ margin: 0, fontSize: '13px', color: 'var(--muted)' })}>Not earned yet</p>
+        )}
+      </Modal>
+    )
+  }
+}
+
+// An earned tile you can wear, with its ⓘ as a badge on the top-right corner:
+// off the line the word is on, so it never takes room from a long word — which
+// on a phone is room the word doesn't have. It has its own touch target rather
+// than the shared `tap-area`, which also sets `position: relative` and would
+// pull the badge off the corner.
+const wearRowStyle = css({
+  position: 'relative',
+  '& .credit-info': {
+    position: 'absolute',
+    top: '-7px',
+    right: '-7px',
+    width: '18px',
+    height: '18px',
+    borderRadius: '50%',
+    background: 'var(--paper)',
+    border: '1px solid var(--rule)',
+    // Centred in public/app.css: Doodle's label display would beat it here.
+    fontSize: '12px',
+    fontWeight: 700,
+    fontStyle: 'italic',
+    lineHeight: 1,
+    color: 'var(--muted)',
+    cursor: 'pointer',
+  },
+  // On a touch screen, a 44px target — the size the rest of the site's small
+  // controls get. It reaches only as far out as the badge does (the 8px grid
+  // gap never gets crossed) and grows down and left over its own tile's corner,
+  // so it can't catch a tap meant for the next tile or the row above.
+  '@media (pointer: coarse)': {
+    '& .credit-info::after': {
+      content: '""',
+      position: 'absolute',
+      top: '-1px',
+      right: '-1px',
+      width: '44px',
+      height: '44px',
+    },
+  },
+  '& .credit-info:hover': { color: 'var(--accent)', borderColor: 'var(--accent)' },
+})
 
 const barStyle = css({
   display: 'block',
@@ -179,7 +245,21 @@ export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[];
                 data-earned={String(isEarned)}
               >
                 {picking && isEarned ? (
-                  <WearTile title={title} picking={picking} />
+                  // Tapping the tile wears it, so how it was earned needs a way
+                  // in of its own: the ⓘ badge on its corner. A sibling of the
+                  // form rather than inside it, since a label can't sit inside
+                  // a button.
+                  <div mix={wearRowStyle}>
+                    <WearTile title={title} picking={picking} />
+                    <ToggleLabel
+                      for={modalId}
+                      class="credit-info"
+                      aria-label={`How you earned ${title.word}`}
+                    >
+                      <span aria-hidden="true">i</span>
+                    </ToggleLabel>
+                    <CreditModal id={modalId} title={title} earned current={current} />
+                  </div>
                 ) : (
                   <>
                     <ToggleLabel for={modalId} class="credit-tile">
@@ -191,23 +271,7 @@ export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[];
                         {!isEarned && current != null && <ProgressBar current={current} goal={title.goal} />}
                       </span>
                     </ToggleLabel>
-                    <Modal id={modalId} title={title.word} small>
-                      <p mix={css({ margin: '0 0 12px' })}>{title.requirement}.</p>
-                      {isEarned ? (
-                        <p mix={css({ margin: 0, color: 'var(--success)', fontWeight: 700 })}>✓ Earned</p>
-                      ) : current != null ? (
-                        <>
-                          <ProgressBar current={current} goal={title.goal} />
-                          <p mix={css({ margin: '6px 0 0', fontSize: '13px', color: 'var(--muted)' })}>
-                            {Math.min(current, title.goal)} of {title.goal} so far
-                          </p>
-                        </>
-                      ) : (
-                        <p mix={css({ margin: 0, fontSize: '13px', color: 'var(--muted)' })}>
-                          Not earned yet
-                        </p>
-                      )}
-                    </Modal>
+                    <CreditModal id={modalId} title={title} earned={isEarned} current={current} />
                   </>
                 )}
               </li>

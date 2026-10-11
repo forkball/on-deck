@@ -102,6 +102,17 @@
   padding: 0;
 }
 
+/* An earned tile's ⓘ badge, which opens how it was earned: sized and placed
+   on the tile's corner by credit-tiles.tsx. Its centring is here because
+   Doodle's unlayered `label { display: inline-block; padding }` would beat a
+   css() rule and leave the "i" off centre in its circle. */
+.doodle label.credit-info {
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* The wordmark as a torn ticket stub: soft gold, blue type, notched at both
    ends and set a little off square. The mask cuts the notches, so the shape
    holds whatever the text's width. Here because `.doodle a` sets the colour
