@@ -189,7 +189,12 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
               idPrefix="user-profile"
               active={activeTab!}
               extraTabs={[
-                { id: TITLES_TAB, label: 'Titles', panel: <CreditGroups credits={credits ?? []} /> },
+                {
+                  id: TITLES_TAB,
+                  label: 'Titles',
+                  end: true,
+                  panel: <CreditGroups credits={credits ?? []} />,
+                },
               ]}
               panels={Object.fromEntries(
                 ACTIVE_MEDIA_TYPES.map((type) => {

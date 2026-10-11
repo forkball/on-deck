@@ -21,6 +21,9 @@ export interface TabDefinition {
   id: string
   label: string
   panel: RemixNode
+  // At the far end of the bar rather than after the tab before it — for a tab
+  // that isn't one of a set, like a profile's Titles beside its media types.
+  end?: boolean
 }
 
 export interface TabsProps {
@@ -106,7 +109,12 @@ export function Tabs(handle: Handle<TabsProps>) {
           })}
         >
           {tabs.map((tab) => (
-            <label key={tab.id} for={`${idPrefix}-tab-${tab.id}`} class="tap-area">
+            <label
+              key={tab.id}
+              for={`${idPrefix}-tab-${tab.id}`}
+              class="tap-area"
+              mix={tab.end ? css({ marginLeft: 'auto' }) : undefined}
+            >
               {tab.label}
             </label>
           ))}
