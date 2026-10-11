@@ -113,9 +113,7 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
             disabled={submitting}
             mix={css({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' })}
           >
-            {submitting && (
-              <Spinner />
-            )}
+            {submitting && <Spinner />}
             {submitting ? 'Searching…' : 'Search'}
           </Button>
         </form>

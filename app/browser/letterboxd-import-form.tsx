@@ -267,9 +267,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
                 gap: space[2],
               })}
             >
-              {submitting && (
-                <Spinner />
-              )}
+              {submitting && <Spinner />}
               {submitting ? 'Importing…' : 'Upload and import'}
             </Button>
           </div>
