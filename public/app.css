@@ -97,7 +97,7 @@
 /* A credit tile (credit-tiles.tsx): the whole tile is the label that opens
    its modal, so it has to fill its grid cell rather than sit inline with
    Doodle's label padding around it. */
-.doodle label.title-tile {
+.doodle label.credit-tile {
   display: block;
   padding: 0;
 }

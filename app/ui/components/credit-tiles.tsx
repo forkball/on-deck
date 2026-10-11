@@ -92,7 +92,7 @@ export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[] 
               // Not a list-item: DoodleCSS gives every <li> a "* " marker,
               // unlayered, which beside a tile reads as a stray asterisk.
               <li key={title.key} mix={css({ display: 'block' })}>
-                <ToggleLabel for={modalId} class="title-tile">
+                <ToggleLabel for={modalId} class="credit-tile">
                   <span mix={[tileStyle, isEarned ? earnedStyle : lockedStyle]}>
                     <span>
                       {isEarned && <span aria-label="Earned">✓ </span>}

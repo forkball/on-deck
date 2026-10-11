@@ -38,8 +38,9 @@ function WordPicker(
   }
 }
 
-// The settings pane for titles: the two pickers, then every word there is. Each
-// achievement earns one word; adjectives go first and nouns second.
+// The settings pane for titles: a genre picker and a role picker over the
+// credits you've earned, then every credit there is with your progress on each.
+// Always has something to pick from, since everyone holds the starter credits.
 export function Titles(handle: Handle<TitlesProps>) {
   return () => {
     const { progress, unlocked, adjective, noun } = handle.props
@@ -57,39 +58,35 @@ export function Titles(handle: Handle<TitlesProps>) {
             <>
               You're wearing <strong>{current}</strong>. It shows under your name on your profile.
             </>
-          ) : earnedAdjectives.length + earnedNouns.length > 0 ? (
-            'Pick a genre and a role from the credits you have earned.'
           ) : (
-            'Every achievement earns you a credit — a genre or a role, the two halves of your title. Log something to earn your first.'
+            'Pick a genre and a role from the credits you have earned.'
           )}
         </p>
 
-        {earnedAdjectives.length + earnedNouns.length > 0 && (
-          <form
-            method="post"
-            action={routes.profile.title.href()}
-            mix={css({
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'flex-end',
-              gap: '12px',
-              marginBottom: '32px',
-            })}
-          >
-            <WordPicker
-              label={PART_NAMES.adjective.one}
-              name="adjective"
-              earned={earnedAdjectives}
-              selected={adjective}
-            />
-            <WordPicker label={PART_NAMES.noun.one} name="noun" earned={earnedNouns} selected={noun} />
-            <div>
-              <Button type="submit" variant="primary">
-                Wear this title
-              </Button>
-            </div>
-          </form>
-        )}
+        <form
+          method="post"
+          action={routes.profile.title.href()}
+          mix={css({
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'flex-end',
+            gap: '12px',
+            marginBottom: '32px',
+          })}
+        >
+          <WordPicker
+            label={PART_NAMES.adjective.one}
+            name="adjective"
+            earned={earnedAdjectives}
+            selected={adjective}
+          />
+          <WordPicker label={PART_NAMES.noun.one} name="noun" earned={earnedNouns} selected={noun} />
+          <div>
+            <Button type="submit" variant="primary">
+              Wear this title
+            </Button>
+          </div>
+        </form>
 
         <CreditTiles
           heading={PART_NAMES.adjective.many}

@@ -18,12 +18,13 @@ import {
 } from '../../data/follows.ts'
 import { loadMediaSummaries } from '../../data/mediaSummary.ts'
 import { users, type User } from '../../data/schema.ts'
+import { checkTitleUnlocksQuietly, loadUnlockedTitleKeys } from '../../data/profileTitles/unlocks.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, searchUsers } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { checkTitleUnlocksQuietly, loadUnlockedTitleKeys } from '../../data/profileTitles/unlocks.ts'
 import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
+import { titleSettingsHref } from '../profile/edit/page.tsx'
 import { UserSearchPage } from './search-page.tsx'
 import { UserCreditsPage } from './credits-page.tsx'
 import { UserProfilePage } from './show-page.tsx'
@@ -186,7 +187,7 @@ export default createController(routes.users, {
 
       const userId = Number(context.params.userId)
       if (userId === auth.identity.id) {
-        return redirect(`${routes.profile.edit.index.href()}?tab=titles`, 303)
+        return redirect(titleSettingsHref(), 303)
       }
 
       const db = context.get(Database)

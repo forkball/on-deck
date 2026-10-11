@@ -37,6 +37,12 @@ export const PROFILE_TABS = {
 
 export type ProfileTab = (typeof PROFILE_TABS)[keyof typeof PROFILE_TABS]
 
+// Where your own credits and title live. Linked from the profile, the unlock
+// notification and your own credits page, so spelled once.
+export function titleSettingsHref(): string {
+  return `${routes.profile.edit.index.href()}?tab=${PROFILE_TABS.titles}`
+}
+
 export interface ProfileEditPageProps {
   // What to put back in the inputs: the stored row on a first load, whatever
   // was typed on a rejected submit.

@@ -12,19 +12,19 @@ export interface NotificationsPageProps {
   displayName: string
 }
 
-// The word each achievement unlocked, joined into one line.
+// The credits a notification announces. One says whether it's a genre or a
+// role; several are grouped that way, since a first visit can unlock a whole
+// log's worth at once.
 function unlockedLine(notification: NotificationSummary) {
   const titles = notification.unlockedTitles.flatMap((key) => {
     const title = titleByKey(key)
     return title ? [title] : []
   })
-  // One credit says which half it is. Several are grouped by half, since a
-  // first visit can unlock a whole log's worth at once.
-  if (titles.length === 1) {
-    const [title] = titles
+  const [only] = titles
+  if (titles.length === 1 && only) {
     return (
       <>
-        You earned a new {PART_NAMES[title!.part].one.toLowerCase()}: <strong>{title!.word}</strong>
+        You earned a new {PART_NAMES[only.part].one.toLowerCase()}: <strong>{only.word}</strong>
       </>
     )
   }
@@ -63,7 +63,7 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
       <Page heading="Notifications" displayName={displayName}>
         {notifications.length === 0 ? (
           <p>
-            Nothing yet — you'll hear about it here when you earn a new title, when someone follows you, or
+            Nothing yet — you'll hear about it here when you earn a new credit, when someone follows you, or
             when someone you follow (and who follows you back) runs a group recommendation with you in it.
           </p>
         ) : (

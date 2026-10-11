@@ -266,8 +266,9 @@ export default createController(routes.profile.imports, {
       // Saving twice would re-upsert every row over the log it just wrote.
       if (batch.status !== 'review') return backToReview(batch)
 
-      await saveBatch(context.get(Database), batch)
-      await checkTitleUnlocksQuietly(context.get(Database), batch.user_id)
+      const db = context.get(Database)
+      await saveBatch(db, batch)
+      await checkTitleUnlocksQuietly(db, batch.user_id)
       return backToReview(batch)
     },
 

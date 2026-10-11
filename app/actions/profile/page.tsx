@@ -18,7 +18,7 @@ import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
-import { PROFILE_TABS } from './edit/page.tsx'
+import { PROFILE_TABS, titleSettingsHref } from './edit/page.tsx'
 import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
@@ -289,11 +289,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
         ) : saved ? (
           <Toast message="Saved." />
         ) : null}
-        <UserTitle
-          title={title}
-          href={`${routes.profile.edit.index.href()}?tab=${PROFILE_TABS.titles}`}
-          fallback="Earn yourself a title →"
-        />
+        <UserTitle title={title} href={titleSettingsHref()} fallback="Earn yourself a title →" />
         <p mix={css({ margin: '-8px 0 16px', color: 'var(--soft)' })}>
           <Link href={routes.profile.following.href()}>{followingCount} following</Link> ·{' '}
           <Link href={routes.profile.followers.href()}>

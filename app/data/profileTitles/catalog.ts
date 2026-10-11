@@ -1,14 +1,14 @@
-// The titles a member can earn, and what earns each one.
+// The credits a member can earn, and what earns each one.
 //
-// A title is two words worn together — an adjective and a noun, "Art House
-// Projectionist". Every achievement here earns exactly one word, either an
-// adjective (the first word) or a noun (the second). The two are chosen
-// separately in settings, from whatever of each has been earned, so watching
-// obscure films gets you "Art House" and a hundred films gets you
-// "Projectionist".
+// A title is two words worn together: a genre and a role, "Art House
+// Projectionist". Every achievement here earns exactly one word — a credit, as
+// in a film's — which is either a genre (an adjective, the first word) or a
+// role (a noun, the second). The two are chosen separately in settings from
+// whatever of each has been earned, so watching obscure films gets you "Art
+// House" and a hundred films gets you "Projectionist".
 //
-// On the site each word is a "credit", as in a film's: the thing you're
-// credited with. "Title word" was the working name and read like one.
+// In code a credit is a TitleDefinition and its key is a "title key", which is
+// what user_titles stores; "credit", "genre" and "role" are the site's words.
 //
 // Every word is meant to be a joke about watching, reading or playing things —
 // they're worn in public, under your name, so nothing a member would mind

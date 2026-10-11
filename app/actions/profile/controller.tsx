@@ -42,6 +42,7 @@ import { routes } from '../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
 import { parseInteractionStatus } from '../../interactionStatus.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
+import { titleSettingsHref } from './edit/page.tsx'
 import { ProfilePage } from './page.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
 import { safeReturnPath } from '../../ui/backLink.ts'
@@ -120,7 +121,7 @@ export default createController(routes.profile, {
       if (!choice) return new Response("You haven't earned that title.", { status: 400 })
 
       await chooseTitle(db, auth.identity.id, choice)
-      return redirect(`${routes.profile.edit.index.href()}?tab=titles&titleSaved=1`, 303)
+      return redirect(`${titleSettingsHref()}&titleSaved=1`, 303)
     },
 
     async settings(context) {
