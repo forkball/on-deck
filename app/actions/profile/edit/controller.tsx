@@ -26,7 +26,7 @@ import { verifyPassword } from '../../auth/password.ts'
 import { profileSettingsFor } from '../../../data/recommendations/tasteProfile.ts'
 import type { ConnectionsProps } from './connections.tsx'
 import type { TitlesProps } from './titles.tsx'
-import { PROFILE_TABS, ProfileEditPage, type ProfileTab } from './page.tsx'
+import { PROFILE_TABS, ProfileEditPage, titleSettingsHref, type ProfileTab } from './page.tsx'
 
 const profileSchema = f.object({
   email: f.field(emailSchema),
@@ -81,7 +81,13 @@ async function connectionsFor(db: Db, identity: User, url: URL): Promise<Connect
 // since the last check.
 async function titlesFor(db: Db, identity: User): Promise<TitlesProps> {
   const { progress, unlocked } = await checkTitleUnlocks(db, identity.id)
-  return { progress, unlocked, ...(await loadWornTitle(db, identity.id)), isAdmin: identity.is_admin }
+  return {
+    progress,
+    unlocked,
+    ...(await loadWornTitle(db, identity.id)),
+    returnTo: titleSettingsHref(),
+    isAdmin: identity.is_admin,
+  }
 }
 
 // Which pane to open on. Read off the query string the other actions redirect

@@ -2,8 +2,9 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { PART_NAMES, type TitleDefinition } from '../../data/profileTitles/catalog.ts'
+import { routes } from '../../routes.ts'
 import { Modal } from './modal.tsx'
-import { ToggleLabel } from '../shared/form-controls.tsx'
+import { Button, ToggleLabel } from '../shared/form-controls.tsx'
 
 export interface Credit {
   title: TitleDefinition
@@ -12,6 +13,14 @@ export interface Credit {
   // page it would read out their counts — how many things they've disliked,
   // say — which is more than their title chose to say.
   current?: number
+}
+
+// Set where the tiles are your own and tapping an earned one should put it on:
+// what you wear now, and where to come back to afterwards.
+export interface Picking {
+  adjective: string | null
+  noun: string | null
+  returnTo: string
 }
 
 const listStyle = css({
@@ -57,6 +66,54 @@ const lockedStyle = css({ borderStyle: 'dashed', color: 'var(--muted)' })
 
 const earnedStyle = css({ borderLeft: '4px solid var(--accent)', background: 'var(--paper-tint)' })
 
+// The one you're wearing: filled, so it stands out from the earned ones round it.
+const wornStyle = css({
+  borderColor: 'var(--accent)',
+  background: 'var(--accent)',
+  color: 'var(--paper)',
+  '&:hover': { borderColor: 'var(--accent)' },
+})
+
+const tileButtonStyle = css({ display: 'block', width: '100%' })
+
+// An earned tile you can wear: a form of its own posting the whole pair — this
+// word in its slot, whatever you wear in the other — so the action is the same
+// one, checked the same way, as when the pair came from two dropdowns. Tapping
+// the one you're wearing takes it off.
+function WearTile(handle: Handle<{ title: TitleDefinition; picking: Picking }>) {
+  return () => {
+    const { title, picking } = handle.props
+    const slot = title.part
+    const worn = picking[slot] === title.key
+    const next = { ...picking, [slot]: worn ? null : title.key }
+    const slotName = PART_NAMES[slot].one.toLowerCase()
+
+    return (
+      <form method="post" action={routes.profile.title.href()}>
+        <input type="hidden" name="adjective" value={next.adjective ?? ''} />
+        <input type="hidden" name="noun" value={next.noun ?? ''} />
+        <input type="hidden" name="return_to" value={picking.returnTo} />
+        <Button
+          type="submit"
+          variant="plain"
+          aria-pressed={worn ? 'true' : 'false'}
+          title={
+            worn ? `Take off ${title.word}` : `Wear ${title.word} as your ${slotName} — ${title.requirement}`
+          }
+          mix={tileButtonStyle}
+        >
+          <span mix={[tileStyle, earnedStyle, worn ? wornStyle : undefined]}>
+            <span mix={wordStyle}>
+              <span aria-hidden="true">{worn ? '● ' : '✓ '}</span>
+              {title.word}
+            </span>
+          </span>
+        </Button>
+      </form>
+    )
+  }
+}
+
 const barStyle = css({
   display: 'block',
   height: '4px',
@@ -85,14 +142,14 @@ function ProgressBar(handle: Handle<{ current: number; goal: number }>) {
 
 // One kind of credit, every one there is, as tiles carrying just the word. A
 // tap opens a small modal saying what earns it and, on your own, how close you
-// are — the list is for browsing the words, and thirty sentences at once buried
+// are — or, with `picking`, puts an earned one on — the list is for browsing the words, and thirty sentences at once buried
 // them. Shared by the settings tab and the Titles tab on both profiles.
 //
 // Showing words before they're earned is deliberate: "Jump-Scared" is a better
 // reason to watch ten horror films than a padlock is.
-export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[] }>) {
+export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[]; picking?: Picking }>) {
   return () => {
-    const { heading, credits } = handle.props
+    const { heading, credits, picking } = handle.props
     const earnedCount = credits.filter((credit) => credit.earned).length
 
     return (
@@ -110,30 +167,38 @@ export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[] 
               // Not a list-item: DoodleCSS gives every <li> a "* " marker,
               // unlayered, which beside a tile reads as a stray asterisk.
               <li key={title.key} mix={css({ display: 'block' })}>
-                <ToggleLabel for={modalId} class="credit-tile">
-                  <span mix={[tileStyle, isEarned ? earnedStyle : lockedStyle]}>
-                    <span mix={wordStyle} title={title.word}>
-                      {isEarned && <span aria-label="Earned">✓ </span>}
-                      {title.word}
-                    </span>
-                    {!isEarned && current != null && <ProgressBar current={current} goal={title.goal} />}
-                  </span>
-                </ToggleLabel>
-                <Modal id={modalId} title={title.word} small>
-                  <p mix={css({ margin: '0 0 12px' })}>{title.requirement}.</p>
-                  {isEarned ? (
-                    <p mix={css({ margin: 0, color: 'var(--success)', fontWeight: 700 })}>✓ Earned</p>
-                  ) : current != null ? (
-                    <>
-                      <ProgressBar current={current} goal={title.goal} />
-                      <p mix={css({ margin: '6px 0 0', fontSize: '13px', color: 'var(--muted)' })}>
-                        {Math.min(current, title.goal)} of {title.goal} so far
-                      </p>
-                    </>
-                  ) : (
-                    <p mix={css({ margin: 0, fontSize: '13px', color: 'var(--muted)' })}>Not earned yet</p>
-                  )}
-                </Modal>
+                {picking && isEarned ? (
+                  <WearTile title={title} picking={picking} />
+                ) : (
+                  <>
+                    <ToggleLabel for={modalId} class="credit-tile">
+                      <span mix={[tileStyle, isEarned ? earnedStyle : lockedStyle]}>
+                        <span mix={wordStyle} title={title.word}>
+                          {isEarned && <span aria-label="Earned">✓ </span>}
+                          {title.word}
+                        </span>
+                        {!isEarned && current != null && <ProgressBar current={current} goal={title.goal} />}
+                      </span>
+                    </ToggleLabel>
+                    <Modal id={modalId} title={title.word} small>
+                      <p mix={css({ margin: '0 0 12px' })}>{title.requirement}.</p>
+                      {isEarned ? (
+                        <p mix={css({ margin: 0, color: 'var(--success)', fontWeight: 700 })}>✓ Earned</p>
+                      ) : current != null ? (
+                        <>
+                          <ProgressBar current={current} goal={title.goal} />
+                          <p mix={css({ margin: '6px 0 0', fontSize: '13px', color: 'var(--muted)' })}>
+                            {Math.min(current, title.goal)} of {title.goal} so far
+                          </p>
+                        </>
+                      ) : (
+                        <p mix={css({ margin: 0, fontSize: '13px', color: 'var(--muted)' })}>
+                          Not earned yet
+                        </p>
+                      )}
+                    </Modal>
+                  </>
+                )}
               </li>
             )
           })}
@@ -145,18 +210,20 @@ export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[] 
 
 // Every credit there is, as genres then roles — what the Titles tab on a profile
 // and in settings both show.
-export function CreditGroups(handle: Handle<{ credits: Credit[] }>) {
+export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picking }>) {
   return () => {
-    const { credits } = handle.props
+    const { credits, picking } = handle.props
     return (
       <>
         <CreditTiles
           heading={PART_NAMES.adjective.many}
           credits={credits.filter((credit) => credit.title.part === 'adjective')}
+          picking={picking}
         />
         <CreditTiles
           heading={PART_NAMES.noun.many}
           credits={credits.filter((credit) => credit.title.part === 'noun')}
+          picking={picking}
         />
       </>
     )

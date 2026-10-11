@@ -110,6 +110,8 @@ export default createController(routes.profile, {
           waitingImports={waitingImports}
           displayName={displayLabel(auth.identity)}
           title={composeTitle(worn.adjective, worn.noun)}
+          worn={worn}
+          titleSaved={context.url.searchParams.get('titleSaved') === '1'}
           credits={(check?.progress ?? []).map(({ title, current }) => ({
             title,
             earned: check?.unlocked.has(title.key) ?? false,
@@ -131,7 +133,10 @@ export default createController(routes.profile, {
       if (!choice) return new Response("You haven't earned that title.", { status: 400 })
 
       await chooseTitle(db, auth.identity.id, choice)
-      return redirect(`${titleSettingsHref()}&titleSaved=1`, 303)
+      // Back to whichever Titles tab the tap came from — settings or your own
+      // profile — with the toast that says it took.
+      const back = safeReturnPath(String(formData.get('return_to') ?? '')) ?? titleSettingsHref()
+      return redirect(`${back}${back.includes('?') ? '&' : '?'}titleSaved=1`, 303)
     },
 
     async settings(context) {
