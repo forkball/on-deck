@@ -1,10 +1,10 @@
 // The titles a member can earn, and what earns each one.
 //
-// A title is two words worn together — an adjective and a noun, "Art House Ho" —
-// and every entry here grants one of each. The two halves are chosen separately in
-// settings, so someone with "Art House" and "Couch Potato" can be an Art House Couch
-// Potato. Granting a pair rather than a single word is what keeps every unlock usable
-// in either slot without anyone ending up as "Ho Art House".
+// A title is two words worn together — an adjective and a noun, "Art House Ho".
+// Every achievement here earns exactly one word, either an adjective (the first
+// word) or a noun (the second). The two are chosen separately in settings, from
+// whatever of each has been earned, so watching obscure films gets you "Art
+// House" and a lot of films gets you "Ho", and together you are an Art House Ho.
 //
 // Database-free, and importing nothing, so the rules are tested directly — the
 // same reason classify.ts and exclusions.ts are. unlocks.ts gathers the stats and
@@ -38,10 +38,13 @@ export interface TitleStats {
   luckyRuns: number
 }
 
+// Which slot a word goes in: adjectives are the first word, nouns the second.
+export type TitlePart = 'adjective' | 'noun'
+
 export interface TitleDefinition {
   key: string
-  adjective: string
-  noun: string
+  word: string
+  part: TitlePart
   // How to earn it, as the settings page says it to someone who hasn't yet.
   requirement: string
   goal: number
@@ -72,157 +75,173 @@ function obscureFilms(stats: TitleStats): number {
   ).length
 }
 
-// In the order the settings page lists them: the first one most people earn
-// first, then taste, then volume, then habits, then the social ones.
+// In the order the settings page lists each part's words: the ones most people
+// earn first, then taste, then volume, then habits, then the social ones.
 export const TITLES: readonly TitleDefinition[] = [
   {
     key: 'rookie',
-    adjective: 'Fresh',
-    noun: 'Rookie',
+    word: 'Rookie',
+    part: 'noun',
     requirement: 'Finish your first anything',
     goal: 1,
     measure: (stats) => stats.consumed.length,
   },
   {
+    key: 'opinionated',
+    word: 'Opinionated',
+    part: 'adjective',
+    requirement: 'Rate your first anything',
+    goal: 1,
+    measure: (stats) => stats.rated,
+  },
+  {
     key: 'art_house',
-    adjective: 'Art House',
-    noun: 'Ho',
+    word: 'Art House',
+    part: 'adjective',
     requirement: 'Watch 10 films hardly anyone else has looked up',
     goal: 10,
     measure: obscureFilms,
   },
   {
     key: 'horror',
-    adjective: 'Spooky',
-    noun: 'Gorehound',
+    word: 'Spooky',
+    part: 'adjective',
     requirement: 'Finish 10 horror films, shows or books',
     goal: 10,
     measure: (stats) => consumedTagged(stats, 'horror'),
   },
   {
     key: 'sci_fi',
-    adjective: 'Cosmic',
-    noun: 'Space Cadet',
+    word: 'Cosmic',
+    part: 'adjective',
     requirement: 'Finish 10 science fiction anythings',
     goal: 10,
     measure: (stats) => consumedTagged(stats, 'science fiction', 'sci-fi & fantasy'),
   },
   {
     key: 'fantasy',
-    adjective: 'Enchanted',
-    noun: 'Wizard',
+    word: 'Enchanted',
+    part: 'adjective',
     requirement: 'Finish 10 fantasy anythings',
     goal: 10,
     measure: (stats) => consumedTagged(stats, 'fantasy', 'sci-fi & fantasy'),
   },
   {
     key: 'documentary',
-    adjective: 'Factual',
-    noun: 'Know-It-All',
+    word: 'Factual',
+    part: 'adjective',
     requirement: 'Watch 10 documentaries',
     goal: 10,
     measure: (stats) => consumedTagged(stats, 'documentary'),
   },
   {
     key: 'animation',
-    adjective: 'Animated',
-    noun: 'Toon Fiend',
+    word: 'Animated',
+    part: 'adjective',
     requirement: 'Watch 10 animated films or shows',
     goal: 10,
     measure: (stats) => consumedTagged(stats, 'animation'),
   },
   {
     key: 'romance',
-    adjective: 'Swooning',
-    noun: 'Romantic',
+    word: 'Swooning',
+    part: 'adjective',
     requirement: 'Finish 10 romances',
     goal: 10,
     measure: (stats) => consumedTagged(stats, 'romance'),
   },
   {
     key: 'comedy',
-    adjective: 'Giggling',
-    noun: 'Clown',
+    word: 'Giggly',
+    part: 'adjective',
     requirement: 'Watch 15 comedies',
     goal: 15,
     measure: (stats) => consumedTagged(stats, 'comedy'),
   },
   {
     key: 'mystery',
-    adjective: 'Shifty',
-    noun: 'Sleuth',
+    word: 'Shifty',
+    part: 'adjective',
     requirement: 'Finish 15 mysteries or crime stories',
     goal: 15,
     measure: (stats) => consumedTagged(stats, 'mystery', 'crime'),
   },
   {
     key: 'western',
-    adjective: 'Dusty',
-    noun: 'Cowpoke',
+    word: 'Dusty',
+    part: 'adjective',
     requirement: 'Watch 5 westerns',
     goal: 5,
     measure: (stats) => consumedTagged(stats, 'western'),
   },
   {
     key: 'rpg',
-    adjective: 'Questing',
-    noun: 'Adventurer',
+    word: 'Adventurer',
+    part: 'noun',
     requirement: 'Play 10 role-playing games',
     goal: 10,
     measure: (stats) => consumedTagged(stats, 'role-playing (rpg)'),
   },
   {
     key: 'shooter',
-    adjective: 'Trigger-Happy',
-    noun: 'Sharpshooter',
+    word: 'Trigger-Happy',
+    part: 'adjective',
     requirement: 'Play 10 shooters',
     goal: 10,
     measure: (stats) => consumedTagged(stats, 'shooter'),
   },
   {
     key: 'cinephile',
-    adjective: 'Cinematic',
-    noun: 'Cinephile',
+    word: 'Cinephile',
+    part: 'noun',
     requirement: 'Watch 50 films',
     goal: 50,
     measure: (stats) => consumedOfType(stats, 'movie'),
   },
   {
+    key: 'ho',
+    word: 'Ho',
+    part: 'noun',
+    requirement: 'Watch 100 films',
+    goal: 100,
+    measure: (stats) => consumedOfType(stats, 'movie'),
+  },
+  {
     key: 'film_freak',
-    adjective: 'Reel-Obsessed',
-    noun: 'Film Freak',
+    word: 'Film Freak',
+    part: 'noun',
     requirement: 'Watch 250 films',
     goal: 250,
     measure: (stats) => consumedOfType(stats, 'movie'),
   },
   {
     key: 'couch_potato',
-    adjective: 'Bingeing',
-    noun: 'Couch Potato',
+    word: 'Couch Potato',
+    part: 'noun',
     requirement: 'Finish 20 shows',
     goal: 20,
     measure: (stats) => consumedOfType(stats, 'tv'),
   },
   {
     key: 'bookworm',
-    adjective: 'Well-Read',
-    noun: 'Bookworm',
+    word: 'Bookworm',
+    part: 'noun',
     requirement: 'Read 25 books',
     goal: 25,
     measure: (stats) => consumedOfType(stats, 'book'),
   },
   {
     key: 'gamer',
-    adjective: 'Button-Mashing',
-    noun: 'Gamer',
+    word: 'Gamer',
+    part: 'noun',
     requirement: 'Play 25 games',
     goal: 25,
     measure: (stats) => consumedOfType(stats, 'game'),
   },
   {
     key: 'polymath',
-    adjective: 'Omnivorous',
-    noun: 'Polymath',
+    word: 'Polymath',
+    part: 'noun',
     requirement: 'Finish 5 each of films, shows, books and games',
     goal: 5,
     measure: (stats) =>
@@ -230,88 +249,88 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'critic',
-    adjective: 'Discerning',
-    noun: 'Critic',
+    word: 'Critic',
+    part: 'noun',
     requirement: 'Rate 50 things',
     goal: 50,
     measure: (stats) => stats.rated,
   },
   {
     key: 'superfan',
-    adjective: 'Gushing',
-    noun: 'Superfan',
+    word: 'Superfan',
+    part: 'noun',
     requirement: 'Give 25 things five stars',
     goal: 25,
     measure: (stats) => stats.topRated,
   },
   {
-    key: 'hater',
-    adjective: 'Salty',
-    noun: 'Hater',
+    key: 'salty',
+    word: 'Salty',
+    part: 'adjective',
     requirement: 'Mark 10 things as disliked',
     goal: 10,
     measure: (stats) => stats.disliked,
   },
   {
-    key: 'diarist',
-    adjective: 'Verbose',
-    noun: 'Diarist',
+    key: 'verbose',
+    word: 'Verbose',
+    part: 'adjective',
     requirement: 'Write notes on 20 things',
     goal: 20,
     measure: (stats) => stats.withNotes,
   },
   {
     key: 'hoarder',
-    adjective: 'Aspirational',
-    noun: 'Hoarder',
+    word: 'Hoarder',
+    part: 'noun',
     requirement: 'Have 30 things on your want-to list',
     goal: 30,
     measure: (stats) => stats.wantToConsume,
   },
   {
-    key: 'gatekeeper',
-    adjective: 'Picky',
-    noun: 'Gatekeeper',
+    key: 'picky',
+    word: 'Picky',
+    part: 'adjective',
     requirement: 'Turn down 20 things as not interested',
     goal: 20,
     measure: (stats) => stats.notInterested,
   },
   {
     key: 'archivist',
-    adjective: 'Archival',
-    noun: 'Archivist',
+    word: 'Archivist',
+    part: 'noun',
     requirement: 'Bring 100 entries in from an import or a connected account',
     goal: 100,
     measure: (stats) => stats.imported,
   },
   {
-    key: 'seeker',
-    adjective: 'Curious',
-    noun: 'Seeker',
+    key: 'curious',
+    word: 'Curious',
+    part: 'adjective',
     requirement: 'Get recommendations for films, shows, books and games',
     goal: 4,
     measure: (stats) => new Set(stats.recommendedTypes).size,
   },
   {
-    key: 'gambler',
-    adjective: 'Lucky',
-    noun: 'Gambler',
+    key: 'lucky',
+    word: 'Lucky',
+    part: 'adjective',
     requirement: "Draw a day's lucky pick",
     goal: 1,
     measure: (stats) => stats.luckyRuns,
   },
   {
-    key: 'lurker',
-    adjective: 'Nosy',
-    noun: 'Lurker',
+    key: 'nosy',
+    word: 'Nosy',
+    part: 'adjective',
     requirement: 'Follow 10 people',
     goal: 10,
     measure: (stats) => stats.following,
   },
   {
-    key: 'influencer',
-    adjective: 'Popular',
-    noun: 'Influencer',
+    key: 'popular',
+    word: 'Popular',
+    part: 'adjective',
     requirement: 'Be followed by 10 people',
     goal: 10,
     measure: (stats) => stats.followers,
@@ -343,6 +362,16 @@ export function earnedTitleKeys(stats: TitleStats): string[] {
     .map((progress) => progress.title.key)
 }
 
+export function titlesOfPart(part: TitlePart): TitleDefinition[] {
+  return TITLES.filter((title) => title.part === part)
+}
+
+// A key, if it names a word of this part — an adjective key is no noun.
+function wordOf(key: string | null | undefined, part: TitlePart): string | undefined {
+  const title = titleByKey(key)
+  return title?.part === part ? title.word : undefined
+}
+
 // What a member is called, from the two keys they chose. Either half may be
 // unset — someone can wear just a noun — and a key no longer in the catalog
 // reads as unset rather than as a blank word.
@@ -350,26 +379,27 @@ export function composeTitle(
   adjectiveKey: string | null | undefined,
   nounKey: string | null | undefined,
 ): string | null {
-  const words = [titleByKey(adjectiveKey)?.adjective, titleByKey(nounKey)?.noun].filter(
+  const words = [wordOf(adjectiveKey, 'adjective'), wordOf(nounKey, 'noun')].filter(
     (word): word is string => word != null,
   )
   return words.length > 0 ? words.join(' ') : null
 }
 
 // A choice from the settings form, checked against what has been unlocked. An
-// empty value clears that half; a key not unlocked is refused outright rather
-// than quietly dropped, since only a hand-made request could send one.
+// empty value clears that half; a key not unlocked, or in the wrong slot, is
+// refused outright rather than quietly dropped, since only a hand-made request
+// could send one.
 export function parseTitleChoice(
   raw: { adjective: string; noun: string },
   unlocked: ReadonlySet<string>,
 ): { adjective: string | null; noun: string | null } | null {
-  const pick = (value: string): string | null | undefined => {
+  const pick = (value: string, part: TitlePart): string | null | undefined => {
     const key = value.trim()
     if (key === '') return null
-    return unlocked.has(key) && TITLES_BY_KEY.has(key) ? key : undefined
+    return unlocked.has(key) && wordOf(key, part) != null ? key : undefined
   }
-  const adjective = pick(raw.adjective)
-  const noun = pick(raw.noun)
+  const adjective = pick(raw.adjective, 'adjective')
+  const noun = pick(raw.noun, 'noun')
   if (adjective === undefined || noun === undefined) return null
   return { adjective, noun }
 }

@@ -38,14 +38,72 @@ const earnedStyle = css({ borderLeft: '4px solid var(--accent)', background: 'va
 
 const metaStyle = css({ fontSize: '12px', color: 'var(--muted)' })
 
-// The settings pane for titles: the two pickers, then every title there is, so
-// the ones not yet earned say what earning them takes. Showing those words
-// before they're earned is deliberate — "Gorehound" is a better reason to watch
-// ten horror films than a padlock is.
+// One kind of word, every one there is, so the ones not yet earned say what
+// earning them takes. Showing those words before they're earned is deliberate —
+// "Spooky" is a better reason to watch ten horror films than a padlock is.
+function WordList(
+  handle: Handle<{ heading: string; progress: TitleProgress[]; unlocked: ReadonlySet<string> }>,
+) {
+  return () => {
+    const { heading, progress, unlocked } = handle.props
+    const earnedCount = progress.filter((entry) => unlocked.has(entry.title.key)).length
+
+    return (
+      <>
+        <h2>
+          {heading} — earned {earnedCount} of {progress.length}
+        </h2>
+        <ul mix={listStyle}>
+          {progress.map(({ title, current }) => {
+            const isEarned = unlocked.has(title.key)
+            return (
+              <li key={title.key} mix={[itemStyle, isEarned ? earnedStyle : lockedStyle]}>
+                <strong>{title.word}</strong>
+                <span mix={css({ fontSize: '14px' })}>{title.requirement}</span>
+                <span mix={metaStyle}>
+                  {isEarned ? 'Earned' : `${Math.min(current, title.goal)} / ${title.goal}`}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      </>
+    )
+  }
+}
+
+function WordPicker(
+  handle: Handle<{ label: string; name: string; earned: TitleProgress[]; selected: string | null }>,
+) {
+  return () => {
+    const { label, name, earned, selected } = handle.props
+
+    return (
+      <Field label={label}>
+        <Select name={name}>
+          <option value="" selected={selected == null}>
+            (none)
+          </option>
+          {earned.map(({ title }) => (
+            <option key={title.key} value={title.key} selected={title.key === selected}>
+              {title.word}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    )
+  }
+}
+
+// The settings pane for titles: the two pickers, then every word there is. Each
+// achievement earns one word; adjectives go first and nouns second.
 export function Titles(handle: Handle<TitlesProps>) {
   return () => {
     const { progress, unlocked, adjective, noun } = handle.props
-    const earned = progress.filter((entry) => unlocked.has(entry.title.key))
+    const adjectives = progress.filter((entry) => entry.title.part === 'adjective')
+    const nouns = progress.filter((entry) => entry.title.part === 'noun')
+    const earnedAdjectives = adjectives.filter((entry) => unlocked.has(entry.title.key))
+    const earnedNouns = nouns.filter((entry) => unlocked.has(entry.title.key))
     const current = composeTitle(adjective, noun)
 
     return (
@@ -56,14 +114,14 @@ export function Titles(handle: Handle<TitlesProps>) {
             <>
               You're wearing <strong>{current}</strong>. It shows under your name on your profile.
             </>
-          ) : earned.length > 0 ? (
-            'Pick a first and a second word from the titles you have earned.'
+          ) : earnedAdjectives.length + earnedNouns.length > 0 ? (
+            'Pick a first and a second word from the ones you have earned.'
           ) : (
-            'Titles come from what you log and how you use On Deck. Log something to earn your first.'
+            'Every achievement earns a word for your title. Log something to earn your first.'
           )}
         </p>
 
-        {earned.length > 0 && (
+        {earnedAdjectives.length + earnedNouns.length > 0 && (
           <form
             method="post"
             action={routes.profile.title.href()}
@@ -75,30 +133,8 @@ export function Titles(handle: Handle<TitlesProps>) {
               marginBottom: '32px',
             })}
           >
-            <Field label="First word">
-              <Select name="adjective">
-                <option value="" selected={adjective == null}>
-                  (none)
-                </option>
-                {earned.map(({ title }) => (
-                  <option key={title.key} value={title.key} selected={title.key === adjective}>
-                    {title.adjective}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Second word">
-              <Select name="noun">
-                <option value="" selected={noun == null}>
-                  (none)
-                </option>
-                {earned.map(({ title }) => (
-                  <option key={title.key} value={title.key} selected={title.key === noun}>
-                    {title.noun}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <WordPicker label="First word" name="adjective" earned={earnedAdjectives} selected={adjective} />
+            <WordPicker label="Second word" name="noun" earned={earnedNouns} selected={noun} />
             <div>
               <Button type="submit" variant="primary">
                 Wear this title
@@ -107,25 +143,8 @@ export function Titles(handle: Handle<TitlesProps>) {
           </form>
         )}
 
-        <h2>
-          Earned {earned.length} of {progress.length}
-        </h2>
-        <ul mix={listStyle}>
-          {progress.map(({ title, current: count }) => {
-            const isEarned = unlocked.has(title.key)
-            return (
-              <li key={title.key} mix={[itemStyle, isEarned ? earnedStyle : lockedStyle]}>
-                <strong>
-                  {title.adjective} · {title.noun}
-                </strong>
-                <span mix={css({ fontSize: '14px' })}>{title.requirement}</span>
-                <span mix={metaStyle}>
-                  {isEarned ? 'Earned' : `${Math.min(count, title.goal)} / ${title.goal}`}
-                </span>
-              </li>
-            )
-          })}
-        </ul>
+        <WordList heading="First words" progress={adjectives} unlocked={unlocked} />
+        <WordList heading="Second words" progress={nouns} unlocked={unlocked} />
       </section>
     )
   }

@@ -7,6 +7,7 @@ import {
   earnedTitleKeys,
   parseTitleChoice,
   TITLES,
+  titleByKey,
   titleProgress,
   type ConsumedEntry,
   type TitleStats,
@@ -38,10 +39,15 @@ function entries(count: number, entry: Partial<ConsumedEntry> = {}): ConsumedEnt
 }
 
 describe('title catalog', () => {
-  it('has unique keys, adjectives and nouns', () => {
+  it('earns one unique word per achievement', () => {
     assert.equal(new Set(TITLES.map((t) => t.key)).size, TITLES.length)
-    assert.equal(new Set(TITLES.map((t) => t.adjective)).size, TITLES.length)
-    assert.equal(new Set(TITLES.map((t) => t.noun)).size, TITLES.length)
+    assert.equal(new Set(TITLES.map((t) => t.word)).size, TITLES.length)
+  })
+
+  it('has first words and second words that are easy to come by', () => {
+    // Someone's first log and first rating are enough for a two-word title.
+    const easy = earnedTitleKeys(stats({ consumed: entries(1), rated: 1 }))
+    assert.deepEqual(easy.map((key) => titleByKey(key)?.part).sort(), ['adjective', 'noun'])
   })
 
   it('earns nothing for an empty account', () => {
@@ -93,16 +99,18 @@ describe('title catalog', () => {
   })
 
   it('composes a title from either half or both', () => {
-    assert.equal(composeTitle('art_house', 'art_house'), 'Art House Ho')
+    assert.equal(composeTitle('art_house', 'ho'), 'Art House Ho')
     assert.equal(composeTitle('art_house', 'couch_potato'), 'Art House Couch Potato')
     assert.equal(composeTitle(null, 'bookworm'), 'Bookworm')
     assert.equal(composeTitle('horror', null), 'Spooky')
     assert.equal(composeTitle(null, null), null)
     assert.equal(composeTitle('retired-key', null), null)
+    // A word only goes in its own slot.
+    assert.equal(composeTitle('bookworm', 'horror'), null)
   })
 
   it('only accepts titles that have been unlocked', () => {
-    const unlocked = new Set(['rookie', 'horror'])
+    const unlocked = new Set(['rookie', 'horror', 'bookworm'])
     assert.deepEqual(parseTitleChoice({ adjective: 'horror', noun: 'rookie' }, unlocked), {
       adjective: 'horror',
       noun: 'rookie',
@@ -112,6 +120,8 @@ describe('title catalog', () => {
       noun: 'rookie',
     })
     assert.equal(parseTitleChoice({ adjective: 'art_house', noun: 'rookie' }, unlocked), null)
+    // Earned, but a noun can't be worn as the first word.
+    assert.equal(parseTitleChoice({ adjective: 'bookworm', noun: 'rookie' }, unlocked), null)
   })
 })
 
@@ -155,7 +165,8 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
     await logMovies(itemIds.slice(0, 1))
     const first = await checkTitleUnlocks(db, userId)
     assert.deepEqual(first.newlyUnlocked, ['rookie'])
-    assert.deepEqual(await loadWornTitle(db, userId), { adjective: 'rookie', noun: 'rookie' })
+    // A noun alone: the first word waits for an adjective.
+    assert.deepEqual(await loadWornTitle(db, userId), { adjective: null, noun: 'rookie' })
 
     // Checking again finds nothing new and says nothing more.
     assert.deepEqual((await checkTitleUnlocks(db, userId)).newlyUnlocked, [])
@@ -164,7 +175,7 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
     const second = await checkTitleUnlocks(db, userId)
     assert.deepEqual(second.newlyUnlocked, ['art_house', 'horror'])
     // Already wearing one, so the new unlocks don't replace it.
-    assert.deepEqual(await loadWornTitle(db, userId), { adjective: 'rookie', noun: 'rookie' })
+    assert.deepEqual(await loadWornTitle(db, userId), { adjective: null, noun: 'rookie' })
 
     const notifications = await listNotifications(db, userId)
     assert.deepEqual(

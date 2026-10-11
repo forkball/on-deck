@@ -4,7 +4,7 @@ import { parseMediaMetadata } from '../mediaMetadata.ts'
 import { createTitleNotification } from '../notifications.ts'
 import { users, userTitles } from '../schema.ts'
 import { logger } from '../../log.ts'
-import { earnedTitleKeys, titleProgress, type TitleProgress, type TitleStats } from './catalog.ts'
+import { earnedTitleKeys, titleByKey, titleProgress, type TitleProgress, type TitleStats } from './catalog.ts'
 
 const log = logger('titles')
 
@@ -111,13 +111,15 @@ export async function checkTitleUnlocks(db: Db, userId: number): Promise<TitleCh
 
   if (newlyUnlocked.length > 0) {
     await createTitleNotification(db, userId, newlyUnlocked)
-    // Somebody's first title goes straight on, both halves of it: an unlock you
-    // have to go and find a setting for is easy to never see.
-    const first = newlyUnlocked[0]!
+    // Somebody's first words go straight on, each in its own slot: an unlock
+    // you have to go and find a setting for is easy to never see. Only while
+    // they wear nothing, so a title someone chose is never swapped out.
+    const firstOf = (part: 'adjective' | 'noun') =>
+      newlyUnlocked.find((key) => titleByKey(key)?.part === part) ?? null
     await pool.query(
-      `update users set title_adjective = $2, title_noun = $2
+      `update users set title_adjective = $2, title_noun = $3
         where id = $1 and title_adjective is null and title_noun is null`,
-      [userId, first],
+      [userId, firstOf('adjective'), firstOf('noun')],
     )
   }
 

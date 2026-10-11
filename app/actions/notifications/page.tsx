@@ -12,14 +12,16 @@ export interface NotificationsPageProps {
   displayName: string
 }
 
-// The words of each title unlocked, "Art House · Ho", joined into one line.
+// The word each achievement unlocked, joined into one line.
 function unlockedLine(notification: NotificationSummary) {
   const titles = notification.unlockedTitles.flatMap((key) => {
     const title = titleByKey(key)
-    return title ? [`${title.adjective} · ${title.noun}`] : []
+    return title ? [title.word] : []
   })
   const lead =
-    titles.length === 1 ? 'You unlocked a new title: ' : `You unlocked ${titles.length} new titles: `
+    titles.length === 1
+      ? 'You unlocked a new title word: '
+      : `You unlocked ${titles.length} new title words: `
   return (
     <>
       {lead}

@@ -94,8 +94,8 @@ does nothing on its own.
     confidence, conflicts, duplicates, counts — and are free of the database so
     they can be tested directly
   - `app/data/profileTitles/` — the titles a member earns ("Art House Ho"):
-    `catalog` holds every title, as an adjective and a noun worn separately, and
-    the threshold that earns it (database-free, so the rules are tested
+    `catalog` holds every achievement, the one word it earns — an adjective
+    for the first slot or a noun for the second — and the threshold that earns it (database-free, so the rules are tested
     directly); `unlocks` gathers the stats, records what they earn in
     `user_titles` and sends the unlock notification. Titles are kept once
     earned. `checkTitleUnlocksQuietly` is called after the writes that can earn
