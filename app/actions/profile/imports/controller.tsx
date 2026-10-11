@@ -26,7 +26,6 @@ import type { ImportBatch, User } from '../../../data/schema.ts'
 import { displayLabel } from '../../../data/users.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import type { ImportBatchContext, ImportRowContext } from '../../../middleware/context.ts'
-import { mediaTypeUiFor } from '../../../mediaTypes.ts'
 import { routes } from '../../../routes.ts'
 import { ImportMatchingPage } from './matching-page.tsx'
 import { ImportReviewPage } from './review-page.tsx'
@@ -270,7 +269,7 @@ export default createController(routes.profile.imports, {
     },
 
     // Abandons an import that isn't saved yet, from either the wait or the
-    // review, and lands back on the upload page for its media type.
+    // review, and lands back on the import page to pick a source again.
     async discard(context: ImportBatchContext) {
       const found = await findBatch(context)
       if (!found.ok) return found.response
@@ -281,7 +280,7 @@ export default createController(routes.profile.imports, {
         return redirect(routes.profile.imports.show.href({ batchId: batch.id }), 303)
       }
 
-      return redirect(mediaTypeUiFor(batch.media_type as MediaType).hrefs.import(), 303)
+      return redirect(routes.profile.import.href(), 303)
     },
   },
 })

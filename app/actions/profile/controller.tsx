@@ -3,7 +3,6 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { activeBatches } from '../../data/imports/batches.ts'
 import { letterboxdSyncAvailableTo } from '../../data/imports/letterboxdFeed.ts'
 import { syncLetterboxdBeforeReading } from '../../data/imports/letterboxdSync.ts'
 import {
@@ -35,7 +34,9 @@ import { routes } from '../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
 import { parseInteractionStatus } from '../../interactionStatus.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
+import { ImportPage } from './import-page.tsx'
 import { ProfilePage } from './page.tsx'
+import { loadWaitingImports } from './waiting-imports.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
 import { safeReturnPath } from '../../ui/backLink.ts'
 
@@ -52,26 +53,15 @@ export default createController(routes.profile, {
       const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
       // Only the log waits on the feed; everything else loads alongside it.
-      const [media, followingCount, followersCount, rebuildAllowance, batches] = await Promise.all([
+      const [media, followingCount, followersCount, rebuildAllowance, waitingImports] = await Promise.all([
         syncLetterboxdBeforeReading(db, auth.identity).then(() =>
           loadMediaSummaries(db, auth.identity.id, RECENT_COUNT),
         ),
         countFollowing(db, auth.identity.id),
         countFollowers(db, auth.identity.id),
         getProfileRebuildAllowance(db, auth.identity),
-        activeBatches(db, auth.identity.id),
+        loadWaitingImports(db, auth.identity.id),
       ])
-      // Unfinished imports, so there's a way back to one. Linked straight to the
-      // review page: client navigation follows the show route's redirect but
-      // leaves its URL in the address bar.
-      const waitingImports = batches.map((batch) => ({
-        href:
-          batch.status === 'review'
-            ? routes.profile.imports.review.href({ batchId: batch.id })
-            : routes.profile.imports.show.href({ batchId: batch.id }),
-        noun: mediaTypeUiFor(batch.media_type).attributive,
-        matching: batch.status === 'matching',
-      }))
 
       return context.render(
         <ProfilePage
@@ -82,16 +72,27 @@ export default createController(routes.profile, {
           followersCount={followersCount}
           saved={context.url.searchParams.get('saved') === '1'}
           settings={profileSettingsFor(auth.identity)}
-          sources={{
-            letterboxdAvailable: letterboxdSyncAvailableTo(auth.identity),
-            letterboxdConnected: auth.identity.letterboxd_username != null,
-            steamConnected: auth.identity.steam_id != null,
-          }}
           rebuildsLeft={rebuildAllowance.unlimited ? null : rebuildAllowance.remaining}
           rebuilt={context.url.searchParams.get('rebuilt') === '1'}
           rebuildError={context.url.searchParams.get('rebuildError') ?? undefined}
           waitingImports={waitingImports}
           displayName={displayLabel(auth.identity)}
+        />,
+      )
+    },
+
+    async import(context) {
+      const auth = context.get(Auth)
+
+      return context.render(
+        <ImportPage
+          displayName={displayLabel(auth.identity)}
+          sources={{
+            letterboxdAvailable: letterboxdSyncAvailableTo(auth.identity),
+            letterboxdConnected: auth.identity.letterboxd_username != null,
+            steamConnected: auth.identity.steam_id != null,
+          }}
+          waitingImports={await loadWaitingImports(context.get(Database), auth.identity.id)}
         />,
       )
     },
@@ -172,7 +173,10 @@ export default createController(routes.profile, {
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
       const mediaType = parseMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
       const status = parseInteractionStatus(context.url.searchParams.get('status'))
-      const filter = { type: mediaType, statuses: status ? [status] : undefined }
+      const filter = {
+        type: mediaType,
+        statuses: status ? [status] : undefined,
+      }
 
       await syncLetterboxdBeforeReading(db, auth.identity)
 

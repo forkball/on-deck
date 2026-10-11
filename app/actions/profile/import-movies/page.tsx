@@ -29,7 +29,11 @@ export function LetterboxdImportPage(handle: Handle<LetterboxdImportPageProps>) 
     const { displayName, error, pendingHref, syncAvailable } = handle.props
 
     return (
-      <Page heading="Import from Letterboxd" displayName={displayName}>
+      <Page
+        heading="Import from Letterboxd"
+        displayName={displayName}
+        back={{ href: routes.profile.import.href(), label: '← All imports' }}
+      >
         {pendingHref && (
           <div
             mix={css({

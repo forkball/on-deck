@@ -17,49 +17,10 @@ import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
-import { PROFILE_TABS } from './edit/page.tsx'
+import { WaitingImports, type WaitingImport } from './waiting-imports.tsx'
 import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
-
-// Whether the source behind a medium is already wired up. Two of the three
-// importers sit behind a connection, and which link to offer depends on it.
-export interface MediaSources {
-  // False when the feed is gated off this account, in which case there is no
-  // connecting to offer and the upload is the only way in.
-  letterboxdAvailable: boolean
-  letterboxdConnected: boolean
-  steamConnected: boolean
-}
-
-const CONNECTIONS_HREF = `${routes.profile.edit.index.href()}?tab=${PROFILE_TABS.connections}`
-
-// TV has no equivalent worth importing.
-//
-// The import pages backfill a history; connecting is what keeps up with one
-// afterwards. Offering the import to someone with nothing connected sends them
-// to upload a file when what they almost certainly want is to name an account —
-// which is how this link kept being the wrong door once connecting moved to
-// settings.
-function sourceLink(
-  type: ActiveMediaType,
-  sources: MediaSources,
-): { href: string; label: string } | undefined {
-  switch (type) {
-    case 'movie':
-      return sources.letterboxdAvailable && !sources.letterboxdConnected
-        ? { href: CONNECTIONS_HREF, label: 'Connect Letterboxd' }
-        : { href: routes.profile.importMovies.index.href(), label: 'Import from Letterboxd' }
-    case 'game':
-      return sources.steamConnected
-        ? { href: routes.profile.importGames.index.href(), label: 'Import from Steam' }
-        : { href: CONNECTIONS_HREF, label: 'Connect Steam' }
-    case 'book':
-      return { href: routes.profile.importBooks.index.href(), label: 'Import from Goodreads' }
-    default:
-      return undefined
-  }
-}
 
 export interface ProfilePageProps {
   // Keyed by media type rather than a prop per type — see loadMediaSummaries.
@@ -70,13 +31,12 @@ export interface ProfilePageProps {
   followersCount: number
   saved?: boolean
   settings: TasteProfileSettings
-  sources: MediaSources
   // Null when this account has no ceiling.
   rebuildsLeft: number | null
   rebuilt?: boolean
   rebuildError?: string
   // Imports still matching or waiting for review, each a way back to it.
-  waitingImports: { href: string; noun: string; matching: boolean }[]
+  waitingImports: WaitingImport[]
   displayName: string
 }
 
@@ -131,7 +91,13 @@ function TasteProfileSummary(
             <>
               <p mix={css({ margin: 0 })}>{summary}</p>
               {updatedAt && (
-                <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: 'var(--muted)' })}>
+                <p
+                  mix={css({
+                    margin: '8px 0 0',
+                    fontSize: '12px',
+                    color: 'var(--muted)',
+                  })}
+                >
                   Written from {source}, as your log stood on {new Date(updatedAt).toLocaleDateString()}. It's
                   rewritten next time you generate, if you've logged anything since.
                 </p>
@@ -145,7 +111,13 @@ function TasteProfileSummary(
               </p>
               {/* Said in the future tense here, because there's nothing yet to
                   describe — but it's still what the button below would read. */}
-              <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: 'var(--muted)' })}>
+              <p
+                mix={css({
+                  margin: '8px 0 0',
+                  fontSize: '12px',
+                  color: 'var(--muted)',
+                })}
+              >
                 It'll be written from {source}.
               </p>
             </>
@@ -169,7 +141,12 @@ function TasteProfileSummary(
           <form
             method="post"
             action={routes.profile.rebuild.href({ mediaType })}
-            mix={css({ marginTop: '12px', display: 'flex', gap: '10px', alignItems: 'baseline' })}
+            mix={css({
+              marginTop: '12px',
+              display: 'flex',
+              gap: '10px',
+              alignItems: 'baseline',
+            })}
           >
             {/* The action refuses both of these too. This only saves someone
                 spending a click, and a rebuild, on finding that out. */}
@@ -264,7 +241,6 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       followersCount,
       saved,
       settings,
-      sources,
       rebuildsLeft,
       rebuilt,
       rebuildError,
@@ -289,33 +265,11 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           <Link href={routes.profile.following.href()}>{followingCount} following</Link> ·{' '}
           <Link href={routes.profile.followers.href()}>
             {followersCount} follower{followersCount === 1 ? '' : 's'}
-          </Link>
+          </Link>{' '}
+          · <Link href={routes.profile.import.href()}>Import from elsewhere</Link>
         </p>
 
-        {waitingImports.map((waiting) => (
-          <p
-            key={waiting.href}
-            mix={css({
-              border: '1px solid var(--rule)',
-              borderLeft: '4px solid var(--accent)',
-              borderRadius: '8px',
-              background: 'var(--paper-tint)',
-              padding: '10px 14px',
-              margin: '0 0 16px',
-              fontSize: '14px',
-            })}
-          >
-            {waiting.matching ? (
-              <>
-                Your {waiting.noun} import is still matching. <Link href={waiting.href}>See progress</Link>
-              </>
-            ) : (
-              <>
-                Your {waiting.noun} import is waiting for review. <Link href={waiting.href}>Continue it</Link>
-              </>
-            )}
-          </p>
-        ))}
+        <WaitingImports imports={waitingImports} />
 
         {/* Rendered the way other people see it on users/show-page —
               editing it lives under Settings in the nav. */}
@@ -327,7 +281,6 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           panels={Object.fromEntries(
             ACTIVE_MEDIA_TYPES.map((type) => {
               const ui = MEDIA_TYPE_UI[type]
-              const source = sourceLink(type, sources)
               const { summary, profileUpdatedAt, log, total } = media[type]
               const seeAllHref =
                 type === DEFAULT_MEDIA_TYPE
@@ -346,25 +299,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                     loggedCount={total}
                     rebuildsLeft={rebuildsLeft}
                   />
-                  {/* Each importer only understands one medium, so the
-                        entry point lives on that medium's tab. */}
-                  {source ? (
-                    <div
-                      mix={css({
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'baseline',
-                        gap: '12px',
-                      })}
-                    >
-                      <h2>What I've {ui.pastParticiple}</h2>
-                      <Link href={source.href} variant="small" tapArea mix={css({ textAlign: 'right' })}>
-                        {source.label}
-                      </Link>
-                    </div>
-                  ) : (
-                    <h2>What I've {ui.pastParticiple}</h2>
-                  )}
+                  <h2>What I've {ui.pastParticiple}</h2>
                   <LoggedList
                     log={log}
                     total={total}

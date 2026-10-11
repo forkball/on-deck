@@ -51,6 +51,9 @@ export const routes = route({
     watchRegion: post('watch-region'),
     rebuild: post('rebuild/:mediaType'),
     password: form('password', { formMethod: 'PUT', names: { action: 'update' } }),
+    // Every source in one place: the page that links out to each importer
+    // below, and to settings for the ones that need a connection first.
+    import: get('import'),
     importMovies: route('import-movies', {
       index: get('/'),
       upload: post('/'),
