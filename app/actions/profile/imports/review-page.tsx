@@ -1128,7 +1128,7 @@ export function ImportReviewPage(handle: Handle<ImportReviewPageProps>) {
             <p>
               <Link href={routes.profile.watched.href()}>See my log</Link>
               {' · '}
-              <Link href={routes.profile.importMovies.index.href()}>Import another file</Link>
+              <Link href={routes.profile.import.href()}>Import another file</Link>
             </p>
 
             {/* An export is a snapshot; the feed keeps it current. Offered, not done for them. */}

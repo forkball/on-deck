@@ -75,7 +75,11 @@ export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
     const { displayName, steamId, error, result } = handle.props
 
     return (
-      <Page heading="Import from Steam" displayName={displayName}>
+      <Page
+        heading="Import from Steam"
+        displayName={displayName}
+        back={{ href: routes.profile.import.href(), label: '← All imports' }}
+      >
         {error && <p mix={css({ color: 'var(--danger)' })}>{error}</p>}
 
         {result ? (

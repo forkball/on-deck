@@ -103,7 +103,7 @@ export type LinkVariant =
   // A link in running text: the accent, bold. The default; no class.
   | 'default'
   // The default at a smaller size, for a link that sits beside a heading as
-  // its secondary action ("Import from Letterboxd" by "What I've watched").
+  // its secondary action.
   | 'small'
   // The small underlined sentence Button's `link` variant is, as a real link:
   // the review's "jump to" under a duplicate. Same `linkish` class, same look.
