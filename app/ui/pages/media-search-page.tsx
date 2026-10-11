@@ -5,6 +5,7 @@ import type { getUserInteractionForItem } from '../../data/mediaItems.ts'
 import type { MediaItem } from '../../data/schema.ts'
 import { MediaTabLinks } from '../components/media-tab-links.tsx'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import { routes } from '../../routes.ts'
 import { LazyList } from '../../browser/lazy-list.tsx'
 import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
 import { Toast } from '../components/toast.tsx'
@@ -58,6 +59,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
           // query across: a title rarely means the same thing in two
           // catalogs, so carrying it just fills the new tab with noise.
           hrefFor={(type) => MEDIA_TYPE_UI[type].hrefs.search()}
+          peopleHref={routes.users.search.href()}
         />
         <MovieSearchForm
           query={query}
