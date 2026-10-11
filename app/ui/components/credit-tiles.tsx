@@ -289,7 +289,9 @@ const filterBarStyle = css({
   display: 'flex',
   flexWrap: 'wrap',
   alignItems: 'flex-end',
-  gap: '8px 24px',
+  // The row gap is what separates the dropdown from Show once they wrap onto
+  // two lines, as they always do on a phone.
+  gap: '20px 24px',
   margin: '16px 0 0',
 })
 
