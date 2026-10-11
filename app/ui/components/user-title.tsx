@@ -1,11 +1,13 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
+// Text colour, not the accent: the accent is what links are on this site, and
+// a title in it read as something to click.
 const titleStyle = css({
   margin: '-12px 0 12px',
   fontStyle: 'italic',
   fontWeight: 600,
-  color: 'var(--accent)',
+  color: 'var(--soft)',
 })
 
 // The title a member wears, on the line under their name. Shared by the profile
