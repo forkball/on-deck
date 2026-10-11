@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css, on } from 'remix/ui'
 
 import type { SuggestState, Suggestion } from './suggestions.ts'
+import { Spinner } from './spinner.tsx'
 import { Button } from '../../ui/shared/form-controls.tsx'
 
 // Rendered inside the two autosuggest forms (movie-search-form.tsx,
@@ -43,22 +44,7 @@ export function SuggestionDropdown(
               fontSize: '13px',
             })}
           >
-            <span
-              aria-hidden="true"
-              mix={css({
-                '@keyframes suggestion-spin': {
-                  from: { transform: 'rotate(0deg)' },
-                  to: { transform: 'rotate(360deg)' },
-                },
-                display: 'inline-block',
-                width: '13px',
-                height: '13px',
-                borderRadius: '50%',
-                border: '2px solid currentColor',
-                borderTopColor: 'transparent',
-                animation: 'suggestion-spin 0.6s linear infinite',
-              })}
-            />
+            <Spinner />
             Searching…
           </div>
         ) : state.suggestions.length === 0 ? (

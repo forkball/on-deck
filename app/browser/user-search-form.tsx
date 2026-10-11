@@ -1,6 +1,7 @@
 import { clientEntry, css, on, ref } from 'remix/ui'
 
 import { SuggestionDropdown } from './shared/suggestion-dropdown.tsx'
+import { Spinner } from './shared/spinner.tsx'
 import {
   createSuggestionFetcher,
   EMPTY_SUGGEST_STATE,
@@ -112,24 +113,7 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
             disabled={submitting}
             mix={css({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' })}
           >
-            {submitting && (
-              <span
-                aria-hidden="true"
-                mix={css({
-                  '@keyframes user-search-spin': {
-                    from: { transform: 'rotate(0deg)' },
-                    to: { transform: 'rotate(360deg)' },
-                  },
-                  display: 'inline-block',
-                  width: '13px',
-                  height: '13px',
-                  borderRadius: '50%',
-                  border: '2px solid currentColor',
-                  borderTopColor: 'transparent',
-                  animation: 'user-search-spin 0.6s linear infinite',
-                })}
-              />
-            )}
+            {submitting && <Spinner />}
             {submitting ? 'Searching…' : 'Search'}
           </Button>
         </form>

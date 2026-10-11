@@ -90,7 +90,11 @@ const GROUP_STYLE = css({
   // The title's phrases are flex items, so a long one wraps between them —
   // never partway through the count.
   '& .title': { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '6px' },
-  '& .chevron': { display: 'inline-block', transition: 'transform 120ms ease' },
+  '& .chevron': {
+    display: 'inline-block',
+    transition: 'transform 120ms ease',
+    '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+  },
   '& > details[open] > summary .chevron': { transform: 'rotate(90deg)' },
   // Grows to fill the gap on a wide screen; shrinks to nothing rather than
   // forcing the date onto the title's line where there isn't room.
