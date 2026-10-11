@@ -96,7 +96,9 @@ does nothing on its own.
   - `app/data/profileTitles/` — titles. A title is a genre and a role ("Art
     House Projectionist"), and each is a credit a member earns. `catalog` holds
     every credit, the one word it earns and the threshold that earns it
-    (database-free, so the rules are tested directly); `unlocks` gathers the
+    (database-free, so the rules are tested directly) — each genre a ladder of
+    credits at 5, 10, 50 and 100, its rungs keyed so a credit already earned
+    keeps its key; `unlocks` gathers the
     stats, records what they earn in `user_titles` and sends the unlock
     notification. Credits are kept once earned. Everyone holds the starter
     credits ("Newborn Baby") from signup, worn until they choose; those are never
