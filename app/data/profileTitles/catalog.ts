@@ -104,7 +104,12 @@ function obscureFilms(stats: TitleStats): number {
 // `<genre>_<goal>`.
 interface Ladder {
   group: string
-  measure: (stats: TitleStats) => number
+  // The catalog genre tags it counts, each entry once — or, for a ladder that
+  // isn't a genre (a medium, obscurity), `measure`. Tags are data rather than
+  // a closure so a test can hold every one against what the catalogs return:
+  // a misspelt tag is a ladder nobody can climb.
+  tags?: string[]
+  measure?: (stats: TitleStats) => number
   // How the requirement reads for a count: "Finish 50 horror films, shows or books".
   requirement: (count: number) => string
   rungs: { goal: number; key: string; word: string; part: TitlePart }[]
@@ -117,7 +122,7 @@ function ladderCredits(ladder: Ladder): TitleDefinition[] {
     part: rung.part,
     requirement: ladder.requirement(rung.goal),
     goal: rung.goal,
-    measure: ladder.measure,
+    measure: ladder.measure ?? ((stats: TitleStats) => consumedTagged(stats, ...(ladder.tags ?? []))),
     group: ladder.group,
   }))
 }
@@ -136,7 +141,7 @@ const GENRE_LADDERS: Ladder[] = [
   },
   {
     group: 'Horror',
-    measure: (stats) => consumedTagged(stats, 'horror'),
+    tags: ['horror'],
     requirement: (n) => `Finish ${n} horror films, shows or books`,
     rungs: [
       { goal: 5, key: 'horror_5', word: 'Squeamish', part: 'adjective' },
@@ -147,7 +152,7 @@ const GENRE_LADDERS: Ladder[] = [
   },
   {
     group: 'Sci-fi',
-    measure: (stats) => consumedTagged(stats, 'science fiction', 'sci-fi & fantasy'),
+    tags: ['science fiction', 'sci-fi & fantasy'],
     requirement: (n) => `Finish ${n} science fiction films, shows or books`,
     rungs: [
       { goal: 5, key: 'sci_fi_5', word: 'Spacey', part: 'adjective' },
@@ -158,7 +163,7 @@ const GENRE_LADDERS: Ladder[] = [
   },
   {
     group: 'Fantasy',
-    measure: (stats) => consumedTagged(stats, 'fantasy', 'sci-fi & fantasy'),
+    tags: ['fantasy', 'sci-fi & fantasy'],
     requirement: (n) => `Finish ${n} fantasy films, shows, books or games`,
     rungs: [
       { goal: 5, key: 'fantasy_5', word: 'Spellbound', part: 'adjective' },
@@ -169,7 +174,7 @@ const GENRE_LADDERS: Ladder[] = [
   },
   {
     group: 'Documentary',
-    measure: (stats) => consumedTagged(stats, 'documentary'),
+    tags: ['documentary'],
     requirement: (n) => `Watch ${n} documentaries`,
     rungs: [
       { goal: 5, key: 'documentary_5', word: 'True-Story', part: 'adjective' },
@@ -180,7 +185,7 @@ const GENRE_LADDERS: Ladder[] = [
   },
   {
     group: 'Animation',
-    measure: (stats) => consumedTagged(stats, 'animation'),
+    tags: ['animation'],
     requirement: (n) => `Watch ${n} animated films or shows`,
     rungs: [
       { goal: 5, key: 'animation_5', word: 'Cel-Shaded', part: 'adjective' },
@@ -191,7 +196,7 @@ const GENRE_LADDERS: Ladder[] = [
   },
   {
     group: 'Romance',
-    measure: (stats) => consumedTagged(stats, 'romance'),
+    tags: ['romance'],
     requirement: (n) => `Finish ${n} romances`,
     rungs: [
       { goal: 5, key: 'romance_5', word: 'Lovestruck', part: 'adjective' },
@@ -202,7 +207,7 @@ const GENRE_LADDERS: Ladder[] = [
   },
   {
     group: 'Comedy',
-    measure: (stats) => consumedTagged(stats, 'comedy'),
+    tags: ['comedy'],
     requirement: (n) => `Watch ${n} comedies`,
     rungs: [
       { goal: 5, key: 'comedy_5', word: 'Chuckling', part: 'adjective' },
@@ -213,7 +218,7 @@ const GENRE_LADDERS: Ladder[] = [
   },
   {
     group: 'Mystery & crime',
-    measure: (stats) => consumedTagged(stats, 'mystery', 'crime'),
+    tags: ['mystery', 'crime'],
     requirement: (n) => `Finish ${n} mysteries or crime stories`,
     rungs: [
       { goal: 5, key: 'mystery_5', word: 'Suspicious', part: 'adjective' },
@@ -224,7 +229,7 @@ const GENRE_LADDERS: Ladder[] = [
   },
   {
     group: 'Westerns',
-    measure: (stats) => consumedTagged(stats, 'western'),
+    tags: ['western'],
     requirement: (n) => `Watch ${n} westerns`,
     rungs: [
       // Westerns started at 5, so the original credit is the bottom rung here.
@@ -236,7 +241,7 @@ const GENRE_LADDERS: Ladder[] = [
   },
   {
     group: 'RPGs',
-    measure: (stats) => consumedTagged(stats, 'role-playing (rpg)'),
+    tags: ['role-playing (rpg)'],
     requirement: (n) => `Play ${n} role-playing games`,
     rungs: [
       // The original RPG credit is a role, so this ladder alternates the other way.
@@ -248,7 +253,7 @@ const GENRE_LADDERS: Ladder[] = [
   },
   {
     group: 'Shooters',
-    measure: (stats) => consumedTagged(stats, 'shooter'),
+    tags: ['shooter'],
     requirement: (n) => `Play ${n} shooters`,
     rungs: [
       { goal: 5, key: 'shooter_5', word: 'Locked-and-Loaded', part: 'adjective' },
@@ -257,7 +262,293 @@ const GENRE_LADDERS: Ladder[] = [
       { goal: 100, key: 'shooter_100', word: 'One-Man Army', part: 'noun' },
     ],
   },
+  // The genres added after the first twelve — every one the catalogs use
+  // that people log for fun. Where catalogs split one idea several ways (TV's
+  // "action & adventure", IGDB's four kinds of strategy) a ladder counts them
+  // together, each entry once.
+  {
+    group: 'Drama',
+    tags: ['drama'],
+    requirement: (n) => `Watch ${n} dramas`,
+    rungs: [
+      { goal: 5, key: 'drama_5', word: 'Weepy', part: 'adjective' },
+      { goal: 10, key: 'drama_10', word: 'Oscar-Baiting', part: 'adjective' },
+      { goal: 50, key: 'drama_50', word: 'Method Actor', part: 'noun' },
+      { goal: 100, key: 'drama_100', word: 'Thespian', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Action',
+    tags: ['action', 'action & adventure'],
+    requirement: (n) => `Watch ${n} action films or shows`,
+    rungs: [
+      { goal: 5, key: 'action_5', word: 'Explosive', part: 'adjective' },
+      { goal: 10, key: 'action_10', word: 'Slow-Motion', part: 'adjective' },
+      { goal: 50, key: 'action_50', word: 'Stunt Double', part: 'noun' },
+      { goal: 100, key: 'action_100', word: 'Action Hero', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Adventure',
+    tags: ['adventure', 'action & adventure'],
+    requirement: (n) => `Finish ${n} adventures`,
+    rungs: [
+      { goal: 5, key: 'adventure_5', word: 'Swashbuckling', part: 'adjective' },
+      { goal: 10, key: 'adventure_10', word: 'Map-Reading', part: 'adjective' },
+      { goal: 50, key: 'adventure_50', word: 'Treasure Hunter', part: 'noun' },
+      { goal: 100, key: 'adventure_100', word: 'Explorer', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Thrillers',
+    tags: ['thriller'],
+    requirement: (n) => `Finish ${n} thrillers`,
+    rungs: [
+      { goal: 5, key: 'thriller_5', word: 'Edge-of-Seat', part: 'adjective' },
+      { goal: 10, key: 'thriller_10', word: 'Twist-Ending', part: 'adjective' },
+      { goal: 50, key: 'thriller_50', word: 'Nail-Biter', part: 'noun' },
+      { goal: 100, key: 'thriller_100', word: 'Mastermind', part: 'noun' },
+    ],
+  },
+  {
+    group: 'History',
+    tags: ['history', 'historical'],
+    requirement: (n) => `Finish ${n} history or historical films, shows or books`,
+    rungs: [
+      { goal: 5, key: 'history_5', word: 'Period-Piece', part: 'adjective' },
+      { goal: 10, key: 'history_10', word: 'Costumed', part: 'adjective' },
+      { goal: 50, key: 'history_50', word: 'History Buff', part: 'noun' },
+      { goal: 100, key: 'history_100', word: 'Historian', part: 'noun' },
+    ],
+  },
+  {
+    group: 'War',
+    tags: ['war', 'war & politics'],
+    requirement: (n) => `Finish ${n} war films or shows`,
+    rungs: [
+      { goal: 5, key: 'war_5', word: 'Shell-Shocked', part: 'adjective' },
+      { goal: 10, key: 'war_10', word: 'Battle-Hardened', part: 'adjective' },
+      { goal: 50, key: 'war_50', word: 'Foot Soldier', part: 'noun' },
+      { goal: 100, key: 'war_100', word: 'Field Marshal', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Family & kids',
+    tags: ['family', 'kids'],
+    requirement: (n) => `Watch ${n} family or kids' films or shows`,
+    rungs: [
+      { goal: 5, key: 'family_5', word: 'Wholesome', part: 'adjective' },
+      { goal: 10, key: 'family_10', word: 'Rated-G', part: 'adjective' },
+      { goal: 50, key: 'family_50', word: 'Babysitter', part: 'noun' },
+      { goal: 100, key: 'family_100', word: 'Kid at Heart', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Music',
+    tags: ['music'],
+    requirement: (n) => `Finish ${n} music films or games`,
+    rungs: [
+      { goal: 5, key: 'music_5', word: 'Toe-Tapping', part: 'adjective' },
+      { goal: 10, key: 'music_10', word: 'Chart-Topping', part: 'adjective' },
+      { goal: 50, key: 'music_50', word: 'Roadie', part: 'noun' },
+      { goal: 100, key: 'music_100', word: 'Rock Star', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Reality TV',
+    tags: ['reality', 'soap', 'talk'],
+    requirement: (n) => `Finish ${n} reality, soap or talk shows`,
+    rungs: [
+      { goal: 5, key: 'reality_5', word: 'Unscripted', part: 'adjective' },
+      { goal: 10, key: 'reality_10', word: 'Cliffhanging', part: 'adjective' },
+      { goal: 50, key: 'reality_50', word: 'Couch Commentator', part: 'noun' },
+      { goal: 100, key: 'reality_100', word: 'Reality Star', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Biography',
+    tags: ['biography'],
+    requirement: (n) => `Read ${n} biographies`,
+    rungs: [
+      { goal: 5, key: 'biography_5', word: 'True-to-Life', part: 'adjective' },
+      { goal: 10, key: 'biography_10', word: 'Larger-than-Life', part: 'adjective' },
+      { goal: 50, key: 'biography_50', word: 'Biographer', part: 'noun' },
+      { goal: 100, key: 'biography_100', word: 'Ghostwriter', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Young adult',
+    tags: ['young adult'],
+    requirement: (n) => `Read ${n} young adult books`,
+    rungs: [
+      { goal: 5, key: 'young_adult_5', word: 'Angsty', part: 'adjective' },
+      { goal: 10, key: 'young_adult_10', word: 'Coming-of-Age', part: 'adjective' },
+      { goal: 50, key: 'young_adult_50', word: 'Love Interest', part: 'noun' },
+      { goal: 100, key: 'young_adult_100', word: 'Chosen One', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Graphic novels',
+    tags: ['graphic novel'],
+    requirement: (n) => `Read ${n} graphic novels`,
+    rungs: [
+      { goal: 5, key: 'graphic_novel_5', word: 'Inked', part: 'adjective' },
+      { goal: 10, key: 'graphic_novel_10', word: 'Panel-Flipping', part: 'adjective' },
+      { goal: 50, key: 'graphic_novel_50', word: 'Sidekick', part: 'noun' },
+      { goal: 100, key: 'graphic_novel_100', word: 'Superhero', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Poetry',
+    tags: ['poetry'],
+    requirement: (n) => `Read ${n} poetry books`,
+    rungs: [
+      { goal: 5, key: 'poetry_5', word: 'Rhyming', part: 'adjective' },
+      { goal: 10, key: 'poetry_10', word: 'Free-Verse', part: 'adjective' },
+      { goal: 50, key: 'poetry_50', word: 'Bard', part: 'noun' },
+      { goal: 100, key: 'poetry_100', word: 'Poet Laureate', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Philosophy',
+    tags: ['philosophy'],
+    requirement: (n) => `Read ${n} philosophy books`,
+    rungs: [
+      { goal: 5, key: 'philosophy_5', word: 'Pondering', part: 'adjective' },
+      { goal: 10, key: 'philosophy_10', word: 'Existential', part: 'adjective' },
+      { goal: 50, key: 'philosophy_50', word: 'Armchair Philosopher', part: 'noun' },
+      { goal: 100, key: 'philosophy_100', word: 'Philosopher King', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Popular science',
+    tags: ['science'],
+    requirement: (n) => `Read ${n} popular science books`,
+    rungs: [
+      { goal: 5, key: 'science_5', word: 'Nerdy', part: 'adjective' },
+      { goal: 10, key: 'science_10', word: 'Peer-Reviewed', part: 'adjective' },
+      { goal: 50, key: 'science_50', word: 'Lab Rat', part: 'noun' },
+      { goal: 100, key: 'science_100', word: 'Mad Scientist', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Indie games',
+    tags: ['indie'],
+    requirement: (n) => `Play ${n} indie games`,
+    rungs: [
+      { goal: 5, key: 'indie_5', word: 'Pixelated', part: 'adjective' },
+      { goal: 10, key: 'indie_10', word: 'Lo-Fi', part: 'adjective' },
+      { goal: 50, key: 'indie_50', word: 'Early Adopter', part: 'noun' },
+      { goal: 100, key: 'indie_100', word: 'Indie Darling', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Platformers',
+    tags: ['platform'],
+    requirement: (n) => `Play ${n} platformers`,
+    rungs: [
+      { goal: 5, key: 'platform_5', word: 'Double-Jumping', part: 'adjective' },
+      { goal: 10, key: 'platform_10', word: 'Wall-Jumping', part: 'adjective' },
+      { goal: 50, key: 'platform_50', word: 'Plumber', part: 'noun' },
+      { goal: 100, key: 'platform_100', word: 'Princess Rescuer', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Puzzles & trivia',
+    tags: ['puzzle', 'quiz/trivia'],
+    requirement: (n) => `Play ${n} puzzle or trivia games`,
+    rungs: [
+      { goal: 5, key: 'puzzle_5', word: 'Puzzled', part: 'adjective' },
+      { goal: 10, key: 'puzzle_10', word: 'Brain-Teased', part: 'adjective' },
+      { goal: 50, key: 'puzzle_50', word: 'Quiz Whiz', part: 'noun' },
+      { goal: 100, key: 'puzzle_100', word: 'Puzzle Master', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Racing',
+    tags: ['racing'],
+    requirement: (n) => `Play ${n} racing games`,
+    rungs: [
+      { goal: 5, key: 'racing_5', word: 'Turbo-Charged', part: 'adjective' },
+      { goal: 10, key: 'racing_10', word: 'Drifting', part: 'adjective' },
+      { goal: 50, key: 'racing_50', word: 'Pit Crew', part: 'noun' },
+      { goal: 100, key: 'racing_100', word: 'Speed Demon', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Fighting',
+    tags: ['fighting', "hack and slash/beat 'em up"],
+    requirement: (n) => `Play ${n} fighting or beat 'em up games`,
+    rungs: [
+      { goal: 5, key: 'fighting_5', word: 'Combo-Breaking', part: 'adjective' },
+      { goal: 10, key: 'fighting_10', word: 'Knockout', part: 'adjective' },
+      { goal: 50, key: 'fighting_50', word: 'Brawler', part: 'noun' },
+      { goal: 100, key: 'fighting_100', word: 'Grand Champion', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Sports',
+    tags: ['sport'],
+    requirement: (n) => `Play ${n} sports games`,
+    rungs: [
+      { goal: 5, key: 'sport_5', word: 'Sporty', part: 'adjective' },
+      { goal: 10, key: 'sport_10', word: 'Benchwarming', part: 'adjective' },
+      { goal: 50, key: 'sport_50', word: 'Team Captain', part: 'noun' },
+      { goal: 100, key: 'sport_100', word: 'MVP', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Strategy',
+    tags: ['strategy', 'real time strategy (rts)', 'turn-based strategy (tbs)', 'tactical', 'moba'],
+    requirement: (n) => `Play ${n} strategy games`,
+    rungs: [
+      { goal: 5, key: 'strategy_5', word: 'Calculating', part: 'adjective' },
+      { goal: 10, key: 'strategy_10', word: 'Tactical', part: 'adjective' },
+      { goal: 50, key: 'strategy_50', word: 'General', part: 'noun' },
+      { goal: 100, key: 'strategy_100', word: 'Warlord', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Simulators',
+    tags: ['simulator'],
+    requirement: (n) => `Play ${n} simulators`,
+    rungs: [
+      { goal: 5, key: 'simulator_5', word: 'Simulated', part: 'adjective' },
+      { goal: 10, key: 'simulator_10', word: 'Hyper-Realistic', part: 'adjective' },
+      { goal: 50, key: 'simulator_50', word: 'Virtual Farmer', part: 'noun' },
+      { goal: 100, key: 'simulator_100', word: 'Sim Overlord', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Story games',
+    tags: ['point-and-click', 'visual novel'],
+    requirement: (n) => `Play ${n} point-and-click games or visual novels`,
+    rungs: [
+      { goal: 5, key: 'story_5', word: 'Clicking', part: 'adjective' },
+      { goal: 10, key: 'story_10', word: 'Branching', part: 'adjective' },
+      { goal: 50, key: 'story_50', word: 'Pixel Hunter', part: 'noun' },
+      { goal: 100, key: 'story_100', word: 'Plot Devourer', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Arcade & tabletop',
+    tags: ['arcade', 'pinball', 'card & board game'],
+    requirement: (n) => `Play ${n} arcade, pinball or card and board games`,
+    rungs: [
+      { goal: 5, key: 'arcade_5', word: 'Coin-Operated', part: 'adjective' },
+      { goal: 10, key: 'arcade_10', word: 'High-Scoring', part: 'adjective' },
+      { goal: 50, key: 'arcade_50', word: 'Card Shark', part: 'noun' },
+      { goal: 100, key: 'arcade_100', word: 'Arcade Legend', part: 'noun' },
+    ],
+  },
 ]
+
+// Every catalog tag a ladder counts — for the test that each is one a catalog
+// really returns.
+export const LADDER_TAGS: string[] = GENRE_LADDERS.flatMap((ladder) => ladder.tags ?? [])
+
+// The genre ladders' group names, so the filter can list them as genres.
+export const GENRE_GROUPS: ReadonlySet<string> = new Set(GENRE_LADDERS.map((ladder) => ladder.group))
 
 // The same ladder for each medium, counted over everything finished in it. The
 // media's original credits sat at 20 or 25; each keeps its key on the rung
@@ -309,6 +600,9 @@ const MEDIA_LADDERS: Ladder[] = [
     ],
   },
 ]
+
+// The media ladders' group names, likewise.
+export const MEDIA_GROUPS: ReadonlySet<string> = new Set(MEDIA_LADDERS.map((ladder) => ladder.group))
 
 // In the order the settings page lists each part's words: the ones most people
 // earn first, then taste, then volume, then habits, then the social ones.

@@ -10,11 +10,16 @@ import {
   titleByKey,
   titleProgress,
   type ConsumedEntry,
+  LADDER_TAGS,
   type TitleDefinition,
   type TitleStats,
 } from '../app/data/profileTitles/catalog.ts'
 import { checkTitleUnlocks, loadCreditTallies, loadWornTitle } from '../app/data/profileTitles/unlocks.ts'
 import { listNotifications } from '../app/data/notifications.ts'
+import { MOVIE_GENRES, TV_GENRES } from '../app/data/catalog/tmdb.ts'
+import { BOOK_GENRES as GOOGLE_BOOK_GENRES } from '../app/data/catalog/googleBooks.ts'
+import { BOOK_GENRES as OPEN_LIBRARY_GENRES } from '../app/data/catalog/openLibrary.ts'
+import { GAME_GENRES } from '../app/data/catalog/igdb.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 
 function stats(overrides: Partial<TitleStats> = {}): TitleStats {
@@ -116,6 +121,29 @@ describe('title catalog', () => {
     assert.deepEqual(rungs('tv', 50), ['tv_5', 'couch_potato', 'tv_50'])
     assert.deepEqual(rungs('book', 100), ['books_5', 'bookworm', 'books_50', 'books_100'])
     assert.deepEqual(rungs('game', 9), ['games_5'])
+  })
+
+  it('only counts genre tags a catalog actually returns', () => {
+    const vocabulary = new Set([
+      ...MOVIE_GENRES,
+      ...TV_GENRES,
+      ...GOOGLE_BOOK_GENRES,
+      ...OPEN_LIBRARY_GENRES,
+      ...GAME_GENRES,
+    ])
+    assert.deepEqual(
+      LADDER_TAGS.filter((tag) => !vocabulary.has(tag)),
+      [],
+    )
+  })
+
+  it('counts an entry once on a ladder that merges several tags', () => {
+    const strategy = (tags: string[]) =>
+      titleProgress(stats({ consumed: entries(1, { type: 'game', tags }) })).find(
+        (p) => p.title.key === 'strategy_5',
+      )!.current
+    assert.equal(strategy(['real time strategy (rts)']), 1)
+    assert.equal(strategy(['strategy', 'tactical', 'turn-based strategy (tbs)']), 1)
   })
 
   it('gives every genre ladder two genres and two roles', () => {

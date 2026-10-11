@@ -1,7 +1,12 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { PART_NAMES, type TitleDefinition } from '../../data/profileTitles/catalog.ts'
+import {
+  GENRE_GROUPS,
+  MEDIA_GROUPS,
+  PART_NAMES,
+  type TitleDefinition,
+} from '../../data/profileTitles/catalog.ts'
 import { routes } from '../../routes.ts'
 import { Modal } from './modal.tsx'
 import { Field } from '../shared/field.tsx'
@@ -278,8 +283,23 @@ const filterBarStyle = css({
 export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picking }>) {
   return () => {
     const { credits, picking } = handle.props
-    // In catalog order, which is the order the credits themselves are in.
     const groups = [...new Set(credits.map((credit) => credit.title.group))]
+    // Forty-odd groups in one list is a lot to scan, so the dropdown splits
+    // them: genres alphabetically, then the media, then everything else in
+    // catalog order.
+    const optionGroups = [
+      {
+        label: 'Genres',
+        groups: groups
+          .filter((group) => GENRE_GROUPS.has(group))
+          .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' })),
+      },
+      { label: 'Media', groups: groups.filter((group) => MEDIA_GROUPS.has(group)) },
+      {
+        label: 'Everything else',
+        groups: groups.filter((group) => !GENRE_GROUPS.has(group) && !MEDIA_GROUPS.has(group)),
+      },
+    ]
 
     return (
       <div mix={css(filterStyle(groups.map(groupSlug)))}>
@@ -289,10 +309,14 @@ export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picki
               <option value="" selected>
                 Everything
               </option>
-              {groups.map((group) => (
-                <option key={group} value={groupSlug(group)}>
-                  {group}
-                </option>
+              {optionGroups.map(({ label, groups: members }) => (
+                <optgroup key={label} label={label}>
+                  {members.map((group) => (
+                    <option key={group} value={groupSlug(group)}>
+                      {group}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </Select>
           </Field>
