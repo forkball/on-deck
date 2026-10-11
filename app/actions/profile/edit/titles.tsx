@@ -19,8 +19,9 @@ export interface TitlesProps {
 }
 
 // The settings pane for titles: every credit there is, with your progress on
-// each. Tapping an earned one wears it — see WearTile. Always has something to
-// pick, since everyone holds the starter credits.
+// each. Tapping one opens it, and an earned one is worn from there — see
+// WearForm. Always has something to pick, since everyone holds the starter
+// credits.
 export function Titles(handle: Handle<TitlesProps>) {
   return () => {
     const { progress, unlocked, adjective, noun, returnTo, isAdmin } = handle.props
@@ -30,8 +31,8 @@ export function Titles(handle: Handle<TitlesProps>) {
         <h2 mix={css({ marginTop: 0 })}>Your title</h2>
 
         <p mix={css({ margin: '0 0 8px', color: 'var(--soft)' })}>
-          Tap a {PART_NAMES.adjective.one.toLowerCase()} and a {PART_NAMES.noun.one.toLowerCase()} you've
-          earned to wear them. Tap one you're wearing to take it off.
+          Your title is a {PART_NAMES.adjective.one.toLowerCase()} and a {PART_NAMES.noun.one.toLowerCase()}{' '}
+          you've earned. Tap any credit to see what earns it, and wear an earned one from there.
         </p>
 
         <CreditGroups

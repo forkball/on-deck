@@ -54,6 +54,9 @@ export function Modal(
     closeButton?: boolean
     // A narrower box, for a line or two of explanation rather than a form.
     small?: boolean
+    // A tap on the dimmed page around the box closes it. Opt-in: a modal
+    // holding a half-written form shouldn't lose it to a stray tap.
+    closeOnOutsideTap?: boolean
     children?: RemixNode
   }>,
 ) {
@@ -67,6 +70,7 @@ export function Modal(
       defaultOpen,
       closeButton = true,
       small,
+      closeOnOutsideTap,
       children,
     } = handle.props
 
@@ -89,8 +93,20 @@ export function Modal(
         )}
 
         <div class="modal-overlay">
+          {/* Behind the box and filling the overlay, so only a tap that
+              misses the box lands on it. Hidden from screen readers, which
+              have the ✕. */}
+          {closeOnOutsideTap && (
+            <ToggleLabel
+              for={id}
+              class="modal-backdrop"
+              aria-hidden="true"
+              mix={css({ position: 'absolute', inset: 0, cursor: 'default' })}
+            />
+          )}
           <div
             mix={css({
+              position: 'relative',
               backgroundColor: 'var(--paper)',
               borderRadius: '8px',
               padding: small ? '20px' : '24px',
