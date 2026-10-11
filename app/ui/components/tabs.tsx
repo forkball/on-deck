@@ -91,7 +91,12 @@ export function Tabs(handle: Handle<TabsProps>) {
         <div
           mix={css({
             display: 'flex',
-            gap: '20px',
+            // The gap narrows on a phone so the settings page's four tabs
+            // still fit one line at 375px, and below that the bar wraps
+            // rather than running off the side of the screen.
+            flexWrap: 'wrap',
+            rowGap: '8px',
+            columnGap: 'clamp(12px, 4vw, 20px)',
             borderBottom: '1px solid var(--rule)',
             marginBottom: '16px',
           })}

@@ -19,7 +19,11 @@ const listStyle = css({
   margin: 0,
   padding: 0,
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+  // Two columns, always: at three a word like "Watchlist Hoarder" wrapped onto
+  // a second line. minmax(0, …) lets a column shrink below its longest word on
+  // a phone, where the word is cut with an ellipsis rather than pushing the
+  // grid wider than the screen.
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   alignItems: 'start',
   gap: '8px',
 })
@@ -33,6 +37,20 @@ const tileStyle = css({
   gap: '6px',
   fontWeight: 700,
   '&:hover': { borderColor: 'var(--accent)' },
+  // Half a phone is narrow: smaller type and padding there keep the longest
+  // words ("Watchlist Hoarder") whole in their column.
+  '@media (max-width: 480px)': { padding: '8px', fontSize: '13px' },
+  '@media (max-width: 400px)': { padding: '8px 6px', fontSize: '12px' },
+})
+
+// One line, so the grid reads as a list of words. Below 340px — the narrowest
+// phones — a few of the longest don't fit half the screen even at the smaller
+// size, and wrapping them beats cutting them off.
+const wordStyle = css({
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  '@media (max-width: 340px)': { whiteSpace: 'normal' },
 })
 
 const lockedStyle = css({ borderStyle: 'dashed', color: 'var(--muted)' })
@@ -94,7 +112,7 @@ export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[] 
               <li key={title.key} mix={css({ display: 'block' })}>
                 <ToggleLabel for={modalId} class="credit-tile">
                   <span mix={[tileStyle, isEarned ? earnedStyle : lockedStyle]}>
-                    <span>
+                    <span mix={wordStyle} title={title.word}>
                       {isEarned && <span aria-label="Earned">✓ </span>}
                       {title.word}
                     </span>

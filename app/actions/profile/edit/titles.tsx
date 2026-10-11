@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { composeTitle, PART_NAMES, type TitleProgress } from '../../../data/profileTitles/catalog.ts'
+import { PART_NAMES, type TitleProgress } from '../../../data/profileTitles/catalog.ts'
 import { routes } from '../../../routes.ts'
 import { Field } from '../../../ui/shared/field.tsx'
 import { CreditTiles } from '../../../ui/components/credit-tiles.tsx'
@@ -48,20 +48,10 @@ export function Titles(handle: Handle<TitlesProps>) {
     const nouns = progress.filter((entry) => entry.title.part === 'noun')
     const earnedAdjectives = adjectives.filter((entry) => unlocked.has(entry.title.key))
     const earnedNouns = nouns.filter((entry) => unlocked.has(entry.title.key))
-    const current = composeTitle(adjective, noun)
 
     return (
       <section>
         <h2 mix={css({ marginTop: 0 })}>Your title</h2>
-        <p mix={css({ margin: '0 0 16px', color: 'var(--soft)' })}>
-          {current ? (
-            <>
-              You're wearing <strong>{current}</strong>. It shows under your name on your profile.
-            </>
-          ) : (
-            'Pick a genre and a role from the credits you have earned.'
-          )}
-        </p>
 
         <form
           method="post"
