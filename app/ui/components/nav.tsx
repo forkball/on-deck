@@ -44,8 +44,8 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
               <ProfileMenu
                 displayName={displayName || 'My Profile'}
                 links={[
+                  // One entry for both: People is a tab on the search pages.
                   { href: routes.media.href(), label: 'Search' },
-                  { href: routes.users.search.href(), label: 'People' },
                   { href: routes.recommendations.index.href(), label: 'Recommendations' },
                   { href: routes.profile.index.href(), label: 'Profile' },
                   { href: titleSettingsHref(), label: 'Titles' },

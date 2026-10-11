@@ -5,7 +5,9 @@ import { PROFILE_HREF_PLACEHOLDER, UserSearchForm } from '../../browser/user-sea
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
+import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { Page } from '../../ui/components/page.tsx'
+import { MEDIA_TYPE_UI } from '../../mediaTypes.ts'
 import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 export interface UserSearchPageProps {
@@ -23,7 +25,13 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
       : routes.users.search.href()
 
     return (
-      <Page heading="Find people" displayName={displayName}>
+      // Wide, like the media searches, so the shared tab bar sits the same.
+      <Page heading="Find people" width="wide" displayName={displayName}>
+        <MediaTabLinks
+          current="people"
+          hrefFor={(type) => MEDIA_TYPE_UI[type].hrefs.search()}
+          peopleHref={routes.users.search.href()}
+        />
         <UserSearchForm
           query={query}
           searchHref={routes.users.search.href()}
