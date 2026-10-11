@@ -101,8 +101,8 @@ function obscureFilms(stats: TitleStats): number {
 // checkTitleUnlocks — and these are always the first.
 export const TITLES: readonly TitleDefinition[] = [
   {
-    key: 'unrated',
-    word: 'Unrated',
+    key: 'newborn',
+    word: 'Newborn',
     part: 'adjective',
     requirement: 'Join On Deck',
     goal: 0,
@@ -110,8 +110,8 @@ export const TITLES: readonly TitleDefinition[] = [
     starter: true,
   },
   {
-    key: 'understudy',
-    word: 'Understudy',
+    key: 'baby',
+    word: 'Baby',
     part: 'noun',
     requirement: 'Join On Deck',
     goal: 0,

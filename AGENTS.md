@@ -98,7 +98,7 @@ does nothing on its own.
     for the first slot or a noun for the second — and the threshold that earns it (database-free, so the rules are tested
     directly); `unlocks` gathers the stats, records what they earn in
     `user_titles` and sends the unlock notification. Titles are kept once
-    earned. Everyone holds a starter genre and role ("Unrated Understudy") from
+    earned. Everyone holds a starter genre and role ("Newborn Baby") from
     signup, worn until they choose; it is never announced. `checkTitleUnlocksQuietly`
     is called after the writes that can earn one, and the pages showing titles
     check again to catch feed syncs. `unlocks` runs its SQL through the `db` it

@@ -53,12 +53,12 @@ describe('title catalog', () => {
   })
 
   it('gives an empty account the starter title and nothing else', () => {
-    assert.deepEqual(earnedTitleKeys(stats()), ['unrated', 'understudy'])
-    assert.equal(composeTitle('unrated', 'understudy'), 'Unrated Understudy')
+    assert.deepEqual(earnedTitleKeys(stats()), ['newborn', 'baby'])
+    assert.equal(composeTitle('newborn', 'baby'), 'Newborn Baby')
   })
 
   it('earns the rookie title from one finished thing', () => {
-    assert.deepEqual(earnedTitleKeys(stats({ consumed: entries(1) })), ['unrated', 'understudy', 'rookie'])
+    assert.deepEqual(earnedTitleKeys(stats({ consumed: entries(1) })), ['newborn', 'baby', 'rookie'])
   })
 
   it('counts obscure films toward Art House, but not ones the catalog gave no popularity', () => {
@@ -164,8 +164,8 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
 
   it('unlocks, notifies once, and puts the starter title on', async () => {
     // The starter title goes on unannounced.
-    assert.deepEqual((await checkTitleUnlocks(db, userId)).newlyUnlocked, ['unrated', 'understudy'])
-    assert.deepEqual(await loadWornTitle(db, userId), { adjective: 'unrated', noun: 'understudy' })
+    assert.deepEqual((await checkTitleUnlocks(db, userId)).newlyUnlocked, ['newborn', 'baby'])
+    assert.deepEqual(await loadWornTitle(db, userId), { adjective: 'newborn', noun: 'baby' })
     assert.deepEqual(await listNotifications(db, userId), [])
 
     await logMovies(itemIds.slice(0, 1))
@@ -179,7 +179,7 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
     const second = await checkTitleUnlocks(db, userId)
     assert.deepEqual(second.newlyUnlocked, ['art_house', 'horror'])
     // Already wearing one, so the new unlocks don't replace it.
-    assert.deepEqual(await loadWornTitle(db, userId), { adjective: 'unrated', noun: 'understudy' })
+    assert.deepEqual(await loadWornTitle(db, userId), { adjective: 'newborn', noun: 'baby' })
 
     const notifications = await listNotifications(db, userId)
     assert.deepEqual(
@@ -200,10 +200,10 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
         [quietId, itemIds[0], Date.now()],
       )
       const check = await checkTitleUnlocks(db, quietId, { notify: false })
-      assert.deepEqual(check.newlyUnlocked, ['unrated', 'understudy', 'rookie'])
+      assert.deepEqual(check.newlyUnlocked, ['newborn', 'baby', 'rookie'])
       assert.deepEqual(await listNotifications(db, quietId), [])
       // Still put on: quiet is about the bell, not the title.
-      assert.deepEqual(await loadWornTitle(db, quietId), { adjective: 'unrated', noun: 'understudy' })
+      assert.deepEqual(await loadWornTitle(db, quietId), { adjective: 'newborn', noun: 'baby' })
     } finally {
       await deleteUsers([quietId])
     }

@@ -127,7 +127,7 @@ export async function checkTitleUnlocks(
 
   if (newlyUnlocked.length > 0) {
     // The starter title isn't an achievement, so it isn't announced: being told
-    // you've earned "Unrated" for having signed up is a strange welcome.
+    // you've earned "Newborn" for having signed up is a strange welcome.
     const announced = newlyUnlocked.filter((key) => !titleByKey(key)?.starter)
     if (options.notify !== false && announced.length > 0) {
       await createTitleNotification(db, userId, announced)
