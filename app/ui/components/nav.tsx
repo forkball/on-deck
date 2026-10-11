@@ -48,7 +48,6 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
                   { href: routes.media.href(), label: 'Search' },
                   { href: routes.recommendations.index.href(), label: 'Recommendations' },
                   { href: routes.profile.index.href(), label: 'Profile' },
-                  { href: routes.profile.import.href(), label: 'Import' },
                   { href: titleSettingsHref(), label: 'Titles' },
                   // Its own entry rather than something to find behind the
                   // profile: it holds the connected accounts, and this is the
