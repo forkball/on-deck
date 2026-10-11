@@ -271,8 +271,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           <Link href={routes.profile.following.href()}>{followingCount} following</Link> ·{' '}
           <Link href={routes.profile.followers.href()}>
             {followersCount} follower{followersCount === 1 ? '' : 's'}
-          </Link>{' '}
-          · <Link href={routes.profile.import.href()}>Import from elsewhere</Link>
+          </Link>
         </p>
 
         <WaitingImports imports={waitingImports} />
@@ -322,6 +321,21 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             }),
           )}
         />
+
+        {/* Below the log rather than up by the counts: it's a one-off, and the
+            top of the page is for what you come back to. */}
+        <p
+          mix={css({
+            borderTop: '1px solid var(--rule)',
+            marginTop: '32px',
+            paddingTop: '16px',
+            fontSize: '14px',
+            color: 'var(--soft)',
+          })}
+        >
+          Logged things somewhere else?{' '}
+          <Link href={routes.profile.import.href()}>Import from Letterboxd, Goodreads or Steam →</Link>
+        </p>
       </Page>
     )
   }
