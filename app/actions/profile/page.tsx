@@ -11,6 +11,7 @@ import {
 } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { Toast } from '../../ui/components/toast.tsx'
+import { PART_NAMES } from '../../data/profileTitles/catalog.ts'
 import { CreditGroups, TITLES_TAB, type Credit } from '../../ui/components/credit-tiles.tsx'
 import { UserTitle } from '../../ui/components/user-title.tsx'
 import { routes } from '../../routes.ts'
@@ -19,7 +20,7 @@ import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
-import { PROFILE_TABS, titleSettingsHref } from './edit/page.tsx'
+import { PROFILE_TABS } from './edit/page.tsx'
 import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
@@ -85,6 +86,10 @@ export interface ProfilePageProps {
   // Every credit, with yours marked and your progress on the rest, for the
   // Titles tab.
   credits: Credit[]
+  // The keys worn now, so the Titles tab can mark them and swap one on a tap.
+  worn: { adjective: string | null; noun: string | null }
+  // Set when a title was just chosen from the Titles tab.
+  titleSaved?: boolean
 }
 
 // What the settings amount to, in the words someone would use for their own
@@ -279,6 +284,8 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       displayName,
       title,
       credits,
+      worn,
+      titleSaved,
     } = handle.props
     const profileHref = routes.profile.index.href()
     const savedReturnTo = `${profileHref}?saved=1`
@@ -293,6 +300,8 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           <Toast message="Taste profile rewritten." />
         ) : saved ? (
           <Toast message="Saved." />
+        ) : titleSaved ? (
+          <Toast message="Title saved." />
         ) : null}
         <UserTitle title={title} />
         <p mix={css({ margin: '-8px 0 16px', color: 'var(--soft)' })}>
@@ -340,10 +349,14 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
               label: 'Titles',
               panel: (
                 <>
-                  <p mix={css({ margin: 0, fontSize: '14px' })}>
-                    <Link href={titleSettingsHref()}>Change your title →</Link>
+                  <p mix={css({ margin: 0, color: 'var(--soft)' })}>
+                    Tap a {PART_NAMES.adjective.one.toLowerCase()} and a {PART_NAMES.noun.one.toLowerCase()}{' '}
+                    you've earned to wear them.
                   </p>
-                  <CreditGroups credits={credits} />
+                  <CreditGroups
+                    credits={credits}
+                    picking={{ ...worn, returnTo: `${profileHref}?tab=${TITLES_TAB}` }}
+                  />
                 </>
               ),
             },
