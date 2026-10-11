@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { NotificationSummary } from '../../data/notifications.ts'
+import { PART_NAMES, titleByKey } from '../../data/profileTitles/catalog.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
 import { Link } from '../../ui/shared/form-controls.tsx'
@@ -9,6 +10,49 @@ import { Link } from '../../ui/shared/form-controls.tsx'
 export interface NotificationsPageProps {
   notifications: NotificationSummary[]
   displayName: string
+}
+
+// The credits a notification announces. One says whether it's a genre or a
+// role; several are grouped that way, since a first visit can unlock a whole
+// log's worth at once.
+function unlockedLine(notification: NotificationSummary) {
+  const titles = notification.unlockedTitles.flatMap((key) => {
+    const title = titleByKey(key)
+    return title ? [title] : []
+  })
+  const [only] = titles
+  if (titles.length === 1 && only) {
+    return (
+      <>
+        You earned a new {PART_NAMES[only.part].one.toLowerCase()}: <strong>{only.word}</strong>
+      </>
+    )
+  }
+  const groups = (['adjective', 'noun'] as const).flatMap((part) => {
+    const words = titles.filter((title) => title.part === part).map((title) => title.word)
+    return words.length > 0 ? [{ name: PART_NAMES[part].many.toLowerCase(), words }] : []
+  })
+  return (
+    <>
+      You earned {titles.length} new credits —{' '}
+      {groups.map((group, index) => (
+        <span key={group.name}>
+          {index > 0 && '; '}
+          {group.name} <strong>{group.words.join(', ')}</strong>
+        </span>
+      ))}
+    </>
+  )
+}
+
+function describe(notification: NotificationSummary) {
+  if (notification.type === 'title') return unlockedLine(notification)
+  return (
+    <>
+      <strong>{notification.actorLabel}</strong>{' '}
+      {notification.type === 'follow' ? 'started following you' : 'ran recommendations you can view'}
+    </>
+  )
 }
 
 export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
@@ -19,8 +63,8 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
       <Page heading="Notifications" displayName={displayName}>
         {notifications.length === 0 ? (
           <p>
-            Nothing yet — you'll hear about it here when someone you follow (and who follows you back) runs a
-            group recommendation with you in it.
+            Nothing yet — you'll hear about it here when you earn a new credit, when someone follows you, or
+            when someone you follow (and who follows you back) runs a group recommendation with you in it.
           </p>
         ) : (
           <ul
@@ -66,11 +110,7 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
                     href={routes.notifications.read.href({ notificationId: String(notification.id) })}
                     rmx-document=""
                   >
-                    <strong>{notification.actorLabel}</strong>{' '}
-                    {notification.type === 'follow'
-                      ? 'started following you'
-                      : 'ran recommendations you can view'}{' '}
-                    — {date}
+                    {describe(notification)} — {date}
                   </Link>
                   {!notification.read && (
                     <span

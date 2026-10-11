@@ -49,6 +49,10 @@ export const routes = route({
     // field on `settings`: that form sends every setting at once, and is posted
     // from a different page than the one this is changed on.
     watchRegion: post('watch-region'),
+    // Which of the titles you've earned to wear. Its own POST for the reason
+    // watchRegion is: the profile form asks for a password on some changes, and
+    // picking a title should never be one of them.
+    title: post('title'),
     rebuild: post('rebuild/:mediaType'),
     password: form('password', { formMethod: 'PUT', names: { action: 'update' } }),
     // Every source in one place: the page that links out to each importer
@@ -123,6 +127,12 @@ export const routes = route({
     unconfirmed: get('unconfirmed/:unconfirmedId'),
     show: get(':runId'),
   }),
+  // Admin-only views. Each action checks users.is_admin itself and answers 403
+  // otherwise, the way the rematch route does.
+  admin: route('admin', {
+    // How many members hold and wear each credit.
+    credits: get('credits'),
+  }),
   users: route('users', {
     search: get('search'),
     suggest: get('suggest'),
@@ -139,4 +149,14 @@ export const routes = route({
 // each end: the landing page and the profile both link to it.
 export function luckyRecommendationsHref(): string {
   return routes.recommendations.luckyPage.href()
+}
+
+// The settings tab your titles are chosen on, and where to send someone for
+// them. Spelled once here because the nav's menu links to it, and the nav is
+// shared UI that can't reach into a page for it; the settings page names its
+// tab from this too.
+export const TITLES_SETTINGS_TAB = 'titles'
+
+export function titleSettingsHref(): string {
+  return `${routes.profile.edit.index.href()}?tab=${TITLES_SETTINGS_TAB}`
 }

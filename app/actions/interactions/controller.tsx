@@ -6,6 +6,7 @@ import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import { deleteInteraction, parseRatingSubmission, updateInteraction } from '../../data/mediaItems.ts'
+import { checkTitleUnlocksQuietly } from '../../data/profileTitles/unlocks.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { INTERACTION_STATUSES, type User } from '../../data/schema.ts'
 import { routes } from '../../routes.ts'
@@ -45,6 +46,7 @@ export default createController(routes.interactions, {
       if (!updated) {
         return new Response('Not Found', { status: 404 })
       }
+      await checkTitleUnlocksQuietly(db, auth.identity.id)
 
       return redirect(parsed.value.return_to || `${routes.profile.index.href()}?saved=1`, 303)
     },

@@ -21,6 +21,9 @@ export interface TabDefinition {
   id: string
   label: string
   panel: RemixNode
+  // At the far end of the bar rather than after the tab before it — for a tab
+  // that isn't one of a set, like a profile's Titles beside its media types.
+  end?: boolean
 }
 
 export interface TabsProps {
@@ -40,19 +43,23 @@ function tabsStyle(idPrefix: string, tabs: TabDefinition[]): CSSStyle {
   const style: Record<string, unknown> = {
     position: 'relative',
     marginTop: '40px',
-    '& input[type="radio"]': {
+    // Only the tab bar's own radios, which are direct children: a radio inside
+    // a panel — the Titles tab's filter — is a real control and must show.
+    '& > input[type="radio"]': {
       position: 'absolute',
       width: 0,
       height: 0,
       opacity: 0,
       pointerEvents: 'none',
     },
-    '& label': {
-      cursor: 'pointer',
-      padding: '0 0 8px',
-      color: 'var(--muted)',
-      borderBottom: '2px solid transparent',
-    },
+  }
+  // The tab bar's own labels, picked out by what they point at, for the same
+  // reason as the radios: labels inside a panel are the panel's business.
+  style[`& label[for^="${idPrefix}-tab-"]`] = {
+    cursor: 'pointer',
+    padding: '0 0 8px',
+    color: 'var(--muted)',
+    borderBottom: '2px solid transparent',
   }
 
   for (const { id } of tabs) {
@@ -91,13 +98,23 @@ export function Tabs(handle: Handle<TabsProps>) {
         <div
           mix={css({
             display: 'flex',
-            gap: '20px',
+            // The gap narrows on a phone so the settings page's four tabs
+            // still fit one line at 375px, and below that the bar wraps
+            // rather than running off the side of the screen.
+            flexWrap: 'wrap',
+            rowGap: '8px',
+            columnGap: 'clamp(12px, 4vw, 20px)',
             borderBottom: '1px solid var(--rule)',
             marginBottom: '16px',
           })}
         >
           {tabs.map((tab) => (
-            <label key={tab.id} for={`${idPrefix}-tab-${tab.id}`} class="tap-area">
+            <label
+              key={tab.id}
+              for={`${idPrefix}-tab-${tab.id}`}
+              class="tap-area"
+              mix={tab.end ? css({ marginLeft: 'auto' }) : undefined}
+            >
               {tab.label}
             </label>
           ))}

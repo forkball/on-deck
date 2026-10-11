@@ -11,6 +11,7 @@ import {
 } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { Toast } from '../../ui/components/toast.tsx'
+import { UserTitle } from '../../ui/components/user-title.tsx'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
@@ -38,6 +39,9 @@ export interface ProfilePageProps {
   // Imports still matching or waiting for review, each a way back to it.
   waitingImports: WaitingImport[]
   displayName: string
+  // The title worn, already put into words, or null for none. Choosing it, and
+  // the credits behind it, are under Titles in the nav.
+  title: string | null
 }
 
 // What the settings amount to, in the words someone would use for their own
@@ -246,6 +250,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       rebuildError,
       waitingImports,
       displayName,
+      title,
     } = handle.props
     const profileHref = routes.profile.index.href()
     const savedReturnTo = `${profileHref}?saved=1`
@@ -261,6 +266,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
         ) : saved ? (
           <Toast message="Saved." />
         ) : null}
+        <UserTitle title={title} />
         <p mix={css({ margin: '-8px 0 16px', color: 'var(--soft)' })}>
           <Link href={routes.profile.following.href()}>{followingCount} following</Link> ·{' '}
           <Link href={routes.profile.followers.href()}>

@@ -15,7 +15,8 @@
     "db:migrate:down": "node --env-file-if-exists=.env --import remix/node-tsx db/migrate.ts down",
     "prod:query": "node --env-file-if-exists=.env --import remix/node-tsx scripts/prod-query.ts",
     "prod:backfill-books": "node --env-file-if-exists=.env --import remix/node-tsx scripts/backfill-google-books.ts --production",
-    "prod:enrich-books": "node --env-file-if-exists=.env --import remix/node-tsx scripts/enrich-open-library.ts --production"
+    "prod:enrich-books": "node --env-file-if-exists=.env --import remix/node-tsx scripts/enrich-open-library.ts --production",
+    "prod:backfill-titles": "node --env-file-if-exists=.env --import remix/node-tsx scripts/backfill-titles.ts --production"
   },
   "engines": {
     "node": ">=24.3.0"

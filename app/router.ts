@@ -5,6 +5,7 @@ import { methodOverride } from 'remix/middleware/method-override'
 import { session } from 'remix/middleware/session'
 
 import controller from './actions/controller.tsx'
+import adminController from './actions/admin/controller.tsx'
 import authController from './actions/auth/controller.tsx'
 import authLoginController from './actions/auth/login/controller.tsx'
 import authSignupController from './actions/auth/signup/controller.tsx'
@@ -56,6 +57,7 @@ export const router = createRouter<AppContext>({
 })
 
 router.map(routes, controller)
+router.map(routes.admin, adminController)
 router.map(routes.auth, authController)
 router.map(routes.auth.login, authLoginController)
 router.map(routes.auth.signup, authSignupController)

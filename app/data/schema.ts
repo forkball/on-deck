@@ -43,6 +43,10 @@ export const users = table({
     // A country code for the "where to watch" list, chosen by the member. Null
     // means guess from the browser's language — see watchRegion.ts.
     watch_region: c.text().nullable(),
+    // The title worn on the profile, as two keys into the catalog in
+    // app/data/profileTitles/catalog.ts — see the 20261011120000 migration.
+    title_adjective: c.text().nullable(),
+    title_noun: c.text().nullable(),
     created_at: c.integer().notNull(),
   },
 })
@@ -336,6 +340,17 @@ export const importRows = table({
   },
 })
 
+// Titles earned, kept once earned — see the 20261011120000 migration.
+export const userTitles = table({
+  name: 'user_titles',
+  primaryKey: ['user_id', 'title_key'],
+  columns: {
+    user_id: c.integer().notNull().references('users', 'id'),
+    title_key: c.text().notNull(),
+    unlocked_at: c.integer().notNull(),
+  },
+})
+
 export const userFollows = table({
   name: 'user_follows',
   primaryKey: ['follower_id', 'followed_id'],
@@ -352,9 +367,11 @@ export const notifications = table({
     id: c.integer().primaryKey().autoIncrement(),
     user_id: c.integer().notNull().references('users', 'id'), // recipient
     actor_user_id: c.integer().notNull().references('users', 'id'), // who did the thing
-    // 'recommendation' | 'follow'. Only the former sets run_id.
+    // 'recommendation' | 'follow' | 'title'. Only the first sets run_id, only
+    // the last unlocked_titles. A title notification is its own actor.
     type: c.text().notNull(),
     run_id: c.integer(),
+    unlocked_titles: c.json().nullable(),
     read_at: c.integer(),
     created_at: c.integer().notNull(),
   },
