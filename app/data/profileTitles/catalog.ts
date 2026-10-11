@@ -49,6 +49,14 @@ export interface TitleStats {
 // Which slot a word goes in: adjectives are the first word, nouns the second.
 export type TitlePart = 'adjective' | 'noun'
 
+// What the two slots are called on the site: a title is a genre and a role,
+// "Art House" + "Projectionist". Spelled once here so the pickers, both credit
+// pages and the unlock notification can't each call them something else.
+export const PART_NAMES: Record<TitlePart, { one: string; many: string }> = {
+  adjective: { one: 'Genre', many: 'Genres' },
+  noun: { one: 'Role', many: 'Roles' },
+}
+
 export interface TitleDefinition {
   key: string
   word: string

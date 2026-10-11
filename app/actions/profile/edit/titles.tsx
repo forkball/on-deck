@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { composeTitle, type TitleProgress } from '../../../data/profileTitles/catalog.ts'
+import { composeTitle, PART_NAMES, type TitleProgress } from '../../../data/profileTitles/catalog.ts'
 import { routes } from '../../../routes.ts'
 import { Field } from '../../../ui/shared/field.tsx'
 import { CreditTiles } from '../../../ui/components/credit-tiles.tsx'
@@ -58,9 +58,9 @@ export function Titles(handle: Handle<TitlesProps>) {
               You're wearing <strong>{current}</strong>. It shows under your name on your profile.
             </>
           ) : earnedAdjectives.length + earnedNouns.length > 0 ? (
-            'Pick a first and a second word from the credits you have earned.'
+            'Pick a genre and a role from the credits you have earned.'
           ) : (
-            'Every achievement earns you a credit: a word for your title. Log something to earn your first.'
+            'Every achievement earns you a credit — a genre or a role, the two halves of your title. Log something to earn your first.'
           )}
         </p>
 
@@ -76,8 +76,13 @@ export function Titles(handle: Handle<TitlesProps>) {
               marginBottom: '32px',
             })}
           >
-            <WordPicker label="First word" name="adjective" earned={earnedAdjectives} selected={adjective} />
-            <WordPicker label="Second word" name="noun" earned={earnedNouns} selected={noun} />
+            <WordPicker
+              label={PART_NAMES.adjective.one}
+              name="adjective"
+              earned={earnedAdjectives}
+              selected={adjective}
+            />
+            <WordPicker label={PART_NAMES.noun.one} name="noun" earned={earnedNouns} selected={noun} />
             <div>
               <Button type="submit" variant="primary">
                 Wear this title
@@ -87,7 +92,7 @@ export function Titles(handle: Handle<TitlesProps>) {
         )}
 
         <CreditTiles
-          heading="First words"
+          heading={PART_NAMES.adjective.many}
           credits={adjectives.map(({ title, current }) => ({
             title,
             earned: unlocked.has(title.key),
@@ -95,7 +100,7 @@ export function Titles(handle: Handle<TitlesProps>) {
           }))}
         />
         <CreditTiles
-          heading="Second words"
+          heading={PART_NAMES.noun.many}
           credits={nouns.map(({ title, current }) => ({ title, earned: unlocked.has(title.key), current }))}
         />
       </section>

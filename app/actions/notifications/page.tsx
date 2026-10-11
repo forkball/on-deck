@@ -2,7 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { NotificationSummary } from '../../data/notifications.ts'
-import { titleByKey } from '../../data/profileTitles/catalog.ts'
+import { PART_NAMES, titleByKey } from '../../data/profileTitles/catalog.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
 import { Link } from '../../ui/shared/form-controls.tsx'
@@ -16,13 +16,31 @@ export interface NotificationsPageProps {
 function unlockedLine(notification: NotificationSummary) {
   const titles = notification.unlockedTitles.flatMap((key) => {
     const title = titleByKey(key)
-    return title ? [title.word] : []
+    return title ? [title] : []
   })
-  const lead = titles.length === 1 ? 'You earned a new credit: ' : `You earned ${titles.length} new credits: `
+  // One credit says which half it is. Several are grouped by half, since a
+  // first visit can unlock a whole log's worth at once.
+  if (titles.length === 1) {
+    const [title] = titles
+    return (
+      <>
+        You earned a new {PART_NAMES[title!.part].one.toLowerCase()}: <strong>{title!.word}</strong>
+      </>
+    )
+  }
+  const groups = (['adjective', 'noun'] as const).flatMap((part) => {
+    const words = titles.filter((title) => title.part === part).map((title) => title.word)
+    return words.length > 0 ? [{ name: PART_NAMES[part].many.toLowerCase(), words }] : []
+  })
   return (
     <>
-      {lead}
-      <strong>{titles.join(', ')}</strong>
+      You earned {titles.length} new credits —{' '}
+      {groups.map((group, index) => (
+        <span key={group.name}>
+          {index > 0 && '; '}
+          {group.name} <strong>{group.words.join(', ')}</strong>
+        </span>
+      ))}
     </>
   )
 }

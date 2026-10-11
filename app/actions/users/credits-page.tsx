@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import { composeTitle, titlesOfPart } from '../../data/profileTitles/catalog.ts'
+import { composeTitle, PART_NAMES, titlesOfPart } from '../../data/profileTitles/catalog.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
@@ -42,8 +42,8 @@ export function UserCreditsPage(handle: Handle<UserCreditsPageProps>) {
             'No credits earned yet.'
           )}
         </p>
-        <CreditTiles heading="First words" credits={creditsOf('adjective')} />
-        <CreditTiles heading="Second words" credits={creditsOf('noun')} />
+        <CreditTiles heading={PART_NAMES.adjective.many} credits={creditsOf('adjective')} />
+        <CreditTiles heading={PART_NAMES.noun.many} credits={creditsOf('noun')} />
       </Page>
     )
   }
