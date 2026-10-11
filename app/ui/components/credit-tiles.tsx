@@ -1,7 +1,7 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { TitleDefinition } from '../../data/profileTitles/catalog.ts'
+import { PART_NAMES, type TitleDefinition } from '../../data/profileTitles/catalog.ts'
 import { Modal } from './modal.tsx'
 import { ToggleLabel } from '../shared/form-controls.tsx'
 
@@ -86,7 +86,7 @@ function ProgressBar(handle: Handle<{ current: number; goal: number }>) {
 // One kind of credit, every one there is, as tiles carrying just the word. A
 // tap opens a small modal saying what earns it and, on your own, how close you
 // are — the list is for browsing the words, and thirty sentences at once buried
-// them. Shared by the settings tab and the page of someone else's credits.
+// them. Shared by the settings tab and the Titles tab on both profiles.
 //
 // Showing words before they're earned is deliberate: "Jump-Scared" is a better
 // reason to watch ten horror films than a padlock is.
@@ -142,3 +142,27 @@ export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[] 
     )
   }
 }
+
+// Every credit there is, as genres then roles — what the Titles tab on a profile
+// and in settings both show.
+export function CreditGroups(handle: Handle<{ credits: Credit[] }>) {
+  return () => {
+    const { credits } = handle.props
+    return (
+      <>
+        <CreditTiles
+          heading={PART_NAMES.adjective.many}
+          credits={credits.filter((credit) => credit.title.part === 'adjective')}
+        />
+        <CreditTiles
+          heading={PART_NAMES.noun.many}
+          credits={credits.filter((credit) => credit.title.part === 'noun')}
+        />
+      </>
+    )
+  }
+}
+
+// The profile tab credits sit under, beside the media types, as it appears in
+// the `?tab=` both profile pages read.
+export const TITLES_TAB = 'titles'

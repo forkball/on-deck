@@ -101,7 +101,9 @@ does nothing on its own.
     notification. Credits are kept once earned. Everyone holds the starter
     credits ("Newborn Baby") from signup, worn until they choose; those are never
     announced. `checkTitleUnlocksQuietly` is called after the writes that can
-    earn one, and the pages showing titles check again to catch feed syncs.
+    earn one, and your own profile and settings check again to catch feed
+    syncs. A profile's credits are its Titles tab, beside the media types; the
+    title under the name is plain text.
     `unlocks` runs its SQL through the `db` it is handed rather than the app's
     pool, which is what lets `scripts/backfill-titles.ts`
     (`npm run prod:backfill-titles`) reuse it. `/admin/credits` shows how many

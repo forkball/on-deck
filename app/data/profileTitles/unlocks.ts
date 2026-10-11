@@ -147,13 +147,15 @@ export async function checkTitleUnlocks(
   return { progress, unlocked, newlyUnlocked }
 }
 
-// For the hooks after a write: a title is never worth failing the write over, and
-// the next page that shows titles checks again anyway.
-export async function checkTitleUnlocksQuietly(db: Db, userId: number): Promise<void> {
+// For the hooks after a write, and the profile page: a title is never worth
+// failing the write or the page over, and the next page that shows titles checks
+// again anyway. Null when the check failed.
+export async function checkTitleUnlocksQuietly(db: Db, userId: number): Promise<TitleCheck | null> {
   try {
-    await checkTitleUnlocks(db, userId)
+    return await checkTitleUnlocks(db, userId)
   } catch (error) {
     log.warn(`title check failed for user ${userId}`, error)
+    return null
   }
 }
 
@@ -192,7 +194,7 @@ export interface CreditTallies {
 }
 
 // How the credits are spread across everyone, for the admin page. Counts only:
-// which members hold what stays on their own credits page, behind its privacy.
+// which members hold what stays on their profile's Titles tab, behind its privacy.
 export async function loadCreditTallies(db: Db): Promise<CreditTallies> {
   const [held, worn, [total]] = await Promise.all([
     rowsOf<{ key: string; count: number }>(

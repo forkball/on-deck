@@ -67,7 +67,7 @@ function CreditTable(handle: Handle<{ part: TitlePart; tallies: CreditTallies }>
 }
 
 // How the credits are spread across everyone, for admins. Counts only — no
-// names — so nothing here gets round the privacy of a member's credits page.
+// names — so nothing here gets round the privacy of a member's Titles tab.
 export function AdminCreditsPage(handle: Handle<AdminCreditsPageProps>) {
   return () => {
     const { tallies, displayName } = handle.props

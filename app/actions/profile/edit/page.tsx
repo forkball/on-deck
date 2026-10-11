@@ -37,8 +37,8 @@ export const PROFILE_TABS = {
 
 export type ProfileTab = (typeof PROFILE_TABS)[keyof typeof PROFILE_TABS]
 
-// Where your own credits and title live. Linked from the profile, the unlock
-// notification and your own credits page, so spelled once.
+// Where you choose your title. Linked from your profile's Titles tab, the
+// unlock notification and the profile controller's redirect, so spelled once.
 export function titleSettingsHref(): string {
   return `${routes.profile.edit.index.href()}?tab=${PROFILE_TABS.titles}`
 }

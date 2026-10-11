@@ -13,6 +13,7 @@ import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
+import { CreditGroups, TITLES_TAB, type Credit } from '../../ui/components/credit-tiles.tsx'
 import { UserTitle } from '../../ui/components/user-title.tsx'
 import { composeTitle } from '../../data/profileTitles/catalog.ts'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
@@ -30,13 +31,15 @@ export interface UserProfilePageProps {
   viewerFollows: boolean
   // Absent when `locked` — there's nothing to show them.
   media?: MediaSummaries
-  activeTab?: ActiveMediaType
+  activeTab?: ActiveMediaType | typeof TITLES_TAB
   bio?: string
   followingCount: number
   followersCount: number
-  // How many credits they've earned. Absent when `locked`: what someone has
-  // earned says what they've logged.
-  earnedCredits?: number
+  // Every credit, theirs marked, for the Titles tab — without their progress on
+  // the rest, which would read out their counts (how many things they've
+  // disliked, say). Absent when `locked`: what someone has earned says what
+  // they've logged.
+  credits?: Credit[]
   displayName: string
 }
 
@@ -146,7 +149,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
       bio,
       followingCount,
       followersCount,
-      earnedCredits,
+      credits,
       displayName,
     } = handle.props
     const label = displayLabel(user)
@@ -156,14 +159,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
       <Page title={label} displayName={displayName}>
         <h1 mix={css({ marginBottom: '4px', overflowWrap: 'break-word' })}>{label}</h1>
         {/* Worn in public: shown even on a private profile, like the name. */}
-        <UserTitle
-          title={composeTitle(user.title_adjective, user.title_noun)}
-          href={locked ? undefined : routes.users.credits.href({ userId: String(user.id) })}
-          fallback={
-            earnedCredits ? `${earnedCredits} credit${earnedCredits === 1 ? '' : 's'} earned →` : undefined
-          }
-          margin="0 0 8px"
-        />
+        <UserTitle title={composeTitle(user.title_adjective, user.title_noun)} margin="0 0 8px" />
         <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>
           {locked ? (
             <>
@@ -192,6 +188,9 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
             <MediaTabs
               idPrefix="user-profile"
               active={activeTab!}
+              extraTabs={[
+                { id: TITLES_TAB, label: 'Titles', panel: <CreditGroups credits={credits ?? []} /> },
+              ]}
               panels={Object.fromEntries(
                 ACTIVE_MEDIA_TYPES.map((type) => {
                   const ui = MEDIA_TYPE_UI[type]

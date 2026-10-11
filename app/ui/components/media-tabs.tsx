@@ -16,9 +16,12 @@ export interface MediaTabsProps {
   idPrefix: string
   // Keyed by MediaType, so adding a type is a registry edit, not a prop edit.
   panels: Partial<Record<ActiveMediaType, RemixNode>>
+  // Tabs after the media types that aren't one — a profile's Titles tab.
+  extraTabs?: TabDefinition[]
   // Without this the tabs have no URL representation, so returning from a
-  // detail page always lands on the first one.
-  active?: ActiveMediaType
+  // detail page always lands on the first one. A media type, or the id of one
+  // of `extraTabs`.
+  active?: ActiveMediaType | string
 }
 
 // The media-type reading of Tabs: the registry decides which tabs exist and
@@ -28,7 +31,7 @@ export interface MediaTabsProps {
 // MediaType, and keeps rendered ids stable.
 export function MediaTabs(handle: Handle<MediaTabsProps>) {
   return () => {
-    const { idPrefix, panels, active } = handle.props
+    const { idPrefix, panels, extraTabs = [], active } = handle.props
 
     const tabs: TabDefinition[] = [
       ...ACTIVE_MEDIA_TYPES.map((type) => ({
@@ -44,8 +47,11 @@ export function MediaTabs(handle: Handle<MediaTabsProps>) {
         label: capitalize(type),
         panel: <p mix={css({ color: 'var(--muted)' })}>{capitalize(type)} logging is coming soon.</p>,
       })),
+      ...extraTabs,
     ]
+    const activeId =
+      active && active in MEDIA_TYPE_UI ? MEDIA_TYPE_UI[active as ActiveMediaType].slug : active
 
-    return <Tabs idPrefix={idPrefix} tabs={tabs} active={active ? MEDIA_TYPE_UI[active].slug : undefined} />
+    return <Tabs idPrefix={idPrefix} tabs={tabs} active={activeId} />
   }
 }
