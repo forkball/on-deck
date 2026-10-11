@@ -4,7 +4,8 @@ import { css } from 'remix/ui'
 import { PART_NAMES, type TitleDefinition } from '../../data/profileTitles/catalog.ts'
 import { routes } from '../../routes.ts'
 import { Modal } from './modal.tsx'
-import { Button, ToggleLabel } from '../shared/form-controls.tsx'
+import { Field } from '../shared/field.tsx'
+import { Button, ChoiceGroup, RadioOption, Select, ToggleLabel } from '../shared/form-controls.tsx'
 
 export interface Credit {
   title: TitleDefinition
@@ -153,7 +154,7 @@ export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[];
     const earnedCount = credits.filter((credit) => credit.earned).length
 
     return (
-      <>
+      <section class="credit-section">
         <h2>
           {heading}{' '}
           <span mix={css({ fontSize: '14px', fontWeight: 400, color: 'var(--muted)' })}>
@@ -164,9 +165,14 @@ export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[];
           {credits.map(({ title, earned: isEarned, current }) => {
             const modalId = `credit-${title.key}`
             return (
-              // Not a list-item: DoodleCSS gives every <li> a "* " marker,
-              // unlayered, which beside a tile reads as a stray asterisk.
-              <li key={title.key} mix={css({ display: 'block' })}>
+              // Its display is set by CreditGroups' filter style, alongside the
+              // rules that hide it — see filterStyle.
+              <li
+                key={title.key}
+                class="credit"
+                data-group={groupSlug(title.group)}
+                data-earned={String(isEarned)}
+              >
                 {picking && isEarned ? (
                   <WearTile title={title} picking={picking} />
                 ) : (
@@ -203,18 +209,101 @@ export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[];
             )
           })}
         </ul>
-      </>
+      </section>
     )
   }
 }
 
+type CSSStyle = Parameters<typeof css>[0]
+
+// A group's name as it sits in a data attribute and an option value.
+function groupSlug(group: string): string {
+  return group.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+}
+
+const STATUSES = [
+  { value: 'all', label: 'All', earned: null },
+  { value: 'earned', label: 'Earned', earned: 'true' },
+  { value: 'unearned', label: 'Still to earn', earned: 'false' },
+] as const
+
+// The filter, in CSS: `:has()` reads which status radio and which group
+// option are checked, and hides the tiles that don't match — the same way
+// tabs.tsx switches panels, so it is instant and needs nothing to run in the
+// browser. A section left with no matching tile goes too, and the "nothing
+// matches" line shows when every section has.
+//
+// One style object, the tile's own `display` included: separate css() calls
+// land in @layers ordered by declaration rather than specificity, so a hide
+// rule in another call could lose to it.
+function filterStyle(groups: string[]): CSSStyle {
+  const style: Record<string, unknown> = {
+    // Not a list-item: DoodleCSS gives every <li> a "* " marker, unlayered,
+    // which beside a tile reads as a stray asterisk.
+    '& li.credit': { display: 'block' },
+    '& .no-match': { display: 'none' },
+  }
+  const status = (value: string) => `:has(input[name="credit-status"][value="${value}"]:checked)`
+  const group = (slug: string) => `:has(select[name="credit-group"] option[value="${slug}"]:checked)`
+
+  for (const { value, earned } of STATUSES) {
+    if (earned) style[`&${status(value)} li.credit:not([data-earned="${earned}"])`] = { display: 'none' }
+  }
+  for (const slug of groups) {
+    style[`&${group(slug)} li.credit:not([data-group="${slug}"])`] = { display: 'none' }
+  }
+  for (const { value, earned } of STATUSES) {
+    for (const slug of ['', ...groups]) {
+      const match = `li.credit${slug ? `[data-group="${slug}"]` : ''}${earned ? `[data-earned="${earned}"]` : ''}`
+      if (!slug && !earned) continue
+      const when = `&${status(value)}${slug ? group(slug) : ''}`
+      style[`${when} .credit-section:not(:has(${match}))`] = { display: 'none' }
+      style[`${when}:not(:has(${match})) .no-match`] = { display: 'block' }
+    }
+  }
+  return style as CSSStyle
+}
+
+const filterBarStyle = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'flex-end',
+  gap: '8px 24px',
+  margin: '16px 0 0',
+})
+
 // Every credit there is, as genres then roles — what the Titles tab on a profile
-// and in settings both show.
+// and in settings both show — with a filter by what earns them and by whether
+// they're earned yet.
 export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picking }>) {
   return () => {
     const { credits, picking } = handle.props
+    // In catalog order, which is the order the credits themselves are in.
+    const groups = [...new Set(credits.map((credit) => credit.title.group))]
+
     return (
-      <>
+      <div mix={css(filterStyle(groups.map(groupSlug)))}>
+        <div mix={filterBarStyle}>
+          <Field label="What earns them">
+            <Select name="credit-group">
+              <option value="" selected>
+                Everything
+              </option>
+              {groups.map((group) => (
+                <option key={group} value={groupSlug(group)}>
+                  {group}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <ChoiceGroup legend="Show" layout="row">
+            {STATUSES.map(({ value, label }) => (
+              <RadioOption key={value} name="credit-status" value={value} defaultChecked={value === 'all'}>
+                {label}
+              </RadioOption>
+            ))}
+          </ChoiceGroup>
+        </div>
         <CreditTiles
           heading={PART_NAMES.adjective.many}
           credits={credits.filter((credit) => credit.title.part === 'adjective')}
@@ -225,7 +314,10 @@ export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picki
           credits={credits.filter((credit) => credit.title.part === 'noun')}
           picking={picking}
         />
-      </>
+        <p class="no-match" mix={css({ color: 'var(--muted)', marginTop: '24px' })}>
+          Nothing matches that filter.
+        </p>
+      </div>
     )
   }
 }

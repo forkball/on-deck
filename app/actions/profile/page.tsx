@@ -347,6 +347,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             {
               id: TITLES_TAB,
               label: 'Titles',
+              end: true,
               panel: (
                 <>
                   <p mix={css({ margin: 0, color: 'var(--soft)' })}>

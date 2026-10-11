@@ -105,7 +105,8 @@ does nothing on its own.
     announced. `checkTitleUnlocksQuietly` is called after the writes that can
     earn one, and your own profile and settings check again to catch feed
     syncs. A profile's credits are its Titles tab, beside the media types; the
-    title under the name is plain text.
+    title under the name is plain text. Every credit has a `group` ("Horror",
+    "Films", "Social"), which that tab's CSS-only filter reads.
     `unlocks` runs its SQL through the `db` it is handed rather than the app's
     pool, which is what lets `scripts/backfill-titles.ts`
     (`npm run prod:backfill-titles`) reuse it. `/admin/credits` shows how many
