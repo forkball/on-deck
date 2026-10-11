@@ -1,10 +1,15 @@
 // The titles a member can earn, and what earns each one.
 //
-// A title is two words worn together — an adjective and a noun, "Art House Ho".
-// Every achievement here earns exactly one word, either an adjective (the first
-// word) or a noun (the second). The two are chosen separately in settings, from
-// whatever of each has been earned, so watching obscure films gets you "Art
-// House" and a lot of films gets you "Ho", and together you are an Art House Ho.
+// A title is two words worn together — an adjective and a noun, "Art House
+// Projectionist". Every achievement here earns exactly one word, either an
+// adjective (the first word) or a noun (the second). The two are chosen
+// separately in settings, from whatever of each has been earned, so watching
+// obscure films gets you "Art House" and a hundred films gets you
+// "Projectionist".
+//
+// Every word is meant to be a joke about watching, reading or playing things —
+// they're worn in public, under your name, so nothing a member would mind
+// someone else reading there.
 //
 // Database-free, and importing nothing, so the rules are tested directly — the
 // same reason classify.ts and exclusions.ts are. unlocks.ts gathers the stats and
@@ -80,7 +85,7 @@ function obscureFilms(stats: TitleStats): number {
 export const TITLES: readonly TitleDefinition[] = [
   {
     key: 'rookie',
-    word: 'Rookie',
+    word: 'Background Extra',
     part: 'noun',
     requirement: 'Finish your first anything',
     goal: 1,
@@ -88,7 +93,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'opinionated',
-    word: 'Opinionated',
+    word: 'Hot-Take',
     part: 'adjective',
     requirement: 'Rate your first anything',
     goal: 1,
@@ -104,7 +109,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'horror',
-    word: 'Spooky',
+    word: 'Jump-Scared',
     part: 'adjective',
     requirement: 'Finish 10 horror films, shows or books',
     goal: 10,
@@ -112,7 +117,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'sci_fi',
-    word: 'Cosmic',
+    word: 'Warp-Speed',
     part: 'adjective',
     requirement: 'Finish 10 science fiction anythings',
     goal: 10,
@@ -120,7 +125,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'fantasy',
-    word: 'Enchanted',
+    word: 'Dragon-Riding',
     part: 'adjective',
     requirement: 'Finish 10 fantasy anythings',
     goal: 10,
@@ -128,7 +133,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'documentary',
-    word: 'Factual',
+    word: 'Fact-Checking',
     part: 'adjective',
     requirement: 'Watch 10 documentaries',
     goal: 10,
@@ -136,7 +141,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'animation',
-    word: 'Animated',
+    word: 'Hand-Drawn',
     part: 'adjective',
     requirement: 'Watch 10 animated films or shows',
     goal: 10,
@@ -144,7 +149,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'romance',
-    word: 'Swooning',
+    word: 'Meet-Cute',
     part: 'adjective',
     requirement: 'Finish 10 romances',
     goal: 10,
@@ -152,7 +157,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'comedy',
-    word: 'Giggly',
+    word: 'Laugh-Tracked',
     part: 'adjective',
     requirement: 'Watch 15 comedies',
     goal: 15,
@@ -160,7 +165,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'mystery',
-    word: 'Shifty',
+    word: 'Whodunit',
     part: 'adjective',
     requirement: 'Finish 15 mysteries or crime stories',
     goal: 15,
@@ -168,7 +173,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'western',
-    word: 'Dusty',
+    word: 'Saddle-Sore',
     part: 'adjective',
     requirement: 'Watch 5 westerns',
     goal: 5,
@@ -176,7 +181,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'rpg',
-    word: 'Adventurer',
+    word: 'Side-Quester',
     part: 'noun',
     requirement: 'Play 10 role-playing games',
     goal: 10,
@@ -192,15 +197,15 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'cinephile',
-    word: 'Cinephile',
+    word: 'Popcorn Muncher',
     part: 'noun',
     requirement: 'Watch 50 films',
     goal: 50,
     measure: (stats) => consumedOfType(stats, 'movie'),
   },
   {
-    key: 'ho',
-    word: 'Ho',
+    key: 'projectionist',
+    word: 'Projectionist',
     part: 'noun',
     requirement: 'Watch 100 films',
     goal: 100,
@@ -208,7 +213,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'film_freak',
-    word: 'Film Freak',
+    word: 'Cinema Goblin',
     part: 'noun',
     requirement: 'Watch 250 films',
     goal: 250,
@@ -224,7 +229,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'bookworm',
-    word: 'Bookworm',
+    word: 'Page-Turner',
     part: 'noun',
     requirement: 'Read 25 books',
     goal: 25,
@@ -232,7 +237,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'gamer',
-    word: 'Gamer',
+    word: 'Button Masher',
     part: 'noun',
     requirement: 'Play 25 games',
     goal: 25,
@@ -240,7 +245,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'polymath',
-    word: 'Polymath',
+    word: 'Media Omnivore',
     part: 'noun',
     requirement: 'Finish 5 each of films, shows, books and games',
     goal: 5,
@@ -249,7 +254,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'critic',
-    word: 'Critic',
+    word: 'Armchair Critic',
     part: 'noun',
     requirement: 'Rate 50 things',
     goal: 50,
@@ -257,7 +262,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'superfan',
-    word: 'Superfan',
+    word: 'Stan',
     part: 'noun',
     requirement: 'Give 25 things five stars',
     goal: 25,
@@ -265,7 +270,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'salty',
-    word: 'Salty',
+    word: 'Certified Rotten',
     part: 'adjective',
     requirement: 'Mark 10 things as disliked',
     goal: 10,
@@ -273,7 +278,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'verbose',
-    word: 'Verbose',
+    word: 'Footnoted',
     part: 'adjective',
     requirement: 'Write notes on 20 things',
     goal: 20,
@@ -281,7 +286,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'hoarder',
-    word: 'Hoarder',
+    word: 'Watchlist Hoarder',
     part: 'noun',
     requirement: 'Have 30 things on your want-to list',
     goal: 30,
@@ -289,7 +294,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'picky',
-    word: 'Picky',
+    word: 'Channel-Flipping',
     part: 'adjective',
     requirement: 'Turn down 20 things as not interested',
     goal: 20,
@@ -297,7 +302,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'archivist',
-    word: 'Archivist',
+    word: 'VHS Collector',
     part: 'noun',
     requirement: 'Bring 100 entries in from an import or a connected account',
     goal: 100,
@@ -305,7 +310,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'curious',
-    word: 'Curious',
+    word: 'Algorithm-Fed',
     part: 'adjective',
     requirement: 'Get recommendations for films, shows, books and games',
     goal: 4,
@@ -313,7 +318,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'lucky',
-    word: 'Lucky',
+    word: 'Shuffle-Mode',
     part: 'adjective',
     requirement: "Draw a day's lucky pick",
     goal: 1,
@@ -321,7 +326,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'nosy',
-    word: 'Nosy',
+    word: 'Subscribed',
     part: 'adjective',
     requirement: 'Follow 10 people',
     goal: 10,
@@ -329,7 +334,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'popular',
-    word: 'Popular',
+    word: 'Red-Carpet',
     part: 'adjective',
     requirement: 'Be followed by 10 people',
     goal: 10,

@@ -99,10 +99,10 @@ describe('title catalog', () => {
   })
 
   it('composes a title from either half or both', () => {
-    assert.equal(composeTitle('art_house', 'ho'), 'Art House Ho')
+    assert.equal(composeTitle('art_house', 'projectionist'), 'Art House Projectionist')
     assert.equal(composeTitle('art_house', 'couch_potato'), 'Art House Couch Potato')
-    assert.equal(composeTitle(null, 'bookworm'), 'Bookworm')
-    assert.equal(composeTitle('horror', null), 'Spooky')
+    assert.equal(composeTitle(null, 'bookworm'), 'Page-Turner')
+    assert.equal(composeTitle('horror', null), 'Jump-Scared')
     assert.equal(composeTitle(null, null), null)
     assert.equal(composeTitle('retired-key', null), null)
     // A word only goes in its own slot.

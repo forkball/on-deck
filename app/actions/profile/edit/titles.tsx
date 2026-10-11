@@ -19,28 +19,55 @@ const listStyle = css({
   margin: 0,
   padding: 0,
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-  gap: '10px',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+  alignItems: 'start',
+  gap: '8px',
 })
 
-const itemStyle = css({
+const tileStyle = css({
   border: '1px solid var(--rule)',
   borderRadius: '8px',
-  padding: '10px 12px',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '4px',
+  '&[open]': { background: 'var(--paper-tint)' },
+  // The chevron turns when the tile is open, so a tap visibly did something.
+  '&[open] .chevron': { transform: 'rotate(180deg)' },
 })
 
-const lockedStyle = css({ opacity: 0.6, borderStyle: 'dashed' })
+const lockedStyle = css({ borderStyle: 'dashed', color: 'var(--muted)' })
 
 const earnedStyle = css({ borderLeft: '4px solid var(--accent)', background: 'var(--paper-tint)' })
 
-const metaStyle = css({ fontSize: '12px', color: 'var(--muted)' })
+const summaryStyle = css({
+  listStyle: 'none',
+  cursor: 'pointer',
+  padding: '10px 12px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '6px',
+  '&::-webkit-details-marker': { display: 'none' },
+})
 
-// One kind of word, every one there is, so the ones not yet earned say what
-// earning them takes. Showing those words before they're earned is deliberate —
-// "Spooky" is a better reason to watch ten horror films than a padlock is.
+const wordRowStyle = css({
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'baseline',
+  gap: '6px',
+  fontWeight: 700,
+})
+
+const chevronStyle = css({ fontSize: '11px', color: 'var(--muted)', transition: 'transform 0.15s' })
+
+const barStyle = css({ height: '3px', borderRadius: '2px', background: 'var(--rule)', overflow: 'hidden' })
+
+const detailStyle = css({ margin: 0, padding: '0 12px 10px', fontSize: '13px', color: 'var(--soft)' })
+
+const metaStyle = css({ display: 'block', marginTop: '4px', fontSize: '12px', color: 'var(--muted)' })
+
+// One kind of word, every one there is, as tiles carrying just the word. A tap
+// opens one to say what earns it and how close you are — the list is for
+// browsing the words, and thirty sentences at once buried them.
+//
+// Showing words before they're earned is deliberate: "Jump-Scared" is a better
+// reason to watch ten horror films than a padlock is.
 function WordList(
   handle: Handle<{ heading: string; progress: TitleProgress[]; unlocked: ReadonlySet<string> }>,
 ) {
@@ -51,18 +78,48 @@ function WordList(
     return (
       <>
         <h2>
-          {heading} — earned {earnedCount} of {progress.length}
+          {heading}{' '}
+          <span mix={css({ fontSize: '14px', fontWeight: 400, color: 'var(--muted)' })}>
+            {earnedCount} of {progress.length} earned
+          </span>
         </h2>
         <ul mix={listStyle}>
           {progress.map(({ title, current }) => {
             const isEarned = unlocked.has(title.key)
+            const shown = Math.min(current, title.goal)
             return (
-              <li key={title.key} mix={[itemStyle, isEarned ? earnedStyle : lockedStyle]}>
-                <strong>{title.word}</strong>
-                <span mix={css({ fontSize: '14px' })}>{title.requirement}</span>
-                <span mix={metaStyle}>
-                  {isEarned ? 'Earned' : `${Math.min(current, title.goal)} / ${title.goal}`}
-                </span>
+              // Not a list-item: DoodleCSS gives every <li> a "* " marker,
+              // unlayered, which beside a tile reads as a stray asterisk.
+              <li key={title.key} mix={css({ display: 'block' })}>
+                <details mix={[tileStyle, isEarned ? earnedStyle : lockedStyle]}>
+                  <summary mix={summaryStyle}>
+                    <span mix={wordRowStyle}>
+                      <span>
+                        {isEarned && <span aria-label="Earned">✓ </span>}
+                        {title.word}
+                      </span>
+                      <span class="chevron" aria-hidden="true" mix={chevronStyle}>
+                        ▾
+                      </span>
+                    </span>
+                    {!isEarned && (
+                      <span mix={barStyle} aria-hidden="true">
+                        <span
+                          mix={css({
+                            display: 'block',
+                            height: '100%',
+                            width: `${Math.round((shown / title.goal) * 100)}%`,
+                            background: 'var(--accent)',
+                          })}
+                        />
+                      </span>
+                    )}
+                  </summary>
+                  <p mix={detailStyle}>
+                    {title.requirement}.
+                    <span mix={metaStyle}>{isEarned ? 'Earned' : `${shown} / ${title.goal}`}</span>
+                  </p>
+                </details>
               </li>
             )
           })}

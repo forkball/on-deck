@@ -1,4 +1,4 @@
--- Titles a member earns from what they log and do — "Art House Ho" — and the
+-- Titles a member earns from what they log and do — "Art House Projectionist" — and the
 -- pair they have chosen to wear. See app/data/profileTitles/catalog.ts for the
 -- rules, which live in code: a title is a few words and a threshold, and adding
 -- one should not take a migration.
