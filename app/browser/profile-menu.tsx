@@ -45,6 +45,7 @@ export const ProfileMenu = clientEntry<ProfileMenuProps>(import.meta.url, functi
               display: 'inline-block',
               fontSize: '10px',
               transition: 'transform 0.15s ease',
+              '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
             },
             '&[open] .chevron': {
               transform: 'rotate(180deg)',

@@ -58,6 +58,9 @@ export function Toast(handle: Handle<{ message: string; variant?: ToastVariant }
                     '100%': { opacity: 0, visibility: 'hidden' },
                   },
                   animation: 'toast-fade 5s forwards',
+                  // Still goes after five seconds, just without the fade:
+                  // dropping the animation would leave it up for good.
+                  '@media (prefers-reduced-motion: reduce)': { animationTimingFunction: 'step-end' },
                 }),
           })}
         >

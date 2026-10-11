@@ -281,6 +281,9 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
                     border: '2px solid currentColor',
                     borderTopColor: 'transparent',
                     animation: 'letterboxd-import-spin 0.6s linear infinite',
+                    // Slowed rather than stopped: a still ring with a gap in it
+                    // doesn't read as "working".
+                    '@media (prefers-reduced-motion: reduce)': { animationDuration: '2s' },
                   })}
                 />
               )}

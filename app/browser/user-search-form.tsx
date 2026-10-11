@@ -127,6 +127,9 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
                   border: '2px solid currentColor',
                   borderTopColor: 'transparent',
                   animation: 'user-search-spin 0.6s linear infinite',
+                  // Slowed rather than stopped: a still ring with a gap in it
+                  // doesn't read as "working".
+                  '@media (prefers-reduced-motion: reduce)': { animationDuration: '2s' },
                 })}
               />
             )}
