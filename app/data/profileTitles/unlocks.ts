@@ -1,5 +1,4 @@
 import type { Db } from '../db.ts'
-import { pool } from '../db.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import { createTitleNotification } from '../notifications.ts'
 import { users, userTitles } from '../schema.ts'
@@ -8,18 +7,27 @@ import { earnedTitleKeys, titleByKey, titleProgress, type TitleProgress, type Ti
 
 const log = logger('titles')
 
+// Rows off db.exec, which can't be told their shape the way pool.query can.
+async function rowsOf<Row>(db: Db, sql: string, values: unknown[]): Promise<Row[]> {
+  const result = await db.exec(sql, values)
+  return (result.rows ?? []) as Row[]
+}
+
 // Everything the catalog's rules read, for one member. Aggregates and a join the
-// table API can't express, hence raw SQL — see db.ts.
-export async function loadTitleStats(userId: number): Promise<TitleStats> {
-  const [consumed, counts] = await Promise.all([
-    pool.query<{ type: string; metadata: unknown; popularity_score: number | null }>(
+// table API can't express, hence raw SQL — through the `db` handed in rather
+// than the app's pool, so scripts/backfill-titles.ts can run this same code over
+// a connection of its own.
+export async function loadTitleStats(db: Db, userId: number): Promise<TitleStats> {
+  const [consumed, [row]] = await Promise.all([
+    rowsOf<{ type: string; metadata: unknown; popularity_score: number | null }>(
+      db,
       `select m.type, m.metadata, m.popularity_score
          from user_media_interactions i
          join media_items m on m.id = i.media_item_id
         where i.user_id = $1 and i.status = 'consumed'`,
       [userId],
     ),
-    pool.query<{
+    rowsOf<{
       rated: number
       top_rated: number
       disliked: number
@@ -32,6 +40,7 @@ export async function loadTitleStats(userId: number): Promise<TitleStats> {
       recommended_types: string[] | null
       lucky_runs: number
     }>(
+      db,
       `select
          count(*) filter (where i.rating is not null)::int as rated,
          count(*) filter (where i.rating >= 5)::int as top_rated,
@@ -51,9 +60,9 @@ export async function loadTitleStats(userId: number): Promise<TitleStats> {
     ),
   ])
 
-  const row = counts.rows[0]!
+  if (!row) throw new Error(`no stats row for user ${userId}`)
   return {
-    consumed: consumed.rows.map((entry) => ({
+    consumed: consumed.map((entry) => ({
       type: entry.type,
       tags: parseMediaMetadata(entry.metadata).tags,
       popularity: entry.popularity_score,
@@ -85,9 +94,15 @@ export interface TitleCheck {
 // follow, a run finishing — and on the pages that show titles, which is what
 // catches the writes nothing calls this after (a Letterboxd feed sync, say).
 // Cheap enough for that: two queries over one member's rows.
-export async function checkTitleUnlocks(db: Db, userId: number): Promise<TitleCheck> {
+//
+// `notify: false` records without telling anyone — the backfill's --quiet.
+export async function checkTitleUnlocks(
+  db: Db,
+  userId: number,
+  options: { notify?: boolean } = {},
+): Promise<TitleCheck> {
   const [stats, existing] = await Promise.all([
-    loadTitleStats(userId),
+    loadTitleStats(db, userId),
     db.findMany(userTitles, { where: { user_id: userId } }),
   ])
   const progress = titleProgress(stats)
@@ -98,7 +113,8 @@ export async function checkTitleUnlocks(db: Db, userId: number): Promise<TitleCh
   // `on conflict … returning` is what makes two checks racing each other — a log
   // and a page load — notify once between them: only the one whose insert landed
   // gets the key back.
-  const { rows } = await pool.query<{ title_key: string }>(
+  const rows = await rowsOf<{ title_key: string }>(
+    db,
     `insert into user_titles (user_id, title_key, unlocked_at)
      select $1, key, $3 from unnest($2::text[]) as key
      on conflict (user_id, title_key) do nothing
@@ -110,13 +126,18 @@ export async function checkTitleUnlocks(db: Db, userId: number): Promise<TitleCh
   for (const key of earned) unlocked.add(key)
 
   if (newlyUnlocked.length > 0) {
-    await createTitleNotification(db, userId, newlyUnlocked)
-    // Somebody's first words go straight on, each in its own slot: an unlock
-    // you have to go and find a setting for is easy to never see. Only while
+    // The starter title isn't an achievement, so it isn't announced: being told
+    // you've earned "Unrated" for having signed up is a strange welcome.
+    const announced = newlyUnlocked.filter((key) => !titleByKey(key)?.starter)
+    if (options.notify !== false && announced.length > 0) {
+      await createTitleNotification(db, userId, announced)
+    }
+    // Somebody's first words go straight on, each in its own slot — which, as
+    // the starter credits lead the catalog, is the starter title. Only while
     // they wear nothing, so a title someone chose is never swapped out.
     const firstOf = (part: 'adjective' | 'noun') =>
       newlyUnlocked.find((key) => titleByKey(key)?.part === part) ?? null
-    await pool.query(
+    await db.exec(
       `update users set title_adjective = $2, title_noun = $3
         where id = $1 and title_adjective is null and title_noun is null`,
       [userId, firstOf('adjective'), firstOf('noun')],

@@ -44,18 +44,21 @@ describe('title catalog', () => {
     assert.equal(new Set(TITLES.map((t) => t.word)).size, TITLES.length)
   })
 
-  it('has first words and second words that are easy to come by', () => {
-    // Someone's first log and first rating are enough for a two-word title.
-    const easy = earnedTitleKeys(stats({ consumed: entries(1), rated: 1 }))
+  it('has a genre and a role that are easy to come by', () => {
+    // Someone's first log and first rating are enough for a title of their own.
+    const easy = earnedTitleKeys(stats({ consumed: entries(1), rated: 1 })).filter(
+      (key) => !titleByKey(key)?.starter,
+    )
     assert.deepEqual(easy.map((key) => titleByKey(key)?.part).sort(), ['adjective', 'noun'])
   })
 
-  it('earns nothing for an empty account', () => {
-    assert.deepEqual(earnedTitleKeys(stats()), [])
+  it('gives an empty account the starter title and nothing else', () => {
+    assert.deepEqual(earnedTitleKeys(stats()), ['unrated', 'understudy'])
+    assert.equal(composeTitle('unrated', 'understudy'), 'Unrated Understudy')
   })
 
   it('earns the rookie title from one finished thing', () => {
-    assert.deepEqual(earnedTitleKeys(stats({ consumed: entries(1) })), ['rookie'])
+    assert.deepEqual(earnedTitleKeys(stats({ consumed: entries(1) })), ['unrated', 'understudy', 'rookie'])
   })
 
   it('counts obscure films toward Art House, but not ones the catalog gave no popularity', () => {
@@ -159,14 +162,15 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
     }
   }
 
-  it('unlocks, notifies once, and puts the first title on', async () => {
-    assert.deepEqual((await checkTitleUnlocks(db, userId)).newlyUnlocked, [])
+  it('unlocks, notifies once, and puts the starter title on', async () => {
+    // The starter title goes on unannounced.
+    assert.deepEqual((await checkTitleUnlocks(db, userId)).newlyUnlocked, ['unrated', 'understudy'])
+    assert.deepEqual(await loadWornTitle(db, userId), { adjective: 'unrated', noun: 'understudy' })
+    assert.deepEqual(await listNotifications(db, userId), [])
 
     await logMovies(itemIds.slice(0, 1))
     const first = await checkTitleUnlocks(db, userId)
     assert.deepEqual(first.newlyUnlocked, ['rookie'])
-    // A noun alone: the first word waits for an adjective.
-    assert.deepEqual(await loadWornTitle(db, userId), { adjective: null, noun: 'rookie' })
 
     // Checking again finds nothing new and says nothing more.
     assert.deepEqual((await checkTitleUnlocks(db, userId)).newlyUnlocked, [])
@@ -175,7 +179,7 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
     const second = await checkTitleUnlocks(db, userId)
     assert.deepEqual(second.newlyUnlocked, ['art_house', 'horror'])
     // Already wearing one, so the new unlocks don't replace it.
-    assert.deepEqual(await loadWornTitle(db, userId), { adjective: null, noun: 'rookie' })
+    assert.deepEqual(await loadWornTitle(db, userId), { adjective: 'unrated', noun: 'understudy' })
 
     const notifications = await listNotifications(db, userId)
     assert.deepEqual(
@@ -185,6 +189,24 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
         ['title', ['rookie']],
       ],
     )
+  })
+
+  it('records without notifying when asked to be quiet', async () => {
+    const quietId = await insertUser('titles-quiet')
+    try {
+      await pool.query(
+        `insert into user_media_interactions (user_id, media_item_id, status, created_at, updated_at)
+         values ($1, $2, 'consumed', $3, $3)`,
+        [quietId, itemIds[0], Date.now()],
+      )
+      const check = await checkTitleUnlocks(db, quietId, { notify: false })
+      assert.deepEqual(check.newlyUnlocked, ['unrated', 'understudy', 'rookie'])
+      assert.deepEqual(await listNotifications(db, quietId), [])
+      // Still put on: quiet is about the bell, not the title.
+      assert.deepEqual(await loadWornTitle(db, quietId), { adjective: 'unrated', noun: 'understudy' })
+    } finally {
+      await deleteUsers([quietId])
+    }
   })
 
   it('keeps a title once earned', async () => {

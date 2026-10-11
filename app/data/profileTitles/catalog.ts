@@ -65,6 +65,8 @@ export interface TitleDefinition {
   requirement: string
   goal: number
   measure: (stats: TitleStats) => number
+  // Held by everyone from the start: the title worn before anything is earned.
+  starter?: boolean
 }
 
 // Below this TMDB popularity a film is one hardly anyone is looking up. Zero and
@@ -93,7 +95,29 @@ function obscureFilms(stats: TitleStats): number {
 
 // In the order the settings page lists each part's words: the ones most people
 // earn first, then taste, then volume, then habits, then the social ones.
+//
+// The two starter credits lead the list on purpose: a member's first title goes
+// on automatically, from the first genre and role unlocked — see
+// checkTitleUnlocks — and these are always the first.
 export const TITLES: readonly TitleDefinition[] = [
+  {
+    key: 'unrated',
+    word: 'Unrated',
+    part: 'adjective',
+    requirement: 'Join On Deck',
+    goal: 0,
+    measure: () => 0,
+    starter: true,
+  },
+  {
+    key: 'understudy',
+    word: 'Understudy',
+    part: 'noun',
+    requirement: 'Join On Deck',
+    goal: 0,
+    measure: () => 0,
+    starter: true,
+  },
   {
     key: 'rookie',
     word: 'Background Extra',
