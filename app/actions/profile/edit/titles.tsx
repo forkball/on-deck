@@ -170,9 +170,9 @@ export function Titles(handle: Handle<TitlesProps>) {
               You're wearing <strong>{current}</strong>. It shows under your name on your profile.
             </>
           ) : earnedAdjectives.length + earnedNouns.length > 0 ? (
-            'Pick a first and a second word from the ones you have earned.'
+            'Pick a first and a second word from the credits you have earned.'
           ) : (
-            'Every achievement earns a word for your title. Log something to earn your first.'
+            'Every achievement earns you a credit: a word for your title. Log something to earn your first.'
           )}
         </p>
 

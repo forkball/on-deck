@@ -7,6 +7,9 @@
 // obscure films gets you "Art House" and a hundred films gets you
 // "Projectionist".
 //
+// On the site each word is a "credit", as in a film's: the thing you're
+// credited with. "Title word" was the working name and read like one.
+//
 // Every word is meant to be a joke about watching, reading or playing things —
 // they're worn in public, under your name, so nothing a member would mind
 // someone else reading there.

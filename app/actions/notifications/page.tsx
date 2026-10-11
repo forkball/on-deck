@@ -18,10 +18,7 @@ function unlockedLine(notification: NotificationSummary) {
     const title = titleByKey(key)
     return title ? [title.word] : []
   })
-  const lead =
-    titles.length === 1
-      ? 'You unlocked a new title word: '
-      : `You unlocked ${titles.length} new title words: `
+  const lead = titles.length === 1 ? 'You earned a new credit: ' : `You earned ${titles.length} new credits: `
   return (
     <>
       {lead}

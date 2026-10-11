@@ -21,7 +21,7 @@ import { users, type User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, searchUsers } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { checkTitleUnlocksQuietly } from '../../data/profileTitles/unlocks.ts'
+import { checkTitleUnlocksQuietly, loadUnlockedTitleKeys } from '../../data/profileTitles/unlocks.ts'
 import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { UserSearchPage } from './search-page.tsx'
@@ -123,7 +123,12 @@ export default createController(routes.users, {
         )
       }
 
-      const media = await loadMediaSummaries(db, userId, RECENT_COUNT)
+      // Read, not checked: looking at someone's profile shouldn't be what sends
+      // them a notification.
+      const [media, earnedTitles] = await Promise.all([
+        loadMediaSummaries(db, userId, RECENT_COUNT),
+        loadUnlockedTitleKeys(db, userId),
+      ])
       const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
       return context.render(
@@ -136,6 +141,7 @@ export default createController(routes.users, {
           bio={target.bio ?? ''}
           followingCount={followingCount}
           followersCount={followersCount}
+          earnedTitles={earnedTitles}
           displayName={displayLabel(auth.identity)}
         />,
       )

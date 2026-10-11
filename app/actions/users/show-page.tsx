@@ -34,6 +34,9 @@ export interface UserProfilePageProps {
   bio?: string
   followingCount: number
   followersCount: number
+  // The credits — title words — they've earned. Absent when `locked`: what someone has
+  // earned says what they've logged.
+  earnedTitles?: ReadonlySet<string>
   displayName: string
 }
 
@@ -143,6 +146,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
       bio,
       followingCount,
       followersCount,
+      earnedTitles,
       displayName,
     } = handle.props
     const label = displayLabel(user)
@@ -152,7 +156,12 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
       <Page title={label} displayName={displayName}>
         <h1 mix={css({ marginBottom: '4px', overflowWrap: 'break-word' })}>{label}</h1>
         {/* Worn in public: shown even on a private profile, like the name. */}
-        <UserTitle title={composeTitle(user.title_adjective, user.title_noun)} margin="0 0 8px" />
+        <UserTitle
+          title={composeTitle(user.title_adjective, user.title_noun)}
+          earned={locked ? undefined : earnedTitles}
+          ownerLabel={label}
+          margin="0 0 8px"
+        />
         <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>
           {locked ? (
             <>

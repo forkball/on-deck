@@ -102,6 +102,15 @@
   padding: 0;
 }
 
+/* The title under someone's name, which opens the words they've earned. Drawn
+   like the link the same title is on your own profile — the `link` variant is
+   the small grey one, and this is the most prominent line under the name. */
+.doodle label.title-trigger {
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 /* The wordmark as a torn ticket stub: soft gold, blue type, notched at both
    ends and set a little off square. The mask cuts the notches, so the shape
    holds whatever the text's width. Here because `.doodle a` sets the colour
