@@ -65,6 +65,9 @@ export interface TitleDefinition {
   requirement: string
   goal: number
   measure: (stats: TitleStats) => number
+  // What earns it, as the Titles tab's filter names it: "Horror", "Films",
+  // "Social". A ladder's rungs share their ladder's.
+  group: string
   // Held by everyone from the start: the title worn before anything is earned.
   starter?: boolean
 }
@@ -93,20 +96,21 @@ function obscureFilms(stats: TitleStats): number {
   ).length
 }
 
-// A genre's credits come as a ladder: one word at 5, 10, 50 and 100 of it,
+// A genre's credits — and a medium's — come as a ladder: one word at 5, 10, 50 and 100 of it,
 // alternating between genres and roles so every genre gives two of each. The
 // 10 rung of most is the genre's original credit, which keeps its key — the
 // key is what user_titles stores and what a member wears — so nobody lost a
 // credit or a title when the ladders went in. New rungs are keyed
 // `<genre>_<goal>`.
-interface GenreLadder {
+interface Ladder {
+  group: string
   measure: (stats: TitleStats) => number
   // How the requirement reads for a count: "Finish 50 horror films, shows or books".
   requirement: (count: number) => string
   rungs: { goal: number; key: string; word: string; part: TitlePart }[]
 }
 
-function ladderCredits(ladder: GenreLadder): TitleDefinition[] {
+function ladderCredits(ladder: Ladder): TitleDefinition[] {
   return ladder.rungs.map((rung) => ({
     key: rung.key,
     word: rung.word,
@@ -114,11 +118,13 @@ function ladderCredits(ladder: GenreLadder): TitleDefinition[] {
     requirement: ladder.requirement(rung.goal),
     goal: rung.goal,
     measure: ladder.measure,
+    group: ladder.group,
   }))
 }
 
-const GENRE_LADDERS: GenreLadder[] = [
+const GENRE_LADDERS: Ladder[] = [
   {
+    group: 'Art House',
     measure: obscureFilms,
     requirement: (n) => `Watch ${n} films hardly anyone else has looked up`,
     rungs: [
@@ -129,6 +135,7 @@ const GENRE_LADDERS: GenreLadder[] = [
     ],
   },
   {
+    group: 'Horror',
     measure: (stats) => consumedTagged(stats, 'horror'),
     requirement: (n) => `Finish ${n} horror films, shows or books`,
     rungs: [
@@ -139,6 +146,7 @@ const GENRE_LADDERS: GenreLadder[] = [
     ],
   },
   {
+    group: 'Sci-fi',
     measure: (stats) => consumedTagged(stats, 'science fiction', 'sci-fi & fantasy'),
     requirement: (n) => `Finish ${n} science fiction films, shows or books`,
     rungs: [
@@ -149,6 +157,7 @@ const GENRE_LADDERS: GenreLadder[] = [
     ],
   },
   {
+    group: 'Fantasy',
     measure: (stats) => consumedTagged(stats, 'fantasy', 'sci-fi & fantasy'),
     requirement: (n) => `Finish ${n} fantasy films, shows, books or games`,
     rungs: [
@@ -159,6 +168,7 @@ const GENRE_LADDERS: GenreLadder[] = [
     ],
   },
   {
+    group: 'Documentary',
     measure: (stats) => consumedTagged(stats, 'documentary'),
     requirement: (n) => `Watch ${n} documentaries`,
     rungs: [
@@ -169,6 +179,7 @@ const GENRE_LADDERS: GenreLadder[] = [
     ],
   },
   {
+    group: 'Animation',
     measure: (stats) => consumedTagged(stats, 'animation'),
     requirement: (n) => `Watch ${n} animated films or shows`,
     rungs: [
@@ -179,6 +190,7 @@ const GENRE_LADDERS: GenreLadder[] = [
     ],
   },
   {
+    group: 'Romance',
     measure: (stats) => consumedTagged(stats, 'romance'),
     requirement: (n) => `Finish ${n} romances`,
     rungs: [
@@ -189,6 +201,7 @@ const GENRE_LADDERS: GenreLadder[] = [
     ],
   },
   {
+    group: 'Comedy',
     measure: (stats) => consumedTagged(stats, 'comedy'),
     requirement: (n) => `Watch ${n} comedies`,
     rungs: [
@@ -199,6 +212,7 @@ const GENRE_LADDERS: GenreLadder[] = [
     ],
   },
   {
+    group: 'Mystery & crime',
     measure: (stats) => consumedTagged(stats, 'mystery', 'crime'),
     requirement: (n) => `Finish ${n} mysteries or crime stories`,
     rungs: [
@@ -209,6 +223,7 @@ const GENRE_LADDERS: GenreLadder[] = [
     ],
   },
   {
+    group: 'Westerns',
     measure: (stats) => consumedTagged(stats, 'western'),
     requirement: (n) => `Watch ${n} westerns`,
     rungs: [
@@ -220,6 +235,7 @@ const GENRE_LADDERS: GenreLadder[] = [
     ],
   },
   {
+    group: 'RPGs',
     measure: (stats) => consumedTagged(stats, 'role-playing (rpg)'),
     requirement: (n) => `Play ${n} role-playing games`,
     rungs: [
@@ -231,6 +247,7 @@ const GENRE_LADDERS: GenreLadder[] = [
     ],
   },
   {
+    group: 'Shooters',
     measure: (stats) => consumedTagged(stats, 'shooter'),
     requirement: (n) => `Play ${n} shooters`,
     rungs: [
@@ -238,6 +255,57 @@ const GENRE_LADDERS: GenreLadder[] = [
       { goal: 10, key: 'shooter', word: 'Trigger-Happy', part: 'adjective' },
       { goal: 50, key: 'shooter_50', word: 'Sharpshooter', part: 'noun' },
       { goal: 100, key: 'shooter_100', word: 'One-Man Army', part: 'noun' },
+    ],
+  },
+]
+
+// The same ladder for each medium, counted over everything finished in it. The
+// media's original credits sat at 20 or 25; each keeps its key on the rung
+// below, which only makes it easier. Films keep a fifth rung at 250.
+const MEDIA_LADDERS: Ladder[] = [
+  {
+    group: 'Films',
+    measure: (stats) => consumedOfType(stats, 'movie'),
+    requirement: (n) => `Watch ${n} films`,
+    rungs: [
+      { goal: 5, key: 'films_5', word: 'Popcorn-Fuelled', part: 'adjective' },
+      { goal: 10, key: 'films_10', word: 'Big-Screen', part: 'adjective' },
+      { goal: 50, key: 'cinephile', word: 'Popcorn Muncher', part: 'noun' },
+      { goal: 100, key: 'projectionist', word: 'Projectionist', part: 'noun' },
+      { goal: 250, key: 'film_freak', word: 'Cinema Goblin', part: 'noun' },
+    ],
+  },
+  {
+    group: 'TV',
+    measure: (stats) => consumedOfType(stats, 'tv'),
+    requirement: (n) => `Finish ${n} shows`,
+    rungs: [
+      { goal: 5, key: 'tv_5', word: 'Binge-Watching', part: 'adjective' },
+      { goal: 10, key: 'couch_potato', word: 'Couch Potato', part: 'noun' },
+      { goal: 50, key: 'tv_50', word: 'Square-Eyed', part: 'adjective' },
+      { goal: 100, key: 'tv_100', word: 'Showrunner', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Books',
+    measure: (stats) => consumedOfType(stats, 'book'),
+    requirement: (n) => `Read ${n} books`,
+    rungs: [
+      { goal: 5, key: 'books_5', word: 'Dog-Eared', part: 'adjective' },
+      { goal: 10, key: 'bookworm', word: 'Page-Turner', part: 'noun' },
+      { goal: 50, key: 'books_50', word: 'Well-Read', part: 'adjective' },
+      { goal: 100, key: 'books_100', word: 'Bookworm', part: 'noun' },
+    ],
+  },
+  {
+    group: 'Games',
+    measure: (stats) => consumedOfType(stats, 'game'),
+    requirement: (n) => `Play ${n} games`,
+    rungs: [
+      { goal: 5, key: 'games_5', word: 'Player-One', part: 'adjective' },
+      { goal: 10, key: 'gamer', word: 'Button Masher', part: 'noun' },
+      { goal: 50, key: 'games_50', word: 'Speedrunning', part: 'adjective' },
+      { goal: 100, key: 'games_100', word: 'Completionist', part: 'noun' },
     ],
   },
 ]
@@ -251,6 +319,7 @@ const GENRE_LADDERS: GenreLadder[] = [
 export const TITLES: readonly TitleDefinition[] = [
   {
     key: 'newborn',
+    group: 'Getting started',
     word: 'Newborn',
     part: 'adjective',
     requirement: 'Join On Deck',
@@ -260,6 +329,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'baby',
+    group: 'Getting started',
     word: 'Baby',
     part: 'noun',
     requirement: 'Join On Deck',
@@ -269,6 +339,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'rookie',
+    group: 'Getting started',
     word: 'Background Extra',
     part: 'noun',
     requirement: 'Finish your first anything',
@@ -277,6 +348,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'opinionated',
+    group: 'Getting started',
     word: 'Hot-Take',
     part: 'adjective',
     requirement: 'Rate your first anything',
@@ -284,56 +356,10 @@ export const TITLES: readonly TitleDefinition[] = [
     measure: (stats) => stats.rated,
   },
   ...GENRE_LADDERS.flatMap(ladderCredits),
-  {
-    key: 'cinephile',
-    word: 'Popcorn Muncher',
-    part: 'noun',
-    requirement: 'Watch 50 films',
-    goal: 50,
-    measure: (stats) => consumedOfType(stats, 'movie'),
-  },
-  {
-    key: 'projectionist',
-    word: 'Projectionist',
-    part: 'noun',
-    requirement: 'Watch 100 films',
-    goal: 100,
-    measure: (stats) => consumedOfType(stats, 'movie'),
-  },
-  {
-    key: 'film_freak',
-    word: 'Cinema Goblin',
-    part: 'noun',
-    requirement: 'Watch 250 films',
-    goal: 250,
-    measure: (stats) => consumedOfType(stats, 'movie'),
-  },
-  {
-    key: 'couch_potato',
-    word: 'Couch Potato',
-    part: 'noun',
-    requirement: 'Finish 20 shows',
-    goal: 20,
-    measure: (stats) => consumedOfType(stats, 'tv'),
-  },
-  {
-    key: 'bookworm',
-    word: 'Page-Turner',
-    part: 'noun',
-    requirement: 'Read 25 books',
-    goal: 25,
-    measure: (stats) => consumedOfType(stats, 'book'),
-  },
-  {
-    key: 'gamer',
-    word: 'Button Masher',
-    part: 'noun',
-    requirement: 'Play 25 games',
-    goal: 25,
-    measure: (stats) => consumedOfType(stats, 'game'),
-  },
+  ...MEDIA_LADDERS.flatMap(ladderCredits),
   {
     key: 'polymath',
+    group: 'Across media',
     word: 'Media Omnivore',
     part: 'noun',
     requirement: 'Finish 5 each of films, shows, books and games',
@@ -343,6 +369,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'critic',
+    group: 'Ratings & notes',
     word: 'Armchair Critic',
     part: 'noun',
     requirement: 'Rate 50 things',
@@ -351,6 +378,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'superfan',
+    group: 'Ratings & notes',
     word: 'Stan',
     part: 'noun',
     requirement: 'Give 25 things five stars',
@@ -359,6 +387,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'salty',
+    group: 'Ratings & notes',
     word: 'Certified Rotten',
     part: 'adjective',
     requirement: 'Mark 10 things as disliked',
@@ -367,6 +396,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'verbose',
+    group: 'Ratings & notes',
     word: 'Footnoted',
     part: 'adjective',
     requirement: 'Write notes on 20 things',
@@ -375,6 +405,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'hoarder',
+    group: 'Your lists',
     word: 'Watchlist Hoarder',
     part: 'noun',
     requirement: 'Have 30 things on your want-to list',
@@ -383,6 +414,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'picky',
+    group: 'Your lists',
     word: 'Channel-Flipping',
     part: 'adjective',
     requirement: 'Turn down 20 things as not interested',
@@ -391,6 +423,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'archivist',
+    group: 'Imports & picks',
     word: 'VHS Collector',
     part: 'noun',
     requirement: 'Bring 100 entries in from an import or a connected account',
@@ -399,6 +432,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'curious',
+    group: 'Imports & picks',
     word: 'Algorithm-Fed',
     part: 'adjective',
     requirement: 'Get recommendations for films, shows, books and games',
@@ -407,6 +441,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'lucky',
+    group: 'Imports & picks',
     word: 'Shuffle-Mode',
     part: 'adjective',
     requirement: "Draw a day's lucky pick",
@@ -415,6 +450,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'nosy',
+    group: 'Social',
     word: 'Subscribed',
     part: 'adjective',
     requirement: 'Follow 10 people',
@@ -423,6 +459,7 @@ export const TITLES: readonly TitleDefinition[] = [
   },
   {
     key: 'popular',
+    group: 'Social',
     word: 'Red-Carpet',
     part: 'adjective',
     requirement: 'Be followed by 10 people',
