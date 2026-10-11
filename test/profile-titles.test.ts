@@ -10,6 +10,7 @@ import {
   titleByKey,
   titleProgress,
   type ConsumedEntry,
+  type TitleDefinition,
   type TitleStats,
 } from '../app/data/profileTitles/catalog.ts'
 import { checkTitleUnlocks, loadCreditTallies, loadWornTitle } from '../app/data/profileTitles/unlocks.ts'
@@ -91,6 +92,37 @@ describe('title catalog', () => {
     )!
     assert.equal(mystery.current, 8)
     assert.equal(mystery.earned, false)
+  })
+
+  it('climbs a genre ladder at 5, 10, 50 and 100', () => {
+    const horror = (count: number) =>
+      earnedTitleKeys(stats({ consumed: entries(count, { tags: ['horror'] }) })).filter((key) =>
+        key.startsWith('horror'),
+      )
+    assert.deepEqual(horror(4), [])
+    assert.deepEqual(horror(5), ['horror_5'])
+    assert.deepEqual(horror(10), ['horror_5', 'horror'])
+    assert.deepEqual(horror(49), ['horror_5', 'horror'])
+    assert.deepEqual(horror(50), ['horror_5', 'horror', 'horror_50'])
+    assert.deepEqual(horror(100), ['horror_5', 'horror', 'horror_50', 'horror_100'])
+  })
+
+  it('gives every genre ladder two genres and two roles', () => {
+    const ladders = new Map<string, TitleDefinition[]>()
+    for (const title of TITLES) {
+      const genre = title.requirement.replace(/\d+/, 'N')
+      if (![5, 10, 50, 100].includes(title.goal) || !/\d/.test(title.requirement)) continue
+      ladders.set(genre, [...(ladders.get(genre) ?? []), title])
+    }
+    const full = [...ladders.values()].filter((rungs) => rungs.length === 4)
+    assert.ok(full.length >= 12, `expected at least 12 four-rung ladders, found ${full.length}`)
+    for (const rungs of full) {
+      assert.deepEqual(
+        rungs.map((rung) => rung.part).sort(),
+        ['adjective', 'adjective', 'noun', 'noun'],
+        rungs[0]!.requirement,
+      )
+    }
   })
 
   it('needs every medium for Polymath', () => {
@@ -177,7 +209,7 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
 
     await logMovies(itemIds.slice(1))
     const second = await checkTitleUnlocks(db, userId)
-    assert.deepEqual(second.newlyUnlocked, ['art_house', 'horror'])
+    assert.deepEqual(second.newlyUnlocked, ['art_house_5', 'art_house', 'horror_5', 'horror'])
     // Already wearing one, so the new unlocks don't replace it.
     assert.deepEqual(await loadWornTitle(db, userId), { adjective: 'newborn', noun: 'baby' })
 
@@ -185,7 +217,7 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
     assert.deepEqual(
       notifications.map((n) => [n.type, n.unlockedTitles]),
       [
-        ['title', ['art_house', 'horror']],
+        ['title', ['art_house_5', 'art_house', 'horror_5', 'horror']],
         ['title', ['rookie']],
       ],
     )
