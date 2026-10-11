@@ -6,6 +6,7 @@ import { Database } from 'remix/data-table'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
+import { checkTitleUnlocksQuietly } from '../../../data/profileTitles/unlocks.ts'
 import { users } from '../../../data/schema.ts'
 import {
   emailSchema,
@@ -78,6 +79,10 @@ export default createController(routes.auth.signup, {
         },
         { returnRow: true },
       )
+
+      // Puts the starter title on, so a new member's profile has one from the
+      // first page — rather than from whenever something first checks.
+      await checkTitleUnlocksQuietly(db, user.id)
 
       const session = completeAuth(context)
       session.set('auth', { userId: user.id })

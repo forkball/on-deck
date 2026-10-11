@@ -20,6 +20,7 @@ import {
   logInteraction,
   parseRatingSubmission,
 } from '../data/mediaItems.ts'
+import { checkTitleUnlocksQuietly } from '../data/profileTitles/unlocks.ts'
 import { INTERACTION_SOURCES, INTERACTION_STATUSES, type User } from '../data/schema.ts'
 import type { MediaControllerContext, MediaItemControllerContext } from '../middleware/context.ts'
 import { displayLabel } from '../data/users.ts'
@@ -222,6 +223,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
         // this row can't mistake it for one of its own and take it back.
         source: INTERACTION_SOURCES.manual,
       })
+      await checkTitleUnlocksQuietly(db, identity.id)
 
       return redirect(parsed.value.return_to || ui.hrefs.search(), 303)
     },

@@ -93,6 +93,19 @@ does nothing on its own.
     entry an exact match already holds. `classify` and `review` hold the rules —
     confidence, conflicts, duplicates, counts — and are free of the database so
     they can be tested directly
+  - `app/data/profileTitles/` — titles. A title is a genre and a role ("Art
+    House Projectionist"), and each is a credit a member earns. `catalog` holds
+    every credit, the one word it earns and the threshold that earns it
+    (database-free, so the rules are tested directly); `unlocks` gathers the
+    stats, records what they earn in `user_titles` and sends the unlock
+    notification. Credits are kept once earned. Everyone holds the starter
+    credits ("Newborn Baby") from signup, worn until they choose; those are never
+    announced. `checkTitleUnlocksQuietly` is called after the writes that can
+    earn one, and the pages showing titles check again to catch feed syncs.
+    `unlocks` runs its SQL through the `db` it is handed rather than the app's
+    pool, which is what lets `scripts/backfill-titles.ts`
+    (`npm run prod:backfill-titles`) reuse it. `/admin/credits` shows how many
+    members hold and wear each credit, counts only
   - `app/data/recommendations/` — the generation pipeline: `picks` asks the model,
     `matching` resolves picks to catalog entries, `exclusions` decides what a run
     may not suggest (database-free, so the rule can be tested directly),

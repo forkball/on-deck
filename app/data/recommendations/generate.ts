@@ -7,6 +7,7 @@ import type { Db } from '../db.ts'
 import { isFollowing } from '../follows.ts'
 import { countUserMediaLog, listUserMediaLog, CONSUMPTION_STATUSES, type MediaType } from '../mediaItems.ts'
 import { createNotification } from '../notifications.ts'
+import { checkTitleUnlocksQuietly } from '../profileTitles/unlocks.ts'
 import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
 import { recordRunAgainstDailyLimit, runCostFor } from './dailyLimit.ts'
@@ -517,6 +518,7 @@ export async function generateRecommendations(
         ),
     track('run.notify', () => notifyMutualFollowers(db, requestingUserId, memberUserIds, runId)),
     track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType, { lucky })),
+    track('run.titles', () => checkTitleUnlocksQuietly(db, requestingUserId)),
   ])
 
   // Off the critical path deliberately: nobody's run should fail over its own

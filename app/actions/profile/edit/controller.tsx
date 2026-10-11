@@ -19,11 +19,13 @@ import {
 } from '../../../data/users.ts'
 import { hasImportedLibrary } from '../../../data/imports/batches.ts'
 import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
+import { checkTitleUnlocks, loadWornTitle } from '../../../data/profileTitles/unlocks.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
 import { verifyPassword } from '../../auth/password.ts'
 import { profileSettingsFor } from '../../../data/recommendations/tasteProfile.ts'
 import type { ConnectionsProps } from './connections.tsx'
+import type { TitlesProps } from './titles.tsx'
 import { PROFILE_TABS, ProfileEditPage, type ProfileTab } from './page.tsx'
 
 const profileSchema = f.object({
@@ -74,6 +76,14 @@ async function connectionsFor(db: Db, identity: User, url: URL): Promise<Connect
   }
 }
 
+// Checked on the way in rather than only read: this is where someone comes to
+// see what they've earned, and it should include whatever a feed sync logged
+// since the last check.
+async function titlesFor(db: Db, identity: User): Promise<TitlesProps> {
+  const { progress, unlocked } = await checkTitleUnlocks(db, identity.id)
+  return { progress, unlocked, ...(await loadWornTitle(db, identity.id)), isAdmin: identity.is_admin }
+}
+
 // Which pane to open on. Read off the query string the other actions redirect
 // with, so a save or a failed connect comes back to the thing it was about
 // rather than to the profile form.
@@ -112,6 +122,8 @@ export default createController(routes.profile.edit, {
           saved={context.url.searchParams.get('saved') === '1'}
           displayName={displayLabel(auth.identity)}
           connections={await connectionsFor(db, auth.identity, context.url)}
+          titles={await titlesFor(db, auth.identity)}
+          titleSaved={context.url.searchParams.get('titleSaved') === '1'}
           activeTab={activeTab(context.url)}
         />,
       )
@@ -134,6 +146,7 @@ export default createController(routes.profile.edit, {
             settings={profileSettingsFor(auth.identity)}
             displayName={displayLabel(auth.identity)}
             connections={await connectionsFor(db, auth.identity, context.url)}
+            titles={await titlesFor(db, auth.identity)}
             // This form is the profile pane, and it is the one that failed —
             // so the errors are rendered where the fields carrying them are.
             activeTab={PROFILE_TABS.profile}

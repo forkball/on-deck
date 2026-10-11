@@ -16,6 +16,13 @@ import {
   profileSettingsFor,
   regenerateTasteProfile,
 } from '../../data/recommendations/tasteProfile.ts'
+import { composeTitle, parseTitleChoice } from '../../data/profileTitles/catalog.ts'
+import {
+  checkTitleUnlocksQuietly,
+  chooseTitle,
+  loadUnlockedTitleKeys,
+  loadWornTitle,
+} from '../../data/profileTitles/unlocks.ts'
 import { updateProfileSettings, updateWatchRegion } from '../../data/users.ts'
 import { parseWatchRegion } from '../../data/watchRegion.ts'
 
@@ -35,6 +42,7 @@ import { routes } from '../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
 import { parseInteractionStatus } from '../../interactionStatus.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
+import { titleSettingsHref } from './edit/page.tsx'
 import { ProfilePage } from './page.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
 import { safeReturnPath } from '../../ui/backLink.ts'
@@ -51,10 +59,14 @@ export default createController(routes.profile, {
       const db = context.get(Database)
       const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
 
-      // Only the log waits on the feed; everything else loads alongside it.
-      const [media, followingCount, followersCount, rebuildAllowance, batches] = await Promise.all([
+      // Only the log waits on the feed; everything else loads alongside it. The
+      // title check waits too, so whatever the feed just logged can earn one.
+      const [[media, worn], followingCount, followersCount, rebuildAllowance, batches] = await Promise.all([
         syncLetterboxdBeforeReading(db, auth.identity).then(() =>
-          loadMediaSummaries(db, auth.identity.id, RECENT_COUNT),
+          Promise.all([
+            loadMediaSummaries(db, auth.identity.id, RECENT_COUNT),
+            checkTitleUnlocksQuietly(db, auth.identity.id).then(() => loadWornTitle(db, auth.identity.id)),
+          ]),
         ),
         countFollowing(db, auth.identity.id),
         countFollowers(db, auth.identity.id),
@@ -92,8 +104,24 @@ export default createController(routes.profile, {
           rebuildError={context.url.searchParams.get('rebuildError') ?? undefined}
           waitingImports={waitingImports}
           displayName={displayLabel(auth.identity)}
+          title={composeTitle(worn.adjective, worn.noun)}
         />,
       )
+    },
+
+    async title(context) {
+      const auth = context.get(Auth)
+      const formData = context.get(FormData)
+      const db = context.get(Database)
+
+      const choice = parseTitleChoice(
+        { adjective: String(formData.get('adjective') ?? ''), noun: String(formData.get('noun') ?? '') },
+        await loadUnlockedTitleKeys(db, auth.identity.id),
+      )
+      if (!choice) return new Response("You haven't earned that title.", { status: 400 })
+
+      await chooseTitle(db, auth.identity.id, choice)
+      return redirect(`${titleSettingsHref()}&titleSaved=1`, 303)
     },
 
     async settings(context) {

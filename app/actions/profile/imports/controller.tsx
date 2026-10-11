@@ -19,6 +19,7 @@ import {
   skipRow,
   unacceptBulk,
 } from '../../../data/imports/batches.ts'
+import { checkTitleUnlocksQuietly } from '../../../data/profileTitles/unlocks.ts'
 import { looserQueries, parseBulkKind } from '../../../data/imports/classify.ts'
 import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
@@ -265,7 +266,9 @@ export default createController(routes.profile.imports, {
       // Saving twice would re-upsert every row over the log it just wrote.
       if (batch.status !== 'review') return backToReview(batch)
 
-      await saveBatch(context.get(Database), batch)
+      const db = context.get(Database)
+      await saveBatch(db, batch)
+      await checkTitleUnlocksQuietly(db, batch.user_id)
       return backToReview(batch)
     },
 

@@ -13,6 +13,7 @@ import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
+import { titleSettingsHref } from '../profile/edit/page.tsx'
 import { NotificationsPage } from './page.tsx'
 
 export default createController(routes.notifications, {
@@ -53,6 +54,9 @@ export default createController(routes.notifications, {
       await markNotificationRead(db, notificationId, auth.identity.id)
 
       // Each kind opens the thing it's about.
+      if (notification.type === 'title') {
+        return redirect(titleSettingsHref(), 303)
+      }
       if (notification.type === 'follow') {
         return redirect(routes.users.show.href({ userId: String(notification.actor_user_id) }), 303)
       }

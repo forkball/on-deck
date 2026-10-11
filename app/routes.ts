@@ -49,6 +49,10 @@ export const routes = route({
     // field on `settings`: that form sends every setting at once, and is posted
     // from a different page than the one this is changed on.
     watchRegion: post('watch-region'),
+    // Which of the titles you've earned to wear. Its own POST for the reason
+    // watchRegion is: the profile form asks for a password on some changes, and
+    // picking a title should never be one of them.
+    title: post('title'),
     rebuild: post('rebuild/:mediaType'),
     password: form('password', { formMethod: 'PUT', names: { action: 'update' } }),
     importMovies: route('import-movies', {
@@ -120,6 +124,12 @@ export const routes = route({
     unconfirmed: get('unconfirmed/:unconfirmedId'),
     show: get(':runId'),
   }),
+  // Admin-only views. Each action checks users.is_admin itself and answers 403
+  // otherwise, the way the rematch route does.
+  admin: route('admin', {
+    // How many members hold and wear each credit.
+    credits: get('credits'),
+  }),
   users: route('users', {
     search: get('search'),
     suggest: get('suggest'),
@@ -127,6 +137,8 @@ export const routes = route({
     watched: get(':userId/watched'),
     following: get(':userId/following'),
     followers: get(':userId/followers'),
+    // Every credit they've earned, which their title on the profile links to.
+    credits: get(':userId/credits'),
     follow: post(':userId/follow'),
     unfollow: post(':userId/unfollow'),
   }),
