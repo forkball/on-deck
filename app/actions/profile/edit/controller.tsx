@@ -21,12 +21,12 @@ import { hasImportedLibrary } from '../../../data/imports/batches.ts'
 import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import { checkTitleUnlocks, loadWornTitle } from '../../../data/profileTitles/unlocks.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
-import { routes } from '../../../routes.ts'
+import { routes, titleSettingsHref } from '../../../routes.ts'
 import { verifyPassword } from '../../auth/password.ts'
 import { profileSettingsFor } from '../../../data/recommendations/tasteProfile.ts'
 import type { ConnectionsProps } from './connections.tsx'
 import type { TitlesProps } from './titles.tsx'
-import { PROFILE_TABS, ProfileEditPage, titleSettingsHref, type ProfileTab } from './page.tsx'
+import { PROFILE_TABS, ProfileEditPage, type ProfileTab } from './page.tsx'
 
 const profileSchema = f.object({
   email: f.field(emailSchema),

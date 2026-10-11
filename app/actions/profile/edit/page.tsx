@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import { BIO_MAX_LENGTH, USERNAME_HINT, USERNAME_MAX_LENGTH } from '../../../data/users.ts'
 import type { TasteProfileSettings } from '../../../data/recommendations/tasteProfile.ts'
 import { Toast } from '../../../ui/components/toast.tsx'
-import { routes } from '../../../routes.ts'
+import { routes, TITLES_SETTINGS_TAB } from '../../../routes.ts'
 import { Page } from '../../../ui/components/page.tsx'
 import { PasswordConfirmModal } from '../../../ui/components/password-confirm-modal.tsx'
 import { Field } from '../../../ui/shared/field.tsx'
@@ -31,17 +31,11 @@ import {
 export const PROFILE_TABS = {
   profile: 'profile',
   taste: 'taste',
-  titles: 'titles',
+  titles: TITLES_SETTINGS_TAB,
   connections: 'connections',
 } as const
 
 export type ProfileTab = (typeof PROFILE_TABS)[keyof typeof PROFILE_TABS]
-
-// Where you choose your title. Linked from your profile's Titles tab, the
-// unlock notification and the profile controller's redirect, so spelled once.
-export function titleSettingsHref(): string {
-  return `${routes.profile.edit.index.href()}?tab=${PROFILE_TABS.titles}`
-}
 
 export interface ProfileEditPageProps {
   // What to put back in the inputs: the stored row on a first load, whatever

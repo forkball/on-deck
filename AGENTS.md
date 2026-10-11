@@ -104,8 +104,10 @@ does nothing on its own.
     credits ("Newborn Baby") from signup, worn until they choose; those are never
     announced. `checkTitleUnlocksQuietly` is called after the writes that can
     earn one, and your own profile and settings check again to catch feed
-    syncs. A profile's credits are its Titles tab, beside the media types; the
-    title under the name is plain text. Every credit has a `group` ("Horror",
+    syncs. Your own credits are chosen on the Titles tab in
+    settings, linked as Titles in the nav's menu (`titleSettingsHref` in
+    routes.ts); someone else's are the Titles tab on their profile. The title
+    under the name is plain text. Every credit has a `group` ("Horror",
     "Films", "Social"), which that tab's CSS-only filter reads.
     `unlocks` runs its SQL through the `db` it is handed rather than the app's
     pool, which is what lets `scripts/backfill-titles.ts`
