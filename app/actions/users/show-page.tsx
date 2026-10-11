@@ -13,6 +13,8 @@ import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
+import { UserTitle } from '../../ui/components/user-title.tsx'
+import { composeTitle } from '../../data/profileTitles/catalog.ts'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
@@ -149,6 +151,8 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
     return (
       <Page title={label} displayName={displayName}>
         <h1 mix={css({ marginBottom: '4px', overflowWrap: 'break-word' })}>{label}</h1>
+        {/* Worn in public: shown even on a private profile, like the name. */}
+        <UserTitle title={composeTitle(user.title_adjective, user.title_noun)} margin="0 0 8px" />
         <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>
           {locked ? (
             <>

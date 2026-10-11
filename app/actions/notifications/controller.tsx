@@ -53,6 +53,9 @@ export default createController(routes.notifications, {
       await markNotificationRead(db, notificationId, auth.identity.id)
 
       // Each kind opens the thing it's about.
+      if (notification.type === 'title') {
+        return redirect(`${routes.profile.edit.index.href()}?tab=titles`, 303)
+      }
       if (notification.type === 'follow') {
         return redirect(routes.users.show.href({ userId: String(notification.actor_user_id) }), 303)
       }

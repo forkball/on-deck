@@ -19,6 +19,7 @@ import {
   skipRow,
   unacceptBulk,
 } from '../../../data/imports/batches.ts'
+import { checkTitleUnlocksQuietly } from '../../../data/profileTitles/unlocks.ts'
 import { looserQueries, parseBulkKind } from '../../../data/imports/classify.ts'
 import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
@@ -266,6 +267,7 @@ export default createController(routes.profile.imports, {
       if (batch.status !== 'review') return backToReview(batch)
 
       await saveBatch(context.get(Database), batch)
+      await checkTitleUnlocksQuietly(context.get(Database), batch.user_id)
       return backToReview(batch)
     },
 

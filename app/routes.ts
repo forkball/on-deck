@@ -49,6 +49,10 @@ export const routes = route({
     // field on `settings`: that form sends every setting at once, and is posted
     // from a different page than the one this is changed on.
     watchRegion: post('watch-region'),
+    // Which of the titles you've earned to wear. Its own POST for the reason
+    // watchRegion is: the profile form asks for a password on some changes, and
+    // picking a title should never be one of them.
+    title: post('title'),
     rebuild: post('rebuild/:mediaType'),
     password: form('password', { formMethod: 'PUT', names: { action: 'update' } }),
     importMovies: route('import-movies', {

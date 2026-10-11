@@ -93,6 +93,13 @@ does nothing on its own.
     entry an exact match already holds. `classify` and `review` hold the rules —
     confidence, conflicts, duplicates, counts — and are free of the database so
     they can be tested directly
+  - `app/data/profileTitles/` — the titles a member earns ("Art House Ho"):
+    `catalog` holds every title, as an adjective and a noun worn separately, and
+    the threshold that earns it (database-free, so the rules are tested
+    directly); `unlocks` gathers the stats, records what they earn in
+    `user_titles` and sends the unlock notification. Titles are kept once
+    earned. `checkTitleUnlocksQuietly` is called after the writes that can earn
+    one, and the pages showing titles check again to catch feed syncs
   - `app/data/recommendations/` — the generation pipeline: `picks` asks the model,
     `matching` resolves picks to catalog entries, `exclusions` decides what a run
     may not suggest (database-free, so the rule can be tested directly),

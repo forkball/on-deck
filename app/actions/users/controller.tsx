@@ -21,6 +21,7 @@ import { users, type User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, searchUsers } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
+import { checkTitleUnlocksQuietly } from '../../data/profileTitles/unlocks.ts'
 import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { UserSearchPage } from './search-page.tsx'
@@ -238,6 +239,11 @@ export default createController(routes.users, {
       const userId = Number(context.params.userId)
       const db = context.get(Database)
       await followUser(db, auth.identity.id, userId)
+      // Both ends moved: one more followed, one more follower.
+      await Promise.all([
+        checkTitleUnlocksQuietly(db, auth.identity.id),
+        checkTitleUnlocksQuietly(db, userId),
+      ])
 
       const formData = context.get(FormData)
       const returnTo = String(formData.get('return_to') || '')

@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { NotificationSummary } from '../../data/notifications.ts'
+import { titleByKey } from '../../data/profileTitles/catalog.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
 import { Link } from '../../ui/shared/form-controls.tsx'
@@ -9,6 +10,32 @@ import { Link } from '../../ui/shared/form-controls.tsx'
 export interface NotificationsPageProps {
   notifications: NotificationSummary[]
   displayName: string
+}
+
+// The words of each title unlocked, "Art House · Ho", joined into one line.
+function unlockedLine(notification: NotificationSummary) {
+  const titles = notification.unlockedTitles.flatMap((key) => {
+    const title = titleByKey(key)
+    return title ? [`${title.adjective} · ${title.noun}`] : []
+  })
+  const lead =
+    titles.length === 1 ? 'You unlocked a new title: ' : `You unlocked ${titles.length} new titles: `
+  return (
+    <>
+      {lead}
+      <strong>{titles.join(', ')}</strong>
+    </>
+  )
+}
+
+function describe(notification: NotificationSummary) {
+  if (notification.type === 'title') return unlockedLine(notification)
+  return (
+    <>
+      <strong>{notification.actorLabel}</strong>{' '}
+      {notification.type === 'follow' ? 'started following you' : 'ran recommendations you can view'}
+    </>
+  )
 }
 
 export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
@@ -19,8 +46,8 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
       <Page heading="Notifications" displayName={displayName}>
         {notifications.length === 0 ? (
           <p>
-            Nothing yet — you'll hear about it here when someone you follow (and who follows you back) runs a
-            group recommendation with you in it.
+            Nothing yet — you'll hear about it here when you earn a new title, when someone follows you, or
+            when someone you follow (and who follows you back) runs a group recommendation with you in it.
           </p>
         ) : (
           <ul
@@ -66,11 +93,7 @@ export function NotificationsPage(handle: Handle<NotificationsPageProps>) {
                     href={routes.notifications.read.href({ notificationId: String(notification.id) })}
                     rmx-document=""
                   >
-                    <strong>{notification.actorLabel}</strong>{' '}
-                    {notification.type === 'follow'
-                      ? 'started following you'
-                      : 'ran recommendations you can view'}{' '}
-                    — {date}
+                    {describe(notification)} — {date}
                   </Link>
                   {!notification.read && (
                     <span
