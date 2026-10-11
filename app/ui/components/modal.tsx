@@ -52,6 +52,8 @@ export function Modal(
     defaultOpen?: boolean
     // False when the content has its own way out.
     closeButton?: boolean
+    // A narrower box, for a line or two of explanation rather than a form.
+    small?: boolean
     children?: RemixNode
   }>,
 ) {
@@ -64,6 +66,7 @@ export function Modal(
       fab,
       defaultOpen,
       closeButton = true,
+      small,
       children,
     } = handle.props
 
@@ -90,8 +93,8 @@ export function Modal(
             mix={css({
               backgroundColor: 'var(--paper)',
               borderRadius: '8px',
-              padding: '24px',
-              maxWidth: '480px',
+              padding: small ? '20px' : '24px',
+              maxWidth: small ? '320px' : '480px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',

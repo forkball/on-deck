@@ -4,7 +4,8 @@ import { css } from 'remix/ui'
 import { composeTitle, type TitleProgress } from '../../../data/profileTitles/catalog.ts'
 import { routes } from '../../../routes.ts'
 import { Field } from '../../../ui/shared/field.tsx'
-import { Button, Select } from '../../../ui/shared/form-controls.tsx'
+import { Modal } from '../../../ui/components/modal.tsx'
+import { Button, Select, ToggleLabel } from '../../../ui/shared/form-controls.tsx'
 
 export interface TitlesProps {
   progress: TitleProgress[]
@@ -27,44 +28,47 @@ const listStyle = css({
 const tileStyle = css({
   border: '1px solid var(--rule)',
   borderRadius: '8px',
-  '&[open]': { background: 'var(--paper-tint)' },
-  // The chevron turns when the tile is open, so a tap visibly did something.
-  '&[open] .chevron': { transform: 'rotate(180deg)' },
+  padding: '10px 12px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '6px',
+  fontWeight: 700,
+  '&:hover': { borderColor: 'var(--accent)' },
 })
 
 const lockedStyle = css({ borderStyle: 'dashed', color: 'var(--muted)' })
 
 const earnedStyle = css({ borderLeft: '4px solid var(--accent)', background: 'var(--paper-tint)' })
 
-const summaryStyle = css({
-  listStyle: 'none',
-  cursor: 'pointer',
-  padding: '10px 12px',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '6px',
-  '&::-webkit-details-marker': { display: 'none' },
+const barStyle = css({
+  display: 'block',
+  height: '4px',
+  borderRadius: '2px',
+  background: 'var(--rule)',
+  overflow: 'hidden',
 })
 
-const wordRowStyle = css({
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'baseline',
-  gap: '6px',
-  fontWeight: 700,
-})
-
-const chevronStyle = css({ fontSize: '11px', color: 'var(--muted)', transition: 'transform 0.15s' })
-
-const barStyle = css({ height: '3px', borderRadius: '2px', background: 'var(--rule)', overflow: 'hidden' })
-
-const detailStyle = css({ margin: 0, padding: '0 12px 10px', fontSize: '13px', color: 'var(--soft)' })
-
-const metaStyle = css({ display: 'block', marginTop: '4px', fontSize: '12px', color: 'var(--muted)' })
+function ProgressBar(handle: Handle<{ current: number; goal: number }>) {
+  return () => {
+    const { current, goal } = handle.props
+    return (
+      <span mix={barStyle} aria-hidden="true">
+        <span
+          mix={css({
+            display: 'block',
+            height: '100%',
+            width: `${Math.round((Math.min(current, goal) / goal) * 100)}%`,
+            background: 'var(--accent)',
+          })}
+        />
+      </span>
+    )
+  }
+}
 
 // One kind of word, every one there is, as tiles carrying just the word. A tap
-// opens one to say what earns it and how close you are — the list is for
-// browsing the words, and thirty sentences at once buried them.
+// opens a small modal saying what earns it and how close you are — the list is
+// for browsing the words, and thirty sentences at once buried them.
 //
 // Showing words before they're earned is deliberate: "Jump-Scared" is a better
 // reason to watch ten horror films than a padlock is.
@@ -86,40 +90,34 @@ function WordList(
         <ul mix={listStyle}>
           {progress.map(({ title, current }) => {
             const isEarned = unlocked.has(title.key)
+            const modalId = `title-word-${title.key}`
             const shown = Math.min(current, title.goal)
             return (
               // Not a list-item: DoodleCSS gives every <li> a "* " marker,
               // unlayered, which beside a tile reads as a stray asterisk.
               <li key={title.key} mix={css({ display: 'block' })}>
-                <details mix={[tileStyle, isEarned ? earnedStyle : lockedStyle]}>
-                  <summary mix={summaryStyle}>
-                    <span mix={wordRowStyle}>
-                      <span>
-                        {isEarned && <span aria-label="Earned">✓ </span>}
-                        {title.word}
-                      </span>
-                      <span class="chevron" aria-hidden="true" mix={chevronStyle}>
-                        ▾
-                      </span>
+                <ToggleLabel for={modalId} class="title-tile">
+                  <span mix={[tileStyle, isEarned ? earnedStyle : lockedStyle]}>
+                    <span>
+                      {isEarned && <span aria-label="Earned">✓ </span>}
+                      {title.word}
                     </span>
-                    {!isEarned && (
-                      <span mix={barStyle} aria-hidden="true">
-                        <span
-                          mix={css({
-                            display: 'block',
-                            height: '100%',
-                            width: `${Math.round((shown / title.goal) * 100)}%`,
-                            background: 'var(--accent)',
-                          })}
-                        />
-                      </span>
-                    )}
-                  </summary>
-                  <p mix={detailStyle}>
-                    {title.requirement}.
-                    <span mix={metaStyle}>{isEarned ? 'Earned' : `${shown} / ${title.goal}`}</span>
-                  </p>
-                </details>
+                    {!isEarned && <ProgressBar current={current} goal={title.goal} />}
+                  </span>
+                </ToggleLabel>
+                <Modal id={modalId} title={title.word} small>
+                  <p mix={css({ margin: '0 0 12px' })}>{title.requirement}.</p>
+                  {isEarned ? (
+                    <p mix={css({ margin: 0, color: 'var(--success)', fontWeight: 700 })}>✓ Earned</p>
+                  ) : (
+                    <>
+                      <ProgressBar current={current} goal={title.goal} />
+                      <p mix={css({ margin: '6px 0 0', fontSize: '13px', color: 'var(--muted)' })}>
+                        {shown} of {title.goal} so far
+                      </p>
+                    </>
+                  )}
+                </Modal>
               </li>
             )
           })}

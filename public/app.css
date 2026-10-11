@@ -94,6 +94,14 @@
   display: inline-block;
 }
 
+/* A word on the Titles settings tab: the whole tile is the label that opens
+   its modal, so it has to fill its grid cell rather than sit inline with
+   Doodle's label padding around it. */
+.doodle label.title-tile {
+  display: block;
+  padding: 0;
+}
+
 /* The wordmark as a torn ticket stub: soft gold, blue type, notched at both
    ends and set a little off square. The mask cuts the notches, so the shape
    holds whatever the text's width. Here because `.doodle a` sets the colour
