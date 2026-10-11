@@ -23,10 +23,10 @@ import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, searchUsers } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../mediaTypes.ts'
+import { TITLES } from '../../data/profileTitles/catalog.ts'
+import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
-import { titleSettingsHref } from '../profile/edit/page.tsx'
 import { UserSearchPage } from './search-page.tsx'
-import { UserCreditsPage } from './credits-page.tsx'
 import { UserProfilePage } from './show-page.tsx'
 import { UserWatchedPage } from './watched-page.tsx'
 
@@ -131,7 +131,8 @@ export default createController(routes.users, {
         loadMediaSummaries(db, userId, RECENT_COUNT),
         loadUnlockedTitleKeys(db, userId),
       ])
-      const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
+      const tab = context.url.searchParams.get('tab')
+      const activeTab = tab === TITLES_TAB ? TITLES_TAB : (parseMediaType(tab) ?? DEFAULT_MEDIA_TYPE)
 
       return context.render(
         <UserProfilePage
@@ -143,7 +144,7 @@ export default createController(routes.users, {
           bio={target.bio ?? ''}
           followingCount={followingCount}
           followersCount={followersCount}
-          earnedCredits={earned.size}
+          credits={TITLES.map((title) => ({ title, earned: earned.has(title.key) }))}
           displayName={displayLabel(auth.identity)}
         />,
       )
@@ -176,28 +177,6 @@ export default createController(routes.users, {
           mediaType={mediaType}
           page={page}
           totalPages={Math.max(1, Math.ceil(totalWatched / PAGE_SIZE))}
-          displayName={displayLabel(auth.identity)}
-        />,
-      )
-    },
-
-    // Gated like the log: what someone has earned says what they've logged.
-    async credits(context) {
-      const auth = context.get(Auth)
-
-      const userId = Number(context.params.userId)
-      if (userId === auth.identity.id) {
-        return redirect(titleSettingsHref(), 303)
-      }
-
-      const db = context.get(Database)
-      const target = await requireViewableProfile(db, auth.identity.id, userId)
-      if (target instanceof Response) return target
-
-      return context.render(
-        <UserCreditsPage
-          user={target}
-          earned={await loadUnlockedTitleKeys(db, userId)}
           displayName={displayLabel(auth.identity)}
         />,
       )

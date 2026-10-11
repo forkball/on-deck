@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import { PART_NAMES, type TitleProgress } from '../../../data/profileTitles/catalog.ts'
 import { routes } from '../../../routes.ts'
 import { Field } from '../../../ui/shared/field.tsx'
-import { CreditTiles } from '../../../ui/components/credit-tiles.tsx'
+import { CreditGroups } from '../../../ui/components/credit-tiles.tsx'
 import { Button, Link, Select } from '../../../ui/shared/form-controls.tsx'
 
 export interface TitlesProps {
@@ -80,17 +80,12 @@ export function Titles(handle: Handle<TitlesProps>) {
           </div>
         </form>
 
-        <CreditTiles
-          heading={PART_NAMES.adjective.many}
-          credits={adjectives.map(({ title, current }) => ({
+        <CreditGroups
+          credits={progress.map(({ title, current }) => ({
             title,
             earned: unlocked.has(title.key),
             current,
           }))}
-        />
-        <CreditTiles
-          heading={PART_NAMES.noun.many}
-          credits={nouns.map(({ title, current }) => ({ title, earned: unlocked.has(title.key), current }))}
         />
         {isAdmin && (
           <p mix={css({ marginTop: '24px', fontSize: '13px' })}>

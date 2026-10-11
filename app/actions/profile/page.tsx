@@ -11,6 +11,7 @@ import {
 } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { Toast } from '../../ui/components/toast.tsx'
+import { CreditGroups, TITLES_TAB, type Credit } from '../../ui/components/credit-tiles.tsx'
 import { UserTitle } from '../../ui/components/user-title.tsx'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
@@ -65,7 +66,7 @@ function sourceLink(
 export interface ProfilePageProps {
   // Keyed by media type rather than a prop per type — see loadMediaSummaries.
   media: MediaSummaries
-  activeTab: ActiveMediaType
+  activeTab: ActiveMediaType | typeof TITLES_TAB
   bio: string
   followingCount: number
   followersCount: number
@@ -81,6 +82,9 @@ export interface ProfilePageProps {
   displayName: string
   // The title worn, already put into words, or null for none.
   title: string | null
+  // Every credit, with yours marked and your progress on the rest, for the
+  // Titles tab.
+  credits: Credit[]
 }
 
 // What the settings amount to, in the words someone would use for their own
@@ -274,6 +278,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       waitingImports,
       displayName,
       title,
+      credits,
     } = handle.props
     const profileHref = routes.profile.index.href()
     const savedReturnTo = `${profileHref}?saved=1`
@@ -289,7 +294,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
         ) : saved ? (
           <Toast message="Saved." />
         ) : null}
-        <UserTitle title={title} href={titleSettingsHref()} fallback="Earn yourself a title →" />
+        <UserTitle title={title} />
         <p mix={css({ margin: '-8px 0 16px', color: 'var(--soft)' })}>
           <Link href={routes.profile.following.href()}>{followingCount} following</Link> ·{' '}
           <Link href={routes.profile.followers.href()}>
@@ -329,6 +334,20 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
         <MediaTabs
           idPrefix="profile"
           active={activeTab}
+          extraTabs={[
+            {
+              id: TITLES_TAB,
+              label: 'Titles',
+              panel: (
+                <>
+                  <p mix={css({ margin: 0, fontSize: '14px' })}>
+                    <Link href={titleSettingsHref()}>Change your title →</Link>
+                  </p>
+                  <CreditGroups credits={credits} />
+                </>
+              ),
+            },
+          ]}
           panels={Object.fromEntries(
             ACTIVE_MEDIA_TYPES.map((type) => {
               const ui = MEDIA_TYPE_UI[type]
