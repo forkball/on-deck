@@ -144,7 +144,9 @@ export default createController(routes.users, {
           bio={target.bio ?? ''}
           followingCount={followingCount}
           followersCount={followersCount}
-          credits={TITLES.map((title) => ({ title, earned: earned.has(title.key) }))}
+          // Only what they hold: someone else's Titles tab lists their credits,
+          // not every credit with theirs ticked.
+          credits={TITLES.filter((title) => earned.has(title.key)).map((title) => ({ title, earned: true }))}
           displayName={displayLabel(auth.identity)}
         />,
       )
