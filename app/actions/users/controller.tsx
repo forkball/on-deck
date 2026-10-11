@@ -25,6 +25,7 @@ import { checkTitleUnlocksQuietly, loadUnlockedTitleKeys } from '../../data/prof
 import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../mediaTypes.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { UserSearchPage } from './search-page.tsx'
+import { UserCreditsPage } from './credits-page.tsx'
 import { UserProfilePage } from './show-page.tsx'
 import { UserWatchedPage } from './watched-page.tsx'
 
@@ -125,7 +126,7 @@ export default createController(routes.users, {
 
       // Read, not checked: looking at someone's profile shouldn't be what sends
       // them a notification.
-      const [media, earnedTitles] = await Promise.all([
+      const [media, earned] = await Promise.all([
         loadMediaSummaries(db, userId, RECENT_COUNT),
         loadUnlockedTitleKeys(db, userId),
       ])
@@ -141,7 +142,7 @@ export default createController(routes.users, {
           bio={target.bio ?? ''}
           followingCount={followingCount}
           followersCount={followersCount}
-          earnedTitles={earnedTitles}
+          earnedCredits={earned.size}
           displayName={displayLabel(auth.identity)}
         />,
       )
@@ -174,6 +175,28 @@ export default createController(routes.users, {
           mediaType={mediaType}
           page={page}
           totalPages={Math.max(1, Math.ceil(totalWatched / PAGE_SIZE))}
+          displayName={displayLabel(auth.identity)}
+        />,
+      )
+    },
+
+    // Gated like the log: what someone has earned says what they've logged.
+    async credits(context) {
+      const auth = context.get(Auth)
+
+      const userId = Number(context.params.userId)
+      if (userId === auth.identity.id) {
+        return redirect(`${routes.profile.edit.index.href()}?tab=titles`, 303)
+      }
+
+      const db = context.get(Database)
+      const target = await requireViewableProfile(db, auth.identity.id, userId)
+      if (target instanceof Response) return target
+
+      return context.render(
+        <UserCreditsPage
+          user={target}
+          earned={await loadUnlockedTitleKeys(db, userId)}
           displayName={displayLabel(auth.identity)}
         />,
       )

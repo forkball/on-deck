@@ -131,6 +131,8 @@ export const routes = route({
     watched: get(':userId/watched'),
     following: get(':userId/following'),
     followers: get(':userId/followers'),
+    // Every credit they've earned, which their title on the profile links to.
+    credits: get(':userId/credits'),
     follow: post(':userId/follow'),
     unfollow: post(':userId/unfollow'),
   }),

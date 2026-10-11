@@ -34,9 +34,9 @@ export interface UserProfilePageProps {
   bio?: string
   followingCount: number
   followersCount: number
-  // The credits — title words — they've earned. Absent when `locked`: what someone has
+  // How many credits they've earned. Absent when `locked`: what someone has
   // earned says what they've logged.
-  earnedTitles?: ReadonlySet<string>
+  earnedCredits?: number
   displayName: string
 }
 
@@ -146,7 +146,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
       bio,
       followingCount,
       followersCount,
-      earnedTitles,
+      earnedCredits,
       displayName,
     } = handle.props
     const label = displayLabel(user)
@@ -158,8 +158,10 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
         {/* Worn in public: shown even on a private profile, like the name. */}
         <UserTitle
           title={composeTitle(user.title_adjective, user.title_noun)}
-          earned={locked ? undefined : earnedTitles}
-          ownerLabel={label}
+          href={locked ? undefined : routes.users.credits.href({ userId: String(user.id) })}
+          fallback={
+            earnedCredits ? `${earnedCredits} credit${earnedCredits === 1 ? '' : 's'} earned →` : undefined
+          }
           margin="0 0 8px"
         />
         <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>

@@ -289,7 +289,11 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
         ) : saved ? (
           <Toast message="Saved." />
         ) : null}
-        <UserTitle title={title} href={`${routes.profile.edit.index.href()}?tab=${PROFILE_TABS.titles}`} />
+        <UserTitle
+          title={title}
+          href={`${routes.profile.edit.index.href()}?tab=${PROFILE_TABS.titles}`}
+          fallback="Earn yourself a title →"
+        />
         <p mix={css({ margin: '-8px 0 16px', color: 'var(--soft)' })}>
           <Link href={routes.profile.following.href()}>{followingCount} following</Link> ·{' '}
           <Link href={routes.profile.followers.href()}>
