@@ -1,6 +1,7 @@
 import { clientEntry, css, on, ref } from 'remix/ui'
 
 import { space } from './shared/spacing.ts'
+import { Spinner } from './shared/spinner.tsx'
 import { Button } from '../ui/shared/form-controls.tsx'
 
 export type LetterboxdImportFormProps = {
@@ -267,25 +268,7 @@ export const LetterboxdImportForm = clientEntry<LetterboxdImportFormProps>(
               })}
             >
               {submitting && (
-                <span
-                  aria-hidden="true"
-                  mix={css({
-                    '@keyframes letterboxd-import-spin': {
-                      from: { transform: 'rotate(0deg)' },
-                      to: { transform: 'rotate(360deg)' },
-                    },
-                    display: 'inline-block',
-                    width: '13px',
-                    height: '13px',
-                    borderRadius: '50%',
-                    border: '2px solid currentColor',
-                    borderTopColor: 'transparent',
-                    animation: 'letterboxd-import-spin 0.6s linear infinite',
-                    // Slowed rather than stopped: a still ring with a gap in it
-                    // doesn't read as "working".
-                    '@media (prefers-reduced-motion: reduce)': { animationDuration: '2s' },
-                  })}
-                />
+                <Spinner />
               )}
               {submitting ? 'Importing…' : 'Upload and import'}
             </Button>
