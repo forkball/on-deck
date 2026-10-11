@@ -124,6 +124,12 @@ export const routes = route({
     unconfirmed: get('unconfirmed/:unconfirmedId'),
     show: get(':runId'),
   }),
+  // Admin-only views. Each action checks users.is_admin itself and answers 403
+  // otherwise, the way the rematch route does.
+  admin: route('admin', {
+    // How many members hold and wear each credit.
+    credits: get('credits'),
+  }),
   users: route('users', {
     search: get('search'),
     suggest: get('suggest'),

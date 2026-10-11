@@ -104,7 +104,8 @@ does nothing on its own.
     earn one, and the pages showing titles check again to catch feed syncs.
     `unlocks` runs its SQL through the `db` it is handed rather than the app's
     pool, which is what lets `scripts/backfill-titles.ts`
-    (`npm run prod:backfill-titles`) reuse it
+    (`npm run prod:backfill-titles`) reuse it. `/admin/credits` shows how many
+    members hold and wear each credit, counts only
   - `app/data/recommendations/` — the generation pipeline: `picks` asks the model,
     `matching` resolves picks to catalog entries, `exclusions` decides what a run
     may not suggest (database-free, so the rule can be tested directly),

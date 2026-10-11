@@ -12,7 +12,7 @@ import {
   type ConsumedEntry,
   type TitleStats,
 } from '../app/data/profileTitles/catalog.ts'
-import { checkTitleUnlocks, loadWornTitle } from '../app/data/profileTitles/unlocks.ts'
+import { checkTitleUnlocks, loadCreditTallies, loadWornTitle } from '../app/data/profileTitles/unlocks.ts'
 import { listNotifications } from '../app/data/notifications.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 
@@ -206,6 +206,23 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
       assert.deepEqual(await loadWornTitle(db, quietId), { adjective: 'newborn', noun: 'baby' })
     } finally {
       await deleteUsers([quietId])
+    }
+  })
+
+  it('tallies who holds and wears each credit', async () => {
+    const before = await loadCreditTallies(db)
+    const otherId = await insertUser('titles-tally')
+    try {
+      await checkTitleUnlocks(db, otherId, { notify: false })
+      await pool.query(`update users set title_adjective = null where id = $1`, [otherId])
+      const after = await loadCreditTallies(db)
+      assert.equal(after.members, before.members + 1)
+      assert.equal(after.held.get('newborn'), (before.held.get('newborn') ?? 0) + 1)
+      // Took the genre off, kept the role on.
+      assert.equal(after.worn.get('newborn') ?? 0, before.worn.get('newborn') ?? 0)
+      assert.equal(after.worn.get('baby'), (before.worn.get('baby') ?? 0) + 1)
+    } finally {
+      await deleteUsers([otherId])
     }
   })
 

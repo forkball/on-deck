@@ -81,7 +81,7 @@ async function connectionsFor(db: Db, identity: User, url: URL): Promise<Connect
 // since the last check.
 async function titlesFor(db: Db, identity: User): Promise<TitlesProps> {
   const { progress, unlocked } = await checkTitleUnlocks(db, identity.id)
-  return { progress, unlocked, ...(await loadWornTitle(db, identity.id)) }
+  return { progress, unlocked, ...(await loadWornTitle(db, identity.id)), isAdmin: identity.is_admin }
 }
 
 // Which pane to open on. Read off the query string the other actions redirect

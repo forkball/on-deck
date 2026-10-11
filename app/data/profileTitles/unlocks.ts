@@ -183,3 +183,37 @@ export async function loadWornTitle(
   const user = await db.find(users, userId)
   return { adjective: user?.title_adjective ?? null, noun: user?.title_noun ?? null }
 }
+
+export interface CreditTallies {
+  members: number
+  // By title key: how many members hold the credit, and how many wear it.
+  held: Map<string, number>
+  worn: Map<string, number>
+}
+
+// How the credits are spread across everyone, for the admin page. Counts only:
+// which members hold what stays on their own credits page, behind its privacy.
+export async function loadCreditTallies(db: Db): Promise<CreditTallies> {
+  const [held, worn, [total]] = await Promise.all([
+    rowsOf<{ key: string; count: number }>(
+      db,
+      'select title_key as key, count(*)::int as count from user_titles group by title_key',
+      [],
+    ),
+    rowsOf<{ key: string; count: number }>(
+      db,
+      `select key, count(*)::int as count from (
+         select title_adjective as key from users where title_adjective is not null
+         union all
+         select title_noun from users where title_noun is not null
+       ) worn group by key`,
+      [],
+    ),
+    rowsOf<{ count: number }>(db, 'select count(*)::int as count from users', []),
+  ])
+  return {
+    members: total?.count ?? 0,
+    held: new Map(held.map((row) => [row.key, row.count])),
+    worn: new Map(worn.map((row) => [row.key, row.count])),
+  }
+}

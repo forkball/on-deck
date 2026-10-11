@@ -5,7 +5,7 @@ import { PART_NAMES, type TitleProgress } from '../../../data/profileTitles/cata
 import { routes } from '../../../routes.ts'
 import { Field } from '../../../ui/shared/field.tsx'
 import { CreditTiles } from '../../../ui/components/credit-tiles.tsx'
-import { Button, Select } from '../../../ui/shared/form-controls.tsx'
+import { Button, Link, Select } from '../../../ui/shared/form-controls.tsx'
 
 export interface TitlesProps {
   progress: TitleProgress[]
@@ -13,6 +13,8 @@ export interface TitlesProps {
   // The keys worn now, either of which may be unset.
   adjective: string | null
   noun: string | null
+  // Admins get a link to how the credits are spread across everyone.
+  isAdmin: boolean
 }
 
 function WordPicker(
@@ -43,7 +45,7 @@ function WordPicker(
 // Always has something to pick from, since everyone holds the starter credits.
 export function Titles(handle: Handle<TitlesProps>) {
   return () => {
-    const { progress, unlocked, adjective, noun } = handle.props
+    const { progress, unlocked, adjective, noun, isAdmin } = handle.props
     const adjectives = progress.filter((entry) => entry.title.part === 'adjective')
     const nouns = progress.filter((entry) => entry.title.part === 'noun')
     const earnedAdjectives = adjectives.filter((entry) => unlocked.has(entry.title.key))
@@ -90,6 +92,11 @@ export function Titles(handle: Handle<TitlesProps>) {
           heading={PART_NAMES.noun.many}
           credits={nouns.map(({ title, current }) => ({ title, earned: unlocked.has(title.key), current }))}
         />
+        {isAdmin && (
+          <p mix={css({ marginTop: '24px', fontSize: '13px' })}>
+            <Link href={routes.admin.credits.href()}>How many members hold each credit (admin) →</Link>
+          </p>
+        )}
       </section>
     )
   }
