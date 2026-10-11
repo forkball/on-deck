@@ -171,7 +171,8 @@ function ProgressBar(handle: Handle<{ current: number; goal: number }>) {
 // One kind of credit, every one there is, as tiles carrying just the word. A
 // tap opens a small modal saying what earns it and, on your own, how close you
 // are — and, with `picking`, a button there to wear an earned one. The list is
-// for browsing the words; thirty sentences at once buried them. Shared by the settings tab and the Titles tab on both profiles.
+// for browsing the words; thirty sentences at once buried them. Shared by the
+// settings tab and the Titles tab on both profiles.
 //
 // Showing words before they're earned is deliberate: "Jump-Scared" is a better
 // reason to watch ten horror films than a padlock is.
@@ -216,7 +217,14 @@ export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[];
                       )}
                       {title.word}
                     </span>
-                    {!isEarned && current != null && <ProgressBar current={current} goal={title.goal} />}
+                    {/* An earned tile keeps the bar's room, empty, so a row of
+                        tiles stays one height whichever of them are done. */}
+                    {current != null &&
+                      (isEarned ? (
+                        <span mix={css({ display: 'block', height: '4px' })} aria-hidden="true" />
+                      ) : (
+                        <ProgressBar current={current} goal={title.goal} />
+                      ))}
                   </span>
                 </ToggleLabel>
                 <CreditModal
