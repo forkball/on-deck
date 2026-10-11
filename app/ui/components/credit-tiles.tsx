@@ -215,21 +215,26 @@ function ProgressBar(handle: Handle<{ current: number; goal: number }>) {
 // One kind of credit, every one there is, as tiles carrying just the word. A
 // tap opens a small modal saying what earns it and, on your own, how close you
 // are — or, with `picking`, puts an earned one on — the list is for browsing the words, and thirty sentences at once buried
-// them. Shared by the settings tab and the Titles tab on both profiles.
+// them. Shared by the settings tab and the Titles tab on someone's profile.
 //
 // Showing words before they're earned is deliberate: "Jump-Scared" is a better
 // reason to watch ten horror films than a padlock is.
-export function CreditTiles(handle: Handle<{ heading: string; credits: Credit[]; picking?: Picking }>) {
+export function CreditTiles(
+  handle: Handle<{ heading: string; credits: Credit[]; picking?: Picking; earnedOnly?: boolean }>,
+) {
   return () => {
-    const { heading, credits, picking } = handle.props
+    const { heading, credits, picking, earnedOnly } = handle.props
     const earnedCount = credits.filter((credit) => credit.earned).length
+    // Someone else's list is only what they've earned, so a section of them
+    // can be empty (no roles yet), and "4 of 4 earned" would say nothing.
+    if (earnedOnly && credits.length === 0) return null
 
     return (
       <section class="credit-section">
         <h2>
           {heading}{' '}
           <span mix={css({ fontSize: '14px', fontWeight: 400, color: 'var(--muted)' })}>
-            {earnedCount} of {credits.length} earned
+            {earnedOnly ? credits.length : `${earnedCount} of ${credits.length} earned`}
           </span>
         </h2>
         <ul mix={listStyle}>
@@ -341,12 +346,16 @@ const filterBarStyle = css({
   margin: '16px 0 0',
 })
 
-// Every credit there is, as genres then roles — what the Titles tab on a profile
-// and in settings both show — with a filter by what earns them and by whether
-// they're earned yet.
-export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picking }>) {
+// Every credit there is, as genres then roles — what your Titles tab in
+// settings shows — with a filter by what earns them and by whether they're
+// earned yet. `earnedOnly` is someone else's Titles tab: just the credits they
+// hold, so the earned/still-to-earn switch has nothing to do and goes.
+export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picking; earnedOnly?: boolean }>) {
   return () => {
-    const { credits, picking } = handle.props
+    const { credits, picking, earnedOnly } = handle.props
+    if (earnedOnly && credits.length === 0) {
+      return <p mix={css({ color: 'var(--muted)' })}>No credits earned yet.</p>
+    }
     const groups = [...new Set(credits.map((credit) => credit.title.group))]
     // Forty-odd groups in one list is a lot to scan, so the dropdown splits
     // them: genres alphabetically, then the media, then everything else in
@@ -363,7 +372,7 @@ export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picki
         label: 'Everything else',
         groups: groups.filter((group) => !GENRE_GROUPS.has(group) && !MEDIA_GROUPS.has(group)),
       },
-    ]
+    ].filter((optionGroup) => optionGroup.groups.length > 0)
 
     return (
       <div mix={css(filterStyle(groups.map(groupSlug)))}>
@@ -384,23 +393,27 @@ export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picki
               ))}
             </Select>
           </Field>
-          <ChoiceGroup legend="Show" layout="row">
-            {STATUSES.map(({ value, label }) => (
-              <RadioOption key={value} name="credit-status" value={value} defaultChecked={value === 'all'}>
-                {label}
-              </RadioOption>
-            ))}
-          </ChoiceGroup>
+          {!earnedOnly && (
+            <ChoiceGroup legend="Show" layout="row">
+              {STATUSES.map(({ value, label }) => (
+                <RadioOption key={value} name="credit-status" value={value} defaultChecked={value === 'all'}>
+                  {label}
+                </RadioOption>
+              ))}
+            </ChoiceGroup>
+          )}
         </div>
         <CreditTiles
           heading={PART_NAMES.adjective.many}
           credits={credits.filter((credit) => credit.title.part === 'adjective')}
           picking={picking}
+          earnedOnly={earnedOnly}
         />
         <CreditTiles
           heading={PART_NAMES.noun.many}
           credits={credits.filter((credit) => credit.title.part === 'noun')}
           picking={picking}
+          earnedOnly={earnedOnly}
         />
         <p class="no-match" mix={css({ color: 'var(--muted)', marginTop: '24px' })}>
           Nothing matches that filter.
