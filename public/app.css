@@ -541,7 +541,7 @@
 
 .doodle .choice-options.column {
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .doodle .choice-options.row {
@@ -827,8 +827,11 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
     min-height: 44px;
   }
 
+  /* 36px rather than the 44px the other small controls get: a stack of 44px
+     rows spread a three-option group over most of a phone screen. Still well
+     clear of the 24px control, and the rows touch, so no tap falls between. */
   .doodle label.choice-label {
-    min-height: 44px;
+    min-height: 36px;
   }
 
   .doodle .choice-options.column {
