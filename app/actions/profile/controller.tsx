@@ -37,7 +37,7 @@ import { loadMediaSummaries } from '../../data/mediaSummary.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
-import { routes, titleSettingsHref } from '../../routes.ts'
+import { routes } from '../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
 import { parseInteractionStatus } from '../../interactionStatus.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
@@ -95,6 +95,7 @@ export default createController(routes.profile, {
           displayName={displayLabel(auth.identity)}
           title={composeTitle(worn.adjective, worn.noun)}
           worn={worn}
+          isAdmin={auth.identity.is_admin}
           titleSaved={context.url.searchParams.get('titleSaved') === '1'}
           credits={(check?.progress ?? []).map(({ title, current }) => ({
             title,
@@ -136,9 +137,11 @@ export default createController(routes.profile, {
       if (!choice) return new Response("You haven't earned that title.", { status: 400 })
 
       await chooseTitle(db, auth.identity.id, choice)
-      // Back to whichever Titles tab the tap came from — settings or your own
-      // profile — with the toast that says it took.
-      const back = safeReturnPath(String(formData.get('return_to') ?? '')) ?? titleSettingsHref()
+      // Back to your profile's Titles tab, which the tap came from, with the
+      // toast that says it took.
+      const back =
+        safeReturnPath(String(formData.get('return_to') ?? '')) ??
+        `${routes.profile.index.href()}?tab=${TITLES_TAB}`
       return redirect(`${back}${back.includes('?') ? '&' : '?'}titleSaved=1`, 303)
     },
 

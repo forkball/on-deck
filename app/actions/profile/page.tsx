@@ -51,6 +51,9 @@ export interface ProfilePageProps {
   worn: { adjective: string | null; noun: string | null }
   // Set when a title was just chosen from the Titles tab.
   titleSaved?: boolean
+  // Admins get a link from the Titles tab to how the credits are spread
+  // across everyone.
+  isAdmin: boolean
 }
 
 // What the settings amount to, in the words someone would use for their own
@@ -255,6 +258,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       credits,
       worn,
       titleSaved,
+      isAdmin,
     } = handle.props
     const profileHref = routes.profile.index.href()
     const savedReturnTo = `${profileHref}?saved=1`
@@ -307,6 +311,13 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                       returnTo: `${profileHref}?tab=${TITLES_TAB}`,
                     }}
                   />
+                  {isAdmin && (
+                    <p mix={css({ marginTop: '24px', fontSize: '13px' })}>
+                      <Link href={routes.admin.credits.href()}>
+                        How many members hold each credit (admin) →
+                      </Link>
+                    </p>
+                  )}
                 </>
               ),
             },
