@@ -4,6 +4,8 @@ import { css } from 'remix/ui'
 import { PROFILE_HREF_PLACEHOLDER, UserSearchForm } from '../../browser/user-search-form.tsx'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
+import { composeTitle } from '../../data/profileTitles/catalog.ts'
+import { UserTitle } from '../../ui/components/user-title.tsx'
 import { routes } from '../../routes.ts'
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { Page } from '../../ui/components/page.tsx'
@@ -77,6 +79,7 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
                   ) : (
                     <strong>{displayLabel(user)}</strong>
                   )}
+                  <UserTitle title={composeTitle(user.title_adjective, user.title_noun)} card />
                 </div>
 
                 <form

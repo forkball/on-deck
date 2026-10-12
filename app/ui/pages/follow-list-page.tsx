@@ -5,6 +5,8 @@ import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { Page } from '../components/page.tsx'
+import { UserTitle } from '../components/user-title.tsx'
+import { composeTitle } from '../../data/profileTitles/catalog.ts'
 import { Button, Link } from '../shared/form-controls.tsx'
 
 export interface FollowListPageProps {
@@ -72,6 +74,7 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
                     ) : (
                       <strong>{displayLabel(user)}</strong>
                     )}
+                    <UserTitle title={composeTitle(user.title_adjective, user.title_noun)} card />
                   </div>
 
                   {isViewer ? (
