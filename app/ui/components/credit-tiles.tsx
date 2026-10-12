@@ -394,7 +394,7 @@ export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picki
             </Select>
           </Field>
           {!earnedOnly && (
-            <ChoiceGroup legend="Show" layout="row">
+            <ChoiceGroup legend="Show">
               {STATUSES.map(({ value, label }) => (
                 <RadioOption key={value} name="credit-status" value={value} defaultChecked={value === 'all'}>
                   {label}
