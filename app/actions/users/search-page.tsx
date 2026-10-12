@@ -3,14 +3,11 @@ import { css } from 'remix/ui'
 
 import { PROFILE_HREF_PLACEHOLDER, UserSearchForm } from '../../browser/user-search-form.tsx'
 import type { User } from '../../data/schema.ts'
-import { displayLabel } from '../../data/users.ts'
-import { composeTitle } from '../../data/profileTitles/catalog.ts'
-import { UserTitle } from '../../ui/components/user-title.tsx'
 import { routes } from '../../routes.ts'
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { Page } from '../../ui/components/page.tsx'
 import { MEDIA_TYPE_UI } from '../../mediaTypes.ts'
-import { Button, Link } from '../../ui/shared/form-controls.tsx'
+import { UserCard } from '../../ui/components/user-card.tsx'
 
 export interface UserSearchPageProps {
   query: string
@@ -28,7 +25,7 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
 
     return (
       // Wide, like the media searches, so the shared tab bar sits the same.
-      <Page heading="Find people" width="wide" displayName={displayName}>
+      <Page heading="Search people" width="wide" displayName={displayName}>
         <MediaTabLinks
           current="people"
           hrefFor={(type) => MEDIA_TYPE_UI[type].hrefs.search()}
@@ -43,61 +40,42 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
 
         {query && results.length === 0 && <p>No one found for "{query}".</p>}
 
-        <ul
-          mix={css({
-            listStyle: 'none',
-            margin: 0,
-            padding: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          })}
-        >
-          {results.map((user) => {
-            const following = followingByUserId.get(user.id) ?? false
-            // Public profiles are viewable by anyone; private ones still
-            // need a follow — see canViewProfile.
-            const canView = !user.is_private || following
-            return (
-              <li
-                key={user.id}
-                mix={css({
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '12px',
-                  border: '1px solid var(--rule)',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
-                })}
-              >
-                <div mix={css({ minWidth: 0, overflowWrap: 'break-word' })}>
-                  {canView ? (
-                    <Link href={routes.users.show.href({ userId: String(user.id) })}>
-                      <strong>{displayLabel(user)}</strong>
-                    </Link>
-                  ) : (
-                    <strong>{displayLabel(user)}</strong>
-                  )}
-                  <UserTitle title={composeTitle(user.title_adjective, user.title_noun)} card />
-                </div>
-
-                <form
-                  method="post"
-                  mix={css({ flexShrink: 0 })}
-                  action={
-                    following
-                      ? routes.users.unfollow.href({ userId: String(user.id) })
-                      : routes.users.follow.href({ userId: String(user.id) })
-                  }
-                >
-                  <input type="hidden" name="return_to" value={returnTo} />
-                  <Button type="submit">{following ? 'Unfollow' : 'Follow'}</Button>
-                </form>
-              </li>
-            )
-          })}
-        </ul>
+        {/* Headed and spaced like the media searches' results. */}
+        {results.length > 0 && (
+          <section>
+            <h2>
+              Results{' '}
+              <span mix={css({ fontSize: '14px', fontWeight: 400, color: 'var(--muted)' })}>
+                ({results.length})
+              </span>
+            </h2>
+            <ul
+              mix={css({
+                listStyle: 'none',
+                margin: 0,
+                padding: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+              })}
+            >
+              {results.map((user) => {
+                const following = followingByUserId.get(user.id) ?? false
+                return (
+                  <UserCard
+                    key={user.id}
+                    user={user}
+                    following={following}
+                    // Public profiles are viewable by anyone; private ones
+                    // still need a follow — see canViewProfile.
+                    canView={!user.is_private || following}
+                    returnTo={returnTo}
+                  />
+                )
+              })}
+            </ul>
+          </section>
+        )}
       </Page>
     )
   }

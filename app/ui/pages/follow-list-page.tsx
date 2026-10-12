@@ -2,12 +2,8 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { User } from '../../data/schema.ts'
-import { displayLabel } from '../../data/users.ts'
-import { routes } from '../../routes.ts'
 import { Page } from '../components/page.tsx'
-import { UserTitle } from '../components/user-title.tsx'
-import { composeTitle } from '../../data/profileTitles/catalog.ts'
-import { Button, Link } from '../shared/form-controls.tsx'
+import { UserCard } from '../components/user-card.tsx'
 
 export interface FollowListPageProps {
   title: string
@@ -27,8 +23,8 @@ export interface FollowListPageProps {
 }
 
 // Shared by /profile/following, /profile/followers, /users/:id/following,
-// and /users/:id/followers — same row shape as the "Find people" search
-// results, just sourced from a follow list instead of a name search.
+// and /users/:id/followers — same row shape as the "Search people"
+// results (UserCard), just sourced from a follow list instead of a name search.
 export function FollowListPage(handle: Handle<FollowListPageProps>) {
   return () => {
     const { title, heading, users, followingByUserId, viewerId, emptyMessage, returnTo, displayName } =
@@ -46,54 +42,21 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
               padding: 0,
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px',
+              gap: '16px',
             })}
           >
             {users.map((user) => {
               const following = followingByUserId.get(user.id) ?? false
               const isViewer = user.id === viewerId
-              const canView = !user.is_private || following || isViewer
               return (
-                <li
+                <UserCard
                   key={user.id}
-                  mix={css({
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '12px',
-                    border: '1px solid var(--rule)',
-                    borderRadius: '8px',
-                    padding: '12px 16px',
-                  })}
-                >
-                  <div mix={css({ minWidth: 0, overflowWrap: 'break-word' })}>
-                    {canView ? (
-                      <Link href={routes.users.show.href({ userId: String(user.id) })} tapArea>
-                        <strong>{displayLabel(user)}</strong>
-                      </Link>
-                    ) : (
-                      <strong>{displayLabel(user)}</strong>
-                    )}
-                    <UserTitle title={composeTitle(user.title_adjective, user.title_noun)} card />
-                  </div>
-
-                  {isViewer ? (
-                    <span mix={css({ fontSize: '13px', color: 'var(--soft)', flexShrink: 0 })}>You</span>
-                  ) : (
-                    <form
-                      method="post"
-                      mix={css({ flexShrink: 0 })}
-                      action={
-                        following
-                          ? routes.users.unfollow.href({ userId: String(user.id) })
-                          : routes.users.follow.href({ userId: String(user.id) })
-                      }
-                    >
-                      <input type="hidden" name="return_to" value={returnTo} />
-                      <Button type="submit">{following ? 'Unfollow' : 'Follow'}</Button>
-                    </form>
-                  )}
-                </li>
+                  user={user}
+                  following={following}
+                  canView={!user.is_private || following || isViewer}
+                  isViewer={isViewer}
+                  returnTo={returnTo}
+                />
               )
             })}
           </ul>

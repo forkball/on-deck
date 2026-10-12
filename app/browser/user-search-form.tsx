@@ -61,7 +61,9 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
           method="get"
           action={searchHref}
           mix={[
-            css({ display: 'flex', gap: '8px', marginBottom: '24px' }),
+            // Stacked, input over a full-width button, like the media searches'
+            // form (movie-search-form.tsx), so switching tabs doesn't move it.
+            css({ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }),
             on('submit', () => {
               submitting = true
               handle.update()
@@ -70,7 +72,7 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
         >
           <div
             mix={[
-              css({ position: 'relative', flex: '1 1 auto', minWidth: 0 }),
+              css({ position: 'relative' }),
               ref((node, signal) => {
                 document.addEventListener(
                   'click',
@@ -89,7 +91,7 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
                 name="q"
                 value={query}
                 autocomplete="off"
-                placeholder="Search by username…"
+                placeholder="Search for a person…"
                 mix={[
                   on('input', (event) => {
                     query = (event.target as HTMLInputElement).value
