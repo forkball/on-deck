@@ -10,6 +10,7 @@ import {
   type ActiveMediaType,
 } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
+import { DisclosureChevron } from '../../ui/shared/collapsible.tsx'
 import { Toast } from '../../ui/components/toast.tsx'
 import { PART_NAMES } from '../../data/profileTitles/catalog.ts'
 import { CreditGroups, TITLES_TAB, type Credit } from '../../ui/components/credit-tiles.tsx'
@@ -88,8 +89,9 @@ function TasteProfileSummary(
 
     return (
       <details mix={css({ marginTop: '24px' })}>
-        <summary class="tap-area" mix={css({ cursor: 'pointer' })}>
-          <h2 mix={css({ display: 'inline' })}>{label}</h2>
+        <summary class="disclosure">
+          <h2 mix={css({ margin: 0 })}>{label}</h2>
+          <DisclosureChevron />
         </summary>
         <div
           mix={css({
@@ -184,9 +186,7 @@ function TasteProfileSummary(
 function LoggedList(
   handle: Handle<{
     log: MediaLog
-    total: number
     detailHref: (mediaItemId: number) => string
-    seeAllHref?: string
     emptyHref: string
     emptyLabel: string
     returnTo: string
@@ -194,7 +194,7 @@ function LoggedList(
   }>,
 ) {
   return () => {
-    const { log, total, detailHref, seeAllHref, emptyHref, emptyLabel, returnTo, mediaType } = handle.props
+    const { log, detailHref, emptyHref, emptyLabel, returnTo, mediaType } = handle.props
 
     if (log.length === 0) {
       return (
@@ -205,40 +205,33 @@ function LoggedList(
     }
 
     return (
-      <>
-        <ul
-          mix={css({
-            listStyle: 'none',
-            margin: 0,
-            padding: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-          })}
-        >
-          {log.map(({ interaction, item }) => (
-            <WatchedListItem
-              key={interaction.id}
-              interaction={interaction}
-              item={item}
-              detailHref={item ? detailHref(item.id) : '#'}
-              actions={
-                <MediaLogEditModal
-                  interaction={interaction}
-                  title={item?.title ?? 'Unknown title'}
-                  returnTo={returnTo}
-                  mediaType={mediaType}
-                />
-              }
-            />
-          ))}
-        </ul>
-        {seeAllHref && total > log.length && (
-          <p mix={css({ marginTop: '16px' })}>
-            <Link href={seeAllHref}>See all →</Link>
-          </p>
-        )}
-      </>
+      <ul
+        mix={css({
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+        })}
+      >
+        {log.map(({ interaction, item }) => (
+          <WatchedListItem
+            key={interaction.id}
+            interaction={interaction}
+            item={item}
+            detailHref={item ? detailHref(item.id) : '#'}
+            actions={
+              <MediaLogEditModal
+                interaction={interaction}
+                title={item?.title ?? 'Unknown title'}
+                returnTo={returnTo}
+                mediaType={mediaType}
+              />
+            }
+          />
+        ))}
+      </ul>
     )
   }
 }
@@ -330,13 +323,22 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
               return [
                 type,
                 <>
-                  <h2>What I've {ui.pastParticiple}</h2>
+                  {/* The heading is the way to the whole log, rather than a "See
+                      all" under it. Plain text with nothing logged: there's
+                      nothing more to see. */}
+                  <h2>
+                    {total > 0 ? (
+                      <Link href={seeAllHref} variant="wrap">
+                        What I've {ui.pastParticiple} →
+                      </Link>
+                    ) : (
+                      <>What I've {ui.pastParticiple}</>
+                    )}
+                  </h2>
                   <LoggedList
                     log={log}
-                    total={total}
                     // Carries the tab, so "back" returns to the one you left.
                     detailHref={(id) => withReturnTo(ui.hrefs.show(id), `${profileHref}?tab=${type}`)}
-                    seeAllHref={seeAllHref}
                     emptyHref={ui.hrefs.search()}
                     emptyLabel={`search for a ${ui.itemNoun}`}
                     returnTo={savedReturnTo}

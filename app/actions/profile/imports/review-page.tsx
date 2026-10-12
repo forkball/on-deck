@@ -777,7 +777,8 @@ function LastLine(handle: Handle<{ batchId: string; last: LastAction }>) {
       )
       end = undo(routes.profile.imports.bulk.href({ batchId }), { kind: last.bulk, undo: '1' })
     } else {
-      mark = '↩'
+      // With the text-style selector: on its own, iOS draws ↩ as an emoji.
+      mark = '↩\uFE0E'
       const [only] = last.rows
       const one = last.rows.length === 1
       text = (
