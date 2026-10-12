@@ -11,6 +11,7 @@ import { Field } from '../../ui/shared/field.tsx'
 import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, mediaTypeQuery, type ActiveMediaType } from '../../mediaTypes.ts'
 import { statusLabelsFor, statusOptionsFor } from '../../interactionStatus.ts'
 import { Button, Select } from '../../ui/shared/form-controls.tsx'
+import { SubmitOnChange } from '../../browser/submit-on-change.tsx'
 
 export interface ProfileWatchedPageProps {
   movieLog: Awaited<ReturnType<typeof listUserMediaLog>>
@@ -42,16 +43,16 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
               `page` is deliberately not carried across: changing the filter
               changes how many pages there are, so it starts again at the
               first. The type is preserved, since it's which tab you came
-              from rather than part of the filter. */}
+              from rather than part of the filter. Picking a status submits it
+              (SubmitOnChange); the button is for when there's no JS. */}
         <form
           method="get"
           action={routes.profile.watched.href()}
           mix={css({ display: 'flex', alignItems: 'flex-end', gap: '8px', margin: '0 0 24px' })}
         >
           {mediaType !== DEFAULT_MEDIA_TYPE && <input type="hidden" name="type" value={mediaType} />}
-          {/* Field spans its container by design, so it needs a bounded box
-                of its own here or it squeezes the button off the row. */}
-          <div mix={css({ flex: '0 1 200px' })}>
+          {/* The whole width: the button beside it is only there with JS off. */}
+          <div mix={css({ flex: '1 1 auto' })}>
             <Field label="Status">
               {/* `selected` rather than defaultValue — see StatusSelect. */}
               <Select name="status">
@@ -67,6 +68,7 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
             </Field>
           </div>
           <Button type="submit">Filter</Button>
+          <SubmitOnChange />
         </form>
 
         {movieLog.length === 0 && (
