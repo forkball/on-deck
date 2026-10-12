@@ -11,6 +11,7 @@ import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
 import { Toast } from '../components/toast.tsx'
 import { Page } from '../components/page.tsx'
 import { MediaItemCard } from '../components/media-item-card.tsx'
+import { markdownToPlainText } from '../components/markdown.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 
 export interface MediaSearchPageProps {
@@ -33,7 +34,7 @@ export interface MediaSearchPageProps {
 const SUMMARY_MAX = 200
 
 function summarize(overview: string): string {
-  const text = overview.replace(/\s+/g, ' ').trim()
+  const text = markdownToPlainText(overview).replace(/\s+/g, ' ').trim()
   if (text.length <= SUMMARY_MAX) return text
 
   const cut = text.slice(0, SUMMARY_MAX)
