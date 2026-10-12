@@ -3,7 +3,7 @@
 // A title is two words worn together: a genre and a role, "Art House
 // Projectionist". Every achievement here earns exactly one word — a credit, as
 // in a film's — which is either a genre (an adjective, the first word) or a
-// role (a noun, the second). The two are chosen separately in settings from
+// role (a noun, the second). The two are chosen separately, on your profile, from
 // whatever of each has been earned, so watching obscure films gets you "Art
 // House" and a hundred films gets you "Projectionist".
 //
@@ -61,7 +61,7 @@ export interface TitleDefinition {
   key: string
   word: string
   part: TitlePart
-  // How to earn it, as the settings page says it to someone who hasn't yet.
+  // How to earn it, as the Titles tab says it to someone who hasn't yet.
   requirement: string
   goal: number
   measure: (stats: TitleStats) => number
@@ -604,7 +604,7 @@ const MEDIA_LADDERS: Ladder[] = [
 // The media ladders' group names, likewise.
 export const MEDIA_GROUPS: ReadonlySet<string> = new Set(MEDIA_LADDERS.map((ladder) => ladder.group))
 
-// In the order the settings page lists each part's words: the ones most people
+// In the order the Titles tab lists each part's words: the ones most people
 // earn first, then taste, then volume, then habits, then the social ones.
 //
 // The two starter credits lead the list on purpose: a member's first title goes
@@ -810,7 +810,7 @@ export function composeTitle(
   return words.length > 0 ? words.join(' ') : null
 }
 
-// A choice from the settings form, checked against what has been unlocked. An
+// A choice from the Titles tab, checked against what has been unlocked. An
 // empty value clears that half; a key not unlocked, or in the wrong slot, is
 // refused outright rather than quietly dropped, since only a hand-made request
 // could send one.

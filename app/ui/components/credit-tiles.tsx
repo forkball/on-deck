@@ -172,7 +172,7 @@ function ProgressBar(handle: Handle<{ current: number; goal: number }>) {
 // tap opens a small modal saying what earns it and, on your own, how close you
 // are — and, with `picking`, a button there to wear an earned one. The list is
 // for browsing the words; thirty sentences at once buried them. Shared by the
-// settings tab and the Titles tab on a profile.
+// Titles tab on your own profile and on someone else's.
 //
 // Showing words before they're earned is deliberate: "Jump-Scared" is a better
 // reason to watch ten horror films than a padlock is.
@@ -308,8 +308,8 @@ const filterBarStyle = css({
   margin: '16px 0 0',
 })
 
-// Every credit there is, as genres then roles — what your Titles tab in
-// settings shows — with a filter by what earns them and by whether they're
+// Every credit there is, as genres then roles — what your own profile's Titles
+// tab shows — with a filter by what earns them and by whether they're
 // earned yet. `earnedOnly` is someone else's Titles tab: just the credits they
 // hold, so the earned/still-to-earn switch has nothing to do and goes.
 export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picking; earnedOnly?: boolean }>) {
