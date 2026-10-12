@@ -2,27 +2,36 @@ import { inList } from 'remix/data-table'
 
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { platformFamilies } from '../catalog/igdb.ts'
-import { upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
+import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
 import type { Db } from '../db.ts'
 import { isFollowing } from '../follows.ts'
 import { countUserMediaLog, listUserMediaLog, CONSUMPTION_STATUSES, type MediaType } from '../mediaItems.ts'
 import { createNotification } from '../notifications.ts'
+import { checkTitleUnlocksQuietly } from '../profileTitles/unlocks.ts'
 import { mediaItems, users } from '../schema.ts'
 import { displayLabel } from '../users.ts'
 import { recordRunAgainstDailyLimit, runCostFor } from './dailyLimit.ts'
+import { CatalogUnavailableError, GenerationError } from './errors.ts'
 import { buildExclusions } from './exclusions.ts'
-import type { GenerationPhase } from './jobs.ts'
+import { phasesFor, type GenerationPhase } from './jobs.ts'
 import {
+  chooseMatch,
+  decadeYear,
+  filterByGenre,
   filterByLength,
   matchesDecade,
+  matchesLengthFor,
+  matchesSeries,
   resolveFromCatalog,
   searchForPicks,
-  titlesLikelyMatch,
+  seriesKey,
+  seriesKeysFor,
   verifyPicksAgainstOverviews,
   withOverviews,
   type Candidate,
 } from './matching.ts'
 import {
+  narrows,
   requestPicks,
   toTasteSummary,
   type MemberProfile,
@@ -37,9 +46,53 @@ import {
   type GenerationParams,
   type RecommendationResult,
 } from './runs.ts'
-import { emptyDrops, logPickTally } from './tally.ts'
+import { emptyDrops, logPickTally, type PickTally } from './tally.ts'
+import { finishTranscript, startTranscript } from './transcripts.ts'
 import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
 import { markPhase, track } from './timings.ts'
+import { picksToKeepUnconfirmed } from './unconfirmed.ts'
+import { selectUnmatchedPicks, type UnmatchedCandidate } from './unmatched.ts'
+import { logger } from '../../log.ts'
+
+const log = logger('generation')
+
+// Which levers a run was narrowed by, in the words the form used for them, so the
+// advice names the thing there is a control for.
+// Exported for the run page, which names the same levers in the same words.
+export const FILTER_LABELS: [keyof RecommendationFilters, string][] = [
+  ['genre', 'genre'],
+  ['decade', 'decade'],
+  ['length', 'length'],
+  ['playerType', 'player type'],
+  ['multiplayerType', 'multiplayer type'],
+  ['platform', 'platform'],
+  ['series', 'series'],
+  ['seenBy', 'already-seen'],
+]
+
+// Exported for its own test: the levers are read off a shape that grows, and copy
+// that forgets one sends somebody looking for a filter it never mentions.
+export function nothingLeftMessage(filters: RecommendationFilters, mediaType: MediaType): string {
+  const noun = mediaTypeUiFor(mediaType).plural
+  const set = FILTER_LABELS.filter(([key]) => narrows(filters, key)).map(([, label]) => label)
+
+  if (set.length === 0) {
+    return `Nothing came back that we could confirm this time. Try generating again.`
+  }
+
+  return (
+    `No ${noun} made it through the ${joinWithAnd(set)} ${set.length === 1 ? 'filter' : 'filters'}. ` +
+    `Try widening ${set.length === 1 ? 'it' : 'them'} and generating again.`
+  )
+}
+
+// "genre", "genre and decade", "genre, decade and length" — no serial comma, as the
+// rest of the copy is written.
+export function joinWithAnd(items: string[]): string {
+  return items.length <= 1
+    ? items.join('')
+    : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
+}
 
 // Exported so the page can say how many a run comes back with rather than
 // restating the number in copy that would then drift from it.
@@ -63,12 +116,16 @@ export interface GenerateOptions {
   // group has logged, and charged to its own once-a-day cap rather than the
   // general allowance. Same queue, same stages, same tables.
   lucky?: boolean
+  // The job this run is being made for, recorded on its transcript so a run can be
+  // traced back from the queue.
+  jobId?: string
 }
 
-export interface GenerateRecommendationsOutcome {
-  runId: number
-  prunedOldestRun: boolean
-}
+// A run, or the model's own answer kept when nothing could confirm it. Callers
+// have to look at which, because the two land on different pages.
+export type GenerateRecommendationsOutcome =
+  | { kind: 'run'; runId: number; prunedOldestRun: boolean }
+  | { kind: 'unconfirmed'; unconfirmedRunId: number }
 
 export interface MissingSourceLogs {
   userId: number
@@ -90,7 +147,9 @@ export async function findMembersMissingSourceLogs(
         // Rejections don't count — a log of nothing but "not interested" gives
         // the profile nothing to work from.
         Promise.all(
-          sourceTypes.map((type) => countUserMediaLog(db, memberId, { type, statuses: CONSUMPTION_STATUSES })),
+          sourceTypes.map((type) =>
+            countUserMediaLog(db, memberId, { type, statuses: CONSUMPTION_STATUSES }),
+          ),
         ),
       ])
       return {
@@ -129,7 +188,12 @@ export async function generateRecommendations(
 
   // Both announcements go through here, or a new stage gets measured as part of
   // the last one that forgot to close.
+  // Entering the phase already current is a no-op, so a stage can be entered from
+  // more than one place without being measured or announced twice.
+  let currentPhase: GenerationPhase | null = null
   const enterPhase = (phase: GenerationPhase): void => {
+    if (phase === currentPhase) return
+    currentPhase = phase
     markPhase(phase)
     onPhase(phase)
   }
@@ -157,7 +221,10 @@ export async function generateRecommendations(
       : members.map(({ regenerated, label }) => ({
           label,
           ...Object.fromEntries(
-            profileTypes.map((type, i) => [`${mediaTypeUiFor(type).plural}_taste`, toTasteSummary(regenerated[i])]),
+            profileTypes.map((type, i) => [
+              `${mediaTypeUiFor(type).plural}_taste`,
+              toTasteSummary(regenerated[i]),
+            ]),
           ),
         }))
 
@@ -174,41 +241,104 @@ export async function generateRecommendations(
     ),
   )
 
-  const { titles: excluded, externalIds: excludedExternalIds } = buildExclusions(exclusionLogs, { lucky })
+  const { titles: excluded, externalIds: excludedExternalIds } = buildExclusions(exclusionLogs, {
+    lucky,
+    seenBy: filters.seenBy,
+  })
 
   let picks: Pick[]
+  // Null on a resumed run: the model was asked on the attempt before this one, and
+  // that attempt kept its own transcript.
+  let transcriptId: number | null = null
   if (checkpoint.picks?.length) {
     picks = checkpoint.picks
   } else {
     enterPhase('picks')
-    picks = await requestPicks(profiles, excluded, filters, mediaType, profileTypes)
+    const asked = await requestPicks(profiles, excluded, filters, mediaType, profileTypes)
+    picks = asked.picks
+    // Before anything is done with the answer, so a run that dies in the stages
+    // below still leaves what was asked and what came back.
+    transcriptId = await startTranscript(db, {
+      userId: requestingUserId,
+      jobId: options.jobId,
+      mediaType,
+      filters,
+      prompt: asked.prompt,
+      response: asked.response,
+    }).catch((error) => {
+      log.warn('transcript could not be started', error)
+      return null
+    })
     checkpoint = { ...checkpoint, picks }
     onCheckpoint(checkpoint)
   }
 
+  // The stages that can find the catalog down. Which picks are worth keeping if
+  // they do is decided here, where the exclusions already are — see the worker,
+  // which keeps them as an unconfirmed run.
+  const keepingPicksIfDown = <T>(stage: Promise<T>): Promise<T> =>
+    stage.catch((error: unknown) => {
+      if (error instanceof CatalogUnavailableError) {
+        error.keep = picksToKeepUnconfirmed(picks, { lucky, excluded })
+      }
+      throw error
+    })
+
   enterPhase('matching')
   const fromCatalog = await resolveFromCatalog(mediaType, picks)
 
-  const matchesByPick = await searchForPicks(mediaType, picks, fromCatalog)
+  const matchesByPick = await keepingPicksIfDown(searchForPicks(mediaType, picks, fromCatalog))
 
   // Not capped at TARGET_COUNT: verification below drops some too, so the
   // over-request slack has to reach it.
+  const lengthWanted = filters.length ? matchesLengthFor(mediaType, filters.length) : undefined
+
   const shortlist: Candidate[] = []
   const seenExternalIds = new Set<string>()
+  // One per series, placed by the catalog wherever it says and by the model where no
+  // catalog does — see seriesKeysFor. The model is asked for this on every run and
+  // mostly obliges, but it returned A Court of Thorns and Roses beside A Court of
+  // Mist and Fury, and Fourth Wing beside Iron Flame, in a single run of eight.
+  //
+  // A series is only spent by a pick that survives to the shortlist, since the add
+  // below sits after every other gate: a sibling dropped as already-logged leaves
+  // its series free for the next entry from it.
+  const seenSeries = new Set<string>()
   const drops = emptyDrops()
+
+  // Picks the catalog couldn't place, which the run may still show as the model
+  // gave them — see unmatched.ts. Only the levers a pick answers for itself can be
+  // applied to one: the decade from its own year, the series from its own answer.
+  // The rest need a catalog record, and the run page says nothing checked them.
+  // Not for a lucky run, whose one pick is the point and has to be a real entry.
+  const unmatchedCandidates: UnmatchedCandidate[] = []
+  const keepUnmatched = (pick: Pick): void => {
+    if (lucky) return
+    if (filters.decade != null && !matchesDecade(pick.year, filters.decade, filters.decadeRelation)) return
+    if (filters.series && !matchesSeries(pick, filters.series)) return
+    unmatchedCandidates.push({ pick, seriesKey: seriesKey(pick) })
+  }
 
   for (const [i, pick] of picks.entries()) {
     const matches: CatalogSearchResult[] = matchesByPick[i]
     if (matches.length === 0) {
       drops.unfound++
+      keepUnmatched(pick)
       continue
     }
 
-    const match =
-      matches.find((m) => m.releaseYear === pick.year) ??
-      [...matches].sort(
-        (a, b) => Math.abs((a.releaseYear ?? 0) - pick.year) - Math.abs((b.releaseYear ?? 0) - pick.year),
-      )[0]
+    // The length lever picks the printing as well as filtering on it, for a medium
+    // whose year is a pressing: a page count belongs to an edition, and dropping a
+    // work because the edition we happened to choose was the wrong length answers a
+    // question nobody asked. Inert for the media whose catalog entry is the work.
+    const match = chooseMatch(pick, matches, mediaType, lengthWanted)
+    if (!match) {
+      drops.titleMismatch++
+      // The catalog answered with other titles, which says more about the catalog
+      // than the pick: a thin book search returns whatever it has.
+      keepUnmatched(pick)
+      continue
+    }
 
     if (excludedExternalIds.has(match.externalId)) {
       drops.alreadyLogged++
@@ -218,35 +348,52 @@ export async function generateRecommendations(
       drops.duplicate++
       continue
     }
-    if (!titlesLikelyMatch(pick.title, match.title)) {
-      drops.titleMismatch++
+    const series = seriesKeysFor(pick, match)
+    // The first of a series is the one kept, and the picks arrive ranked, so that is
+    // the one the model thought was the better entry point.
+    if (series.some((key) => seenSeries.has(key))) {
+      drops.sameSeries++
       continue
     }
+    // Genre is checked after this loop, not in it: for books the search hit
+    // can't answer it. `series` is checked against the pick's own label, since no
+    // catalog carries the answer — see matchesSeries.
     if (
-      (filters.genre && !match.tags.includes(filters.genre)) ||
-      (filters.decade != null && !matchesDecade(match.releaseYear, filters.decade, filters.decadeRelation)) ||
+      (filters.decade != null &&
+        !matchesDecade(decadeYear(mediaType, pick, match), filters.decade, filters.decadeRelation)) ||
       (filters.playerType && !match.tags.includes(filters.playerType)) ||
       (filters.multiplayerType && !match.tags.includes(filters.multiplayerType)) ||
       // Platforms are their own field, not tags, and compare by family.
       (filters.platform && !platformFamilies(match.platforms ?? []).includes(filters.platform)) ||
-      (filters.series && !match.tags.includes(filters.series))
+      (filters.series && !matchesSeries(pick, filters.series))
     ) {
       drops.filtered++
       continue
     }
 
     seenExternalIds.add(match.externalId)
+    for (const key of series) seenSeries.add(key)
     shortlist.push({ pick, match })
   }
 
   let candidates: Candidate[] = shortlist
+  if (filters.genre) {
+    // The same function the job's phase list was built from, so a stage entered
+    // here is a stage that list holds.
+    if (phasesFor({ mediaType, filters }).includes('genres')) enterPhase('genres')
+    const inGenre = await keepingPicksIfDown(filterByGenre(candidates, mediaType, filters.genre))
+    drops.genre = candidates.length - inGenre.length
+    candidates = inGenre
+  }
   if (filters.length) {
     enterPhase('lengths')
-    candidates = await filterByLength(shortlist, mediaType, filters.length)
-    drops.length = shortlist.length - candidates.length
+    const atLength = await keepingPicksIfDown(filterByLength(candidates, mediaType, filters.length))
+    drops.length = candidates.length - atLength.length
+    candidates = atLength
   }
 
   let results: RecommendationResult[]
+  let tally: PickTally | null = null
 
   if (checkpoint.verified?.length) {
     const ids = checkpoint.verified.map((entry) => entry.mediaItemId)
@@ -266,7 +413,9 @@ export async function generateRecommendations(
     const verified = await verifyPicksAgainstOverviews(await withOverviews(candidates, mediaType), mediaType)
     drops.unverified = candidates.length - verified.length
 
-    enterPhase('saving')
+    // Only once there is something to save: a run that ends with nothing left
+    // fails on the check that emptied it, which is the step the page crosses out.
+    if (verified.length > 0) enterPhase('saving')
     // Promise.all keeps pick order, which is the order they're ranked in.
     results = await Promise.all(
       verified.slice(0, lucky ? LUCKY_TARGET_COUNT : TARGET_COUNT).map(async ({ pick, match }) => ({
@@ -284,14 +433,51 @@ export async function generateRecommendations(
 
     // Only on this path — a resumed run skipped verification, and a tally
     // missing a stage reads as though everything was counted.
-    logPickTally({
+    tally = {
       requested: picks.length,
       kept: results.length,
       surplus: verified.length - results.length,
       dropped: drops,
-    })
+    }
   }
 
+  // After the confirmed picks are settled, since these only fill the places they
+  // leave. Ranked order is kept, so the model's stronger unmatched picks come first.
+  const unmatched = selectUnmatchedPicks({
+    candidates: unmatchedCandidates,
+    excluded,
+    shownTitles: results.map((result) => result.item.title),
+    takenSeries: seenSeries,
+    slots: (lucky ? LUCKY_TARGET_COUNT : TARGET_COUNT) - results.length,
+  })
+  // Logged here rather than where it is built, so the line carries this count too.
+  if (tally) {
+    tally.shownUnmatched = unmatched.length
+    logPickTally(tally)
+  }
+
+  // A run with nothing in it is not a run. Saving one spends the day's allowance,
+  // takes one of the three slots a person keeps, prunes the oldest real run to make
+  // room for it, and notifies them that their recommendations are ready — all for a
+  // page with nothing on it. Every gate between the picks and here is a filter they
+  // set, so the useful answer is which one to loosen, not an empty list.
+  //
+  // Thrown rather than returned: failJob puts a GenerationError's message in front
+  // of whoever is waiting, and the job lands as failed rather than as a completed
+  // run that isn't one.
+  //
+  // A run of nothing but unmatched picks is still a run: the model's answer is
+  // what someone asked for, and the catalog not knowing a title is no reason to
+  // withhold it.
+  if (results.length === 0 && unmatched.length === 0) {
+    // Before the throw: an empty run is the case most worth being able to read
+    // afterwards, and it leaves no run row to hang the numbers off.
+    if (transcriptId != null && tally) await finishTranscript(db, transcriptId, { tally })
+    throw new GenerationError(nothingLeftMessage(filters, mediaType))
+  }
+
+  // A run of only unmatched picks reaches here without having entered it yet.
+  enterPhase('saving')
   const runId = await track('run.save', () =>
     saveRun(db, {
       requestingUserId,
@@ -308,9 +494,11 @@ export async function generateRecommendations(
         multiplayerType: filters.multiplayerType,
         platform: filters.platform,
         series: filters.series,
+        seenBy: filters.seenBy,
         sourceTypes: profileTypes,
       } satisfies GenerationParams,
       results,
+      unmatched,
     }),
   )
 
@@ -325,12 +513,19 @@ export async function generateRecommendations(
   const [, , prunedOldestRun] = await Promise.all([
     lucky
       ? Promise.resolve()
-      : track('run.usage', () => recordRunAgainstDailyLimit(db, requestingUserId, runCostFor(memberUserIds.length))),
+      : track('run.usage', () =>
+          recordRunAgainstDailyLimit(db, requestingUserId, runCostFor(memberUserIds.length)),
+        ),
     track('run.notify', () => notifyMutualFollowers(db, requestingUserId, memberUserIds, runId)),
     track('run.prune', () => pruneOldRuns(db, requestingUserId, mediaType, { lucky })),
+    track('run.titles', () => checkTitleUnlocksQuietly(db, requestingUserId)),
   ])
 
-  return { runId, prunedOldestRun }
+  // Off the critical path deliberately: nobody's run should fail over its own
+  // record of itself, which is why finishTranscript swallows its errors.
+  if (transcriptId != null && tally) await finishTranscript(db, transcriptId, { runId, tally })
+
+  return { kind: 'run', runId, prunedOldestRun }
 }
 
 // Mutual follows only — the picker requires one direction, this requires the
@@ -351,7 +546,12 @@ async function notifyMutualFollowers(
       ])
       if (!requesterFollowsMember || !memberFollowsRequester) return
 
-      await createNotification(db, { userId: memberId, actorUserId: requestingUserId, type: 'recommendation', runId })
+      await createNotification(db, {
+        userId: memberId,
+        actorUserId: requestingUserId,
+        type: 'recommendation',
+        runId,
+      })
     }),
   )
 }

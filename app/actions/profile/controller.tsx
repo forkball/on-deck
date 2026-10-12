@@ -3,19 +3,27 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { syncLetterboxdInBackground } from '../../data/imports/letterboxdSync.ts'
+import { letterboxdSyncAvailableTo } from '../../data/imports/letterboxdFeed.ts'
+import { syncLetterboxdBeforeReading } from '../../data/imports/letterboxdSync.ts'
 import {
   getProfileRebuildAllowance,
   recordProfileRebuild,
   timeUntil,
 } from '../../data/recommendations/dailyLimit.ts'
-import { getLuckyState } from '../../data/recommendations/lucky.ts'
 import {
   parseProfileLogLimit,
   profileSettingsFor,
   regenerateTasteProfile,
 } from '../../data/recommendations/tasteProfile.ts'
-import { updateProfileSettings } from '../../data/users.ts'
+import { composeTitle, parseTitleChoice } from '../../data/profileTitles/catalog.ts'
+import {
+  checkTitleUnlocksQuietly,
+  chooseTitle,
+  loadUnlockedTitleKeys,
+  loadWornTitle,
+} from '../../data/profileTitles/unlocks.ts'
+import { updateProfileSettings, updateWatchRegion } from '../../data/users.ts'
+import { parseWatchRegion } from '../../data/watchRegion.ts'
 
 import {
   countFollowers,
@@ -29,12 +37,16 @@ import { loadMediaSummaries } from '../../data/mediaSummary.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
-import { routes } from '../../routes.ts'
+import { routes, titleSettingsHref } from '../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
 import { parseInteractionStatus } from '../../interactionStatus.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
+import { ImportPage } from './import-page.tsx'
+import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
 import { ProfilePage } from './page.tsx'
+import { loadWaitingImports } from './waiting-imports.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
+import { safeReturnPath } from '../../ui/backLink.ts'
 
 const RECENT_COUNT = 5
 const PAGE_SIZE = 10
@@ -46,21 +58,26 @@ export default createController(routes.profile, {
       const auth = context.get(Auth)
 
       const db = context.get(Database)
-      const media = await loadMediaSummaries(db, auth.identity.id, RECENT_COUNT)
-      const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
+      const tab = context.url.searchParams.get('tab')
+      const activeTab = tab === TITLES_TAB ? TITLES_TAB : (parseMediaType(tab) ?? DEFAULT_MEDIA_TYPE)
 
-      const followingCount = await countFollowing(db, auth.identity.id)
-      const followersCount = await countFollowers(db, auth.identity.id)
-      const [rebuildAllowance, lucky] = await Promise.all([
-        getProfileRebuildAllowance(db, auth.identity),
-        getLuckyState(auth.identity),
-      ])
-
-      // Kicked off beside the render, never awaited into it: reading the feed
-      // and looking up any film new to the catalog is seconds of network, and
-      // the log it updates is the one this page draws next time. No-op unless a
-      // Letterboxd account is connected and the fetch cooldown has passed.
-      syncLetterboxdInBackground(db, auth.identity)
+      // Only the log waits on the feed; everything else loads alongside it. The
+      // title check waits too, so whatever the feed just logged can earn one.
+      const [[media, [check, worn]], followingCount, followersCount, rebuildAllowance, waitingImports] =
+        await Promise.all([
+          syncLetterboxdBeforeReading(db, auth.identity).then(() =>
+            Promise.all([
+              loadMediaSummaries(db, auth.identity.id, RECENT_COUNT),
+              checkTitleUnlocksQuietly(db, auth.identity.id).then((result) =>
+                Promise.all([result, loadWornTitle(db, auth.identity.id)]),
+              ),
+            ]),
+          ),
+          countFollowing(db, auth.identity.id),
+          countFollowers(db, auth.identity.id),
+          getProfileRebuildAllowance(db, auth.identity),
+          loadWaitingImports(db, auth.identity.id),
+        ])
 
       return context.render(
         <ProfilePage
@@ -74,10 +91,55 @@ export default createController(routes.profile, {
           rebuildsLeft={rebuildAllowance.unlimited ? null : rebuildAllowance.remaining}
           rebuilt={context.url.searchParams.get('rebuilt') === '1'}
           rebuildError={context.url.searchParams.get('rebuildError') ?? undefined}
-          lucky={lucky}
+          waitingImports={waitingImports}
           displayName={displayLabel(auth.identity)}
+          title={composeTitle(worn.adjective, worn.noun)}
+          worn={worn}
+          titleSaved={context.url.searchParams.get('titleSaved') === '1'}
+          credits={(check?.progress ?? []).map(({ title, current }) => ({
+            title,
+            earned: check?.unlocked.has(title.key) ?? false,
+            current,
+          }))}
         />,
       )
+    },
+
+    async import(context) {
+      const auth = context.get(Auth)
+
+      return context.render(
+        <ImportPage
+          displayName={displayLabel(auth.identity)}
+          sources={{
+            letterboxdAvailable: letterboxdSyncAvailableTo(auth.identity),
+            letterboxdConnected: auth.identity.letterboxd_username != null,
+            steamConnected: auth.identity.steam_id != null,
+          }}
+          waitingImports={await loadWaitingImports(context.get(Database), auth.identity.id)}
+        />,
+      )
+    },
+
+    async title(context) {
+      const auth = context.get(Auth)
+      const formData = context.get(FormData)
+      const db = context.get(Database)
+
+      const choice = parseTitleChoice(
+        {
+          adjective: String(formData.get('adjective') ?? ''),
+          noun: String(formData.get('noun') ?? ''),
+        },
+        await loadUnlockedTitleKeys(db, auth.identity.id),
+      )
+      if (!choice) return new Response("You haven't earned that title.", { status: 400 })
+
+      await chooseTitle(db, auth.identity.id, choice)
+      // Back to whichever Titles tab the tap came from — settings or your own
+      // profile — with the toast that says it took.
+      const back = safeReturnPath(String(formData.get('return_to') ?? '')) ?? titleSettingsHref()
+      return redirect(`${back}${back.includes('?') ? '&' : '?'}titleSaved=1`, 303)
     },
 
     async settings(context) {
@@ -91,7 +153,20 @@ export default createController(routes.profile, {
         useNotes: formData.get('use_notes') != null,
       })
 
-      return redirect(`${routes.profile.edit.index.href()}?saved=1`, 303)
+      return redirect(`${routes.profile.edit.index.href()}?tab=taste&saved=1`, 303)
+    },
+
+    // Posted from a detail page's "where to watch" list, and sends you back to
+    // it. A value not in the list is ignored rather than stored, since it could
+    // only ever show nothing.
+    async watchRegion(context) {
+      const auth = context.get(Auth)
+      const formData = context.get(FormData)
+
+      const region = parseWatchRegion(formData.get('region'))
+      if (region) await updateWatchRegion(context.get(Database), auth.identity.id, region)
+
+      return redirect(safeReturnPath(String(formData.get('return_to') ?? '')) ?? routes.home.href(), 303)
     },
 
     async rebuild(context) {
@@ -143,18 +218,23 @@ export default createController(routes.profile, {
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
       const mediaType = parseMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
       const status = parseInteractionStatus(context.url.searchParams.get('status'))
-      const filter = { type: mediaType, statuses: status ? [status] : undefined }
+      const filter = {
+        type: mediaType,
+        statuses: status ? [status] : undefined,
+      }
+
+      await syncLetterboxdBeforeReading(db, auth.identity)
 
       // Counted through the same filter, or the last page of a filtered list
       // pages past its own end.
-      const totalWatched = await countUserMediaLog(db, auth.identity.id, filter)
-      const movieLog = await listUserMediaLog(db, auth.identity.id, {
-        ...filter,
-        limit: PAGE_SIZE,
-        offset: (page - 1) * PAGE_SIZE,
-      })
-
-      syncLetterboxdInBackground(db, auth.identity)
+      const [totalWatched, movieLog] = await Promise.all([
+        countUserMediaLog(db, auth.identity.id, filter),
+        listUserMediaLog(db, auth.identity.id, {
+          ...filter,
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+        }),
+      ])
 
       return context.render(
         <ProfileWatchedPage
@@ -173,7 +253,11 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
       const users = await listFollowedUsers(db, auth.identity.id)
-      const followingIds = await listFollowingIds(db, auth.identity.id, users.map((u) => u.id))
+      const followingIds = await listFollowingIds(
+        db,
+        auth.identity.id,
+        users.map((u) => u.id),
+      )
 
       return context.render(
         <FollowListPage
@@ -194,7 +278,11 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
       const users = await listFollowers(db, auth.identity.id)
-      const followingIds = await listFollowingIds(db, auth.identity.id, users.map((u) => u.id))
+      const followingIds = await listFollowingIds(
+        db,
+        auth.identity.id,
+        users.map((u) => u.id),
+      )
 
       return context.render(
         <FollowListPage

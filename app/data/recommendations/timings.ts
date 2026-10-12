@@ -139,7 +139,9 @@ export function summarizeTimings(timings: RunTimings): string {
 
   for (const phase of timings.phases) {
     const steps = phase.steps.map((step) => `${step.name} ${duration(step.ms)}×${step.count}`).join(', ')
-    parts.push(steps ? `${phase.name} ${duration(phase.ms)} [${steps}]` : `${phase.name} ${duration(phase.ms)}`)
+    parts.push(
+      steps ? `${phase.name} ${duration(phase.ms)} [${steps}]` : `${phase.name} ${duration(phase.ms)}`,
+    )
   }
 
   return parts.join(' · ')

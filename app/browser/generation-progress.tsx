@@ -1,5 +1,6 @@
 import type { Handle } from 'remix/ui'
 import { clientEntry, css, ref } from 'remix/ui'
+import { Link } from '../ui/shared/form-controls.tsx'
 
 // Polls for the stage a run is actually in. Every label comes from the server
 // having entered that stage, so progress can't run backwards or be invented.
@@ -25,7 +26,7 @@ const stepStyle = css({
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
-  color: '#888',
+  color: 'var(--muted)',
   fontSize: '14px',
 })
 
@@ -33,7 +34,16 @@ const activeStepStyle = css({
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
-  color: '#111',
+  color: 'var(--ink)',
+  fontSize: '14px',
+  fontWeight: 'bold',
+})
+
+const failedStepStyle = css({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  color: 'var(--danger)',
   fontSize: '14px',
   fontWeight: 'bold',
 })
@@ -42,18 +52,29 @@ const doneStepStyle = css({
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
-  color: '#15803d',
+  color: 'var(--success)',
   fontSize: '14px',
 })
 
 export type GenerationProgressProps = {
   statusHref: string
+  // Where a run that came back with nothing sends someone: the form they set the
+  // filters on. Passed in because a client entry can't reach routes.ts.
+  formHref: string
+  // Offered beside it, for someone done with recommendations for now.
+  homeHref: string
   initialLabel: string
   initialPhase: string
   initialStatus: string
   initialQueuedAhead: number | null
+  // Queued again to wait out a catalog that wasn't answering. Its steps stay on
+  // screen, since it has been through them, rather than reading as not started.
+  initialRetrying: boolean
   phases: string[]
   labels: Record<string, string>
+  // Why the run stopped, when it had already stopped before the page loaded. Set,
+  // the page paints the failure over the steps and never starts polling.
+  initialError?: string | null
 }
 
 export const GenerationProgress = clientEntry<GenerationProgressProps>(
@@ -62,8 +83,14 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
     let phase = handle.props.initialPhase
     let queueState = handle.props.initialStatus
     let ahead: number | null = handle.props.initialQueuedAhead
-    let failed: string | null = null
-    let lostContact = false
+    let retrying = handle.props.initialRetrying
+    // Why this page stopped following the run, or null while it still is. Only a
+    // run that `failed` gets its step crossed out: a run that went missing, or that
+    // the page lost contact with, may well still be going, so its steps stay as last
+    // seen. `reload` is the way on for the lost-contact case.
+    let stopped: { message: string; failed: boolean; reload: boolean } | null = handle.props.initialError
+      ? { message: handle.props.initialError, failed: true, reload: false }
+      : null
 
     // handle.update() returns a promise that rejects when there's no renderer to
     // schedule against, and called bare from the loop below that rejection has
@@ -88,7 +115,11 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
           })
 
           if (response.status === 404) {
-            failed = "This run is no longer available. It may have finished a while ago."
+            stopped = {
+              message: 'This run is no longer available. It may have finished a while ago.',
+              failed: false,
+              reload: false,
+            }
             render()
             return
           }
@@ -102,6 +133,7 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             status: string
             phase: string
             queuedAhead: number | null
+            retrying?: boolean
             done: boolean
             href: string | null
             error: string | null
@@ -109,7 +141,9 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
           consecutiveFailures = 0
 
           if (status.error) {
-            failed = status.error
+            // The stage it stopped on, so the cross lands on the right step.
+            phase = status.phase
+            stopped = { message: status.error, failed: true, reload: false }
             render()
             return
           }
@@ -119,7 +153,14 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             return
           }
 
-          if (status.status !== queueState || status.phase !== phase || status.queuedAhead !== ahead) {
+          const nowRetrying = status.retrying === true
+          if (
+            status.status !== queueState ||
+            status.phase !== phase ||
+            status.queuedAhead !== ahead ||
+            nowRetrying !== retrying
+          ) {
+            retrying = nowRetrying
             queueState = status.status
             phase = status.phase
             ahead = status.queuedAhead
@@ -133,28 +174,51 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
     }
 
     function giveUp() {
-      lostContact = true
+      stopped = {
+        message: 'Lost contact with the server. Your picks are probably still being put together.',
+        failed: false,
+        reload: true,
+      }
       render()
     }
 
     return () => {
       const { phases, labels } = handle.props
 
-      function panel() {
-        if (failed) return <p mix={css({ color: '#b91c1c' })}>{failed}</p>
-
-        if (lostContact) {
+      // What stopped the run, or stopped this page following it. Above the steps,
+      // which stay on screen so it is clear how far the run got. The message is
+      // written where the failure happened and already says what to do about it.
+      function notice() {
+        if (stopped) return <p mix={css({ color: 'var(--danger)' })}>{stopped.message}</p>
+        // Not an error, so not in red: the run is fine and will carry on by itself.
+        if (retrying) {
           return (
-            <p mix={css({ color: '#b91c1c' })}>
-              Lost contact with the server. Your picks are probably still being put together —{' '}
-              <a href="">reload</a> to check.
-            </p>
+            <p mix={css({ color: 'var(--soft)' })}>The catalog isn't answering — trying again in a minute.</p>
           )
         }
+        return null
+      }
 
-        if (queueState === 'queued') {
+      // The way on, under the steps: back to the form for a run that is over, a
+      // reload for one this page has only lost track of.
+      function nextStep() {
+        if (!stopped) return null
+        return (
+          <p mix={css({ display: 'flex', flexWrap: 'wrap', gap: '16px' })}>
+            {stopped.reload ? (
+              <Link href="">Reload to check</Link>
+            ) : (
+              <Link href={handle.props.formHref}>Back to recommendations</Link>
+            )}
+            <Link href={handle.props.homeHref}>Home</Link>
+          </p>
+        )
+      }
+
+      function panel() {
+        if (queueState === 'queued' && !stopped?.failed && !retrying) {
           return (
-            <p mix={css({ color: '#555' })}>
+            <p mix={css({ color: 'var(--soft)' })}>
               Waiting to start
               {ahead != null && ahead > 0 ? ` — ${ahead} ${ahead === 1 ? 'run' : 'runs'} ahead of yours` : ''}
               …
@@ -169,10 +233,22 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
             {phases.map((step, index) => {
               const done = index < current
               const active = index === current
+              const stoppedHere = active && stopped?.failed === true
 
               return (
-                <li key={step} mix={done ? doneStepStyle : active ? activeStepStyle : stepStyle}>
-                  <span aria-hidden="true">{done ? '✓' : active ? '◐' : '○'}</span>
+                <li
+                  key={step}
+                  mix={
+                    stoppedHere
+                      ? failedStepStyle
+                      : done
+                        ? doneStepStyle
+                        : active
+                          ? activeStepStyle
+                          : stepStyle
+                  }
+                >
+                  <span aria-hidden="true">{stoppedHere ? '✗' : done ? '✓' : active ? '◐' : '○'}</span>
                   <span>{labels[step]}</span>
                 </li>
               )
@@ -190,7 +266,19 @@ export const GenerationProgress = clientEntry<GenerationProgressProps>(
       // moves, so every swap would abort the loop and start another. This element
       // survives all of it — display: contents, so it changes no layout.
       return (
-        <div mix={[css({ display: 'contents' }), ref((_node, signal) => void poll(signal))]}>{panel()}</div>
+        <div
+          mix={[
+            css({ display: 'contents' }),
+            // A run that had already failed when the page loaded has nothing to poll for.
+            ref((_node, signal) => {
+              if (!stopped) void poll(signal)
+            }),
+          ]}
+        >
+          {notice()}
+          {panel()}
+          {nextStep()}
+        </div>
       )
     }
   },

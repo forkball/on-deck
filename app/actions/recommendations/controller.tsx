@@ -8,10 +8,10 @@ import { redirect } from 'remix/response/redirect'
 import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import type { Db } from '../../data/db.ts'
 import { listFollowedUsers } from '../../data/follows.ts'
-import { syncLetterboxdBeforeRun } from '../../data/imports/letterboxdSync.ts'
+import { syncLetterboxdBeforeReading } from '../../data/imports/letterboxdSync.ts'
 import { loadLoggedTypesByUser } from '../../data/mediaItems.ts'
 import { getDailyRunAllowance, runCostFor, timeUntil } from '../../data/recommendations/dailyLimit.ts'
-import { enqueueJob, getJob, PHASE_LABELS } from '../../data/recommendations/jobs.ts'
+import { enqueueJob, getJob, PHASE_LABELS, type GenerationJob } from '../../data/recommendations/jobs.ts'
 import { getLuckyState, LUCKY_RUN_NAME } from '../../data/recommendations/lucky.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
@@ -29,15 +29,14 @@ import {
 } from '../../data/recommendations/runs.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import {
-  DEFAULT_MEDIA_TYPE,
-  mediaTypeUiFor,
-  parseMediaType,
-  type ActiveMediaType,
-} from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType, type ActiveMediaType } from '../../mediaTypes.ts'
 import { RETURN_TO_PARAM } from '../../ui/backLink.ts'
+import { SEEN_BY_OPTIONS } from '../../ui/shared/seen-by.ts'
 import { LUCKY_PAGE_ORIGIN } from '../../browser/draw-lucky-form.tsx'
 import { GeneratingPage } from './generating-page.tsx'
+import { getUnconfirmedRun, listUnconfirmedRuns } from '../../data/recommendations/unconfirmed.ts'
+import { UnconfirmedRunPage } from './unconfirmed-page.tsx'
+import type { ErrorLink } from './error-notice.tsx'
 import { LuckyPickPage, type LuckyPickPageProps } from './lucky-page.tsx'
 import { RecommendationsPage, type RecommendationsPageProps } from './page.tsx'
 import { RecommendationRunPage } from './run-page.tsx'
@@ -56,16 +55,21 @@ const generateSchema = f.object({
   multiplayer_type: f.field(s.defaulted(s.string(), '')),
   platform: f.field(s.defaulted(s.string(), '')),
   series: f.field(s.defaulted(s.string(), '')),
+  seen_by: f.field(s.defaulted(s.string(), '')),
   name: f.field(s.defaulted(s.string(), '')),
 })
 
 async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
-  const [allRuns, runsFromOthers, friends, dailyRuns, lucky] = await Promise.all([
+  const [allRuns, runsFromOthers, friends, dailyRuns, lucky, unconfirmedRuns] = await Promise.all([
     listRecommendationRuns(db, user.id, mediaType),
     listRecommendationRunsFromOthers(db, user.id, mediaType),
     listFollowedUsers(db, user.id),
     getDailyRunAllowance(db, user),
     getLuckyState(user),
+    // Not filtered by media type, unlike the runs above: there are at most three,
+    // and a list this small hiding two thirds of itself behind a tab is a way to
+    // lose them.
+    listUnconfirmedRuns(db, user.id),
   ])
 
   // The page shows these as separate sections rather than one list.
@@ -83,6 +87,7 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     dailyRuns,
     lucky,
     runs,
+    unconfirmedRuns,
     luckyRuns,
     runsFromOthers,
     friends,
@@ -100,8 +105,47 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
   }
 }
 
-// Both actions refuse for the same reason in the same words — an empty log
-// gives the profile nothing to work from, whichever kind of run asked for it.
+// Where a finished job sends someone: a real run, or the unconfirmed picks kept
+// when the catalog wouldn't answer. Spelled once, because the redirect and the poll
+// the generating page runs both need it and must not be able to disagree.
+function finishedHref(job: GenerationJob): string | null {
+  if (job.runId != null) {
+    const href = routes.recommendations.show.href({ runId: String(job.runId) })
+    return job.prunedOldestRun ? `${href}?prunedOldest=1` : href
+  }
+  if (job.unconfirmedRunId != null) {
+    return routes.recommendations.unconfirmed.href({ unconfirmedId: String(job.unconfirmedRunId) })
+  }
+  return null
+}
+
+// The friend ids a run request names. `mode` decides whether the checkboxes
+// count at all: the shared form keeps every friend checkbox mounted and only
+// hides them, so a selection made and then switched away from is still in the
+// request.
+function requestedFriendIds(formData: FormData): number[] {
+  if (formData.get('mode') !== 'group') return []
+  return formData
+    .getAll('friend_ids')
+    .map((value) => Number(value))
+    .filter((id) => Number.isInteger(id))
+}
+
+// "With friends" and nobody else is refused rather than run for one. The forms
+// keep their button disabled instead, so only a hand-built request reads this.
+const NO_FRIENDS_PICKED_ERROR = 'Tick at least one friend, or switch to "Just me".'
+
+// Both actions refuse a second run in the same words, pointing at the first one
+// while it is still there to point at.
+const RUN_IN_PROGRESS_ERROR = 'You already have a run in progress — give that one a moment to finish first.'
+
+function runInProgressLink(activeJobId: string | null): ErrorLink | undefined {
+  if (activeJobId == null) return undefined
+  return { href: routes.recommendations.generating.href({ jobId: activeJobId }), label: 'See its progress' }
+}
+
+// Both actions refuse for the same reason in the same words — an empty log gives
+// the profile nothing to work from, whichever kind of run asked for it.
 function describeMissingLogs(missing: MissingSourceLogs[], viewerId: number): string {
   return missing
     .map(({ userId, label, missing: types }) => {
@@ -118,7 +162,7 @@ async function indexPage(
   db: Db,
   user: User,
   mediaType: ActiveMediaType,
-  extras: Pick<RecommendationsPageProps, 'error' | 'duplicate'> = {},
+  extras: Pick<RecommendationsPageProps, 'error' | 'errorLink' | 'duplicate'> = {},
 ) {
   const data = await loadIndexData(db, user, mediaType)
   return <RecommendationsPage {...data} mediaType={mediaType} {...extras} />
@@ -146,10 +190,12 @@ async function luckyDrawPage(
   db: Db,
   user: User,
   mediaType: ActiveMediaType,
-  extras: Pick<LuckyPickPageProps, 'error'> = {},
+  extras: Pick<LuckyPickPageProps, 'error' | 'errorLink'> = {},
 ) {
   const data = await loadLuckyPageData(db, user, mediaType)
-  return <LuckyPickPage {...data} mediaType={mediaType} findPeopleHref={routes.users.search.href()} {...extras} />
+  return (
+    <LuckyPickPage {...data} mediaType={mediaType} findPeopleHref={routes.users.search.href()} {...extras} />
+  )
 }
 
 export default createController(routes.recommendations, {
@@ -158,8 +204,7 @@ export default createController(routes.recommendations, {
     async index(context) {
       const auth = context.get(Auth)
 
-      const mediaType =
-        parseMediaType(context.url.searchParams.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
+      const mediaType = parseMediaType(context.url.searchParams.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
 
       const db = context.get(Database)
 
@@ -169,8 +214,7 @@ export default createController(routes.recommendations, {
     async luckyPage(context) {
       const auth = context.get(Auth)
 
-      const mediaType =
-        parseMediaType(context.url.searchParams.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
+      const mediaType = parseMediaType(context.url.searchParams.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
 
       const db = context.get(Database)
 
@@ -186,13 +230,16 @@ export default createController(routes.recommendations, {
         return new Response('Invalid request', { status: 400 })
       }
 
-      const friendIds =
-        parsed.value.mode === 'group'
-          ? formData
-              .getAll('friend_ids')
-              .map((value) => Number(value))
-              .filter((id) => Number.isInteger(id))
-          : []
+      const friendIds = requestedFriendIds(formData)
+      if (parsed.value.mode === 'group' && friendIds.length === 0) {
+        const mediaType = parseMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
+        return context.render(
+          await indexPage(context.get(Database), auth.identity, mediaType, {
+            error: NO_FRIENDS_PICKED_ERROR,
+          }),
+          { status: 400 },
+        )
+      }
 
       const filters: RecommendationFilters = {}
       if (parsed.value.genre) filters.genre = parsed.value.genre
@@ -216,6 +263,13 @@ export default createController(routes.recommendations, {
       if (parsed.value.multiplayer_type) filters.multiplayerType = parsed.value.multiplayer_type
       if (parsed.value.platform) filters.platform = parsed.value.platform
       if (parsed.value.series) filters.series = parsed.value.series
+      // A group question: alone, "no one" and "half" are the same rule, and "any"
+      // would be asking for things already watched. 'half' stays unset — see
+      // ui/shared/seen-by.ts.
+      // Missing or unrecognised means what the form defaults to.
+      const seenBy =
+        SEEN_BY_OPTIONS.find((option) => option.value === parsed.value.seen_by)?.value ?? 'no_one'
+      if (friendIds.length > 0 && seenBy !== 'half') filters.seenBy = seenBy
 
       const sourceTypes = formData
         .getAll('source')
@@ -231,7 +285,7 @@ export default createController(routes.recommendations, {
       // turned away for having nothing logged. Bounded, so a slow feed delays
       // the run rather than failing it — and it is a no-op for the vast
       // majority of runs, which are inside the fetch cooldown.
-      await syncLetterboxdBeforeRun(db, auth.identity)
+      await syncLetterboxdBeforeReading(db, auth.identity)
 
       const memberIds = [auth.identity.id, ...friendIds]
       const mediaType = parseMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
@@ -299,6 +353,7 @@ export default createController(routes.recommendations, {
                   ['multiplayer_type', filters.multiplayerType ?? ''],
                   ['platform', filters.platform ?? ''],
                   ['series', filters.series ?? ''],
+                  ['seen_by', filters.seenBy ?? ''],
                   ...sourceTypes.map((type) => ['source', type] as [string, string]),
                   ...friendIds.map((id) => ['friend_ids', String(id)] as [string, string]),
                 ],
@@ -310,23 +365,19 @@ export default createController(routes.recommendations, {
 
       // No pre-check: the insert refuses a second active run for this user, so
       // two requests arriving together can't both get through.
-      const enqueued = await enqueueJob(
-        db,
-        auth.identity.id,
-        {
-          memberIds,
-          mediaType,
-          filters: filters as Record<string, unknown>,
-          sourceTypes,
-          name: parsed.value.name || undefined,
-        },
-        { withLengthCheck: filters.length != null },
-      )
+      const enqueued = await enqueueJob(db, auth.identity.id, {
+        memberIds,
+        mediaType,
+        filters: filters as Record<string, unknown>,
+        sourceTypes,
+        name: parsed.value.name || undefined,
+      })
 
       if (!enqueued.ok) {
         return context.render(
           await indexPage(db, auth.identity, mediaType, {
-            error: 'You already have a run in progress — give that one a moment to finish first.',
+            error: RUN_IN_PROGRESS_ERROR,
+            errorLink: runInProgressLink(enqueued.activeJobId),
           }),
           { status: 409 },
         )
@@ -344,36 +395,30 @@ export default createController(routes.recommendations, {
       const db = context.get(Database)
       const formData = context.get(FormData)
       const fromLuckyPage = formData.get('origin') === LUCKY_PAGE_ORIGIN
-      const renderFailure = (mediaType: ActiveMediaType, error: string) =>
+      const renderFailure = (mediaType: ActiveMediaType, error: string, errorLink?: ErrorLink) =>
         fromLuckyPage
-          ? luckyDrawPage(db, auth.identity, mediaType, { error })
-          : indexPage(db, auth.identity, mediaType, { error })
+          ? luckyDrawPage(db, auth.identity, mediaType, { error, errorLink })
+          : indexPage(db, auth.identity, mediaType, { error, errorLink })
 
       const mediaType = parseMediaType(formData.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
 
-      // `mode` decides whether the checkboxes count at all, the same way it does
-      // in `generate`: the shared form keeps every friend checkbox mounted and
-      // only hides them, so a selection made and then switched away from is
-      // still in the request.
-      //
-      // What survives that is narrowed to people this account actually follows.
-      // The picker only offers those, so it costs nothing in the normal case —
-      // it stops a hand-posted id pulling a stranger's taste into a run and
-      // notifying them about it.
-      const requested = new Set(
-        formData.get('mode') === 'group'
-          ? formData
-              .getAll('friend_ids')
-              .map((value) => Number(value))
-              .filter((id) => Number.isInteger(id))
-          : [],
-      )
+      // Narrowed to people this account actually follows. The picker only
+      // offers those, so it costs nothing in the normal case — it stops a
+      // hand-posted id pulling a stranger's taste into a run and notifying them
+      // about it.
+      const requested = new Set(requestedFriendIds(formData))
       const friendIds =
         requested.size === 0
           ? []
           : (await listFollowedUsers(db, auth.identity.id))
               .map((friend) => friend.id)
               .filter((id) => requested.has(id))
+
+      // After the narrowing, so a group of nobody but strangers is refused too
+      // rather than quietly drawn for one.
+      if (formData.get('mode') === 'group' && friendIds.length === 0) {
+        return context.render(await renderFailure(mediaType, NO_FRIENDS_PICKED_ERROR), { status: 400 })
+      }
 
       const memberIds = [auth.identity.id, ...friendIds]
 
@@ -407,26 +452,18 @@ export default createController(routes.recommendations, {
 
       // No duplicate check: a lucky run carries no levers to match on, and its
       // once-a-day cap already rules out drawing the same thing twice in a day.
-      const enqueued = await enqueueJob(
-        db,
-        auth.identity.id,
-        {
-          memberIds,
-          mediaType,
-          filters: {},
-          sourceTypes: [mediaType],
-          name: LUCKY_RUN_NAME,
-          lucky: true,
-        },
-        { withLengthCheck: false },
-      )
+      const enqueued = await enqueueJob(db, auth.identity.id, {
+        memberIds,
+        mediaType,
+        filters: {},
+        sourceTypes: [mediaType],
+        name: LUCKY_RUN_NAME,
+        lucky: true,
+      })
 
       if (!enqueued.ok) {
         return context.render(
-          await renderFailure(
-            mediaType,
-            'You already have a run in progress — give that one a moment to finish first.',
-          ),
+          await renderFailure(mediaType, RUN_IN_PROGRESS_ERROR, runInProgressLink(enqueued.activeJobId)),
           { status: 409 },
         )
       }
@@ -440,10 +477,8 @@ export default createController(routes.recommendations, {
       const job = await getJob(context.get(Database), context.params.jobId, auth.identity.id)
       if (!job) return new Response('Not Found', { status: 404 })
 
-      if (job.runId != null) {
-        const href = routes.recommendations.show.href({ runId: String(job.runId) })
-        return redirect(job.prunedOldestRun ? `${href}?prunedOldest=1` : href, 303)
-      }
+      const finished = finishedHref(job)
+      if (finished) return redirect(finished, 303)
 
       return context.render(
         <GeneratingPage
@@ -452,8 +487,12 @@ export default createController(routes.recommendations, {
           phases={job.phases}
           status={job.status}
           queuedAhead={job.queuedAhead ?? null}
+          retrying={job.retrying}
           error={job.error}
           statusHref={routes.recommendations.status.href({ jobId: context.params.jobId })}
+          // Back to where the run was asked for: a lucky draw that came back with
+          // nothing is retried from the draw, not from the shortlist form.
+          formHref={job.lucky ? routes.recommendations.luckyPage.href() : routes.recommendations.index.href()}
           displayName={displayLabel(auth.identity)}
         />,
       )
@@ -465,19 +504,31 @@ export default createController(routes.recommendations, {
       const job = await getJob(context.get(Database), context.params.jobId, auth.identity.id)
       if (!job) return Response.json({ error: 'not_found' }, { status: 404 })
 
+      const finished = finishedHref(job)
+
       return Response.json({
         status: job.status,
         queuedAhead: job.queuedAhead ?? null,
+        retrying: job.retrying,
         phase: job.phase,
         label: PHASE_LABELS[job.phase],
-        done: job.runId != null,
-        href:
-          job.runId == null
-            ? null
-            : routes.recommendations.show.href({ runId: String(job.runId) }) +
-              (job.prunedOldestRun ? '?prunedOldest=1' : ''),
+        done: finished != null,
+        href: finished,
         error: job.error ?? null,
       })
+    },
+
+    async unconfirmed(context) {
+      const auth = context.get(Auth)
+
+      const run = await getUnconfirmedRun(
+        context.get(Database),
+        Number(context.params.unconfirmedId),
+        auth.identity.id,
+      )
+      if (!run) return new Response('Not Found', { status: 404 })
+
+      return context.render(<UnconfirmedRunPage run={run} displayName={displayLabel(auth.identity)} />)
     },
 
     async show(context) {

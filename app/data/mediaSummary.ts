@@ -1,5 +1,10 @@
 import type { Db } from './db.ts'
-import { CONSUMPTION_STATUSES, loadUserLogEntries, matchesLogFilter, type listUserMediaLog } from './mediaItems.ts'
+import {
+  CONSUMPTION_STATUSES,
+  loadUserLogEntries,
+  matchesLogFilter,
+  type listUserMediaLog,
+} from './mediaItems.ts'
 import { getTasteProfile } from './recommendations/tasteProfile.ts'
 import { ACTIVE_MEDIA_TYPES, type ActiveMediaType } from '../mediaTypes.ts'
 
@@ -12,7 +17,11 @@ export interface MediaTypeSummary {
 
 export type MediaSummaries = Record<ActiveMediaType, MediaTypeSummary>
 
-export async function loadMediaSummaries(db: Db, userId: number, recentCount: number): Promise<MediaSummaries> {
+export async function loadMediaSummaries(
+  db: Db,
+  userId: number,
+  recentCount: number,
+): Promise<MediaSummaries> {
   // Fetched once and partitioned in memory: per-type list+count calls would be
   // one pass over identical rows per media type.
   const [logEntries, profiles] = await Promise.all([

@@ -4,6 +4,8 @@ import {
   claimJobs,
   completeJob,
   failJob,
+  MAX_ATTEMPTS,
+  requeueJob,
   requeueStaleJobs,
   saveCheckpoint,
   saveJobTimings,
@@ -11,12 +13,17 @@ import {
   touchJobClaim,
   type ClaimedJob,
 } from './jobs.ts'
-import { GenerationError } from './errors.ts'
+import { CatalogUnavailableError, GenerationError } from './errors.ts'
 import { generateRecommendations, type GenerationCheckpoint } from './generate.ts'
+import { CIRCUIT_COOLDOWN_MS } from '../catalog/googleBooks.ts'
 import type { MediaType } from '../mediaItems.ts'
 import type { RecommendationFilters } from './picks.ts'
 import { saveRunTimings } from './runs.ts'
+import { saveUnconfirmedRun } from './unconfirmed.ts'
 import { startTimings, summarizeTimings, type RunTimings } from './timings.ts'
+import { logger, withLogContext } from '../../log.ts'
+
+const log = logger('generation')
 
 // Drains the recommendation queue through a fixed number of slots. Every
 // in-flight run holds a user's whole log in memory on a 512MB machine and fans
@@ -25,6 +32,9 @@ import { startTimings, summarizeTimings, type RunTimings } from './timings.ts'
 const DEFAULT_SLOTS = 2
 
 const IDLE_POLL_MS = 2000
+
+// A retry any sooner than the circuit's cooldown is refused by the same open circuit.
+const CATALOG_RETRY_DELAY_MS = CIRCUIT_COOLDOWN_MS
 
 // Derived rather than picked, so lowering the staleness window can't quietly
 // leave the heartbeat too slow to keep up with it. Several beats per window,
@@ -48,7 +58,11 @@ export function startGenerationWorker(): GenerationWorker {
   let stopped = false
   let timer: NodeJS.Timeout | null = null
 
-  async function run(job: ClaimedJob): Promise<void> {
+  function run(job: ClaimedJob): Promise<void> {
+    return withLogContext({ job: job.id, user: job.userId }, () => runJob(job))
+  }
+
+  async function runJob(job: ClaimedJob): Promise<void> {
     running++
     const timings = startTimings({ queuedMs: job.queuedMs, attempt: job.attempt })
     let runId: number | null = null
@@ -83,19 +97,56 @@ export function startGenerationWorker(): GenerationWorker {
           (phase) => void setPhase(db, job.id, phase).catch(() => {}),
           job.checkpoint as GenerationCheckpoint,
           (checkpoint) => void saveCheckpoint(db, job.id, checkpoint).catch(() => {}),
-          { lucky: lucky === true },
+          { lucky: lucky === true, jobId: job.id },
         ),
       )
 
-      runId = outcome.runId
-      await completeJob(db, job.id, outcome.runId, outcome.prunedOldestRun)
+      runId = outcome.kind === 'run' ? outcome.runId : null
+      await completeJob(db, job.id, outcome)
     } catch (error) {
+      // The catalog went quiet, but the model already answered. Rather than losing
+      // that answer to a retry someone has to ask for — and that costs another
+      // profile and picks call — it is kept as an unconfirmed run: the picks, the
+      // filters they were made under, and the line explaining what couldn't be
+      // checked. Nothing is upserted into the catalog and nothing can be logged
+      // from it, because nothing here has been confirmed to exist.
+      // A catalog that won't answer is usually a catalog that won't answer *yet* —
+      // Google Books' own circuit reopens after a minute. Resuming costs no model
+      // calls, the checkpoint already holding the picks, so the attempts this job
+      // has are worth spending before settling for titles nothing confirmed.
+      if (error instanceof CatalogUnavailableError && job.attempt < MAX_ATTEMPTS) {
+        await requeueJob(db, job.id, { delayMs: CATALOG_RETRY_DELAY_MS }).catch(() => {})
+        return
+      }
+
+      // `keep` is empty when every pick was already logged: nothing worth a page,
+      // and the catalog being down is still what the failure below says.
+      if (error instanceof CatalogUnavailableError && error.keep?.length) {
+        try {
+          const unconfirmedRunId = await saveUnconfirmedRun(db, {
+            userId: job.userId,
+            mediaType: job.params.mediaType as MediaType,
+            filters: job.params.filters as RecommendationFilters,
+            picks: error.keep,
+            reason: error.message,
+            lucky: job.params.lucky === true,
+          })
+          await completeJob(db, job.id, { kind: 'unconfirmed', unconfirmedRunId })
+          return
+        } catch (saveError) {
+          // Falls through to the ordinary failure below: someone waiting on a run
+          // that couldn't be salvaged should be told the catalog is down, not that
+          // saving what it couldn't confirm also failed.
+          log.error('could not keep unconfirmed picks', saveError)
+        }
+      }
+
       // An actual error, so retrying would reproduce it. Interrupted jobs never
       // reach here — their machine died — and the staleness sweep recovers them.
       //
       // Logged whatever it is: this is the only place the detail of a failed run
       // is kept, since it doesn't travel to the page.
-      console.error(`[generation] job=${job.id} failed:`, error)
+      log.error('run failed', error)
 
       // Only a message written for the person reaches them; everything else gets
       // the generic line. See errors.ts — silence is the safe default, so a new
@@ -116,7 +167,7 @@ export function startGenerationWorker(): GenerationWorker {
   }
 
   async function recordTimings(job: ClaimedJob, runId: number | null, measured: RunTimings): Promise<void> {
-    console.info(`[generation] job=${job.id} run=${runId ?? 'none'} ${summarizeTimings(measured)}`)
+    log.info(`run=${runId ?? 'none'} ${summarizeTimings(measured)}`)
     await saveJobTimings(db, job.id, measured)
     if (runId != null) await saveRunTimings(db, runId, measured)
   }
@@ -128,8 +179,7 @@ export function startGenerationWorker(): GenerationWorker {
       await requeueStaleJobs(db)
       const jobs = await claimJobs(db, slots - running)
       for (const job of jobs) void run(job)
-    } catch {
-    }
+    } catch {}
   }
 
   function schedule(): void {

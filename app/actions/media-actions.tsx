@@ -20,11 +20,14 @@ import {
   logInteraction,
   parseRatingSubmission,
 } from '../data/mediaItems.ts'
+import { checkTitleUnlocksQuietly } from '../data/profileTitles/unlocks.ts'
 import { INTERACTION_SOURCES, INTERACTION_STATUSES, type User } from '../data/schema.ts'
 import type { MediaControllerContext, MediaItemControllerContext } from '../middleware/context.ts'
 import { displayLabel } from '../data/users.ts'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../mediaTypes.ts'
 import { parseMediaMetadata } from '../data/mediaMetadata.ts'
+import { loadWatchProviders } from '../data/watchProviders.ts'
+import { guessWatchRegion, parseWatchRegion } from '../data/watchRegion.ts'
 import { MediaDetailPage } from '../ui/pages/media-detail-page.tsx'
 import { MediaSearchPage } from '../ui/pages/media-search-page.tsx'
 import { RETURN_TO_PARAM, withReturnTo } from '../ui/backLink.ts'
@@ -32,7 +35,6 @@ import { RETURN_TO_PARAM, withReturnTo } from '../ui/backLink.ts'
 const SUGGESTION_LIMIT = 6
 
 const SEARCH_INITIAL_VISIBLE = 10
-
 
 const logSchema = f.object({
   status: f.field(s.enum_(INTERACTION_STATUSES)),
@@ -87,10 +89,13 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       // typing, so it is the heaviest caller in the app and the one whose
       // answer the submitted search is about to want anyway.
       const results = await searchCatalog(mediaType, query)
+      // Who made it, next to the year. A year alone does not separate two books with
+      // the same name, and books are full of them: searching "Strata" offers one from
+      // 1981 and one from 2011, and only the author says which is the Pratchett.
       const suggestions = results.slice(0, SUGGESTION_LIMIT).map((result) => ({
         key: result.externalId,
         label: result.title,
-        sublabel: result.releaseYear ? String(result.releaseYear) : undefined,
+        sublabel: [result.releaseYear, result.creator].filter(Boolean).join(' · ') || undefined,
         imageUrl: result.posterUrl ?? undefined,
       }))
 
@@ -130,8 +135,16 @@ export function createMediaActions(mediaType: ActiveMediaType) {
         backfillCatalogDetail(db, mediaType, item)
       }
 
-      const interaction = await getUserInteractionForItem(db, identity.id, mediaItemId)
+      // A country someone chose, else a guess from their browser's language.
+      const region =
+        parseWatchRegion(identity.watch_region) ??
+        guessWatchRegion(context.request.headers.get('accept-language'))
+      const [interaction, availability] = await Promise.all([
+        getUserInteractionForItem(db, identity.id, mediaItemId),
+        loadWatchProviders(item, region),
+      ])
       const from = context.url.searchParams.get(RETURN_TO_PARAM) || undefined
+      const watch = availability && { region, providers: availability.providers }
 
       return context.render(
         <MediaDetailPage
@@ -144,6 +157,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
           rematchError={context.url.searchParams.get('rematchError') || undefined}
           rematched={context.url.searchParams.get('rematched') === '1'}
           merged={context.url.searchParams.get('merged') === '1'}
+          watch={watch}
         />,
       )
     },
@@ -209,6 +223,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
         // this row can't mistake it for one of its own and take it back.
         source: INTERACTION_SOURCES.manual,
       })
+      await checkTitleUnlocksQuietly(db, identity.id)
 
       return redirect(parsed.value.return_to || ui.hrefs.search(), 303)
     },

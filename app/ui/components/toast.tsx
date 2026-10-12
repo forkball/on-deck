@@ -43,9 +43,9 @@ export function Toast(handle: Handle<{ message: string; variant?: ToastVariant }
             borderRadius: '8px',
             // Matches the page rather than sitting on it as a white card —
             // see doodle.css, which paints the body #FDF7F1.
-            backgroundColor: '#FDF7F1',
-            border: `1px solid ${isError ? '#b91c1c' : '#15803d'}`,
-            color: isError ? '#b91c1c' : '#15803d',
+            backgroundColor: 'var(--paper)',
+            border: `1px solid ${isError ? 'var(--danger)' : 'var(--success)'}`,
+            color: isError ? 'var(--danger)' : 'var(--success)',
             fontSize: '14px',
             boxShadow: '0 2px 12px rgba(0, 0, 0, 0.14)',
             ...(isError
@@ -58,6 +58,9 @@ export function Toast(handle: Handle<{ message: string; variant?: ToastVariant }
                     '100%': { opacity: 0, visibility: 'hidden' },
                   },
                   animation: 'toast-fade 5s forwards',
+                  // Still goes after five seconds, just without the fade:
+                  // dropping the animation would leave it up for good.
+                  '@media (prefers-reduced-motion: reduce)': { animationTimingFunction: 'step-end' },
                 }),
           })}
         >

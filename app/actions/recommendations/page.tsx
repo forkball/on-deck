@@ -6,17 +6,27 @@ import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { timeUntil, type DailyRunAllowance } from '../../data/recommendations/dailyLimit.ts'
 import { TARGET_COUNT } from '../../data/recommendations/generate.ts'
 import type { LuckyState } from '../../data/recommendations/lucky.ts'
-import { MAX_LUCKY_RUNS_PER_USER, MAX_RUNS_PER_USER, type RecommendationRunSummary } from '../../data/recommendations/runs.ts'
+import {
+  MAX_LUCKY_RUNS_PER_USER,
+  MAX_RUNS_PER_USER,
+  type RecommendationRunSummary,
+} from '../../data/recommendations/runs.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { Document } from '../../ui/components/document.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
+import { Page } from '../../ui/components/page.tsx'
+import { ErrorNotice, type ErrorLink } from './error-notice.tsx'
 import { RunList } from '../../ui/components/run-list.tsx'
-import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import type { UnconfirmedRunDetail } from '../../data/recommendations/unconfirmed.ts'
+import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, mediaTypeUiFor, type ActiveMediaType } from '../../mediaTypes.ts'
+import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 export interface RecommendationsPageProps {
   runs: RecommendationRunSummary[]
+  // Runs the catalog couldn't answer for, kept so an outage doesn't throw away
+  // what the model said. Their own section, because they aren't runs: nothing in
+  // them can be logged, rated or opened.
+  unconfirmedRuns: UnconfirmedRunDetail[]
   // Past lucky draws — shown in their own section rather than mixed into `runs`.
   luckyRuns: RecommendationRunSummary[]
   runsFromOthers: RecommendationRunSummary[]
@@ -46,6 +56,7 @@ export interface RecommendationsPageProps {
   // controller — see indexPage.
   startLucky?: boolean
   error?: string
+  errorLink?: ErrorLink
   // Set when the request matched an earlier run the user hasn't taken
   // anything from — see DuplicateNotice.
   duplicate?: {
@@ -57,7 +68,7 @@ export interface RecommendationsPageProps {
   }
 }
 
-const sectionCaption = css({ margin: '0 0 16px', fontSize: '13px', color: '#888' })
+const sectionCaption = css({ margin: '0 0 16px', fontSize: '13px', color: 'var(--muted)' })
 
 // A run list section that only appears once it has something to show —
 // "Recommendations from others" and "Lucky picks" both work this way. Past
@@ -75,6 +86,37 @@ function RunsSection(handle: Handle<{ title: string; caption: string; runs: Reco
   }
 }
 
+// Kept quiet on purpose: a list of things nothing could confirm sits below the
+// real runs, says how many it holds and what it is, and stays out of the way.
+function UnconfirmedSection(handle: Handle<{ runs: UnconfirmedRunDetail[] }>) {
+  return () => (
+    <section mix={css({ marginTop: '40px' })}>
+      <h2>Unconfirmed</h2>
+      <p mix={sectionCaption}>
+        Runs the catalog couldn't be reached for. The model's picks were kept, but the catalog hasn't
+        confirmed them.
+      </p>
+      <ul mix={css({ listStyle: 'none', margin: 0, padding: 0 })}>
+        {handle.props.runs.map((run) => (
+          // Block, not list-item, so Doodle's "* " marker isn't drawn — see run-list.tsx.
+          <li
+            key={run.id}
+            mix={css({ display: 'block', padding: '8px 0', borderBottom: '1px solid var(--rule-soft)' })}
+          >
+            <Link href={routes.recommendations.unconfirmed.href({ unconfirmedId: String(run.id) })}>
+              {run.isLucky ? '🎲 Lucky pick' : `${run.picks.length} ${mediaTypeUiFor(run.mediaType).plural}`}
+            </Link>
+            <span mix={css({ color: 'var(--muted)', fontSize: '13px' })}>
+              {' — '}
+              {new Date(run.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 // Shown when the same levers already produced a run whose picks are all still
 // unlogged. Not a hard block — the button is right there.
 function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<RecommendationsPageProps['duplicate']> }>) {
@@ -85,7 +127,7 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
     return (
       <div
         mix={css({
-          border: '1px solid #ddd',
+          border: '1px solid var(--rule)',
           borderRadius: '8px',
           padding: '16px',
           marginBottom: '24px',
@@ -94,22 +136,18 @@ function DuplicateNotice(handle: Handle<{ duplicate: NonNullable<Recommendations
         <p mix={css({ margin: '0 0 8px' })}>
           <strong>You already have a recommendation like this.</strong>
         </p>
-        <p mix={css({ margin: '0 0 12px', color: '#555' })}>
-          Those exact settings produced{' '}
-          <a href={href}>{duplicate.name || 'an earlier run'}</a> on{' '}
-          {new Date(duplicate.createdAt).toLocaleDateString()}, and you haven't logged anything from it
-          yet. Generating again will replace it with a different set of picks.
+        <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>
+          Those exact settings produced <Link href={href}>{duplicate.name || 'an earlier run'}</Link> on{' '}
+          {new Date(duplicate.createdAt).toLocaleDateString()}, and you haven't logged anything from it yet.
+          Generating again will replace it with a different set of picks.
         </p>
-        <div mix={css({ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' })}>
-          <a href={href}>Show me that one →</a>
-          <form method="post" action={routes.recommendations.generate.href()}>
-            {duplicate.fields.map(([name, value], index) => (
-              <input key={`${name}-${index}`} type="hidden" name={name} value={value} />
-            ))}
-            <input type="hidden" name="force" value="1" />
-            <button type="submit">Generate a new one anyway</button>
-          </form>
-        </div>
+        <form method="post" action={routes.recommendations.generate.href()}>
+          {duplicate.fields.map(([name, value], index) => (
+            <input key={`${name}-${index}`} type="hidden" name={name} value={value} />
+          ))}
+          <input type="hidden" name="force" value="1" />
+          <Button type="submit">Generate a new one anyway</Button>
+        </form>
       </div>
     )
   }
@@ -134,6 +172,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
   return () => {
     const {
       runs,
+      unconfirmedRuns,
       luckyRuns,
       runsFromOthers,
       friends,
@@ -151,110 +190,93 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       lucky,
       startLucky,
       error,
+      errorLink,
       duplicate,
     } = handle.props
     const recsHref = routes.recommendations.index.href()
     const ui = MEDIA_TYPE_UI[mediaType]
 
     return (
-      <Document title="Recommendations | On Deck">
-        <Nav authed={true} displayName={displayName} />
-        <main mix={css({ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>Recommendations</h1>
-          <p mix={css({ margin: 0, color: '#555' })}>
-            Rewrites your {ui.attributive} taste profile from what you've logged, then finds
-            picks to try next.
-          </p>
-          <p mix={css({ margin: '4px 0 0', color: '#888', fontSize: '13px' })}>
-            Only your last {MAX_RUNS_PER_USER} runs are kept — generating a new one deletes the oldest.
-          </p>
-          <MediaTabLinks
-            current={mediaType}
-            hrefFor={(type) => `${recsHref}?mediaType=${type}`}
+      <Page heading="Recommendations" width="wide" displayName={displayName}>
+        <p mix={css({ margin: 0, color: 'var(--soft)' })}>
+          Rewrites your {ui.attributive} taste profile from what you've logged, then finds picks to try next.
+        </p>
+        <p mix={css({ margin: '4px 0 0', color: 'var(--muted)', fontSize: '13px' })}>
+          Only your last {MAX_RUNS_PER_USER} runs are kept — generating a new one deletes the oldest.
+        </p>
+        <MediaTabLinks current={mediaType} hrefFor={(type) => `${recsHref}?mediaType=${type}`} />
+
+        {duplicate && <DuplicateNotice duplicate={duplicate} />}
+
+        {error && <ErrorNotice error={error} link={errorLink} />}
+
+        <GenerateRecommendationsForm
+          friends={friends.map((friend) => ({
+            id: friend.id,
+            label: displayLabel(friend),
+            loggedTypes: loggedTypes[friend.id] ?? [],
+          }))}
+          viewerLoggedTypes={viewerLoggedTypes}
+          mediaType={mediaType}
+          mediaTypeLabel={ui.attributive}
+          itemNoun={ui.singular}
+          shortlistCount={TARGET_COUNT}
+          runsLeftLabel={runsLeftLabel(dailyRuns)}
+          runsRemaining={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.remaining : undefined}
+          runsLimit={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.limit : undefined}
+          sources={ACTIVE_MEDIA_TYPES.map((type) => ({
+            value: type,
+            label: MEDIA_TYPE_UI[type].tabLabel,
+          }))}
+          genres={genres}
+          lengthOptions={lengthOptions}
+          playerTypes={playerTypes}
+          multiplayerTypes={multiplayerTypes}
+          platforms={platforms}
+          seriesTypes={seriesTypes}
+          generateHref={routes.recommendations.generate.href()}
+          luckyHref={routes.recommendations.lucky.href()}
+          luckyAvailable={lucky.available}
+          luckyWaitLabel={lucky.nextAt == null ? '' : `about ${timeUntil(lucky.nextAt)}`}
+          startLucky={startLucky === true}
+          findPeopleHref={routes.users.search.href()}
+        />
+
+        {runsFromOthers.length > 0 && (
+          <RunsSection
+            title="Recommendations from others"
+            caption="Group runs that included you."
+            runs={runsFromOthers}
           />
+        )}
 
-          {duplicate && <DuplicateNotice duplicate={duplicate} />}
+        {unconfirmedRuns.length > 0 && <UnconfirmedSection runs={unconfirmedRuns} />}
 
-          {error && (
-            <p
-              mix={css({
-                margin: '0 0 16px',
-                padding: '12px 16px',
-                border: '1px solid #b91c1c',
-                borderRadius: '8px',
-                color: '#b91c1c',
-              })}
-            >
-              {error}
+        {luckyRuns.length > 0 && (
+          <RunsSection
+            title="Lucky picks"
+            caption={`Your last ${MAX_LUCKY_RUNS_PER_USER} draws.`}
+            runs={luckyRuns}
+          />
+        )}
+
+        <section mix={css({ marginTop: '40px' })}>
+          <h2>Past recommendations</h2>
+          {runs.length > 0 && (
+            <p mix={sectionCaption}>
+              Your last {MAX_RUNS_PER_USER} {ui.attributive} runs.
             </p>
           )}
-
-          <GenerateRecommendationsForm
-            friends={friends.map((friend) => ({
-              id: friend.id,
-              label: displayLabel(friend),
-              loggedTypes: loggedTypes[friend.id] ?? [],
-            }))}
-            viewerLoggedTypes={viewerLoggedTypes}
-            mediaType={mediaType}
-            mediaTypeLabel={ui.attributive}
-            itemNoun={ui.singular}
-            shortlistCount={TARGET_COUNT}
-            runsLeftLabel={runsLeftLabel(dailyRuns)}
-            runsRemaining={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.remaining : undefined}
-            runsLimit={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.limit : undefined}
-            sources={ACTIVE_MEDIA_TYPES.map((type) => ({
-              value: type,
-              label: `${MEDIA_TYPE_UI[type].attributive} taste`,
-            }))}
-            genres={genres}
-            lengthOptions={lengthOptions}
-            playerTypes={playerTypes}
-            multiplayerTypes={multiplayerTypes}
-            platforms={platforms}
-            seriesTypes={seriesTypes}
-            generateHref={routes.recommendations.generate.href()}
-            luckyHref={routes.recommendations.lucky.href()}
-            luckyAvailable={lucky.available}
-            luckyWaitLabel={lucky.nextAt == null ? '' : `about ${timeUntil(lucky.nextAt)}`}
-            startLucky={startLucky === true}
-            findPeopleHref={routes.users.search.href()}
-          />
-
-          {runsFromOthers.length > 0 && (
-            <RunsSection
-              title="Recommendations from others"
-              caption="Group runs that included you."
-              runs={runsFromOthers}
-            />
+          {runs.length === 0 ? (
+            <p>
+              Nothing yet — log a few {ui.plural} on your{' '}
+              <Link href={routes.profile.index.href()}>profile page</Link>, then get recommendations above.
+            </p>
+          ) : (
+            <RunList runs={runs} returnTo={routes.recommendations.index.href()} />
           )}
-
-          {luckyRuns.length > 0 && (
-            <RunsSection
-              title="Lucky picks"
-              caption={`Your last ${MAX_LUCKY_RUNS_PER_USER} draws.`}
-              runs={luckyRuns}
-            />
-          )}
-
-          <section mix={css({ marginTop: '40px' })}>
-            <h2>Past recommendations</h2>
-            {runs.length > 0 && (
-              <p mix={sectionCaption}>
-                Your last {MAX_RUNS_PER_USER} {ui.attributive} runs.
-              </p>
-            )}
-            {runs.length === 0 ? (
-              <p>
-                Nothing yet — log a few {ui.plural} on your{' '}
-                <a href={routes.profile.index.href()}>profile page</a>, then get recommendations above.
-              </p>
-            ) : (
-              <RunList runs={runs} returnTo={routes.recommendations.index.href()} />
-            )}
-          </section>
-        </main>
-      </Document>
+        </section>
+      </Page>
     )
   }
 }

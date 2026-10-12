@@ -1,8 +1,165 @@
 /* App-level interaction states layered on top of the vendored DoodleCSS,
    which ships with focus-visible styling but no hover/idle distinction —
    every bordered control uses the same dark hand-drawn stroke all the time.
-   Here the border starts light and only turns dark (the vendored button.svg
-   / border.svg) on hover or focus, so idle controls read as quieter. */
+   Here the border starts a warm grey (#948a7d, 3.2:1 on the paper — enough
+   to read as a control, the 3:1 a control's outline needs) and turns the
+   accent blue on hover or focus, so idle controls read as quieter and the
+   one being used reads as the app's.
+
+   Buttons and one-line fields draw DoodleCSS's button.svg path, and textareas
+   its border.svg path, at a 2px stroke rather than the vendored 3: at 3 a form
+   read as a stack of heavy boxes. Same path and same 10px slice, so every box —
+   and the one-height row of a field beside a button — is unchanged; only the
+   line thins. Fieldsets keep the vendored weight. */
+
+/* The palette. Every colour the app sets comes from here, so a page reads as
+   one piece and a change is made once. The neutrals are warm, taken from the
+   cream DoodleCSS paints the page with, rather than the cool greys that had
+   collected call site by call site. Each text colour clears WCAG AA (4.5:1)
+   on --paper: --muted at 5.5 replaces #888, which was 3.3.
+
+   --accent is the one colour that means "you can act on this": links, the
+   primary button, the active tab, the focus ring. It is a dusty video-store
+   blue, and --marquee-soft the faded gold that goes with it, as on the back
+   wall of a rental shop: a nod, not a logo. Gold is too light to read as text
+   or a thin line on the paper, so it is only ever a fill: the brand's ticket
+   and selected text. The four media-type tokens
+   (placeholders for now) mark which kind of thing a card is; MEDIA_TYPE_UI names them, so
+   code picks one by type rather than by hex. */
+:root {
+  --paper: #fdf7f1;
+  --paper-tint: #fbf4ea;
+  --paper-sunk: #efe6db;
+  --rule-soft: #eee4d6;
+  --rule: #d9cfbe;
+  --muted: #6b6459;
+  --soft: #5a534b;
+  --text: #3c3c3c;
+  --ink: #1c1c1c;
+  --accent: #2b4c7e;
+  --marquee-soft: #f3d27a;
+  --danger: #b91c1c;
+  --success: #15803d;
+  /* Media-type colours are not chosen yet. Each type has its own token, so
+     cards and the type tag are already marked by type and get their colour
+     here in one place; until then all four share this neutral placeholder.
+     Whatever replaces it only ever draws a line or a dot, never text. */
+  --media-placeholder: #b8ab96;
+  --movie: var(--media-placeholder);
+  --tv: var(--media-placeholder);
+  --book: var(--media-placeholder);
+  --game: var(--media-placeholder);
+}
+
+/* Links take the accent. Doodle makes them bold #1c1c1c, the same ink as a
+   heading, so nothing on a page said which words go somewhere. */
+.doodle a {
+  color: var(--accent);
+}
+
+/* Read by a screen reader, not drawn: Field's `labelHidden`. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Link `small`: the default link at a size that sits beside a heading. */
+.doodle a.small-link {
+  font-size: 13px;
+}
+
+/* Link (form-controls.tsx) `wrap`: around a poster, an icon or a row that has
+   its own look, so the link adds none. */
+.doodle a.wrap-link {
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: none;
+}
+
+/* ToggleLabel: a <label> that opens a modal or drawer is a control, so it
+   gets the pointer a control gets. The button-shaped ones draw their frame on
+   an inline-block span inside, the way a modal trigger does. */
+.doodle label.toggle-label {
+  cursor: pointer;
+}
+
+.doodle label.toggle-label > .doodle-border {
+  display: inline-block;
+}
+
+/* A credit tile (credit-tiles.tsx): the whole tile is the label that opens
+   its modal, so it has to fill its grid cell rather than sit inline with
+   Doodle's label padding around it. */
+.doodle label.credit-tile {
+  display: block;
+  padding: 0;
+}
+
+/* A modal's backdrop (modal.tsx, closeOnOutsideTap): the label filling the
+   overlay behind the box. Doodle's label padding would only shift it, but its
+   cursor would read as clickable text. */
+.doodle label.modal-backdrop {
+  padding: 0;
+  cursor: default;
+}
+
+/* The wordmark as a torn ticket stub: soft gold, blue type, notched at both
+   ends and set a little off square. The mask cuts the notches, so the shape
+   holds whatever the text's width. Here because `.doodle a` sets the colour
+   unlayered. */
+.doodle a.brand {
+  display: inline-block;
+  font-weight: bold;
+  text-decoration: none;
+  padding: 2px 12px;
+  color: var(--accent);
+  background: var(--marquee-soft);
+  border-radius: 2px;
+  transform: rotate(-2deg);
+  mask:
+    radial-gradient(circle 5px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 5px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+}
+
+::selection {
+  background: var(--marquee-soft);
+  color: var(--ink);
+}
+
+/* The media-type tabs that are links (MediaTabLinks): quiet until current,
+   then the same as every other tab (tabs.tsx) — bold blue over a blue line.
+   Not the type's own hue: four colours along one tab strip read as four
+   different controls. The hue is for marking a card, where it stands alone.
+   Here because `.doodle a` would otherwise make every one of them a bold
+   accent link. */
+.doodle a.media-tab {
+  color: var(--muted);
+  font-weight: normal;
+  text-decoration: none;
+}
+
+.doodle a.media-tab[aria-current] {
+  color: var(--accent);
+  font-weight: bold;
+  border-bottom-color: var(--accent);
+}
+
+/* Focus in the accent too, so it reads as the app's own rather than as a
+   darker border. Doodle's dashed outline and offset stay. */
+.doodle button:focus-visible,
+.doodle textarea:focus-visible,
+.doodle input:focus-visible,
+.doodle select:focus-visible,
+.doodle .menu-link:focus-visible {
+  outline-color: var(--accent);
+}
 
 .doodle button,
 .doodle .doodle-border,
@@ -11,46 +168,157 @@
   border-image: url(/button-light.svg) 10 10 10 10 stretch stretch;
 }
 
-.doodle fieldset,
-.doodle textarea {
+.doodle fieldset {
   border-image: url(/border-light.svg) 10 10 10 10 stretch stretch;
 }
 
-/* A disabled radio already greys its `-` glyph (DoodleCSS's own
-   `:disabled:after { color: grey }`), but the ring is a border-image — an SVG
-   stroke baked at #3c3c3c — which `color` can't touch, so the border stayed
-   full black and the option still read as selectable. Fading the whole glyph
-   dims the ring along with it. */
-.doodle input[type='radio']:disabled {
-  opacity: 0.4;
+/* Checkboxes and radios follow the same rule as every other field: a 2px line,
+   grey while idle, blue on hover or focus. Checked is blue too — the `*` alone
+   is a small mark, and the coloured ring is what makes the chosen option in a
+   group read as chosen at a glance. Same shapes and slices as DoodleCSS's own
+   checkbox.svg and radio.svg.
+
+   DoodleCSS sizes both at 1.5em (24px) but gives the radio a 16px border, and a
+   border can't shrink below itself: 16 + 16 made every radio 32px beside a 24px
+   checkbox. A 12px border brings it back to 24. That draws the 16px slice at
+   three quarters, so radio.svg's stroke is 2.67 to land on 2px. */
+/* The images serve the import review's checkline buttons too — a submit drawn
+   as a checkbox, blue once ticked. Each `.radio` selector outranks its
+   checkbox counterpart, so a radio-shaped box never takes the square image. */
+.doodle input[type='checkbox'],
+.doodle .checkline-box {
+  border-image: url(/checkbox-light.svg) 6 6 6 6 stretch stretch;
+}
+
+.doodle input[type='radio'],
+.doodle .checkline-box.radio {
+  border-image: url(/radio-light.svg) 16 16 16 16 stretch stretch;
+}
+
+.doodle input[type='radio'] {
+  border-width: 12px;
+}
+
+.doodle input[type='checkbox']:hover:not(:disabled),
+.doodle input[type='checkbox']:focus-visible,
+.doodle input[type='checkbox']:checked,
+.doodle button.checkline:hover:not(:disabled) .checkline-box,
+.doodle button.checkline:focus-visible .checkline-box,
+.doodle button.checkline.ticked .checkline-box {
+  border-image: url(/checkbox.svg) 6 6 6 6 stretch stretch;
+}
+
+.doodle input[type='radio']:hover:not(:disabled),
+.doodle input[type='radio']:focus-visible,
+.doodle input[type='radio']:checked,
+.doodle button.checkline:hover:not(:disabled) .checkline-box.radio,
+.doodle button.checkline:focus-visible .checkline-box.radio,
+.doodle button.checkline.ticked .checkline-box.radio {
+  border-image: url(/radio.svg) 16 16 16 16 stretch stretch;
+}
+
+/* Disabled is one look for every control: the whole thing faded, label and
+   all, with no hover response. DoodleCSS had a different answer per element —
+   a grey `-` glyph in an empty checkbox or radio, grey text on a button, and
+   nothing at all on a text field — and none of them dim a border-image, whose
+   colour is baked into the SVG, so a disabled field still read as usable.
+   Opacity is the one thing that fades text, border and glyph together.
+
+   A checkbox or radio is faded through its option's <label> rather than on
+   its own, so the label goes with it — and fading both would multiply to
+   almost nothing. A checkline's :disabled means "posting", not unavailable,
+   and keeps its own look below. */
+.doodle input:not([type='checkbox']):not([type='radio']):disabled,
+.doodle select:disabled,
+.doodle textarea:disabled,
+.doodle button:disabled:not(.checkline),
+.doodle label.choice-label:has(> input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.doodle input:disabled {
+  cursor: not-allowed;
+}
+
+/* Grey text under the fade would be faded twice; the opacity alone says it. */
+.doodle button:disabled {
+  color: var(--text);
+}
+
+.doodle input[type='checkbox']:disabled:not(:checked)::after,
+.doodle input[type='radio']:disabled:not(:checked)::after {
+  content: ' ';
 }
 
 .doodle button:hover:not(:disabled),
 .doodle .doodle-border:hover,
-.doodle select:hover,
-.doodle input:not([type='checkbox']):not([type='radio']):hover,
+.doodle select:hover:not(:disabled),
+.doodle input:not([type='checkbox']):not([type='radio']):hover:not(:disabled),
 .doodle button:focus-visible,
 .doodle .doodle-border:focus-visible,
 .doodle select:focus-visible,
 .doodle input:not([type='checkbox']):not([type='radio']):focus-visible {
-  border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
+  border-image: url(/button.svg) 10 10 10 10 stretch stretch;
 }
 
-.doodle button.primary {
-  border-image: url(/vendor/doodle/button.svg) 10 10 10 10 stretch stretch;
+/* A secondary button's label follows its frame into the accent, so hover
+   says "this one" in the same colour as the line around it. Only the plain
+   frame — Button's default variant, class `secondary` — so every other
+   variant keeps the colours it states below. */
+.doodle button.secondary:hover:not(:disabled),
+.doodle button.secondary:focus-visible,
+.doodle .doodle-border:not(.primary):hover,
+.doodle .doodle-border:not(.primary):focus-visible {
+  color: var(--accent);
 }
 
-.doodle fieldset:hover,
-.doodle textarea:hover,
-.doodle textarea:focus-visible {
+/* Primary: the hand-drawn shape filled with the accent, so the one action a
+   form exists for is the one solid thing on it. `fill` paints the image's
+   middle too. Hover and focus are listed because the generic hover rule above
+   swaps every button's frame for the outline one, which would leave
+   paper-coloured text on paper; they keep the same image and darken it, so
+   there is no second image to fetch on first hover. */
+.doodle button.primary,
+.doodle .doodle-border.primary,
+.doodle button.primary:hover:not(:disabled),
+.doodle .doodle-border.primary:hover,
+.doodle button.primary:focus-visible,
+.doodle .doodle-border.primary:focus-visible {
+  border-image: url(/button-primary.svg) 10 fill / 10px stretch;
+  color: var(--paper);
+}
+
+.doodle button.primary:hover:not(:disabled),
+.doodle .doodle-border.primary:hover,
+.doodle button.primary:focus-visible,
+.doodle .doodle-border.primary:focus-visible {
+  filter: brightness(0.82);
+}
+
+.doodle button.primary:focus-visible,
+.doodle .doodle-border.primary:focus-visible {
+  outline-color: var(--paper);
+}
+
+.doodle fieldset:hover {
   border-image: url(/vendor/doodle/border.svg) 10 10 10 10 stretch stretch;
 }
 
-.doodle button,
+.doodle textarea {
+  border-image: url(/textarea-light.svg) 10 10 10 10 stretch stretch;
+}
+
+.doodle textarea:hover:not(:disabled),
+.doodle textarea:focus-visible {
+  border-image: url(/textarea.svg) 10 10 10 10 stretch stretch;
+}
+
+.doodle button:not(:disabled),
 .doodle .doodle-border,
-.doodle select,
-.doodle input[type='checkbox'],
-.doodle input[type='radio'] {
+.doodle select:not(:disabled),
+.doodle input[type='checkbox']:not(:disabled),
+.doodle input[type='radio']:not(:disabled) {
   cursor: pointer;
 }
 
@@ -73,25 +341,90 @@
   font-family: 'Short Stack', cursive;
   font-size: 1em;
   font-weight: normal;
-  color: #3c3c3c;
+  color: var(--text);
+  /* The two a real <button> gets from the browser: centred text, and no
+     underline — which a link has, and every ButtonLink was taking off at its
+     own call site before this. */
+  text-align: center;
+  text-decoration: none;
 }
 
-/* Same box, too, or they match in colour and still stand at different
-   heights. DoodleCSS leaves a real <button> on the browser's default padding
-   (~1px 6px) while each impostor carried its own 4px 14px, so a trigger
-   already stood ~6px taller before anything else. Declared in one place
-   rather than per component, which is what makes "all buttons" true. */
+/* Same box, too, declared once so "all buttons" is true: no block padding, so
+   a button is the 10px hand-drawn border either side of one 20px line — 40px. */
 .doodle button,
 .doodle .doodle-border {
-  padding: 4px 14px;
+  padding: 0 14px;
 }
 
-/* The floating-action variant is deliberately larger. Listed after the rule
-   above at equal specificity so it wins, and unlayered like the rest —
-   the css() rules the components use are layered, and layered always loses
-   to unlayered no matter the specificity. */
-.doodle .modal-fab {
+/* The floating-action trigger (Modal's `fab`) is deliberately larger, and
+   floats over the page, so it carries its own paper and shadow. More specific
+   than the rule above, and unlayered like the rest — a css() rule on the span
+   would be layered and lose to it. */
+.doodle label.modal-fab > .doodle-border {
   padding: 14px 22px;
+  text-align: center;
+  background-color: var(--paper);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+/* The other half of a form row: a <select> or text <input> beside a button
+   takes no block padding either, so the row stands at one height. Only the
+   block padding is stated: an input's inline padding is the browser's, and a
+   select's right padding is the caret allowance set just below.
+
+   A <textarea> keeps 4px: it holds prose, not one line, and on no padding its
+   first line sits against the border. It is also left out of the line-height
+   rule below, which exists to make one-line controls agree on a height. */
+.doodle textarea {
+  padding-block: 4px;
+}
+
+.doodle select,
+.doodle input:not([type='checkbox']):not([type='radio']) {
+  padding-block: 0;
+}
+
+/* DoodleCSS paints the caret at caret.svg's own 18.5px, with a 3px stroke —
+   taller than the text's x-height and heavier than the 2px field border around
+   it. Drawn at 12px wide the stroke scales to ~2px, the same line as the field.
+
+   DoodleCSS sets it 10px in from the right but only allows `padding-right:
+   1.5em` for it, which left the caret overlapping the last letter of the
+   option. The inset, the size and the padding are stated together here, the
+   padding worked out from the other two plus an 8px gap, so changing either
+   can't put the caret back over the text. Pixels, not em: the caret is a fixed
+   size and doesn't scale with the text.
+
+   Its colour follows the border's too: grey while idle, the blue one (caret.svg)
+   on hover or focus, at the same moment the border turns blue. Only the image
+   is swapped, so DoodleCSS's position and no-repeat still apply. */
+.doodle select:not([multiple]) {
+  --caret-inset: 10px;
+  --caret-size: 12px;
+  background-image: url(/caret-light.svg);
+  background-position: right var(--caret-inset) center;
+  background-size: var(--caret-size) auto;
+  padding-right: calc(var(--caret-inset) + var(--caret-size) + 8px);
+}
+
+.doodle select:not([multiple]):hover:not(:disabled),
+.doodle select:not([multiple]):focus-visible {
+  background-image: url(/caret.svg);
+}
+
+/* Padding gets them to the same height while Short Stack is rendering, but the
+   font arrives over the network and `line-height: normal` is read off whatever
+   is rendering at the time: with the fallback the select comes out a pixel
+   short of the button, because a select's text box and a button's line box
+   round a font's metrics differently. Stating the number makes the shared box
+   the same whichever font renders. 1.25 is 20px at the app's 16px, which is
+   exactly Short Stack's own normal line box — so nothing moves when it loads,
+   and nothing drifts when it doesn't. */
+.doodle button,
+.doodle .doodle-border,
+.doodle select,
+.doodle input:not([type='checkbox']):not([type='radio']) {
+  line-height: 1.25;
 }
 
 /* Labels that are a click target and nothing more: they must contribute no box
@@ -102,6 +435,122 @@
    not there. */
 .doodle label.modal-trigger {
   padding: 0;
+}
+
+/* A Field's <label> is a wrapper around a stacked label-and-control, not a line
+   of text, but `.doodle label { padding: .25em 0 }` still hung 4px under the
+   control. In a row that bottom-aligns its items — the status filter and its
+   button — that padding is what the button lines up with, so the field sat 4px
+   high even once the two were the same height. Forms space stacked fields with
+   their own `gap`, so the padding was only ever incidental. Here rather than in
+   field.tsx for the usual reason: a layered css() rule cannot outrank an
+   unlayered Doodle one. */
+.doodle label.field {
+  padding: 0;
+}
+
+/* CheckboxOption and RadioOption (form-controls.tsx). The control and its text
+   on one centred line, 8px apart, with an optional hint under the text — lined
+   up with the text, not the control. Here because `.doodle label` sets display
+   and padding unlayered, and a css() rule can't outrank that.
+
+   The control's size and the gap beside it are named on the option, and the
+   hint's indent is worked out from them, so it stays under the text if either
+   changes. The control's margin is zeroed so the gap is the only space beside
+   it. 24px is the size DoodleCSS draws both at (1.5em of its 16px), stated in
+   pixels because the hint's own 12px text would make an em mean 18 there.
+
+   Flex centres the text's line box on the control, but Short Stack's lowercase
+   letters sit low in that box — their middle lands about 0.075em under its
+   middle — so the text is lifted by that much to put the middle of the letters
+   on the middle of the control, which is what the eye checks. Measured from
+   pixels, the same for radios and checkboxes; in em, so it holds at any size. */
+.doodle .choice {
+  --choice-control: 24px;
+  --choice-gap: 8px;
+}
+
+.doodle label.choice-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--choice-gap);
+  padding: 0;
+  line-height: 1.25;
+}
+
+.doodle label.choice-label input {
+  flex: 0 0 auto;
+  width: var(--choice-control);
+  height: var(--choice-control);
+  margin: 0;
+}
+
+.doodle .choice-text {
+  position: relative;
+  top: -0.075em;
+}
+
+/* A line under an option, or under a whole group. */
+.doodle .choice-hint,
+.doodle .choice-group-hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.doodle .choice-hint {
+  margin-top: 4px;
+  padding-left: calc(var(--choice-control) + var(--choice-gap));
+}
+
+/* ChoiceGroup. A <fieldset> for what it says — one question, its options — and
+   none of Doodle's look: `.doodle fieldset` draws the hand-drawn border box,
+   which these groups never had. */
+.doodle fieldset.choice-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-image: none;
+  min-width: 0;
+}
+
+.doodle .choice-legend {
+  display: block;
+  padding: 0;
+}
+
+.doodle .choice-legend.section {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.doodle .choice-legend.subsection {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.doodle .choice-options {
+  display: flex;
+}
+
+.doodle .choice-options.column {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.doodle .choice-options.row {
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.doodle .choice-group-hint {
+  margin-top: 8px;
 }
 
 /* The "Not for me" chip in the rating picker. Its border, radius and colours
@@ -121,6 +570,15 @@
   padding: 0 26px;
 }
 
+/* Every page's title starts flush with the top of <main>, rather than 0.67em
+   (~21px) down where the browser puts an <h1>. Here rather than on Page's own
+   <h1> so it also holds for a page that places its heading inside its own
+   layout. Only the top: the space under a title is each page's call, set with
+   css() rules this unlayered one would override. */
+.doodle main h1 {
+  margin-top: 0;
+}
+
 /* Rating/notes only make sense once something's actually been watched —
    reacts live to the status <select> with no JS, via :has() + option:checked. */
 .watched-only-fields {
@@ -134,7 +592,7 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 /* Destructive actions (delete log). Needs the element selector to outrank
    DoodleCSS's own `.doodle button { color: #3c3c3c }`. */
 .doodle button.danger {
-  color: #c33;
+  color: var(--danger);
 }
 
 .doodle button.danger:hover:not(:disabled) {
@@ -147,17 +605,279 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
    padding and colour from an unlayered rule, so a layered css() declaration is
    dropped without a word — which is why this lives here, like the modal trigger
    and rating chip above. */
-.doodle button.linkish {
+.doodle button.linkish,
+.doodle a.linkish,
+.doodle label.linkish,
+.doodle span.linkish {
+  padding: 0;
+  cursor: pointer;
+  font-weight: normal;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: underline;
+}
+
+.doodle button.linkish:hover,
+.doodle a.linkish:hover,
+.doodle label.linkish:hover,
+.doodle summary:hover > span.linkish {
+  color: var(--text);
+}
+
+/* Buttons that read as text or an icon rather than a control. Unlayered, like
+   the rules above, so css() can't do this. The border width going to 0 is also
+   what keeps the hover and focus border-images from drawing. */
+.doodle button.linkish,
+.doodle button.bare,
+.doodle button.checkline,
+.doodle button.plain,
+.doodle button.menu-link {
   border: 0;
   border-image: none;
   background: none;
-  padding: 0;
-  font-size: 13px;
-  color: #6b6459;
-  text-decoration: underline;
   cursor: pointer;
 }
 
-.doodle button.linkish:hover {
-  color: #3c3c3c;
+/* "menu-link": an item in a menu of places to go — the profile menu's links,
+   and Log out, a button because it has to POST, among them. Plain at rest, and
+   bold and underlined under the pointer or keyboard focus, which is what says
+   which item a press would take. `.doodle a` makes every link bold, unlayered,
+   so the rest state has to be said here, for the links as much as the button.
+
+   The rest is what the button needs to sit among the links: the menu's 4px 8px
+   row padding, left-aligned text and a normal line height, so every row is one
+   height. Focus also keeps Doodle's dashed outline, on the links too, drawn
+   just outside the text rather than 8px inside a 24px row. */
+.doodle .menu-link {
+  padding: 4px 8px;
+  font-weight: normal;
+  color: var(--ink);
+  text-decoration: none;
+  text-align: left;
+  line-height: normal;
+}
+
+.doodle .menu-link:hover,
+.doodle .menu-link:focus-visible {
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+.doodle .menu-link:focus-visible {
+  outline: 2px dashed var(--text);
+  outline-offset: 0;
+}
+
+/* Button variant "plain": a button whose look is its own content — the import
+   picker's poster tiles. Layout stays with the call site, where css() can set
+   it because Doodle doesn't. */
+.doodle button.plain {
+  padding: 0;
+  text-align: left;
+}
+
+.doodle button.bare {
+  padding: 4px 8px;
+  color: var(--muted);
+}
+
+.doodle button.bare:hover:not(:disabled),
+.doodle button.checkline:hover:not(:disabled) {
+  color: var(--text);
+}
+
+/* A submit drawn as a checkbox (or radio, with .radio on the box), wearing the
+   same images as the real ones above: grey idle, blue on hover or once ticked.
+   While posting it shows the state it is heading to. */
+.doodle button.checkline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: left;
+}
+
+.doodle .checkline-box {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 5px;
+  font-size: 14px;
+}
+
+.doodle .checkline-box.radio {
+  border-width: 10px;
+}
+
+.doodle button.checkline.ticked .checkline-box::after,
+.doodle button.checkline:disabled .checkline-box::after {
+  content: '*';
+  font-size: 1.2em;
+  margin-bottom: -0.3em;
+}
+
+.doodle button.checkline.ticked:disabled .checkline-box::after {
+  content: none;
+}
+
+/* FloatingDropdown's `compact` trigger — the same sketched border at half the
+   width, for one that sits beside a heading rather than in a row of buttons.
+   Here because `.doodle-border` is unlayered and sets the width. */
+.doodle .doodle-border.compact {
+  border-width: 5px;
+  padding: 1px 4px;
+  line-height: 1.3;
+}
+
+/* An icon-only trigger (FloatingDropdown's `icon`, Modal's `triggerIcon`) — a
+   square around the glyph, with the compact border so the frame doesn't
+   swallow the icon. */
+.doodle .doodle-border.icon {
+  border-width: 5px;
+  padding: 4px;
+  line-height: 0;
+}
+
+/* A choice in a dropdown list, as a row rather than a button: the where-to-watch
+   country picker, where each country is its own submit button. Doodle gives
+   every button a sketched border and centred text, unlayered, so this undoes
+   both here. With no border to darken, focus shows as an outline instead. */
+.doodle button.menu-choice {
+  border: none;
+  border-image: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.doodle button.menu-choice:hover,
+.doodle button.menu-choice:focus-visible {
+  background-color: var(--paper-sunk);
+}
+
+.doodle button.menu-choice:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
+}
+
+.doodle button.menu-choice[aria-current] {
+  font-weight: bold;
+}
+
+/* Touch targets. With a finger rather than a pointer, the things the app sizes
+   for a mouse are too small to hit reliably: the nav's links were 17px tall,
+   menu rows and option labels 24-26px, tabs 30px. 44px is the height phones are
+   designed around. All of this is for coarse pointers only, so nothing moves on
+   a desktop.
+
+   Two ways in. A row in a list — a menu item, a suggestion, a checkbox or radio
+   option — is simply made 44px tall, and the gaps between rows go, so a tap
+   between two of them still lands on one. Anything else — a link in the nav, a
+   tab, a back link, a close ✕ — keeps its size and gets an invisible tap area
+   around it instead (`tap-area`): a 44px-tall band centred on it and 8px
+   wider either side, drawn by ::after so the layout doesn't change. Exactly
+   44 rather than a fixed margin, so a 20px link reaches out 12px and no more —
+   a fixed 15 reached into the button above the home page's "Sign up". The
+   rating picker's "Not for me" chip sits beside the stars, so its band is no
+   wider than the chip. The text-like button variants get
+   it without the class, being small wherever they appear. */
+@media (pointer: coarse) {
+  .doodle .tap-area,
+  .doodle button.linkish,
+  .doodle a.linkish,
+  .doodle button.bare,
+  .doodle button.checkline,
+  .doodle label.rating-choice {
+    position: relative;
+  }
+
+  .doodle .tap-area::after,
+  .doodle button.linkish::after,
+  .doodle a.linkish::after,
+  .doodle button.bare::after,
+  .doodle button.checkline::after,
+  .doodle label.rating-choice::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -8px;
+    right: -8px;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+
+  .doodle label.rating-choice::after {
+    left: 0;
+    right: 0;
+  }
+
+  .doodle .menu-link,
+  .doodle button.menu-choice {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  /* 36px rather than the 44px the other small controls get: a stack of 44px
+     rows spread a three-option group over most of a phone screen. Still well
+     clear of the 24px control, and the rows touch, so no tap falls between. */
+  .doodle label.choice-label {
+    min-height: 36px;
+  }
+
+  .doodle .choice-options.column {
+    gap: 0;
+  }
+}
+
+/* A <details> whose open/closed chevron sits at the right end of its summary
+   rather than the browser's triangle at the left — every disclosure on the
+   site: Collapsible, the taste profile on both profiles, the recommendation
+   form's settings and the activity feed's folded groups. The chevron is a
+   span (DisclosureChevron) rather than ::after, since `tap-area` already draws
+   with that; a summary laid out on its own, as the feed's is, places the span
+   itself and leaves off `.disclosure`. Down when closed, up when open; no
+   transition, so nothing to turn off for reduced motion. */
+.doodle summary.disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.doodle summary.disclosure::-webkit-details-marker {
+  display: none;
+}
+
+/* The whole row is the target, and never shorter than a finger. */
+@media (pointer: coarse) {
+  .doodle summary.disclosure {
+    min-height: 44px;
+  }
+}
+
+.doodle .disclosure-chevron {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin: 0 6px 4px 0;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.doodle details[open] > summary .disclosure-chevron {
+  margin-bottom: -4px;
+  transform: rotate(-135deg);
 }

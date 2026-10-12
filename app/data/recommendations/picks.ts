@@ -1,5 +1,11 @@
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
-import { describeLength, getCatalogProvider, type LengthBucket } from '../catalog/provider.ts'
+import type { SeenBy } from '../../ui/shared/seen-by.ts'
+import {
+  describeLength,
+  getCatalogProvider,
+  searchReadsCreator,
+  type LengthBucket,
+} from '../catalog/provider.ts'
 import type { MediaType } from '../mediaItems.ts'
 import { requestStructured } from './claude.ts'
 
@@ -7,6 +13,16 @@ export interface Pick {
   title: string
   year: number
   reason: string
+  // Only asked for when the series lever is set, and absent on picks carried in a
+  // checkpoint written before it was — see matchesSeries, which reads nothing as
+  // "no answer given" rather than as standalone.
+  part_of_series?: boolean
+  // The series this belongs to, empty for a standalone. Asked for on every run, to
+  // keep one series from taking several of the eight slots — see seriesKey.
+  series_name?: string
+  // Who made it, asked for only where the catalog's search reads it — see
+  // searchesCreator. A title alone often does not find a book at all.
+  creator?: string
 }
 
 export interface TasteSummary {
@@ -55,27 +71,60 @@ export interface RecommendationFilters {
   platform?: string
   // Books only — see BOOK_SERIES_TYPES.
   series?: string
+  // Group runs only, and never 'half' — see ui/shared/seen-by.ts. Enforced by
+  // buildExclusions rather than a gate of its own.
+  seenBy?: SeenBy
 }
 
-const PICKS_SCHEMA = {
-  type: 'object' as const,
-  additionalProperties: false,
-  properties: {
-    picks: {
-      type: 'array' as const,
-      items: {
-        type: 'object' as const,
-        additionalProperties: false,
-        properties: {
-          title: { type: 'string' as const },
-          year: { type: 'number' as const },
-          reason: { type: 'string' as const },
+// Whether a lever cut this run down. Every lever does whenever it is set, but
+// seenBy is also set to widen ('any'), so the one exception is spelled here for
+// everything that asks.
+export function narrows(filters: RecommendationFilters, key: keyof RecommendationFilters): boolean {
+  return key === 'seenBy' ? filters.seenBy === 'no_one' : filters[key] != null
+}
+
+const NARROWING_KEYS: (keyof RecommendationFilters)[] = [
+  'genre',
+  'decade',
+  'length',
+  'playerType',
+  'multiplayerType',
+  'platform',
+  'series',
+  'seenBy',
+]
+
+// Built per request rather than a constant: part_of_series is asked for only when
+// the lever needs it, and structured output requires every property it declares, so
+// a field that is sometimes wanted can't just be optional in one fixed schema.
+function picksSchema(options: { partOfSeries: boolean; creator: boolean }) {
+  const properties = {
+    title: { type: 'string' as const },
+    year: { type: 'number' as const },
+    reason: { type: 'string' as const },
+    // A string rather than a nullable one: structured output takes a single type
+    // per property, and "" is a clearer "no series" than a magic word would be.
+    series_name: { type: 'string' as const },
+    ...(options.creator ? { creator: { type: 'string' as const } } : {}),
+    ...(options.partOfSeries ? { part_of_series: { type: 'boolean' as const } } : {}),
+  }
+
+  return {
+    type: 'object' as const,
+    additionalProperties: false,
+    properties: {
+      picks: {
+        type: 'array' as const,
+        items: {
+          type: 'object' as const,
+          additionalProperties: false,
+          properties,
+          required: Object.keys(properties),
         },
-        required: ['title', 'year', 'reason'],
       },
     },
-  },
-  required: ['picks'],
+    required: ['picks'],
+  }
 }
 
 // Enough over TARGET_COUNT to survive the gates dropping some, and no more: a
@@ -105,18 +154,32 @@ export function describeSeen(seen: string[], noun: string, subject: string | nul
   // whole of what they've watched and pitches at someone barely started.
   return subject
     ? `\n\n${subject} has logged ${seen.length} ${noun} as seen — here are the ${shown.length} most recent, none ` +
-      `of which you should suggest: ${JSON.stringify(shown)}. Take it as read that there are many more you ` +
-      `haven't been shown: ${subject} is well past the obvious picks, so favour things ${subject} is unlikely to ` +
-      `have already worked through.`
+        `of which you should suggest: ${JSON.stringify(shown)}. Take it as read that there are many more you ` +
+        `haven't been shown: ${subject} is well past the obvious picks, so favour things ${subject} is unlikely to ` +
+        `have already worked through.`
     : `\n\nThey've logged ${seen.length} ${noun} as seen — here are the ${shown.length} most recent, none of ` +
-      `which you should suggest: ${JSON.stringify(shown)}. Take it as read that there are many more you ` +
-      `haven't been shown: this is someone well past the obvious picks, so favour things they're unlikely to ` +
-      `have already worked through.`
+        `which you should suggest: ${JSON.stringify(shown)}. Take it as read that there are many more you ` +
+        `haven't been shown: this is someone well past the obvious picks, so favour things they're unlikely to ` +
+        `have already worked through.`
 }
 
-function buildFilterInstructions(filters: RecommendationFilters, noun: string, mediaType: MediaType): string {
+function buildFilterInstructions(
+  filters: RecommendationFilters,
+  noun: string,
+  singular: string,
+  mediaType: MediaType,
+): string {
   const clauses: string[] = []
-  if (filters.genre) clauses.push(`Only suggest ${noun} in the "${filters.genre}" genre.`)
+  if (filters.genre) {
+    clauses.push(
+      `Only suggest ${noun} in the "${filters.genre}" genre. This one is checked: each pick is looked up and ` +
+        `discarded unless the catalog itself files it under "${filters.genre}", so a ${singular} ` +
+        `from another genre that merely contains ${filters.genre} will not survive. Where this genre and the ` +
+        `taste profile barely overlap, the genre wins — suggest the "${filters.genre}" ${noun} this reader is ` +
+        `most likely to enjoy, rather than the ${singular} closest to their profile that gestures ` +
+        `at "${filters.genre}".`,
+    )
+  }
   if (filters.decade != null) {
     if (filters.decadeRelation === 'before') {
       clauses.push(`Only suggest ${noun} originally released before ${filters.decade}.`)
@@ -129,7 +192,12 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string, m
   // The medium's own bucket, never a runtime for everything — see lengthOptions.
   if (filters.length) {
     const phrase = describeLength(getCatalogProvider(mediaType), filters.length)
-    if (phrase) clauses.push(`Only suggest ${noun} with ${phrase}.`)
+    if (phrase) {
+      clauses.push(
+        `Only suggest ${noun} with ${phrase}. This is checked against the catalog too, so a ${singular} ` +
+          `outside that range is discarded.`,
+      )
+    }
   }
   if (filters.playerType === 'singleplayer') clauses.push(`Only suggest ${noun} playable single-player.`)
   if (filters.playerType === 'multiplayer') clauses.push(`Only suggest ${noun} playable multiplayer.`)
@@ -141,16 +209,44 @@ function buildFilterInstructions(filters: RecommendationFilters, noun: string, m
   if (filters.platform) clauses.push(`Only suggest ${noun} playable on ${filters.platform}.`)
   if (filters.series === 'series') clauses.push(`Only suggest ${noun} that are part of a series.`)
   if (filters.series === 'standalone') clauses.push(`Only suggest standalone ${noun}, not part of a series.`)
+  // No clause for 'no_one': the seen list below already names everything anyone
+  // has finished. 'any' empties that list, so without this the model would still
+  // steer clear of what it guesses they've seen.
+  if (filters.seenBy === 'any') {
+    clauses.push(`It's fine to suggest ${noun} some or all of them have already seen.`)
+  }
+  // Nothing in any book catalog answers this, so the model is asked to label its own
+  // picks and is held to the labels — see matchesSeries.
+  if (filters.series != null) {
+    clauses.push(
+      `Set "part_of_series" on every pick: true if it belongs to a series, false if it stands alone. ` +
+        `Answer for the work itself, not for whether the author wrote other books.`,
+    )
+  }
   return clauses.length > 0 ? ` ${clauses.join(' ')}` : ''
 }
 
-export async function requestPicks(
+// The picks, plus what was said to get them. The caller keeps both — see
+// transcripts.ts for why they aren't simply logged.
+export interface PicksResult {
+  picks: Pick[]
+  prompt: string
+  response: string
+}
+
+// The whole message the picks call sends, built from the profiles and the levers.
+//
+// Exported because nothing used to check that a lever reached the prompt at all: the
+// clauses were assembled inside the request and only a live call could show what was
+// sent. A filter that never made it into the text would look exactly like a model
+// ignoring it. test/picks-prompt.test.ts walks every lever the form can set.
+export function buildPicksPrompt(
   profiles: MemberProfile[] | MultiSourceMemberProfile[],
   excluded: ExcludedTitles,
   filters: RecommendationFilters = {},
   mediaType: MediaType = 'movie',
   sourceTypes: MediaType[] = ['movie'],
-): Promise<Pick[]> {
+): { content: string; requestedCount: number; hasFilters: boolean; searchesCreator: boolean } {
   const isGroup = profiles.length > 1
   const subject = isGroup ? null : profiles[0].label
   const noun = mediaTypeUiFor(mediaType).plural
@@ -163,16 +259,29 @@ export async function requestPicks(
     : sourceTypes.length > 1
       ? ` Each person has a separate profile per type above; weigh all of them.`
       : ''
-  const hasFilters =
-    filters.genre != null ||
-    filters.decade != null ||
-    filters.length != null ||
-    filters.playerType != null ||
-    filters.multiplayerType != null ||
-    filters.platform != null ||
-    filters.series != null
+  const hasFilters = NARROWING_KEYS.some((key) => narrows(filters, key))
   const requestedCount = hasFilters ? REQUESTED_COUNT + 6 : REQUESTED_COUNT
-  const filterInstructions = buildFilterInstructions(filters, noun, mediaType) + sourceInstructions
+  const { singular } = mediaTypeUiFor(mediaType)
+  // Asked for only where it is used. Google Books' search reads it and often cannot
+  // find the book without it; TMDB's and IGDB's match titles only — see
+  // searchesCreator.
+  const searchesCreator = searchReadsCreator(mediaType)
+  const creatorRule = searchesCreator
+    ? ` Set "creator" on each pick: who wrote it, as the cover would say. It is used to look the ${singular} ` +
+      `up, so give the name rather than a description of them.`
+    : ''
+  const seriesRule =
+    ` Set "series_name" on each pick: the series it belongs to, or "" if it stands alone.` +
+    (filters.series === 'standalone'
+      ? ''
+      : ` Suggest at most one ${singular} per series — the one someone new to that series should start with — ` +
+        `so the list is that many different ${noun} rather than half of one shelf.`)
+
+  const filterInstructions =
+    buildFilterInstructions(filters, noun, singular, mediaType) +
+    sourceInstructions +
+    seriesRule +
+    creatorRule
 
   const prompt = isGroup
     ? `Group of ${profiles.length} people, each with their own ${noun} taste profile:\n${JSON.stringify(profiles, null, 2)}\n\n` +
@@ -188,38 +297,66 @@ export async function requestPicks(
       `this taste profile.${filterInstructions} For each, give your best-guess release year (used only to ` +
       `disambiguate remakes/same-titled entries) and a one-sentence reason tied to ${subject}'s profile.`
 
-// Scales per person because the reasoning does — a run that exhausts its budget
+  return {
+    content:
+      prompt +
+      describeSeen(excluded.seen, noun, subject) +
+      (excluded.rejected.length > 0
+        ? subject
+          ? `\n\n${subject} has explicitly ruled these out as not interesting — never suggest them, and treat ` +
+            `them as a signal about what to steer away from more broadly: ` +
+            `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
+          : `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
+            `as a signal about what to steer away from more broadly: ` +
+            `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
+        : ''),
+    requestedCount,
+    hasFilters,
+    searchesCreator,
+  }
+}
+
+export async function requestPicks(
+  profiles: MemberProfile[] | MultiSourceMemberProfile[],
+  excluded: ExcludedTitles,
+  filters: RecommendationFilters = {},
+  mediaType: MediaType = 'movie',
+  sourceTypes: MediaType[] = ['movie'],
+): Promise<PicksResult> {
+  const { content, requestedCount, hasFilters, searchesCreator } = buildPicksPrompt(
+    profiles,
+    excluded,
+    filters,
+    mediaType,
+    sourceTypes,
+  )
+  // Scales per person because the reasoning does — a run that exhausts its budget
   // thinking comes back with no picks at all.
   //
   // Capped where a non-streaming request stops being comfortable: past this a
   // call wants .stream() and get_final_message(), not a bigger ceiling.
   const maxTokens = Math.min(6000 + 3000 * profiles.length + (hasFilters ? 4000 : 0), 32000)
 
-  const { picks } = await requestStructured<{ picks: Pick[] }>('picks.model', {
-    model: 'claude-sonnet-5',
-    max_tokens: maxTokens,
-    output_config: {
-      effort: 'medium',
-      format: { type: 'json_schema', schema: PICKS_SCHEMA },
-    },
-    messages: [
-      {
-        role: 'user',
-        content:
-          prompt +
-          describeSeen(excluded.seen, noun, subject) +
-          (excluded.rejected.length > 0
-            ? subject
-              ? `\n\n${subject} has explicitly ruled these out as not interesting — never suggest them, and treat ` +
-                `them as a signal about what to steer away from more broadly: ` +
-                `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
-              : `\n\nThey've explicitly said they're not interested in these — never suggest them, and treat them ` +
-                `as a signal about what to steer away from more broadly: ` +
-                `${JSON.stringify(excluded.rejected.slice(0, REJECTED_TITLES_IN_PROMPT))}`
-            : ''),
-      },
-    ],
-  })
+  let response = ''
 
-  return picks
+  const { picks } = await requestStructured<{ picks: Pick[] }>(
+    'picks.model',
+    {
+      model: 'claude-sonnet-5',
+      max_tokens: maxTokens,
+      output_config: {
+        effort: 'medium',
+        format: {
+          type: 'json_schema',
+          schema: picksSchema({ partOfSeries: filters.series != null, creator: searchesCreator }),
+        },
+      },
+      messages: [{ role: 'user', content }],
+    },
+    (raw) => {
+      response = raw
+    },
+  )
+
+  return { picks, prompt: content, response }
 }

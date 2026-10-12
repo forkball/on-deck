@@ -19,7 +19,11 @@ export type MediaType = MediaItem['type']
 // credits, runtime or description, so re-importing over an enriched row would
 // null out what a by-id lookup filled in. Rematch passes none — it repoints the
 // row at a different work.
-function buildMetadata(result: TmdbSearchResult, previous?: unknown, fromDetailLookup = false): MediaMetadata {
+function buildMetadata(
+  result: TmdbSearchResult,
+  previous?: unknown,
+  fromDetailLookup = false,
+): MediaMetadata {
   const prev = previous != null ? parseMediaMetadata(previous) : null
 
   return {
@@ -31,11 +35,20 @@ function buildMetadata(result: TmdbSearchResult, previous?: unknown, fromDetailL
     pageCount: result.pageCount ?? prev?.pageCount ?? null,
     playtimeHours: result.playtimeHours ?? prev?.playtimeHours ?? null,
     seasonCount: result.seasonCount ?? prev?.seasonCount ?? null,
+    episodeCount: result.episodeCount ?? prev?.episodeCount ?? null,
+    lastAirYear: result.lastAirYear ?? prev?.lastAirYear ?? null,
+    showStatus: result.showStatus ?? prev?.showStatus ?? null,
+    networks: result.networks?.length ? result.networks : (prev?.networks ?? []),
     creator: result.creator ?? prev?.creator ?? null,
+    creators: result.creators?.length ? result.creators : (prev?.creators ?? []),
+    cast: result.cast?.length ? result.cast : (prev?.cast ?? []),
+    tagline: result.tagline ?? prev?.tagline ?? null,
+    sourceUrl: result.sourceUrl ?? prev?.sourceUrl ?? null,
     // `??` won't do: an empty array is truthy, so a lookup returning no stills
     // would replace a set we already had.
     images: result.images?.length ? result.images : (prev?.images ?? []),
     platforms: result.platforms?.length ? result.platforms : (prev?.platforms ?? []),
+    series: result.series?.length ? result.series : (prev?.series ?? []),
     tags: result.tags?.length ? result.tags : (prev?.tags ?? []),
   }
 }
@@ -79,7 +92,9 @@ export async function markMediaItemEnriched(db: Db, item: MediaItem): Promise<vo
   await db.update(mediaItems, item.id, { metadata: { ...metadata, enrichedAt: Date.now() } })
 }
 
-export type RematchMediaItemResult = { ok: true; item: MediaItem; merged: boolean } | { ok: false; error: string }
+export type RematchMediaItemResult =
+  | { ok: true; item: MediaItem; merged: boolean }
+  | { ok: false; error: string }
 
 // The unique (user_id, media_item_id) constraint won't allow keeping both logs,
 // so the more recently updated wins.
@@ -313,7 +328,8 @@ export async function updateInteraction(
     ...(input.rating !== undefined ? { rating: input.rating } : {}),
     ...(input.disliked !== undefined ? { disliked: input.disliked } : {}),
     ...(input.notes !== undefined ? { notes: input.notes } : {}),
-    consumed_at: input.status === 'consumed' ? (existing.consumed_at ?? now) : (existing.consumed_at ?? undefined),
+    consumed_at:
+      input.status === 'consumed' ? (existing.consumed_at ?? now) : (existing.consumed_at ?? undefined),
     updated_at: now,
   })
 }

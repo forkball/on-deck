@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 
 import { DEFAULT_MEDIA_TYPE, type ActiveMediaType } from '../../mediaTypes.ts'
 import { statusOptionsFor } from '../../interactionStatus.ts'
+import { Select } from '../shared/form-controls.tsx'
 
 // `<select defaultValue>` doesn't preselect in this framework — HTML needs
 // `selected` on the matching <option>. `defaultValue` is a plain string because
@@ -14,13 +15,13 @@ export function StatusSelect(
     const options = statusOptionsFor(mediaType ?? DEFAULT_MEDIA_TYPE)
 
     return (
-      <select name={name}>
+      <Select name={name}>
         {options.map((opt) => (
           <option key={opt.value} value={opt.value} selected={opt.value === defaultValue}>
             {opt.label}
           </option>
         ))}
-      </select>
+      </Select>
     )
   }
 }

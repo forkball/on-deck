@@ -1,7 +1,15 @@
 import { clientEntry, css, on, ref } from 'remix/ui'
 
 import { SuggestionDropdown } from './shared/suggestion-dropdown.tsx'
-import { createSuggestionFetcher, EMPTY_SUGGEST_STATE, type SuggestState, type Suggestion } from './shared/suggestions.ts'
+import { Spinner } from './shared/spinner.tsx'
+import {
+  createSuggestionFetcher,
+  EMPTY_SUGGEST_STATE,
+  type SuggestState,
+  type Suggestion,
+} from './shared/suggestions.ts'
+import { Button, TextInput } from '../ui/shared/form-controls.tsx'
+import { Field } from '../ui/shared/field.tsx'
 
 export type UserSearchFormProps = {
   query: string
@@ -76,54 +84,38 @@ export const UserSearchForm = clientEntry<UserSearchFormProps>(
               }),
             ]}
           >
-            <input
-              type="text"
-              name="q"
-              value={query}
-              autocomplete="off"
-              placeholder="Search by username…"
-              mix={[
-                css({ display: 'block', width: '100%' }),
-                on('input', (event) => {
-                  query = (event.target as HTMLInputElement).value
-                  fetcher.query(query)
-                  handle.update()
-                }),
-                on('keydown', (event) => {
-                  if (event.key !== 'Escape') return
-                  suggestState = EMPTY_SUGGEST_STATE
-                  handle.update()
-                }),
-              ]}
-            />
+            <Field label="Search people" labelHidden>
+              <TextInput
+                name="q"
+                value={query}
+                autocomplete="off"
+                placeholder="Search by username…"
+                mix={[
+                  on('input', (event) => {
+                    query = (event.target as HTMLInputElement).value
+                    fetcher.query(query)
+                    handle.update()
+                  }),
+                  on('keydown', (event) => {
+                    if (event.key !== 'Escape') return
+                    suggestState = EMPTY_SUGGEST_STATE
+                    handle.update()
+                  }),
+                ]}
+              />
+            </Field>
             {suggestState.open && <SuggestionDropdown state={suggestState} onSelect={selectSuggestion} />}
           </div>
 
-          <button
+          <Button
             type="submit"
+            variant="primary"
             disabled={submitting}
             mix={css({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' })}
           >
-            {submitting && (
-              <span
-                aria-hidden="true"
-                mix={css({
-                  '@keyframes user-search-spin': {
-                    from: { transform: 'rotate(0deg)' },
-                    to: { transform: 'rotate(360deg)' },
-                  },
-                  display: 'inline-block',
-                  width: '13px',
-                  height: '13px',
-                  borderRadius: '50%',
-                  border: '2px solid currentColor',
-                  borderTopColor: 'transparent',
-                  animation: 'user-search-spin 0.6s linear infinite',
-                })}
-              />
-            )}
+            {submitting && <Spinner />}
             {submitting ? 'Searching…' : 'Search'}
-          </button>
+          </Button>
         </form>
       )
     }

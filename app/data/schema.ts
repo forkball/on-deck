@@ -11,6 +11,11 @@ export const users = table({
     display_name: c.text().notNull().unique(),
     bio: c.text(),
     steam_id: c.text(),
+    // What Steam calls the linked account, for a settings page that would
+    // otherwise show seventeen digits. Nullable and always optional: every
+    // reader falls back to steam_id, since this is only ever a nicer label for
+    // an id that already works.
+    steam_persona: c.text().nullable(),
     // A Letterboxd member name, not a linked account: the RSS feed it reads is
     // public, so nothing proves the person typing it owns it. Hence no unique
     // index, where steam_id has one.
@@ -18,12 +23,30 @@ export const users = table({
     // Throttles the feed fetch — not a watermark over what has been seen. See
     // syncLetterboxdDiary for why the entries themselves are always re-read.
     letterboxd_synced_at: c.integer().nullable(),
+    // When the diary was connected, and so the point the feed speaks from:
+    // entries published after it are followed, entries before it are history
+    // the CSV import exists for. Null for anyone connected before this existed.
+    letterboxd_connected_at: c.integer().nullable(),
+    // What the last sync saw of the feed: the oldest entry it showed, and how
+    // many <item>s it carried in total, lists included. Together they let the
+    // next sync tell a feed that was truncated from one that shrank — see
+    // feedCoverage, and the 20260920120000 migration for why the current fetch
+    // cannot answer that on its own.
+    letterboxd_feed_floor: c.integer().nullable(),
+    letterboxd_feed_items: c.integer().nullable(),
     // Gates the bio and media log behind a follow (see follows.ts,
     // canViewProfile) — everyone still sees the name and follow counts.
     is_private: c.boolean().notNull().default(false),
     is_admin: c.boolean().notNull().default(false),
     profile_log_limit: c.integer().nullable(),
     profile_use_notes: c.boolean().notNull().default(true),
+    // A country code for the "where to watch" list, chosen by the member. Null
+    // means guess from the browser's language — see watchRegion.ts.
+    watch_region: c.text().nullable(),
+    // The title worn on the profile, as two keys into the catalog in
+    // app/data/profileTitles/catalog.ts — see the 20261011120000 migration.
+    title_adjective: c.text().nullable(),
+    title_noun: c.text().nullable(),
     created_at: c.integer().notNull(),
   },
 })
@@ -41,6 +64,18 @@ export const mediaItems = table({
     metadata: c.json().notNull(),
     popularity_score: c.decimal(10, 2),
     created_at: c.integer().notNull(),
+  },
+})
+
+// Streaming availability for a movie or show, every country at once. Refetched
+// on a clock, unlike metadata — see watchProviders.ts and the migration.
+export const mediaWatchProviders = table({
+  name: 'media_watch_providers',
+  primaryKey: ['media_item_id'],
+  columns: {
+    media_item_id: c.integer().notNull().references('media_items', 'id'),
+    regions: c.json().notNull(),
+    fetched_at: c.integer().notNull(),
   },
 })
 
@@ -125,11 +160,15 @@ export const recommendationJobs = table({
     phases: c.text().notNull(),
     phase: c.text().notNull(),
     run_id: c.integer(),
+    // Set instead of run_id when the catalog wouldn't answer — see unconfirmed.ts.
+    unconfirmed_run_id: c.integer(),
     pruned_oldest_run: c.integer().notNull(),
     error: c.text(),
     timings: c.text(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
+    // When a retry may be claimed — see the 20261008120000 migration.
+    retry_at: c.integer(),
   },
 })
 
@@ -149,6 +188,9 @@ export const recommendationRuns = table({
     // its own — see the 20260821120000 migration.
     is_lucky: c.boolean().notNull().default(false),
     timings: c.text(),
+    // The model's picks no catalog entry could be found for, as JSON — see
+    // data/recommendations/unmatched.ts and the 20261006120000 migration.
+    unmatched_picks: c.text().notNull().default('[]'),
   },
 })
 
@@ -177,6 +219,55 @@ export const recommendationRunMembers = table({
     run_id: c.integer().notNull().references('recommendation_runs', 'id'),
     user_id: c.integer().notNull().references('users', 'id'),
   },
+})
+
+// What was asked of the model and what it said back — see the migration for why
+// this is a table rather than a log line.
+export const generationTranscripts = table({
+  name: 'generation_transcripts',
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    user_id: c.integer().notNull().references('users', 'id'),
+    job_id: c.text(),
+    run_id: c.integer(),
+    media_type: c.text().notNull(),
+    params: c.text().notNull(),
+    prompt: c.text().notNull(),
+    response: c.text().notNull(),
+    tally: c.text(),
+    created_at: c.integer().notNull(),
+  },
+})
+
+// The model's answer when the catalog couldn't be reached — see the migration for
+// why these don't live in recommendation_runs.
+export const unconfirmedRuns = table({
+  name: 'unconfirmed_runs',
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    user_id: c.integer().notNull().references('users', 'id'),
+    media_type: c.text().notNull(),
+    params: c.text().notNull(),
+    picks: c.text().notNull(),
+    reason: c.text().notNull(),
+    created_at: c.integer().notNull(),
+    // From a lucky draw — see the 20261007120000 migration.
+    is_lucky: c.boolean().notNull().default(false),
+  },
+})
+
+// What the Open Library → Google Books backfill already tried, so a re-run spends
+// its Google Books quota on rows it has not asked about yet. Written only by
+// scripts/backfill-google-books.ts; nothing the app serves reads it.
+export const bookBackfillAttempts = table({
+  name: 'book_backfill_attempts',
+  columns: {
+    media_item_id: c.integer().notNull().references('media_items', 'id'),
+    outcome: c.text().notNull(),
+    detail: c.text().notNull(),
+    attempted_at: c.integer().notNull(),
+  },
+  primaryKey: ['media_item_id'],
 })
 
 export const userRecommendations = table({
@@ -236,8 +327,27 @@ export const importRows = table({
     year_delta: c.integer().nullable(),
     matched_external_id: c.text(),
     media_item_id: c.integer().nullable(),
+    // Same-titled films a no-year row could have meant. See the migration and
+    // inlineAlternates in app/data/imports/classify.ts.
+    alternates: c.json().nullable(),
+    // Which one-tap accept confirmed the row, so unticking it can put back
+    // exactly those, or `remembered` (a past import's answer). See the migration.
+    accepted_by: c.text(),
+    // The match before a repoint, restored by undo. See the migration.
+    previous_match: c.json().nullable(),
     created_at: c.integer().notNull(),
     updated_at: c.integer().notNull(),
+  },
+})
+
+// Titles earned, kept once earned — see the 20261011120000 migration.
+export const userTitles = table({
+  name: 'user_titles',
+  primaryKey: ['user_id', 'title_key'],
+  columns: {
+    user_id: c.integer().notNull().references('users', 'id'),
+    title_key: c.text().notNull(),
+    unlocked_at: c.integer().notNull(),
   },
 })
 
@@ -257,9 +367,11 @@ export const notifications = table({
     id: c.integer().primaryKey().autoIncrement(),
     user_id: c.integer().notNull().references('users', 'id'), // recipient
     actor_user_id: c.integer().notNull().references('users', 'id'), // who did the thing
-    // 'recommendation' | 'follow'. Only the former sets run_id.
+    // 'recommendation' | 'follow' | 'title'. Only the first sets run_id, only
+    // the last unlocked_titles. A title notification is its own actor.
     type: c.text().notNull(),
     run_id: c.integer(),
+    unlocked_titles: c.json().nullable(),
     read_at: c.integer(),
     created_at: c.integer().notNull(),
   },
@@ -271,6 +383,8 @@ export type UserMediaInteraction = TableRow<typeof userMediaInteractions>
 export type UserTasteProfile = TableRow<typeof userTasteProfiles>
 export type UserRecommendation = TableRow<typeof userRecommendations>
 export type UserFollow = TableRow<typeof userFollows>
+export type GenerationTranscript = TableRow<typeof generationTranscripts>
+export type UnconfirmedRun = TableRow<typeof unconfirmedRuns>
 export type RecommendationRun = TableRow<typeof recommendationRuns>
 export type RecommendationJob = TableRow<typeof recommendationJobs>
 export type RecommendationRunMember = TableRow<typeof recommendationRunMembers>

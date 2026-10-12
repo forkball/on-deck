@@ -5,6 +5,7 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
+import type { Db } from '../../../data/db.ts'
 import type { User } from '../../../data/schema.ts'
 import {
   bioSchema,
@@ -16,11 +17,16 @@ import {
   userFieldErrors,
   usernameSchema,
 } from '../../../data/users.ts'
+import { hasImportedLibrary } from '../../../data/imports/batches.ts'
+import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
+import { checkTitleUnlocks, loadWornTitle } from '../../../data/profileTitles/unlocks.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
-import { routes } from '../../../routes.ts'
+import { routes, titleSettingsHref } from '../../../routes.ts'
 import { verifyPassword } from '../../auth/password.ts'
 import { profileSettingsFor } from '../../../data/recommendations/tasteProfile.ts'
-import { ProfileEditPage } from './page.tsx'
+import type { ConnectionsProps } from './connections.tsx'
+import type { TitlesProps } from './titles.tsx'
+import { PROFILE_TABS, ProfileEditPage, type ProfileTab } from './page.tsx'
 
 const profileSchema = f.object({
   email: f.field(emailSchema),
@@ -36,6 +42,62 @@ const profileSchema = f.object({
   current_password: f.field(s.defaulted(s.string(), '')),
 })
 
+// The Steam OpenID callback can only redirect with a code, so the wording lives
+// here rather than travelling through the URL.
+function steamError(code: string | null): string | undefined {
+  if (!code) return undefined
+  if (code === 'taken') return 'That Steam account is already connected to another profile.'
+  return "Couldn't verify that Steam sign-in. Try connecting again."
+}
+
+// Both connections read off the identity and the query string the connect
+// actions redirect back with. Built for every render of this page, the rejected
+// submits included — the panels are part of the page, not of the form that
+// failed, and dropping them on a bad password would be a strange thing to do to
+// someone who mistyped one.
+async function connectionsFor(db: Db, identity: User, url: URL): Promise<ConnectionsProps> {
+  return {
+    letterboxd: letterboxdSyncAvailableTo(identity)
+      ? {
+          username: identity.letterboxd_username ?? null,
+          justConnected: url.searchParams.get('letterboxdConnected') === '1',
+          error: url.searchParams.get('letterboxdError') ?? undefined,
+          notice: url.searchParams.get('letterboxdNotice') ?? undefined,
+          connectedAt: identity.letterboxd_connected_at ?? null,
+          historyImported: await hasImportedLibrary(db, identity.id, 'movie'),
+        }
+      : null,
+    steam: {
+      steamId: identity.steam_id ?? null,
+      persona: identity.steam_persona ?? null,
+      justConnected: url.searchParams.get('steamConnected') === '1',
+      error: steamError(url.searchParams.get('steamError')),
+    },
+  }
+}
+
+// Checked on the way in rather than only read: this is where someone comes to
+// see what they've earned, and it should include whatever a feed sync logged
+// since the last check.
+async function titlesFor(db: Db, identity: User): Promise<TitlesProps> {
+  const { progress, unlocked } = await checkTitleUnlocks(db, identity.id)
+  return {
+    progress,
+    unlocked,
+    ...(await loadWornTitle(db, identity.id)),
+    returnTo: titleSettingsHref(),
+    isAdmin: identity.is_admin,
+  }
+}
+
+// Which pane to open on. Read off the query string the other actions redirect
+// with, so a save or a failed connect comes back to the thing it was about
+// rather than to the profile form.
+function activeTab(url: URL): ProfileTab | undefined {
+  const tab = url.searchParams.get('tab')
+  return tab != null && tab in PROFILE_TABS ? (tab as ProfileTab) : undefined
+}
+
 // Whatever was typed, so a rejected submit comes back with the person's own
 // text (and checkbox state) in the inputs rather than the stored row.
 function submittedValues(formData: FormData) {
@@ -50,8 +112,9 @@ function submittedValues(formData: FormData) {
 export default createController(routes.profile.edit, {
   middleware: [requireAuth<User>()],
   actions: {
-    index(context) {
+    async index(context) {
       const auth = context.get(Auth)
+      const db = context.get(Database)
 
       return context.render(
         <ProfileEditPage
@@ -64,6 +127,10 @@ export default createController(routes.profile.edit, {
           settings={profileSettingsFor(auth.identity)}
           saved={context.url.searchParams.get('saved') === '1'}
           displayName={displayLabel(auth.identity)}
+          connections={await connectionsFor(db, auth.identity, context.url)}
+          titles={await titlesFor(db, auth.identity)}
+          titleSaved={context.url.searchParams.get('titleSaved') === '1'}
+          activeTab={activeTab(context.url)}
         />,
       )
     },
@@ -72,10 +139,11 @@ export default createController(routes.profile.edit, {
       const auth = context.get(Auth)
 
       const formData = context.get(FormData)
+      const db = context.get(Database)
 
       // Every rejection puts the form back with what was typed in it — bar
       // the password box, which submittedValues deliberately never reads.
-      const reject = (errors: Record<string, string>, status: number, confirming = false) =>
+      const reject = async (errors: Record<string, string>, status: number, confirming = false) =>
         context.render(
           <ProfileEditPage
             values={submittedValues(formData)}
@@ -83,6 +151,11 @@ export default createController(routes.profile.edit, {
             confirming={confirming}
             settings={profileSettingsFor(auth.identity)}
             displayName={displayLabel(auth.identity)}
+            connections={await connectionsFor(db, auth.identity, context.url)}
+            titles={await titlesFor(db, auth.identity)}
+            // This form is the profile pane, and it is the one that failed —
+            // so the errors are rendered where the fields carrying them are.
+            activeTab={PROFILE_TABS.profile}
           />,
           { status },
         )
@@ -90,7 +163,6 @@ export default createController(routes.profile.edit, {
       const parsed = s.parseSafe(profileSchema, formData)
       if (!parsed.success) return reject(userFieldErrors(parsed.issues), 400)
 
-      const db = context.get(Database)
       const { email, display_name, bio, is_private, current_password } = parsed.value
 
       // The two handles are how the account is reached — an email a reset can

@@ -45,8 +45,19 @@ export const routes = route({
     followers: get('followers'),
     edit: form('edit', { formMethod: 'PUT', names: { action: 'update' } }),
     settings: post('settings'),
+    // The country the "where to watch" list is for. Its own POST rather than a
+    // field on `settings`: that form sends every setting at once, and is posted
+    // from a different page than the one this is changed on.
+    watchRegion: post('watch-region'),
+    // Which of the titles you've earned to wear. Its own POST for the reason
+    // watchRegion is: the profile form asks for a password on some changes, and
+    // picking a title should never be one of them.
+    title: post('title'),
     rebuild: post('rebuild/:mediaType'),
     password: form('password', { formMethod: 'PUT', names: { action: 'update' } }),
+    // Every source in one place: the page that links out to each importer
+    // below, and to settings for the ones that need a connection first.
+    import: get('import'),
     importMovies: route('import-movies', {
       index: get('/'),
       upload: post('/'),
@@ -65,6 +76,7 @@ export const routes = route({
       bulk: post(':batchId/bulk'),
       conflicts: post(':batchId/conflicts'),
       save: post(':batchId/save'),
+      discard: post(':batchId/discard'),
     }),
     importBooks: route('import-books', {
       index: get('/'),
@@ -89,6 +101,12 @@ export const routes = route({
     letterboxd: route('letterboxd', {
       connect: post('connect'),
       disconnect: post('disconnect'),
+      // Reading the diary on demand. The background sync holds a cooldown so
+      // page loads don't each pull the whole feed, which leaves no way to see
+      // an edit made a minute ago — and no way to tell a feed that is quiet
+      // from one that is failing. A click is not a page load, so this one
+      // skips the cooldown and answers with what it found.
+      sync: post('sync'),
     }),
   }),
   recommendations: route('recommendations', {
@@ -105,7 +123,15 @@ export const routes = route({
     luckyPage: get('lucky'),
     generating: get('generating/:jobId'),
     status: get('status/:jobId'),
+    // Ahead of `show`, which would otherwise take 'unconfirmed' for a run id.
+    unconfirmed: get('unconfirmed/:unconfirmedId'),
     show: get(':runId'),
+  }),
+  // Admin-only views. Each action checks users.is_admin itself and answers 403
+  // otherwise, the way the rematch route does.
+  admin: route('admin', {
+    // How many members hold and wear each credit.
+    credits: get('credits'),
   }),
   users: route('users', {
     search: get('search'),
@@ -123,4 +149,14 @@ export const routes = route({
 // each end: the landing page and the profile both link to it.
 export function luckyRecommendationsHref(): string {
   return routes.recommendations.luckyPage.href()
+}
+
+// The settings tab your titles are chosen on, and where to send someone for
+// them. Spelled once here because the nav's menu links to it, and the nav is
+// shared UI that can't reach into a page for it; the settings page names its
+// tab from this too.
+export const TITLES_SETTINGS_TAB = 'titles'
+
+export function titleSettingsHref(): string {
+  return `${routes.profile.edit.index.href()}?tab=${TITLES_SETTINGS_TAB}`
 }

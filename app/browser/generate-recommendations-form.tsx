@@ -1,7 +1,17 @@
 import { clientEntry, css, on } from 'remix/ui'
 
 import { Field } from '../ui/shared/field.tsx'
-import { FriendPicker, radioOption, sectionLabel, type FriendOption } from './friend-picker.tsx'
+import { DisclosureChevron } from '../ui/shared/collapsible.tsx'
+import { SEEN_BY_OPTIONS, type SeenBy } from '../ui/shared/seen-by.ts'
+import { FriendPicker, type FriendOption } from './friend-picker.tsx'
+import {
+  Button,
+  CheckboxOption,
+  ChoiceGroup,
+  RadioOption,
+  Select,
+  TextInput,
+} from '../ui/shared/form-controls.tsx'
 
 export type { FriendOption }
 
@@ -39,13 +49,38 @@ export type GenerateRecommendationsFormProps = {
   findPeopleHref: string
 }
 
+// The Settings disclosure's label, in the same small capitals as the
+// ChoiceGroup legends above it (`.choice-legend.section` in app.css). Kept as a
+// css() rule because a <summary> can't take the legend's display: block without
+// losing its disclosure triangle.
+const sectionLabel = css({
+  margin: '0 0 10px',
+  fontSize: '12px',
+  fontWeight: 700,
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+  color: 'var(--muted)',
+})
+
 const DECADES = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020]
 
-const PLAYER_TYPE_LABELS: Record<string, string> = { singleplayer: 'Singleplayer', multiplayer: 'Multiplayer' }
+const PLAYER_TYPE_LABELS: Record<string, string> = {
+  singleplayer: 'Singleplayer',
+  multiplayer: 'Multiplayer',
+}
 const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus: 'Versus' }
 const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series', standalone: 'Standalone' }
 
 const PLACEHOLDER_SOURCES: string[] = []
+
+// The shortlist's caption, which otherwise promises a rule the group just
+// changed. Alone, the default reads the same: one person is "most of you".
+function shortlistCaption(count: number, seenBy: SeenBy, isGroup: boolean): string {
+  if (!isGroup) return `Up to ${count} picks, minus what you've already finished.`
+  if (seenBy === 'no_one') return `Up to ${count} picks, minus anything any of you has finished.`
+  if (seenBy === 'any') return `Up to ${count} picks, whether or not you've seen them.`
+  return `Up to ${count} picks, minus what most of you have already finished.`
+}
 
 // Submitting redirects almost immediately to a page reporting the real stage,
 // so this only covers that hop: the button disables itself so a second
@@ -56,6 +91,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
     let submitting = false
     let runKind: 'shortlist' | 'lucky' = handle.props.startLucky ? 'lucky' : 'shortlist'
     let mode: 'self' | 'group' = 'self'
+    let seenBy: SeenBy = 'no_one'
     let search = ''
     let page = 1
     const selectedFriends = new Set<number>()
@@ -98,6 +134,9 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
         { label: 'You', loggedTypes: viewerLoggedTypes },
         ...(mode === 'group' ? friends.filter((friend) => selectedFriends.has(friend.id)) : []),
       ]
+      // Who is actually in it, not which radio is set. "With friends" with nobody
+      // ticked isn't a group run yet, and can't be submitted.
+      const isGroupRun = membersInRun.length > 1
       const sourceLabel = (value: string) => sources.find((source) => source.value === value)?.label ?? value
       const blockedBy = membersInRun
         .map((member) => ({
@@ -111,17 +150,41 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
       // go anywhere".
       const isLucky = runKind === 'lucky'
       const luckyBlockedBy = membersInRun.filter((member) => !member.loggedTypes.includes(mediaType))
-      const disabled = submitting || (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
-
-      const caption = css({ margin: '10px 0 0', fontSize: '12px', color: '#888', lineHeight: 1.4 })
+      // Either kind of run: both read the same picker. The button just stays
+      // disabled — nothing ticked is a step not taken yet, not a mistake.
+      const noFriendsPicked = mode === 'group' && !isGroupRun
+      const disabled =
+        submitting ||
+        noFriendsPicked ||
+        (isLucky ? luckyBlockedBy.length > 0 : !hasSource || blockedBy.length > 0)
 
       const runsPill = css({
         display: 'inline-block',
+        // Inside the option's label, so this is its distance from the words.
+        marginLeft: '10px',
         padding: '2px 8px',
         borderRadius: '999px',
-        border: '1px solid #ccc',
+        border: '1px solid var(--rule)',
         fontSize: '11px',
-        color: '#555',
+        color: 'var(--soft)',
+      })
+
+      // Settings falls into sections — what taste picks are drawn from, what
+      // narrows them, and what only a group has — each under a heading that
+      // reads as part of the panel rather than a second caps section label.
+      const settingsSection = css({ display: 'flex', flexDirection: 'column', gap: '8px' })
+      const sectionDivider = css({
+        marginTop: '16px',
+        paddingTop: '16px',
+        borderTop: '1px dashed var(--rule-soft)',
+      })
+      const settingsHeading = css({ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--text)' })
+      // auto-fill rather than auto-fit, so a section with one field keeps the
+      // same column width as one with five instead of stretching it across.
+      const settingsGrid = css({
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+        gap: '12px',
       })
 
       // A field that doesn't apply to the run being made is hidden rather
@@ -138,7 +201,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               flexDirection: 'column',
               gap: '20px',
               width: '100%',
-              border: '1px solid #ddd',
+              border: '1px solid var(--rule)',
               borderRadius: '8px',
               padding: '20px',
             }),
@@ -148,55 +211,52 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
             }),
           ]}
         >
-          <div>
-            <p mix={sectionLabel}>What are you after?</p>
-            <div mix={css({ display: 'flex', flexDirection: 'column', gap: '16px' })}>
-              <div>
-                <div mix={css({ display: 'flex', alignItems: 'center', gap: '10px' })}>
-                  {radioOption({
-                    name: 'run_kind',
-                    value: 'shortlist',
-                    checked: !startLucky,
-                    onChange: () => {
-                      runKind = 'shortlist'
-                      handle.update()
-                    },
-                    children: 'A shortlist',
-                  })}
-                  {runsRemaining != null && runsLimit != null && (
-                    <span mix={runsPill}>
-                      {runsRemaining}/{runsLimit} runs left today
-                    </span>
-                  )}
-                </div>
-                <p mix={[caption, css({ paddingLeft: '1.6em' })]}>
-                  {`Up to ${shortlistCount} picks, minus what most of you have already finished.`}
+          <ChoiceGroup legend="What are you after?">
+            <RadioOption
+              name="run_kind"
+              value="shortlist"
+              defaultChecked={!startLucky}
+              mix={on('change', () => {
+                runKind = 'shortlist'
+                handle.update()
+              })}
+              hint={
+                <>
+                  {shortlistCaption(shortlistCount, seenBy, isGroupRun)}
                   {runsRemaining == null && runsLeftLabel && ` ${runsLeftLabel}.`}
-                </p>
-              </div>
-              <div mix={css({ color: luckyAvailable ? 'inherit' : '#888' })}>
-                {radioOption({
-                  name: 'run_kind',
-                  value: 'lucky',
-                  checked: startLucky,
-                  disabled: !luckyAvailable,
-                  onChange: () => {
-                    runKind = 'lucky'
-                    handle.update()
-                  },
-                  children: "Today's lucky pick",
-                })}
-                <p mix={[caption, css({ paddingLeft: '1.6em' })]}>{`One ${itemNoun} nobody in the run has logged.`}</p>
-                {!luckyAvailable && (
-                  <p mix={[caption, css({ paddingLeft: '1.6em' })]}>Already drawn — another in {luckyWaitLabel}.</p>
-                )}
-              </div>
-            </div>
-          </div>
+                </>
+              }
+            >
+              A shortlist
+              {runsRemaining != null && runsLimit != null && (
+                <span mix={runsPill}>
+                  {runsRemaining}/{runsLimit} runs left today
+                </span>
+              )}
+            </RadioOption>
+            <RadioOption
+              name="run_kind"
+              value="lucky"
+              defaultChecked={startLucky}
+              disabled={!luckyAvailable}
+              mix={on('change', () => {
+                runKind = 'lucky'
+                handle.update()
+              })}
+              hint={
+                <>
+                  {`One ${itemNoun} nobody in the run has logged.`}
+                  {!luckyAvailable && <div>Already drawn — another in {luckyWaitLabel}.</div>}
+                </>
+              }
+            >
+              Today's lucky pick
+            </RadioOption>
+          </ChoiceGroup>
 
           <div mix={onlyForShortlist}>
             <Field label="Name this run (optional)">
-              <input type="text" name="name" placeholder="e.g. Cozy weekend picks" />
+              <TextInput name="name" placeholder="e.g. Cozy weekend picks" />
             </Field>
           </div>
 
@@ -229,7 +289,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
 
           <input type="hidden" name="mediaType" value={mediaType} />
 
-          <div mix={[css({ borderTop: '1px solid #eee', paddingTop: '16px' }), onlyForShortlist]}>
+          <div mix={[css({ borderTop: '1px solid var(--rule-soft)', paddingTop: '16px' }), onlyForShortlist]}>
             <details
               open={settingsOpen}
               mix={on('toggle', (event) => {
@@ -240,169 +300,195 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               {/* Named on the summary when closed and not what the page
                   implies — folded away with no sign of it, a run drawn from a
                   different taste would look like a bug. */}
-              <summary mix={[sectionLabel, css({ cursor: 'pointer' })]}>
-                Settings (optional)
-                {!settingsOpen && hasSource && !sourcesAreDefault && (
-                  <span mix={css({ textTransform: 'none', letterSpacing: 0, fontWeight: 400 })}>
-                    {' '}
-                    — based on {[...selectedSources].map(sourceLabel).join(', ')}
-                  </span>
-                )}
+              <summary class="disclosure" mix={sectionLabel}>
+                <span>
+                  Settings (optional)
+                  {!settingsOpen && hasSource && !sourcesAreDefault && (
+                    <span mix={css({ textTransform: 'none', letterSpacing: 0, fontWeight: 400 })}>
+                      {' '}
+                      — based on {[...selectedSources].map(sourceLabel).join(', ')}
+                    </span>
+                  )}
+                </span>
+                <DisclosureChevron />
               </summary>
 
-              <div mix={css({ marginTop: '12px', marginBottom: '16px' })}>
-                <p mix={sectionLabel}>Base picks on</p>
-                <div mix={css({ display: 'flex', gap: '20px', flexWrap: 'wrap' })}>
-                  {sources.map((source) => (
-                    <label key={source.value}>
-                      <input
-                        type="checkbox"
-                        name="source"
-                        value={source.value}
-                        checked={selectedSources.has(source.value)}
-                        mix={on('change', (event) => {
-                          if ((event.target as HTMLInputElement).checked) selectedSources.add(source.value)
-                          else selectedSources.delete(source.value)
-                          handle.update()
-                        })}
-                      />{' '}
-                      {source.label}
-                    </label>
-                  ))}
-                  {PLACEHOLDER_SOURCES.map((label) => (
-                    <label key={label} mix={css({ color: '#aaa' })}>
-                      <input type="checkbox" disabled /> {label}{' '}
-                      <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
-                    </label>
-                  ))}
-                </div>
-                {hasSource && (
-                  <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
-                    You'll still get {mediaTypeLabel} picks — this only changes which taste they're drawn from.
-                  </p>
-                )}
-              </div>
-
-              <div
-                mix={css({
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                  gap: '12px',
-                })}
+              <ChoiceGroup
+                legend="Taste"
+                legendSize="subsection"
+                layout="row"
+                mix={css({ marginTop: '12px' })}
+                hint={
+                  hasSource &&
+                  `You'll still get ${mediaTypeLabel} picks — this only changes which taste they're drawn from.`
+                }
               >
-                <Field label="Genre">
-                  <select name="genre" defaultValue="">
-                    <option value="">Any</option>
-                    {genres.map((genre) => (
-                      <option value={genre}>{genre.replace(/^./, (c) => c.toUpperCase())}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Decade">
-                  <select
-                    name="decade"
-                    defaultValue=""
+                {sources.map((source) => (
+                  <CheckboxOption
+                    key={source.value}
+                    name="source"
+                    value={source.value}
+                    checked={selectedSources.has(source.value)}
                     mix={on('change', (event) => {
-                      decade = (event.target as HTMLSelectElement).value
+                      if ((event.target as HTMLInputElement).checked) selectedSources.add(source.value)
+                      else selectedSources.delete(source.value)
                       handle.update()
                     })}
                   >
-                    <option value="">Any</option>
-                    {DECADES.map((value) => (
-                      <option key={value} value={String(value)}>
-                        {value}s
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                {decade !== '' && (
-                  <Field label="Relative to decade">
-                    <select name="decade_relation" defaultValue="within">
-                      <option value="before">Before</option>
-                      <option value="within">Within</option>
-                      <option value="after">After</option>
-                    </select>
+                    {source.label}
+                  </CheckboxOption>
+                ))}
+                {PLACEHOLDER_SOURCES.map((label) => (
+                  <CheckboxOption key={label} disabled>
+                    {label} <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
+                  </CheckboxOption>
+                ))}
+              </ChoiceGroup>
+
+              <section mix={[settingsSection, sectionDivider]}>
+                <p mix={settingsHeading}>Filters</p>
+                <div mix={settingsGrid}>
+                  <Field label="Genre">
+                    <Select name="genre" defaultValue="">
+                      <option value="">Any</option>
+                      {genres.map((genre) => (
+                        <option value={genre}>{genre.replace(/^./, (c) => c.toUpperCase())}</option>
+                      ))}
+                    </Select>
                   </Field>
-                )}
-                <Field label="Length">
-                  <select name="length" defaultValue="">
-                    <option value="">Any</option>
-                    {lengthOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                {playerTypes.length > 0 && (
-                  <Field label="Player type">
-                    <select
-                      name="player_type"
+                  <Field label="Decade">
+                    <Select
+                      name="decade"
                       defaultValue=""
                       mix={on('change', (event) => {
-                        playerType = (event.target as HTMLSelectElement).value
+                        decade = (event.target as HTMLSelectElement).value
                         handle.update()
                       })}
                     >
                       <option value="">Any</option>
-                      {playerTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {PLAYER_TYPE_LABELS[type] ?? type}
+                      {DECADES.map((value) => (
+                        <option key={value} value={String(value)}>
+                          {value}s
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
-                )}
-                {playerType === 'multiplayer' && multiplayerTypes.length > 0 && (
-                  <Field label="Multiplayer type">
-                    <select name="multiplayer_type" defaultValue="">
+                  {decade !== '' && (
+                    <Field label="Relative to decade">
+                      <Select name="decade_relation" defaultValue="within">
+                        <option value="before">Before</option>
+                        <option value="within">Within</option>
+                        <option value="after">After</option>
+                      </Select>
+                    </Field>
+                  )}
+                  <Field label="Length">
+                    <Select name="length" defaultValue="">
                       <option value="">Any</option>
-                      {multiplayerTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {MULTIPLAYER_TYPE_LABELS[type] ?? type}
+                      {lengthOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
-                )}
-                {platforms.length > 0 && (
-                  <Field label="Platform">
-                    <select name="platform" defaultValue="">
-                      <option value="">Any</option>
-                      {platforms.map((platform) => (
-                        <option key={platform} value={platform}>
-                          {platform}
+                  {playerTypes.length > 0 && (
+                    <Field label="Player type">
+                      <Select
+                        name="player_type"
+                        defaultValue=""
+                        mix={on('change', (event) => {
+                          playerType = (event.target as HTMLSelectElement).value
+                          handle.update()
+                        })}
+                      >
+                        <option value="">Any</option>
+                        {playerTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {PLAYER_TYPE_LABELS[type] ?? type}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  )}
+                  {playerType === 'multiplayer' && multiplayerTypes.length > 0 && (
+                    <Field label="Multiplayer type">
+                      <Select name="multiplayer_type" defaultValue="">
+                        <option value="">Any</option>
+                        {multiplayerTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {MULTIPLAYER_TYPE_LABELS[type] ?? type}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  )}
+                  {platforms.length > 0 && (
+                    <Field label="Platform">
+                      <Select name="platform" defaultValue="">
+                        <option value="">Any</option>
+                        {platforms.map((platform) => (
+                          <option key={platform} value={platform}>
+                            {platform}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  )}
+                  {seriesTypes.length > 0 && (
+                    <Field label="Series">
+                      <Select name="series" defaultValue="">
+                        <option value="">Any</option>
+                        {seriesTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {SERIES_TYPE_LABELS[type] ?? type}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  )}
+                </div>
+              </section>
+
+              {/* Hidden rather than unmounted, like the friend list, so a
+                  choice survives a trip to "Just me" and back, or unticking
+                  everyone. */}
+              <section
+                mix={[settingsSection, sectionDivider, css({ display: isGroupRun ? 'block' : 'none' })]}
+              >
+                <p mix={settingsHeading}>Group</p>
+                <div mix={settingsGrid}>
+                  <Field label="History">
+                    <Select
+                      name="seen_by"
+                      defaultValue="no_one"
+                      mix={on('change', (event) => {
+                        seenBy = (event.target as HTMLSelectElement).value as SeenBy
+                        handle.update()
+                      })}
+                    >
+                      {SEEN_BY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
-                )}
-                {seriesTypes.length > 0 && (
-                  <Field label="Series">
-                    <select name="series" defaultValue="">
-                      <option value="">Any</option>
-                      {seriesTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {SERIES_TYPE_LABELS[type] ?? type}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-              </div>
+                </div>
+              </section>
             </details>
           </div>
 
           {isLucky
             ? luckyBlockedBy.length > 0 && (
-                <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
+                <p mix={css({ margin: 0, fontSize: '13px', color: 'var(--danger)' })}>
                   {luckyBlockedBy.map((member) => member.label).join(', ')}{' '}
-                  {luckyBlockedBy.length === 1 && luckyBlockedBy[0].label === 'You' ? 'have' : 'has'}{' '}
-                  nothing {mediaTypeLabel} logged to draw from.
+                  {luckyBlockedBy.length === 1 && luckyBlockedBy[0].label === 'You' ? 'have' : 'has'} nothing{' '}
+                  {mediaTypeLabel} logged to draw from.
                 </p>
               )
             : (!hasSource || blockedBy.length > 0) && (
-                <p mix={css({ margin: 0, fontSize: '13px', color: '#b91c1c' })}>
+                <p mix={css({ margin: 0, fontSize: '13px', color: 'var(--danger)' })}>
                   {!hasSource
                     ? 'Pick at least one taste to base picks on, under Settings.'
                     : blockedBy
@@ -416,7 +502,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                 </p>
               )}
 
-          <button type="submit" disabled={disabled} mix={css({ minHeight: '44px', width: '100%' })}>
+          <Button type="submit" variant="primary" disabled={disabled} mix={css({ width: '100%' })}>
             {submitting
               ? isLucky
                 ? 'Drawing…'
@@ -424,7 +510,7 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               : isLucky
                 ? `🎲 Draw today's pick`
                 : 'Get recommendations'}
-          </button>
+          </Button>
         </form>
       )
     }

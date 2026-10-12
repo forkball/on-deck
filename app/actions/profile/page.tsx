@@ -2,7 +2,6 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
-import type { LuckyState } from '../../data/recommendations/lucky.ts'
 import type { TasteProfileSettings } from '../../data/recommendations/tasteProfile.ts'
 import {
   ACTIVE_MEDIA_TYPES,
@@ -11,29 +10,26 @@ import {
   type ActiveMediaType,
 } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
+import { DisclosureChevron } from '../../ui/shared/collapsible.tsx'
 import { Toast } from '../../ui/components/toast.tsx'
-import { luckyRecommendationsHref, routes } from '../../routes.ts'
-import { Document } from '../../ui/components/document.tsx'
+import { PART_NAMES } from '../../data/profileTitles/catalog.ts'
+import { CreditGroups, TITLES_TAB, type Credit } from '../../ui/components/credit-tiles.tsx'
+import { UserTitle } from '../../ui/components/user-title.tsx'
+import { routes } from '../../routes.ts'
+import { Page } from '../../ui/components/page.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
-import { LuckyPickCard } from '../../ui/components/lucky-pick-card.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
+import { WaitingImports, type WaitingImport } from './waiting-imports.tsx'
+import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
-
-// TV has no equivalent worth importing.
-const IMPORT_LINKS: Partial<Record<ActiveMediaType, { href: string; label: string }>> = {
-  movie: { href: routes.profile.importMovies.index.href(), label: 'Import from Letterboxd' },
-  book: { href: routes.profile.importBooks.index.href(), label: 'Import from Goodreads' },
-  game: { href: routes.profile.importGames.index.href(), label: 'Import from Steam' },
-}
 
 export interface ProfilePageProps {
   // Keyed by media type rather than a prop per type — see loadMediaSummaries.
   media: MediaSummaries
-  activeTab: ActiveMediaType
+  activeTab: ActiveMediaType | typeof TITLES_TAB
   bio: string
   followingCount: number
   followersCount: number
@@ -43,10 +39,18 @@ export interface ProfilePageProps {
   rebuildsLeft: number | null
   rebuilt?: boolean
   rebuildError?: string
-  // Today's one-click pick, shown above the tabs so it is the same thing here as
-  // on the landing page rather than something to go looking for.
-  lucky: LuckyState
+  // Imports still matching or waiting for review, each a way back to it.
+  waitingImports: WaitingImport[]
   displayName: string
+  // The title worn, already put into words, or null for none.
+  title: string | null
+  // Every credit, with yours marked and your progress on the rest, for the
+  // Titles tab.
+  credits: Credit[]
+  // The keys worn now, so the Titles tab can mark them and swap one on a tap.
+  worn: { adjective: string | null; noun: string | null }
+  // Set when a title was just chosen from the Titles tab.
+  titleSaved?: boolean
 }
 
 // What the settings amount to, in the words someone would use for their own
@@ -61,9 +65,7 @@ function describeProfileSource(settings: TasteProfileSettings, mediaType: Active
       ? `your whole ${ui.attributive} log`
       : `your last ${settings.logLimit} logged ${ui.plural}`
 
-  return settings.useNotes
-    ? `${scope}, including the notes you've written`
-    : `${scope}, without your notes`
+  return settings.useNotes ? `${scope}, including the notes you've written` : `${scope}, without your notes`
 }
 
 function TasteProfileSummary(
@@ -86,52 +88,87 @@ function TasteProfileSummary(
     const source = describeProfileSource(settings, mediaType)
 
     return (
-      <details>
-        <summary mix={css({ cursor: 'pointer' })}>
-          <h2 mix={css({ display: 'inline' })}>{label}</h2>
+      <details mix={css({ marginTop: '24px' })}>
+        <summary class="disclosure">
+          <h2 mix={css({ margin: 0 })}>{label}</h2>
+          <DisclosureChevron />
         </summary>
-        <div mix={css({ border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginTop: '12px' })}>
+        <div
+          mix={css({
+            border: '1px solid var(--rule)',
+            borderRadius: '8px',
+            padding: '16px',
+            marginTop: '12px',
+          })}
+        >
           {summary ? (
             <>
               <p mix={css({ margin: 0 })}>{summary}</p>
               {updatedAt && (
-                <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
-                  Written from {source}, as your log stood on{' '}
-                  {new Date(updatedAt).toLocaleDateString()}. It's rewritten next time you generate, if
-                  you've logged anything since.
+                <p
+                  mix={css({
+                    margin: '8px 0 0',
+                    fontSize: '12px',
+                    color: 'var(--muted)',
+                  })}
+                >
+                  Written from {source}, as your log stood on {new Date(updatedAt).toLocaleDateString()}. It's
+                  rewritten next time you generate, if you've logged anything since.
                 </p>
               )}
             </>
           ) : (
             <>
-              <p mix={css({ margin: 0, color: '#555' })}>
-                Nothing yet — <a href={routes.recommendations.index.href()}>get recommendations</a> to have
-                one written from what you've logged.
+              <p mix={css({ margin: 0, color: 'var(--soft)' })}>
+                Nothing yet — <Link href={routes.recommendations.index.href()}>get recommendations</Link> to
+                have one written from what you've logged.
               </p>
               {/* Said in the future tense here, because there's nothing yet to
                   describe — but it's still what the button below would read. */}
-              <p mix={css({ margin: '8px 0 0', fontSize: '12px', color: '#888' })}>
+              <p
+                mix={css({
+                  margin: '8px 0 0',
+                  fontSize: '12px',
+                  color: 'var(--muted)',
+                })}
+              >
                 It'll be written from {source}.
               </p>
             </>
           )}
 
-          <p mix={css({ margin: '8px 0 0', fontSize: '12px' })}>
-            <a href={routes.profile.edit.index.href()}>Change what it's written from →</a>
+          {/* On a touch screen the link's tap area reaches 15px around it,
+              2px more than the gap down to Rebuild below. Padding, because a
+              margin here would only merge with the form's own. */}
+          <p
+            mix={css({
+              margin: '8px 0 0',
+              fontSize: '12px',
+              '@media (pointer: coarse)': { paddingBottom: '4px' },
+            })}
+          >
+            <Link href={routes.profile.edit.index.href()} tapArea>
+              Change what it's written from →
+            </Link>
           </p>
 
           <form
             method="post"
             action={routes.profile.rebuild.href({ mediaType })}
-            mix={css({ marginTop: '12px', display: 'flex', gap: '10px', alignItems: 'baseline' })}
+            mix={css({
+              marginTop: '12px',
+              display: 'flex',
+              gap: '10px',
+              alignItems: 'baseline',
+            })}
           >
             {/* The action refuses both of these too. This only saves someone
                 spending a click, and a rebuild, on finding that out. */}
-            <button type="submit" disabled={nothingLogged || outOfRebuilds}>
+            <Button type="submit" disabled={nothingLogged || outOfRebuilds}>
               Rebuild now
-            </button>
+            </Button>
             {(nothingLogged || rebuildsLeft != null) && (
-              <span mix={css({ fontSize: '12px', color: '#888' })}>
+              <span mix={css({ fontSize: '12px', color: 'var(--muted)' })}>
                 {nothingLogged
                   ? `Nothing logged to write one from`
                   : outOfRebuilds
@@ -149,9 +186,7 @@ function TasteProfileSummary(
 function LoggedList(
   handle: Handle<{
     log: MediaLog
-    total: number
     detailHref: (mediaItemId: number) => string
-    seeAllHref?: string
     emptyHref: string
     emptyLabel: string
     returnTo: string
@@ -159,42 +194,44 @@ function LoggedList(
   }>,
 ) {
   return () => {
-    const { log, total, detailHref, seeAllHref, emptyHref, emptyLabel, returnTo, mediaType } = handle.props
+    const { log, detailHref, emptyHref, emptyLabel, returnTo, mediaType } = handle.props
 
     if (log.length === 0) {
       return (
         <p>
-          Nothing logged yet — <a href={emptyHref}>{emptyLabel}</a> to get started.
+          Nothing logged yet — <Link href={emptyHref}>{emptyLabel}</Link> to get started.
         </p>
       )
     }
 
     return (
-      <>
-        <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
-          {log.map(({ interaction, item }) => (
-            <WatchedListItem
-              key={interaction.id}
-              interaction={interaction}
-              item={item}
-              detailHref={item ? detailHref(item.id) : '#'}
-              actions={
-                <MediaLogEditModal
-                  interaction={interaction}
-                  title={item?.title ?? 'Unknown title'}
-                  returnTo={returnTo}
-                  mediaType={mediaType}
-                />
-              }
-            />
-          ))}
-        </ul>
-        {seeAllHref && total > log.length && (
-          <p mix={css({ marginTop: '16px' })}>
-            <a href={seeAllHref}>See all →</a>
-          </p>
-        )}
-      </>
+      <ul
+        mix={css({
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+        })}
+      >
+        {log.map(({ interaction, item }) => (
+          <WatchedListItem
+            key={interaction.id}
+            interaction={interaction}
+            item={item}
+            detailHref={item ? detailHref(item.id) : '#'}
+            actions={
+              <MediaLogEditModal
+                interaction={interaction}
+                title={item?.title ?? 'Unknown title'}
+                returnTo={returnTo}
+                mediaType={mediaType}
+              />
+            }
+          />
+        ))}
+      </ul>
     )
   }
 }
@@ -212,15 +249,18 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       rebuildsLeft,
       rebuilt,
       rebuildError,
-      lucky,
+      waitingImports,
       displayName,
+      title,
+      credits,
+      worn,
+      titleSaved,
     } = handle.props
     const profileHref = routes.profile.index.href()
     const savedReturnTo = `${profileHref}?saved=1`
 
     return (
-      <Document title="My profile | On Deck">
-        <Nav authed={true} displayName={displayName} />
+      <Page title="My profile" heading={displayName} displayName={displayName}>
         {/* One at a time: these arrive as query params on a redirect, and no
             action sets more than one of them. */}
         {rebuildError ? (
@@ -229,114 +269,113 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           <Toast message="Taste profile rewritten." />
         ) : saved ? (
           <Toast message="Saved." />
+        ) : titleSaved ? (
+          <Toast message="Title saved." />
         ) : null}
-        <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <div mix={css({ display: 'flex', alignItems: 'baseline', gap: '12px' })}>
-            <h1>{displayName}</h1>
-            <a
-              href={routes.profile.edit.index.href()}
-              title="Edit profile"
-              aria-label="Edit profile"
-              mix={css({ fontSize: '20px', textDecoration: 'none' })}
-            >
-              ✎
-            </a>
-          </div>
-          <p mix={css({ margin: '-8px 0 16px', color: '#555' })}>
-            <a href={routes.profile.following.href()}>{followingCount} following</a> ·{' '}
-            <a href={routes.profile.followers.href()}>
-              {followersCount} follower{followersCount === 1 ? '' : 's'}
-            </a>
-          </p>
+        <UserTitle title={title} />
+        <p mix={css({ margin: '-8px 0 16px', color: 'var(--soft)' })}>
+          <Link href={routes.profile.following.href()}>{followingCount} following</Link> ·{' '}
+          <Link href={routes.profile.followers.href()}>
+            {followersCount} follower{followersCount === 1 ? '' : 's'}
+          </Link>
+        </p>
 
-          {/* Rendered the way other people see it on users/show-page —
-              editing it lives behind the pencil above. */}
-          {bio ? (
-            <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>
-          ) : (
-            <p mix={css({ color: '#555' })}>
-              No bio yet — <a href={routes.profile.edit.index.href()}>add one</a> for other people to read.
-              It has no effect on your recommendations.
-            </p>
-          )}
+        <WaitingImports imports={waitingImports} />
 
-          {lucky.pick ? (
-            <div mix={css({ margin: '24px 0' })}>
-              <LuckyPickCard pick={lucky.pick} returnTo={`${profileHref}?tab=${lucky.pick.mediaType}`} />
-            </div>
-          ) : (
-            <p mix={css({ margin: '24px 0', color: '#555' })}>
-              {/* rmx-document forces a full document load — see media-tab-links.tsx. */}
-              <a href={luckyRecommendationsHref()} rmx-document="">
-                🎲 Draw today's lucky pick
-              </a>{' '}
-              — one thing nobody's logged, picked for you.
-            </p>
-          )}
+        {/* Rendered the way other people see it on users/show-page —
+              editing it lives under Settings in the nav. */}
+        {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
 
-          <MediaTabs
-            idPrefix="profile"
-            active={activeTab}
-            panels={Object.fromEntries(
-              ACTIVE_MEDIA_TYPES.map((type) => {
-                const ui = MEDIA_TYPE_UI[type]
-                const { summary, profileUpdatedAt, log, total } = media[type]
-                const seeAllHref =
-                  type === DEFAULT_MEDIA_TYPE
-                    ? routes.profile.watched.href()
-                    : `${routes.profile.watched.href()}?type=${type}`
+        <MediaTabs
+          idPrefix="profile"
+          active={activeTab}
+          extraTabs={[
+            {
+              id: TITLES_TAB,
+              label: 'Titles',
+              end: true,
+              panel: (
+                <>
+                  <p mix={css({ margin: 0, color: 'var(--soft)' })}>
+                    Tap a {PART_NAMES.adjective.one.toLowerCase()} and a {PART_NAMES.noun.one.toLowerCase()}{' '}
+                    you've earned to wear them.
+                  </p>
+                  <CreditGroups
+                    credits={credits}
+                    picking={{
+                      ...worn,
+                      returnTo: `${profileHref}?tab=${TITLES_TAB}`,
+                    }}
+                  />
+                </>
+              ),
+            },
+          ]}
+          panels={Object.fromEntries(
+            ACTIVE_MEDIA_TYPES.map((type) => {
+              const ui = MEDIA_TYPE_UI[type]
+              const { summary, profileUpdatedAt, log, total } = media[type]
+              const seeAllHref =
+                type === DEFAULT_MEDIA_TYPE
+                  ? routes.profile.watched.href()
+                  : `${routes.profile.watched.href()}?type=${type}`
 
-                return [
-                  type,
-                  <>
-                    <TasteProfileSummary
-                      label={`My ${ui.attributive} taste profile`}
-                      summary={summary}
-                      updatedAt={profileUpdatedAt}
-                      mediaType={type}
-                      settings={settings}
-                      loggedCount={total}
-                      rebuildsLeft={rebuildsLeft}
-                    />
-                    {/* Each importer only understands one medium, so the
-                        entry point lives on that medium's tab. */}
-                    {IMPORT_LINKS[type] ? (
-                      <div
-                        mix={css({
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'baseline',
-                          gap: '12px',
-                        })}
-                      >
-                        <h2>What I've {ui.pastParticiple}</h2>
-                        <a href={IMPORT_LINKS[type]!.href} mix={css({ fontSize: '13px', textAlign: 'right' })}>
-                          {IMPORT_LINKS[type]!.label}
-                        </a>
-                      </div>
+              return [
+                type,
+                <>
+                  {/* The heading is the way to the whole log, rather than a "See
+                      all" under it. Plain text with nothing logged: there's
+                      nothing more to see. */}
+                  <h2>
+                    {total > 0 ? (
+                      <Link href={seeAllHref} variant="wrap">
+                        What I've {ui.pastParticiple} →
+                      </Link>
                     ) : (
-                      <h2>What I've {ui.pastParticiple}</h2>
+                      <>What I've {ui.pastParticiple}</>
                     )}
-                    <LoggedList
-                      log={log}
-                      total={total}
-                      // Carries the tab, so "back" returns to the one you left.
-                      detailHref={(id) =>
-                        withReturnTo(ui.hrefs.show(id), `${profileHref}?tab=${type}`)
-                      }
-                      seeAllHref={seeAllHref}
-                      emptyHref={ui.hrefs.search()}
-                      emptyLabel={`search for a ${ui.itemNoun}`}
-                      returnTo={savedReturnTo}
-                      mediaType={type}
-                    />
-                  </>,
-                ]
-              }),
-            )}
-          />
-        </main>
-      </Document>
+                  </h2>
+                  <LoggedList
+                    log={log}
+                    // Carries the tab, so "back" returns to the one you left.
+                    detailHref={(id) => withReturnTo(ui.hrefs.show(id), `${profileHref}?tab=${type}`)}
+                    emptyHref={ui.hrefs.search()}
+                    emptyLabel={`search for a ${ui.itemNoun}`}
+                    returnTo={savedReturnTo}
+                    mediaType={type}
+                  />
+                  {/* Under the log: what you've logged is what you come here for, and the
+                      profile written from it is something to check now and then. */}
+                  <TasteProfileSummary
+                    label={`My ${ui.attributive} taste profile`}
+                    summary={summary}
+                    updatedAt={profileUpdatedAt}
+                    mediaType={type}
+                    settings={settings}
+                    loggedCount={total}
+                    rebuildsLeft={rebuildsLeft}
+                  />
+                </>,
+              ]
+            }),
+          )}
+        />
+
+        {/* Below the log rather than up by the counts: it's a one-off, and the
+            top of the page is for what you come back to. */}
+        <p
+          mix={css({
+            borderTop: '1px solid var(--rule)',
+            marginTop: '32px',
+            paddingTop: '16px',
+            fontSize: '14px',
+            color: 'var(--soft)',
+          })}
+        >
+          Logged things somewhere else?{' '}
+          <Link href={routes.profile.import.href()}>Import from Letterboxd, Goodreads or Steam →</Link>
+        </p>
+      </Page>
     )
   }
 }

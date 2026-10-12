@@ -1,0 +1,24 @@
+-- When this member pointed On Deck at a Letterboxd diary, and therefore the
+-- point from which the feed speaks for them.
+--
+-- The feed carries the 50 most recent diary entries, which for an active member
+-- is a few weeks and for a light one is years. Reading it at connection time
+-- brought that arbitrary slice across as though it were a library: an 800-film
+-- profile arrived as 50 films, and nothing said which 50 or why. Worse, it read
+-- as complete — recommendations exclude what the log knows about, so the other
+-- 750 were fair game to suggest back.
+--
+-- So connecting is a subscription rather than an import. Entries published
+-- after this instant are the member's ongoing diary and are followed; entries
+-- before it are history, which is what the CSV export is for. The two paths
+-- stop overlapping, and neither pretends to be the other.
+--
+-- pubDate is the axis because it is when the entry was written, not when the
+-- film was watched: someone logging a 2019 film today has just made a new diary
+-- entry, and it should arrive. Backdating the watch is ordinary use and says
+-- nothing about whether the entry is new.
+--
+-- Null means a member who connected before this existed. They keep the old
+-- behaviour rather than losing the window they already have — see
+-- syncLetterboxdDiary.
+alter table users add column letterboxd_connected_at bigint;

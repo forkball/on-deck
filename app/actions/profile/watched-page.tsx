@@ -3,14 +3,15 @@ import { css } from 'remix/ui'
 
 import type { InteractionStatus, listUserMediaLog } from '../../data/mediaItems.ts'
 import { routes } from '../../routes.ts'
-import { Document } from '../../ui/components/document.tsx'
+import { Page } from '../../ui/components/page.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedList } from '../../ui/components/watched-list.tsx'
 import { Field } from '../../ui/shared/field.tsx'
 import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, mediaTypeQuery, type ActiveMediaType } from '../../mediaTypes.ts'
 import { statusLabelsFor, statusOptionsFor } from '../../interactionStatus.ts'
+import { Button, Select } from '../../ui/shared/form-controls.tsx'
+import { SubmitOnChange } from '../../browser/submit-on-change.tsx'
 
 export interface ProfileWatchedPageProps {
   movieLog: Awaited<ReturnType<typeof listUserMediaLog>>
@@ -37,44 +38,48 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
     const heading = `My ${ui.attributive} log`
 
     return (
-      <Document title={`${heading} | On Deck`}>
-        <Nav authed={true} displayName={displayName} />
-        <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>{heading}</h1>
-
-          {/* GET, so a filtered list is a URL you can link to or reload.
+      <Page heading={heading} displayName={displayName}>
+        {/* GET, so a filtered list is a URL you can link to or reload.
               `page` is deliberately not carried across: changing the filter
               changes how many pages there are, so it starts again at the
               first. The type is preserved, since it's which tab you came
-              from rather than part of the filter. */}
-          <form
-            method="get"
-            action={routes.profile.watched.href()}
-            mix={css({ display: 'flex', alignItems: 'flex-end', gap: '8px', margin: '0 0 24px' })}
-          >
-            {mediaType !== DEFAULT_MEDIA_TYPE && <input type="hidden" name="type" value={mediaType} />}
-            {/* Field spans its container by design, so it needs a bounded box
-                of its own here or it squeezes the button off the row. */}
-            <div mix={css({ flex: '0 1 200px' })}>
-              <Field label="Status">
-                {/* `selected` rather than defaultValue — see StatusSelect. */}
-                <select name="status">
-                  <option value="" selected={status === null}>
-                    All
+              from rather than part of the filter. Picking a status submits it
+              (SubmitOnChange); the button is for when there's no JS. */}
+        <form
+          id="log-filter"
+          method="get"
+          action={routes.profile.watched.href()}
+          mix={css({ display: 'flex', alignItems: 'flex-end', gap: '8px', margin: '0 0 24px' })}
+        >
+          {mediaType !== DEFAULT_MEDIA_TYPE && <input type="hidden" name="type" value={mediaType} />}
+          {/* The whole width: the button beside it is only there with JS off. */}
+          <div mix={css({ flex: '1 1 auto' })}>
+            <Field label="Status">
+              {/* `selected` rather than defaultValue — see StatusSelect. */}
+              <Select name="status">
+                <option value="" selected={status === null}>
+                  All
+                </option>
+                {statusOptionsFor(mediaType).map((option) => (
+                  <option key={option.value} value={option.value} selected={option.value === status}>
+                    {option.label}
                   </option>
-                  {statusOptionsFor(mediaType).map((option) => (
-                    <option key={option.value} value={option.value} selected={option.value === status}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <button type="submit">Filter</button>
-          </form>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          {/* Only without JS: drawn and then hidden by script, it flashed on
+              every load. */}
+          <noscript>
+            <Button type="submit">Filter</Button>
+          </noscript>
+        </form>
 
+        {/* A spinner in the list's place while a new filter loads. */}
+        <SubmitOnChange form="log-filter" results="log-filter-results" />
+        <div id="log-filter-results">
           {movieLog.length === 0 && (
-            <p mix={css({ color: '#555' })}>
+            <p mix={css({ color: 'var(--soft)' })}>
               Nothing in your {ui.attributive} log
               {status ? ` under "${statusLabelsFor(mediaType)[status]}"` : ''}.
             </p>
@@ -102,8 +107,8 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
               pageHref={(p) => `${routes.profile.watched.href()}?page=${p}${filterQuery}`}
             />
           )}
-        </main>
-      </Document>
+        </div>
+      </Page>
     )
   }
 }

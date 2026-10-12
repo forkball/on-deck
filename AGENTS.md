@@ -64,9 +64,24 @@ does nothing on its own.
 - `app/middleware/` holds request lifecycle concerns
 - `app/data/` holds persistence and the services built on it, in subdirectories:
   - `app/data/` root: `db`, `schema`, `mediaItems`, `mediaMetadata`, `users`,
-    `follows`, `notifications`, `mediaSummary`
+    `follows`, `notifications`, `mediaSummary`, `watchProviders`, `watchRegion`,
+    `titles`. `titles` is how a title is compared — one rule for the
+    recommendation matcher, the importers, IGDB's relevance ranking and the
+    backfill script, which each used to carry their own and disagree. It imports
+    nothing, deliberately: that is what lets a script use it without dragging in
+    the database pool.
+    `watchProviders` is streaming availability, stored apart from metadata
+    because it goes stale and is refetched weekly; `watchRegion` is the country
+    it is shown for, guessed from Accept-Language and database-free so the
+    guess is tested directly
   - `app/data/catalog/` — external metadata providers behind one `CatalogProvider`
     interface (`provider.ts` is the registry; `tmdb`/`openLibrary`/`igdb` implement it).
+    `query.ts` is what a caller asks for — a title, or the text a person typed, plus
+    a creator or an isbn where one is known. Rendering that into a query string is
+    each provider's own business, since only Google Books can confine a term to a
+    field (`intitle:`/`inauthor:`). It imports nothing, for the same reason
+    `titles.ts` doesn't: every provider needs it, and importing the registry to get
+    it is a cycle.
     `retry.ts` holds the shared GET-with-backoff the two book providers use;
     `circuit.ts` holds the per-provider "stop asking, it's down" rule, which is
     policy each provider opts into rather than something the registry applies
@@ -78,9 +93,31 @@ does nothing on its own.
     entry an exact match already holds. `classify` and `review` hold the rules —
     confidence, conflicts, duplicates, counts — and are free of the database so
     they can be tested directly
+  - `app/data/profileTitles/` — titles. A title is a genre and a role ("Art
+    House Projectionist"), and each is a credit a member earns. `catalog` holds
+    every credit, the one word it earns and the threshold that earns it
+    (database-free, so the rules are tested directly) — each genre a ladder of
+    credits at 5, 10, 50 and 100, its rungs keyed so a credit already earned
+    keeps its key; `unlocks` gathers the
+    stats, records what they earn in `user_titles` and sends the unlock
+    notification. Credits are kept once earned. Everyone holds the starter
+    credits ("Newborn Baby") from signup, worn until they choose; those are never
+    announced. `checkTitleUnlocksQuietly` is called after the writes that can
+    earn one, and your own profile and settings check again to catch feed
+    syncs. Your own credits are chosen on the Titles tab of your own profile
+    (and the same tab in settings); someone else's are the Titles tab on their profile, which lists only
+    the credits they hold. The title
+    under the name is plain text. Every credit has a `group` ("Horror",
+    "Films", "Social"), which that tab's CSS-only filter reads.
+    `unlocks` runs its SQL through the `db` it is handed rather than the app's
+    pool, which is what lets `scripts/backfill-titles.ts`
+    (`npm run prod:backfill-titles`) reuse it. `/admin/credits` shows how many
+    members hold and wear each credit, counts only
   - `app/data/recommendations/` — the generation pipeline: `picks` asks the model,
     `matching` resolves picks to catalog entries, `exclusions` decides what a run
-    may not suggest (database-free, so the rule can be tested directly), `runs`
+    may not suggest (database-free, so the rule can be tested directly),
+    `unmatched` decides which picks no catalog entry was found for a run still
+    shows, as the model gave them (database-free for the same reason), `runs`
     persists them, `generate` orchestrates those, `jobs`/`worker` run it in the
     background, `dailyLimit` caps how many runs one account can generate in 24
     hours (`users.is_admin` is exempt — granted only by `scripts/set-admin.ts`),
@@ -117,6 +154,34 @@ does nothing on its own.
   A member correcting a bad match for themselves does it through the import
   review (`repointRow`), which changes which existing row a staged row points at
   and leaves the catalog alone.
+- Every page renders through `Page` (`app/ui/components/page.tsx`), which owns
+  the nav, the column width (`narrow`/default/`wide`), the back link and the
+  `<h1>`. Don't lay out `<Document>`/`<Nav>`/`<main>` by hand: that is how the
+  pages drifted into putting their titles at different heights.
+- Every visible control renders through `app/ui/shared/form-controls.tsx`:
+  `Button` (with a `variant` rather than a class string), `ButtonLink`,
+  `Link` (every `<a>`, also with a `variant`, and `external` for a new tab),
+  `ToggleLabel` (a `<label>` that opens a modal or drawer), `TextInput`,
+  `Select` and `Textarea`, plus `buttonFrameClass` for a `<span>`
+  or `<summary>` that has to look like a button. A text control is named by
+  a `Field` — with `labelHidden` when the page around it already says what
+  it is, such as a search box, so a screen reader still gets a name. Checkboxes and radios come
+  only as `CheckboxOption`/`RadioOption` — the control with its label and an
+  optional `hint` under it — inside a `ChoiceGroup` (`<fieldset>` + `<legend>`)
+  when several answer one question; there is no bare `Checkbox` to lay a label
+  beside by hand. Their look is in `public/app.css`, because DoodleCSS is unlayered and
+  a `css()` rule can't beat it. `test/form-controls.test.tsx` fails on a raw
+  `<button>`, `<input>`, `<select>`, `<textarea>`, `<a>` or `<label>` anywhere
+  else; hidden inputs, the invisible toggles CSS reads (tabs, modal, carousel)
+  and the components that own a `<label>` of their own are listed there
+  with the reason. A call site's `mix` is for layout; a different look is a new
+  variant — a `css()` look rule loses to Doodle's unlayered one and does nothing.
+- Colours come from the custom properties at the top of `public/app.css`
+  (`var(--muted)`, `var(--rule)`, `var(--accent)`…), not hex literals at call
+  sites. That is how ~50 copies of `#888`, which fails contrast on the cream
+  paper, had accumulated. A media type's colour is `MEDIA_TYPE_UI[type].hue`, for marking a card or
+  the `MediaTypeTag`; tabs stay one colour. The four are a shared placeholder
+  in `app.css` until real ones are chosen.
 - Tests live in `test/`, usually one file per module under test
   (`import-review.test.ts` covers `data/imports/review.ts`), though a few cover
   a pair — `lucky.test.ts` holds both `lucky` and `exclusions`. `npm test` runs

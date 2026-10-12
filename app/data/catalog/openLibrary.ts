@@ -1,3 +1,4 @@
+import { stripPublisherPromo } from './blurb.ts'
 import { fetchWithRetry } from './retry.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
 
@@ -109,14 +110,27 @@ function coverUrl(coverId: number | undefined): string | null {
 // Self-published study aids that shadow popular books. Readership can't
 // separate them (students give them more readers than most novels), so they're
 // matched on the one consistent thing: title shape.
-const STUDY_AID_TITLE = /^\s*(summary|study guide|workbook|analysis|conversation starters|key takeaways|sparknotes)\b|\bstudy guide\b/i
+const STUDY_AID_TITLE =
+  /^\s*(summary|study guide|workbook|analysis|conversation starters|key takeaways|sparknotes)\b|\bstudy guide\b/i
 
-// Neither filter alone is enough: missing cover art marks index junk (real
-// books have ~94% coverage), the title pattern catches study aids that do
-// have covers.
-function looksReal(doc: OpenLibraryDoc): boolean {
+// Sold alongside a book and not the book: a box of several, or something to colour in.
+// A set has no single year, author or page count to be right about.
+//
+// "Companion" is left out on purpose — The Hobbit Companion and A Dune Companion are
+// real books people read, and this cannot tell them from an activity book.
+const NOT_THE_BOOK_TITLE =
+  /\b(collection set|box(ed)? set|books? collection|set of \d+ books?|\d+ books? (collection|set)|colou?ring book|activity book)\b|\[collection\/set\]/i
+
+// No one filter is enough: a missing cover marks index junk (real books have ~94%
+// coverage) and takes most summaries with it, the study-aid pattern catches the ones
+// that do have covers, and the pattern above catches what was never a book to read.
+export function looksReal(doc: OpenLibraryDoc): boolean {
   if (!doc.cover_i) return false
-  return !STUDY_AID_TITLE.test(doc.title ?? '')
+
+  // Subtitle too: Open Library splits titles inconsistently, so "Fourth Wing" can
+  // carry "The Official Coloring Book" in the field next to it.
+  const whole = `${doc.title ?? ''} ${doc.subtitle ?? ''}`
+  return !STUDY_AID_TITLE.test(doc.title ?? '') && !NOT_THE_BOOK_TITLE.test(whole)
 }
 
 function toResult(doc: OpenLibraryDoc): CatalogSearchResult {
@@ -160,6 +174,65 @@ async function searchOpenLibrary(query: string, limit: number): Promise<OpenLibr
 // Deliberately keeps Open Library's own relevance ordering. Sorting by
 // readership instead destroys it outright — `sort=readinglog` on a search for
 // "project hail mary" returns Romeo and Juliet.
+// Open Library's own ids, as media_items.external_id holds them: a bare work key.
+// Rows carrying one predate the switch to Google Books, or came through the
+// fallback below, and there are more of them than Google-sourced rows.
+const WORK_KEY = /^OL\d+W$/
+
+export function parseOpenLibraryWorkId(input: string): string | null {
+  const trimmed = input.trim()
+  if (WORK_KEY.test(trimmed)) return trimmed
+
+  const match = trimmed.match(/\/works\/(OL\d+W)/)
+  return match ? match[1] : null
+}
+
+// The work record, for a row whose id belongs to this catalog rather than Google
+// Books. Asking Google about an OL key can only fail — it did, eleven times in one
+// run, and a failed lookup was being read as "not this genre".
+//
+// Subjects here are the same free-form list the search index carries, so the
+// genres derive the same way. The description is worth as much: it is what
+// verifyPicksAgainstOverviews reads, and the search index has none.
+export async function getWorkById(externalId: string): Promise<CatalogSearchResult | null> {
+  const key = parseOpenLibraryWorkId(externalId)
+  if (!key) return null
+
+  const url = new URL(`${OPEN_LIBRARY_BASE}/works/${key}.json`)
+  const response = await fetchWithRetry(url, 'Open Library', { 'User-Agent': USER_AGENT })
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error(`Open Library responded ${response.status}`)
+
+  const work = (await response.json()) as {
+    title?: string
+    subjects?: string[]
+    covers?: number[]
+    first_publish_date?: string
+    // Sometimes a bare string, sometimes the typed-value shape.
+    description?: string | { value?: string }
+  }
+
+  const description = typeof work.description === 'string' ? work.description : work.description?.value
+
+  return {
+    externalId: key,
+    title: work.title ?? 'Untitled',
+    releaseYear: Number(work.first_publish_date?.match(/\d{4}/)?.[0]) || null,
+    tags: deriveGenres(work.subjects),
+    posterUrl: coverUrl(work.covers?.[0]),
+    // The work record carries no readership figure; the search index is where
+    // popularity comes from, and a lookup never competes with search hits.
+    popularity: 0,
+    overview: description ? stripPublisherPromo(description) : null,
+    runtimeMinutes: null,
+    pageCount: null,
+    creator: null,
+    // Keeps upserts pointed at the row this came from rather than minting a
+    // google-books twin of it.
+    sourceOverride: 'openlibrary',
+  }
+}
+
 export async function searchBooks(query: string): Promise<CatalogSearchResult[]> {
   const docs = await searchOpenLibrary(query, 20)
   return docs.filter(looksReal).map(toResult)

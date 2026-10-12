@@ -2,8 +2,43 @@ import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
 
 import { db, pool } from '../app/data/db.ts'
-import { completeJob, enqueueJob, failJob, getJob, requeueJob } from '../app/data/recommendations/jobs.ts'
+import {
+  claimJobs,
+  completeJob,
+  enqueueJob,
+  failJob,
+  getJob,
+  phasesFor,
+  requeueJob,
+} from '../app/data/recommendations/jobs.ts'
 import { skipWithoutDatabase } from './support/db.ts'
+
+// What the progress list holds has to be what the run enters. The genre stage is a
+// stage only where it costs a round of lookups, so a movie run with a genre set must
+// not be promised one.
+describe('phasesFor', () => {
+  it('lists the genre stage for a book run that has to look genres up', () => {
+    assert.ok(phasesFor({ mediaType: 'book', filters: { genre: 'horror' } }).includes('genres'))
+  })
+
+  it('leaves it out when the search hit already answers the genre', () => {
+    assert.ok(!phasesFor({ mediaType: 'movie', filters: { genre: 'horror' } }).includes('genres'))
+  })
+
+  it('leaves out both optional stages for a run with no levers', () => {
+    assert.deepEqual(phasesFor({ mediaType: 'book', filters: {} }), [
+      'profiles',
+      'picks',
+      'matching',
+      'verifying',
+      'saving',
+    ])
+  })
+
+  it('lists the length stage whenever that lever is set', () => {
+    assert.ok(phasesFor({ mediaType: 'game', filters: { length: 'short' } }).includes('lengths'))
+  })
+})
 
 // A user may have one queued-or-running job at a time. The rule is enforced by a
 // partial unique index, not by a read before the insert: two requests arriving
@@ -15,11 +50,13 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
   let otherId: number
 
   const params = { mediaType: 'movie', filters: {}, sourceTypes: ['movie'] }
-  const enqueue = (id: number) => enqueueJob(db, id, { ...params, memberIds: [id] }, { withLengthCheck: false })
+  const enqueue = (id: number) => enqueueJob(db, id, { ...params, memberIds: [id] })
 
   const newUser = async (tag: string) => {
     const s = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const { rows: [u] } = await pool.query<{ id: number }>(
+    const {
+      rows: [u],
+    } = await pool.query<{ id: number }>(
       `insert into users (email, password_hash, display_name, created_at)
        values ($1,'x',$2,$3) returning id`,
       [`jobs-${tag}-${s}@example.test`, `jobs-${tag}-${s}`, Date.now()],
@@ -41,7 +78,8 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
     await pool.end()
   })
 
-  const clear = () => pool.query('delete from recommendation_jobs where user_id = any($1)', [[userId, otherId]])
+  const clear = () =>
+    pool.query('delete from recommendation_jobs where user_id = any($1)', [[userId, otherId]])
 
   it('accepts the first job', async () => {
     await clear()
@@ -50,11 +88,15 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
 
   it('refuses a second while one is queued', async () => {
     await clear()
-    assert.equal((await enqueue(userId)).ok, true)
+    const first = await enqueue(userId)
+    assert.equal(first.ok, true)
 
     const second = await enqueue(userId)
     assert.equal(second.ok, false)
     assert.equal(second.ok === false && second.reason, 'active_job')
+    // Names the job that holds the slot, so the refusal can link to it.
+    assert.ok(first.ok)
+    assert.equal(second.ok === false && second.activeJobId, first.jobId)
   })
 
   // The reason the index exists: a read before the insert cannot close this
@@ -94,12 +136,14 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
     assert.ok(first.ok)
 
     // completeJob points the row at a real run, so one has to exist.
-    const { rows: [run] } = await pool.query<{ id: number }>(
+    const {
+      rows: [run],
+    } = await pool.query<{ id: number }>(
       `insert into recommendation_runs (user_id, media_type, created_at, params)
        values ($1, 'movie', $2, '{}') returning id`,
       [userId, Date.now()],
     )
-    await completeJob(db, first.jobId, run.id, false)
+    await completeJob(db, first.jobId, { kind: 'run', runId: run.id, prunedOldestRun: false })
 
     assert.equal((await enqueue(userId)).ok, true)
   })
@@ -122,6 +166,51 @@ describe('one active job per user', { skip: skipWithoutDatabase }, () => {
     await pool.query(`update recommendation_jobs set status='running' where id=$1`, [first.jobId])
     await requeueJob(db, first.jobId)
 
-    assert.equal((await getJob(db, first.jobId, userId))?.status, 'queued')
+    const requeued = await getJob(db, first.jobId, userId)
+    assert.equal(requeued?.status, 'queued')
+    // Picked up again straight away, so not a retry waiting anything out.
+    assert.equal(requeued?.retrying, false)
+  })
+
+  // Retries that went straight back in were all spent inside one outage: workers
+  // poll every two seconds and the catalog's circuit stays open for a minute.
+  it('holds a delayed retry back until its time, and says it is retrying', async () => {
+    await clear()
+    const job = await enqueue(userId)
+    assert.ok(job.ok)
+
+    await pool.query(`update recommendation_jobs set status='running' where id=$1`, [job.jobId])
+    await requeueJob(db, job.jobId, { delayMs: 60_000 })
+    assert.equal((await getJob(db, job.jobId, userId))?.retrying, true)
+
+    const early = await claimJobs(db, 50)
+    assert.ok(!early.some((claimed) => claimed.id === job.jobId), 'claimed before its retry time')
+
+    await pool.query(`update recommendation_jobs set retry_at = $2 where id = $1`, [
+      job.jobId,
+      Date.now() - 1,
+    ])
+    const due = await claimJobs(db, 50)
+    assert.ok(
+      due.some((claimed) => claimed.id === job.jobId),
+      'not claimed once its retry time passed',
+    )
+
+    const running = await getJob(db, job.jobId, userId)
+    assert.equal(running?.status, 'running')
+    assert.equal(running?.retrying, false)
+  })
+
+  // The generating page reads this to send a failed draw back to the draw.
+  it('says whether a job is a lucky draw', async () => {
+    await clear()
+    const plain = await enqueue(userId)
+    assert.ok(plain.ok)
+    assert.equal((await getJob(db, plain.jobId, userId))?.lucky, false)
+
+    await clear()
+    const draw = await enqueueJob(db, userId, { ...params, memberIds: [userId], lucky: true })
+    assert.ok(draw.ok)
+    assert.equal((await getJob(db, draw.jobId, userId))?.lucky, true)
   })
 })

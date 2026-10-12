@@ -5,9 +5,9 @@ import { FeedAutoLoad } from '../browser/feed-auto-load.tsx'
 import type { FeedCursor, FeedItem } from '../data/feed.ts'
 import type { LuckyState } from '../data/recommendations/lucky.ts'
 import { luckyRecommendationsHref, routes } from '../routes.ts'
-import { Document } from '../ui/components/document.tsx'
-import { LUCKY_CARD_BOX, LUCKY_PICK_LABEL, LuckyPickCard } from '../ui/components/lucky-pick-card.tsx'
-import { Nav } from '../ui/components/nav.tsx'
+import { Page } from '../ui/components/page.tsx'
+import { ButtonLink, Link } from '../ui/shared/form-controls.tsx'
+import { LUCKY_CARD_BOX, LUCKY_PICK_LABEL, LuckyPickCard } from './lucky-pick-card.tsx'
 import { FEED_LIST_ID, FeedList } from './activity-feed.tsx'
 
 export interface HomeDashboard {
@@ -33,6 +33,14 @@ export interface HomePageProps {
 
 const HEADING = css({ margin: '0 0 12px', fontSize: '18px' })
 
+// The page's two ways in, styled as buttons the way the lucky-pick and sign-in
+// links are: DoodleCSS's border does the drawing. Each grows to fill its row,
+// so side by side they split the width and stacked on a phone they match.
+const CTA_BUTTON = css({
+  flex: '1 1 auto',
+  whiteSpace: 'nowrap',
+})
+
 function Section(handle: Handle<{ title: string; children?: RemixNode }>) {
   return () => {
     const { title, children } = handle.props
@@ -48,7 +56,7 @@ function Section(handle: Handle<{ title: string; children?: RemixNode }>) {
 
 // The empty state every list here shares: one quiet line, and a way out of it.
 function Empty(handle: Handle<{ children?: RemixNode }>) {
-  return () => <p mix={css({ margin: 0, color: '#555' })}>{handle.props.children}</p>
+  return () => <p mix={css({ margin: 0, color: 'var(--soft)' })}>{handle.props.children}</p>
 }
 
 // Opens the dedicated lucky-pick page rather than drawing on the spot — a
@@ -60,18 +68,17 @@ function LuckyPickCta() {
       <p mix={css({ margin: 0 })}>
         <strong>Nothing drawn yet today.</strong>
       </p>
-      <p mix={css({ margin: '6px 0 0', color: '#555' })}>
+      <p mix={css({ margin: '6px 0 0', color: 'var(--soft)' })}>
         One thing to watch, read or play — no filters, nothing to decide.
       </p>
       {/* rmx-document forces a full document load — see media-tab-links.tsx. */}
-      <a
+      <ButtonLink
         href={luckyRecommendationsHref()}
         rmx-document=""
-        class="doodle-border"
-        mix={css({ display: 'inline-block', marginTop: '12px', textDecoration: 'none' })}
+        mix={css({ display: 'inline-block', marginTop: '12px' })}
       >
         🎲 Draw today's pick
-      </a>
+      </ButtonLink>
     </div>
   )
 }
@@ -106,7 +113,12 @@ function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
               <FeedList items={feed} />
               <p
                 id={FEED_STATUS_ID}
-                mix={css({ margin: '12px 0 0', fontSize: '12px', color: '#888', textAlign: 'center' })}
+                mix={css({
+                  margin: '12px 0 0',
+                  fontSize: '12px',
+                  color: 'var(--muted)',
+                  textAlign: 'center',
+                })}
               >
                 {feedCursor ? '' : FEED_END_TEXT}
               </p>
@@ -121,11 +133,10 @@ function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
               )}
             </>
           ) : followsAnyone ? (
-            <Empty>Quiet so far — nothing logged or generated yet.</Empty>
+            <Empty>Quiet so far — nothing logged yet.</Empty>
           ) : (
             <Empty>
-              Nothing here yet — <a href={routes.recommendations.index.href()}>generate a recommendation</a>{' '}
-              or <a href={routes.users.search.href()}>find people</a> to follow.
+              Nothing here yet — <Link href={routes.users.search.href()}>find people</Link> to follow.
             </Empty>
           )}
         </Section>
@@ -137,29 +148,33 @@ function Dashboard(handle: Handle<{ dashboard: HomeDashboard }>) {
 function Pitch() {
   return () => (
     <>
-      <h1>On Deck</h1>
       <p>
         A media taste profile for you (and your group) — movies, TV, books, and games — with a recommender
         that knows what you actually like.
       </p>
       <div
-        mix={css({ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', marginTop: '32px' })}
+        mix={css({
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          alignItems: 'center',
+          marginTop: '32px',
+        })}
       >
-        <a
+        <ButtonLink
           href={routes.auth.login.index.href()}
-          class="doodle-border"
           mix={css({
             display: 'inline-block',
             boxSizing: 'border-box',
             width: '420px',
             maxWidth: '100%',
-            textAlign: 'center',
-            textDecoration: 'none',
           })}
         >
           Log in
-        </a>
-        <a href={routes.auth.signup.index.href()}>Sign up</a>
+        </ButtonLink>
+        <Link href={routes.auth.signup.index.href()} tapArea>
+          Sign up
+        </Link>
       </div>
     </>
   )
@@ -170,30 +185,28 @@ export function HomePage(handle: Handle<HomePageProps>) {
     const { dashboard } = handle.props
 
     return (
-      <Document title="On Deck">
-        <Nav authed={dashboard != null} displayName={dashboard?.displayName} />
-        <main
-          mix={css({
-            // The same 720 the nav uses, so the page lines up with it above.
-            maxWidth: dashboard ? '720px' : '640px',
-            margin: '0 auto',
-            padding: dashboard ? '32px 24px' : '48px 24px',
-          })}
-        >
-          {dashboard ? (
-            <>
-              <h1 mix={css({ margin: 0 })}>Hey, {dashboard.displayName}</h1>
-              <p mix={css({ margin: '8px 0 0', color: '#555' })}>
-                <a href={routes.media.href()}>Search for media to log</a> or{' '}
-                <a href={routes.recommendations.index.href()}>get recommendations</a>.
-              </p>
-              <Dashboard dashboard={dashboard} />
-            </>
-          ) : (
-            <Pitch />
-          )}
-        </main>
-      </Document>
+      <Page
+        title={null}
+        heading={dashboard ? `Hey, ${dashboard.displayName}` : 'On Deck'}
+        width={dashboard ? 'wide' : 'default'}
+        displayName={dashboard?.displayName}
+      >
+        {dashboard ? (
+          <>
+            <div mix={css({ display: 'flex', flexWrap: 'wrap', gap: '12px' })}>
+              <ButtonLink href={routes.media.href()} mix={CTA_BUTTON}>
+                Search for media
+              </ButtonLink>
+              <ButtonLink href={routes.recommendations.index.href()} mix={CTA_BUTTON}>
+                Get recommendations
+              </ButtonLink>
+            </div>
+            <Dashboard dashboard={dashboard} />
+          </>
+        ) : (
+          <Pitch />
+        )}
+      </Page>
     )
   }
 }

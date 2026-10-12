@@ -1,10 +1,16 @@
+import { logger } from '../../log.ts'
+
+const log = logger('generation')
+
 // Log-only: nothing is stored or shown.
 export interface PickDrops {
   unfound: number
   alreadyLogged: number
   duplicate: number
+  sameSeries: number
   titleMismatch: number
   filtered: number
+  genre: number
   length: number
   unverified: number
 }
@@ -16,6 +22,10 @@ export interface PickTally {
   // run doesn't read as bleeding picks.
   surplus: number
   dropped: PickDrops
+  // Of the unfound and title-mismatched drops, how many the run shows anyway as
+  // the model's own answer — see unmatched.ts. Already counted in `dropped`, so
+  // it plays no part in the accounting below.
+  shownUnmatched?: number
 }
 
 export function emptyDrops(): PickDrops {
@@ -23,8 +33,10 @@ export function emptyDrops(): PickDrops {
     unfound: 0,
     alreadyLogged: 0,
     duplicate: 0,
+    sameSeries: 0,
     titleMismatch: 0,
     filtered: 0,
+    genre: 0,
     length: 0,
     unverified: 0,
   }
@@ -41,15 +53,17 @@ export function unaccountedFor(tally: PickTally): number {
 }
 
 export function logPickTally(tally: PickTally): void {
-  console.info(`[generation] ${summarizePickTally(tally)}`)
+  log.info(summarizePickTally(tally))
 }
 
 const DROP_LABELS: Record<keyof PickDrops, string> = {
   unfound: 'unfound',
   alreadyLogged: 'already-logged',
   duplicate: 'duplicate',
+  sameSeries: 'same-series',
   titleMismatch: 'title-mismatch',
   filtered: 'filtered',
+  genre: 'genre',
   length: 'length',
   unverified: 'unverified',
 }
@@ -63,6 +77,8 @@ export function summarizePickTally(tally: PickTally): string {
     const count = tally.dropped[key]
     if (count > 0) parts.push(`${label} ${count}`)
   }
+
+  if (tally.shownUnmatched) parts.push(`shown-unmatched ${tally.shownUnmatched}`)
 
   const unaccounted = unaccountedFor(tally)
   if (unaccounted !== 0) parts.push(`UNACCOUNTED ${unaccounted}`)

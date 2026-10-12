@@ -17,7 +17,9 @@ export function parseGoodreadsLibrary(csvText: string): ParsedRow[] {
   const titleIndex = indexOf('title')
   const shelfIndex = indexOf('exclusive shelf')
   if (titleIndex === -1 || shelfIndex === -1) {
-    throw new Error('That doesn\'t look like a Goodreads export — expected "Title" and "Exclusive Shelf" columns.')
+    throw new Error(
+      'That doesn\'t look like a Goodreads export — expected "Title" and "Exclusive Shelf" columns.',
+    )
   }
 
   const authorIndex = indexOf('author')

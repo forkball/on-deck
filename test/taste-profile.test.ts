@@ -1,18 +1,24 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { buildProfilePrompt, logSignature, profilePromptRows } from '../app/data/recommendations/tasteProfile.ts'
+import {
+  buildProfilePrompt,
+  logSignature,
+  profilePromptRows,
+} from '../app/data/recommendations/tasteProfile.ts'
 
 type Entry = Parameters<typeof logSignature>[0][number]
 
-const entry = (over: {
-  id?: number
-  title?: string
-  status?: string
-  rating?: number | null
-  disliked?: boolean | null
-  notes?: string | null
-} = {}): Entry =>
+const entry = (
+  over: {
+    id?: number
+    title?: string
+    status?: string
+    rating?: number | null
+    disliked?: boolean | null
+    notes?: string | null
+  } = {},
+): Entry =>
   ({
     interaction: {
       status: over.status ?? 'consumed',

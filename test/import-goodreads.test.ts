@@ -10,7 +10,8 @@ function shelf(...lines: string[]): string {
   return HEADER + lines.map((line) => `${line}\n`).join('')
 }
 
-const DUNE = 'Dune,Frank Herbert,="0441013597",="9780441013593",5,4.25,Ace,2005,1965,2024/02/11,read,"Still the best."'
+const DUNE =
+  'Dune,Frank Herbert,="0441013597",="9780441013593",5,4.25,Ace,2005,1965,2024/02/11,read,"Still the best."'
 
 describe('parseGoodreadsLibrary', () => {
   it('reads a shelf row whole', () => {
@@ -77,7 +78,10 @@ describe('parseGoodreadsLibrary', () => {
   })
 
   it('refuses a CSV that is not a Goodreads export', () => {
-    assert.throws(() => parseGoodreadsLibrary('Date,Name,Year,Rating\n2024-01-01,Heat,1995,4\n'), /Goodreads export/)
+    assert.throws(
+      () => parseGoodreadsLibrary('Date,Name,Year,Rating\n2024-01-01,Heat,1995,4\n'),
+      /Goodreads export/,
+    )
   })
 
   it('numbers rows by their line in the file', () => {
@@ -85,6 +89,9 @@ describe('parseGoodreadsLibrary', () => {
       shelf(DUNE, 'Ubik,Philip K. Dick,="",="",4,4.1,Vintage,1991,1969,2024/01/01,read,'),
     )
 
-    assert.deepEqual(rows.map((row) => row.rowIndex), [2, 3])
+    assert.deepEqual(
+      rows.map((row) => row.rowIndex),
+      [2, 3],
+    )
   })
 })

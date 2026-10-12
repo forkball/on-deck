@@ -1,10 +1,9 @@
 import type { Handle } from 'remix/ui'
-import { css } from 'remix/ui'
 
 import { PHASE_LABELS, type GenerationPhase } from '../../data/recommendations/jobs.ts'
 import { GenerationProgress } from '../../browser/generation-progress.tsx'
-import { Document } from '../../ui/components/document.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
+import { Page } from '../../ui/components/page.tsx'
+import { routes } from '../../routes.ts'
 
 export interface GeneratingPageProps {
   jobId: string
@@ -12,8 +11,10 @@ export interface GeneratingPageProps {
   phases: GenerationPhase[]
   status: string
   queuedAhead: number | null
+  retrying: boolean
   error?: string
   statusHref: string
+  formHref: string
   displayName: string
 }
 
@@ -22,44 +23,39 @@ export interface GeneratingPageProps {
 // with a quieter poll.
 export function GeneratingPage(handle: Handle<GeneratingPageProps>) {
   return () => {
-    const { jobId, phase, phases, status, queuedAhead, error, statusHref, displayName } = handle.props
+    const { jobId, phase, phases, status, queuedAhead, retrying, error, statusHref, formHref, displayName } =
+      handle.props
 
     return (
-      <Document
-        title="Generating recommendations | On Deck"
+      <Page
+        title="Generating recommendations"
+        heading="Putting your picks together"
+        displayName={displayName}
         head={
           // With the client entry running, this would reload the page under it.
-          <noscript>
-            <meta httpEquiv="refresh" content="3" />
-          </noscript>
+          // Not once the run has failed: there is nothing left to wait for.
+          error ? undefined : (
+            <noscript>
+              <meta httpEquiv="refresh" content="3" />
+            </noscript>
+          )
         }
       >
-        <Nav authed={true} displayName={displayName} />
-        <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1>Putting your picks together</h1>
-
-          {error ? (
-            <p mix={css({ color: '#b91c1c' })}>{error}</p>
-          ) : (
-            <>
-              <GenerationProgress
-                statusHref={statusHref}
-                initialLabel={PHASE_LABELS[phase]}
-                initialPhase={phase}
-                initialStatus={status}
-                initialQueuedAhead={queuedAhead}
-                phases={phases}
-                labels={PHASE_LABELS}
-                key={jobId}
-              />
-              <p mix={css({ fontSize: '13px', color: '#888' })}>
-                This takes a little while — two of these steps are the model thinking. You can leave this
-                page open; it'll go to your picks on its own.
-              </p>
-            </>
-          )}
-        </main>
-      </Document>
+        <GenerationProgress
+          statusHref={statusHref}
+          formHref={formHref}
+          homeHref={routes.home.href()}
+          initialLabel={PHASE_LABELS[phase]}
+          initialPhase={phase}
+          initialStatus={status}
+          initialQueuedAhead={queuedAhead}
+          initialRetrying={retrying}
+          initialError={error ?? null}
+          phases={phases}
+          labels={PHASE_LABELS}
+          key={jobId}
+        />
+      </Page>
     )
   }
 }

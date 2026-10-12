@@ -16,8 +16,10 @@ import {
   type UserMediaInteraction,
 } from '../schema.ts'
 import { displayLabel } from '../users.ts'
+import type { SeenBy } from '../../ui/shared/seen-by.ts'
 import type { DecadeRelation, RecommendationFilters } from './picks.ts'
 import type { RunTimings } from './timings.ts'
+import { parseUnmatchedPicks, type UnmatchedPick } from './unmatched.ts'
 
 export const MAX_RUNS_PER_USER = 3
 
@@ -74,12 +76,16 @@ export interface GenerationParams {
   multiplayerType?: string
   platform?: string
   series?: string
+  seenBy?: SeenBy
   sourceTypes: MediaType[]
 }
 
 export interface RecommendationRunDetail extends RecommendationRunSummary {
   otherMemberLabels: string[]
   results: RecommendationResult[]
+  // Picks the model made that no catalog entry was found for. Shown apart from
+  // `results`, which are all catalog entries — see unmatched.ts.
+  unmatched: UnmatchedPick[]
   params: GenerationParams
 }
 
@@ -101,7 +107,9 @@ function parseParams(run: RecommendationRun): GenerationParams {
       multiplayerType: parsed.multiplayerType,
       platform: parsed.platform,
       series: parsed.series,
-      sourceTypes: parsed.sourceTypes && parsed.sourceTypes.length > 0 ? parsed.sourceTypes : [run.media_type],
+      seenBy: parsed.seenBy,
+      sourceTypes:
+        parsed.sourceTypes && parsed.sourceTypes.length > 0 ? parsed.sourceTypes : [run.media_type],
     }
   } catch {
     return { sourceTypes: [run.media_type] }
@@ -120,6 +128,7 @@ function paramsKey(filters: RecommendationFilters, sourceTypes: MediaType[], mem
     filters.multiplayerType ?? null,
     filters.platform ?? null,
     filters.series ?? null,
+    filters.seenBy ?? null,
     [...sourceTypes].sort(),
     [...memberIds].sort((a, b) => a - b),
   ])
@@ -150,7 +159,12 @@ export async function findUnusedDuplicateRun(
   const memberRows =
     runs.length === 0
       ? []
-      : await db.findMany(recommendationRunMembers, { where: inList('run_id', runs.map((run) => run.id)) })
+      : await db.findMany(recommendationRunMembers, {
+          where: inList(
+            'run_id',
+            runs.map((run) => run.id),
+          ),
+        })
   const memberIdsByRun = new Map<number, number[]>(runs.map((run) => [run.id, []]))
   for (const row of memberRows) memberIdsByRun.get(row.run_id)?.push(row.user_id)
 
@@ -166,6 +180,7 @@ export async function findUnusedDuplicateRun(
         multiplayerType: params.multiplayerType,
         platform: params.platform,
         series: params.series,
+        seenBy: params.seenBy,
       },
       params.sourceTypes,
       memberIdsByRun.get(run.id) ?? [],
@@ -206,7 +221,10 @@ async function loadOtherMemberLabels(
   if (runs.length === 0) return byRun
 
   const memberRows = await db.findMany(recommendationRunMembers, {
-    where: inList('run_id', runs.map((run) => run.id)),
+    where: inList(
+      'run_id',
+      runs.map((run) => run.id),
+    ),
   })
   const otherMemberIds = [...new Set(memberRows.map((row) => row.user_id))].filter((id) => id !== viewerId)
   if (otherMemberIds.length === 0) return byRun
@@ -237,6 +255,7 @@ export interface SaveRunInput {
   name?: string
   params: GenerationParams
   results: RecommendationResult[]
+  unmatched?: UnmatchedPick[]
   lucky?: boolean
 }
 
@@ -250,6 +269,7 @@ export async function saveRun(db: Db, input: SaveRunInput): Promise<number> {
       name: input.name?.trim() || undefined,
       params: JSON.stringify(input.params),
       is_lucky: input.lucky === true,
+      unmatched_picks: JSON.stringify(input.unmatched ?? []),
     },
     { returnRow: true },
   )
@@ -295,7 +315,12 @@ export async function pruneOldRuns(
   if (runs.length <= keep) return false
 
   const excess = runs.slice(0, runs.length - keep)
-  await db.deleteMany(recommendationRuns, { where: inList('id', excess.map((run) => run.id)) })
+  await db.deleteMany(recommendationRuns, {
+    where: inList(
+      'id',
+      excess.map((run) => run.id),
+    ),
+  })
   return true
 }
 
@@ -361,7 +386,12 @@ export async function listRecommendationRunsFromOthers(
   const memberships = await db.findMany(recommendationRunMembers, { where: { user_id: userId } })
   if (memberships.length === 0) return []
 
-  const runs = await db.findMany(recommendationRuns, { where: inList('id', memberships.map((m) => m.run_id)) })
+  const runs = await db.findMany(recommendationRuns, {
+    where: inList(
+      'id',
+      memberships.map((m) => m.run_id),
+    ),
+  })
   const runsFromOthers = runs.filter(
     (run) => run.user_id !== userId && (mediaType === undefined || run.media_type === mediaType),
   )
@@ -422,7 +452,9 @@ export async function getRecommendationRun(
   if (!run) return null
 
   if (run.user_id !== userId) {
-    const membership = await db.findOne(recommendationRunMembers, { where: { run_id: runId, user_id: userId } })
+    const membership = await db.findOne(recommendationRunMembers, {
+      where: { run_id: runId, user_id: userId },
+    })
     if (!membership) return null
   }
 
@@ -445,6 +477,7 @@ export async function getRecommendationRun(
       owner,
       otherMemberLabels,
       results: [],
+      unmatched: parseUnmatchedPicks(run.unmatched_picks),
       params,
     }
   }
@@ -482,6 +515,7 @@ export async function getRecommendationRun(
     owner,
     otherMemberLabels,
     results,
+    unmatched: parseUnmatchedPicks(run.unmatched_picks),
     params,
   }
 }

@@ -4,7 +4,7 @@ import type { Db } from './db.ts'
 import { notifications, users } from './schema.ts'
 import { displayLabel } from './users.ts'
 
-export type NotificationType = 'recommendation' | 'follow'
+export type NotificationType = 'recommendation' | 'follow' | 'title'
 
 export interface NotificationSummary {
   id: number
@@ -12,6 +12,8 @@ export interface NotificationSummary {
   type: NotificationType
   // Only set for kinds that point at a run.
   runId: number | null
+  // Only set for 'title': the keys of the titles just unlocked.
+  unlockedTitles: string[]
   actorUserId: number
   createdAt: number
   read: boolean
@@ -33,6 +35,27 @@ export async function createNotification(
   })
 }
 
+// About the recipient and nobody else, so it is its own actor — which is why it
+// can't go through createNotification, whose first rule is that nobody is told
+// about their own doing.
+export async function createTitleNotification(db: Db, userId: number, titleKeys: string[]): Promise<void> {
+  if (titleKeys.length === 0) return
+
+  await db.create(notifications, {
+    user_id: userId,
+    actor_user_id: userId,
+    type: 'title',
+    // Stringified: pg sends a bare array as a Postgres array, which jsonb refuses.
+    unlocked_titles: JSON.stringify(titleKeys),
+    created_at: Date.now(),
+  })
+}
+
+function stringList(value: unknown): string[] {
+  const parsed = typeof value === 'string' ? (JSON.parse(value) as unknown) : value
+  return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string') : []
+}
+
 const LIST_LIMIT = 30
 
 export async function listNotifications(db: Db, userId: number): Promise<NotificationSummary[]> {
@@ -43,7 +66,12 @@ export async function listNotifications(db: Db, userId: number): Promise<Notific
   })
   if (rows.length === 0) return []
 
-  const actors = await db.findMany(users, { where: inList('id', rows.map((row) => row.actor_user_id)) })
+  const actors = await db.findMany(users, {
+    where: inList(
+      'id',
+      rows.map((row) => row.actor_user_id),
+    ),
+  })
   const actorLabelById = new Map(actors.map((actor) => [actor.id, displayLabel(actor)]))
 
   return rows.map((row) => ({
@@ -51,6 +79,7 @@ export async function listNotifications(db: Db, userId: number): Promise<Notific
     actorLabel: actorLabelById.get(row.actor_user_id) ?? 'Someone',
     type: (row.type as NotificationType) ?? 'recommendation',
     runId: row.run_id ?? null,
+    unlockedTitles: stringList(row.unlocked_titles),
     actorUserId: row.actor_user_id,
     createdAt: row.created_at,
     read: row.read_at != null,

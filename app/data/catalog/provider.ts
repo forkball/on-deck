@@ -1,3 +1,4 @@
+import { queryWords, type CatalogQuery } from './query.ts'
 import type { Db } from '../db.ts'
 import {
   markMediaItemEnriched,
@@ -7,7 +8,14 @@ import {
   type RematchMediaItemResult,
 } from '../mediaItems.ts'
 import type { MediaItem } from '../schema.ts'
-import { BOOK_GENRES, BOOK_SERIES_TYPES, getBookById, parseGoogleBooksId, searchBooks } from './googleBooks.ts'
+import {
+  BOOK_GENRES,
+  BOOK_SERIES_TYPES,
+  getBookById,
+  parseGoogleBooksId,
+  searchBooks,
+} from './googleBooks.ts'
+import { getWorkById, parseOpenLibraryWorkId } from './openLibrary.ts'
 import {
   GAME_GENRES,
   GAME_MULTIPLAYER_TYPES,
@@ -27,6 +35,9 @@ import {
   TV_GENRES,
   type TmdbSearchResult,
 } from './tmdb.ts'
+import { logger } from '../../log.ts'
+
+const log = logger('search')
 
 // Structurally what TMDB returns, aliased so other providers satisfy one shape.
 export type CatalogSearchResult = TmdbSearchResult
@@ -41,7 +52,7 @@ export interface CatalogProvider {
   // Recorded as media_items.external_source, so ids from different providers
   // can't collide.
   sourceName: string
-  search(query: string): Promise<CatalogSearchResult[]>
+  search(query: CatalogQuery): Promise<CatalogSearchResult[]>
   getById(externalId: string): Promise<CatalogSearchResult | null>
   genres: string[]
   playerTypes?: string[]
@@ -49,6 +60,17 @@ export interface CatalogProvider {
   // Platform *families*, not raw names — see GAME_PLATFORMS.
   platforms?: string[]
   seriesTypes?: string[]
+  // Whether this provider's search reads more than a title, so a pick's author or
+  // director is worth adding to the query.
+  //
+  // Google Books queries full text, and a bare title is often not enough to find
+  // the book at all: "Iron Flame" returns a 1963 Oak Ridge lab index and not the
+  // novel, "Bitten" returns a French verb-conjugation guide, "Uprooted" a report on
+  // humanitarian policy. With the author appended each one comes back first.
+  //
+  // TMDB and IGDB match titles only, and the extra words actively hurt: "Dune Denis
+  // Villeneuve" finds a making-of documentary, and "Portal 2 Valve" finds nothing.
+  searchesCreator?: boolean
   parseExternalId(input: string): string | null
   matchHint: string
   lookupFailedError: string
@@ -64,6 +86,13 @@ export interface CatalogProvider {
 
 // Fits after "Only suggest books with …". Null when the medium doesn't offer the
 // bucket, in which case there is nothing truthful to ask for.
+// Whether the provider's search reads more than a title — see searchesCreator.
+// Exported because the picks prompt asks the model for a creator only where one
+// will be used.
+export function searchReadsCreator(type: MediaType): boolean {
+  return getCatalogProvider(type).searchesCreator === true
+}
+
 export function describeLength(provider: CatalogProvider, length: LengthBucket): string | null {
   return provider.lengthOptions.find((option) => option.value === length)?.phrase ?? null
 }
@@ -73,7 +102,7 @@ export function describeLength(provider: CatalogProvider, length: LengthBucket):
 const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
   movie: {
     sourceName: 'tmdb',
-    search: searchMovies,
+    search: (query) => searchMovies(queryWords(query)),
     getById: getMovieById,
     genres: MOVIE_GENRES,
     parseExternalId: (input) => parseTmdbId(input, 'movie'),
@@ -99,9 +128,16 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
   book: {
     sourceName: 'google-books',
     search: searchBooks,
-    getById: getBookById,
+    // Routed by the id itself, because books are the one medium whose rows come
+    // from two catalogs: 549 of 744 rows still carry an Open Library work key,
+    // from before the switch and from the fallback in searchBooks. Asking Google
+    // about one of those can only fail — it did, eleven times in one run, and a
+    // failed lookup was read as "not the genre you asked for".
+    getById: (externalId) =>
+      parseOpenLibraryWorkId(externalId) ? getWorkById(externalId) : getBookById(externalId),
     genres: BOOK_GENRES,
     seriesTypes: BOOK_SERIES_TYPES,
+    searchesCreator: true,
     parseExternalId: parseGoogleBooksId,
     matchHint: 'Paste a Google Books link or volume id.',
     lookupFailedError: "Couldn't find that on Google Books — check the link.",
@@ -121,7 +157,7 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
   },
   game: {
     sourceName: 'igdb',
-    search: searchGames,
+    search: (query) => searchGames(queryWords(query)),
     getById: getGameById,
     genres: GAME_GENRES,
     playerTypes: GAME_PLAYER_TYPES,
@@ -145,7 +181,7 @@ const CATALOG_PROVIDERS: Record<string, CatalogProvider> = {
   },
   tv: {
     sourceName: 'tmdb',
-    search: searchTv,
+    search: (query) => searchTv(queryWords(query)),
     getById: getTvShowById,
     genres: TV_GENRES,
     parseExternalId: (input) => parseTmdbId(input, 'tv'),
@@ -239,7 +275,8 @@ export async function searchCatalog(type: MediaType, query: string): Promise<Cat
   const cached = answers.get(key)
   if (cached) return cached
 
-  const results = await getCatalogProvider(type).search(query)
+  // `text`, not `title`: this is the door a person's typing comes through.
+  const results = await getCatalogProvider(type).search({ text: query })
   answers.set(key, results)
   return results
 }
@@ -275,8 +312,8 @@ function logSearch(
   results: MediaItem[],
   startedAt: number,
 ): void {
-  console.info(
-    `[search] ${type} ${JSON.stringify(query)} ${cache} ${results.length} result(s) ` +
+  log.info(
+    `${type} ${JSON.stringify(query)} ${cache} ${results.length} result(s) ` +
       `via ${sourcesOf(results)} ${duration(Date.now() - startedAt)}`,
   )
 }
@@ -307,7 +344,7 @@ export async function searchAndImport(db: Db, type: MediaType, query: string): P
     // handler as a bare stack with no query and no media type on it. Rethrown
     // immediately — the 500 is still the right answer, this only makes it
     // possible to tell which search caused it.
-    console.error(`[search] ${type} ${JSON.stringify(query)} failed after ${duration(Date.now() - startedAt)}:`, error)
+    log.error(`${type} ${JSON.stringify(query)} failed after ${duration(Date.now() - startedAt)}`, error)
     throw error
   }
 

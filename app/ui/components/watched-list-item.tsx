@@ -2,11 +2,14 @@ import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { MediaItem, UserMediaInteraction } from '../../data/schema.ts'
+import type { MediaType } from '../../data/mediaItems.ts'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { statusLabel } from '../../interactionStatus.ts'
+import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
 import { PlatformList } from './platform-list.tsx'
 import { DislikedDisplay, StarRatingDisplay } from './star-rating.tsx'
+import { Link } from '../shared/form-controls.tsx'
 
 export interface WatchedListItemProps {
   interaction: UserMediaInteraction
@@ -41,26 +44,27 @@ export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
         mix={css({
           display: 'flex',
           gap: '12px',
-          border: '1px solid #ddd',
+          border: '1px solid var(--rule)',
+          borderLeft: `4px solid ${item ? mediaTypeUiFor(item.type as MediaType).hue : 'var(--rule)'}`,
           borderRadius: '8px',
           padding: '12px 16px',
         })}
       >
         {posterUrl ? (
-          <a href={detailHref} mix={css({ flex: '0 0 auto' })}>
+          <Link variant="wrap" href={detailHref} mix={css({ flex: '0 0 auto' })}>
             <img
               src={posterUrl}
               alt={`${item?.title ?? ''} poster`}
               mix={css({ width: '48px', borderRadius: '4px', display: 'block' })}
             />
-          </a>
+          </Link>
         ) : (
           <div
             mix={css({
               width: '48px',
               height: '72px',
               flex: '0 0 auto',
-              border: '1px solid #ddd',
+              border: '1px solid var(--rule)',
               borderRadius: '4px',
             })}
           />
@@ -75,13 +79,13 @@ export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
           })}
         >
           <div>
-            <a href={detailHref}>
+            <Link href={detailHref}>
               <strong>{item?.title ?? 'Unknown title'}</strong>
-            </a>
+            </Link>
             <p mix={css({ margin: '4px 0 0' })}>
               {actor ? (
                 <>
-                  <a href={routes.users.show.href({ userId: String(actor.id) })}>{actor.label}</a>{' '}
+                  <Link href={routes.users.show.href({ userId: String(actor.id) })}>{actor.label}</Link>{' '}
                   {status.toLowerCase()}
                 </>
               ) : (
@@ -104,7 +108,7 @@ export function WatchedListItem(handle: Handle<WatchedListItemProps>) {
             {interaction.notes && (
               <p mix={css({ margin: '4px 0 0', fontStyle: 'italic' })}>"{interaction.notes}"</p>
             )}
-            <p mix={css({ margin: '4px 0 0', fontSize: '12px', color: '#888' })}>
+            <p mix={css({ margin: '4px 0 0', fontSize: '12px', color: 'var(--muted)' })}>
               {actor ? loggedDate : `Logged ${loggedDate}`}
             </p>
           </div>

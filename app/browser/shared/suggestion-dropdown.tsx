@@ -2,6 +2,8 @@ import type { Handle } from 'remix/ui'
 import { css, on } from 'remix/ui'
 
 import type { SuggestState, Suggestion } from './suggestions.ts'
+import { Spinner } from './spinner.tsx'
+import { Button } from '../../ui/shared/form-controls.tsx'
 
 // Rendered inside the two autosuggest forms (movie-search-form.tsx,
 // user-search-form.tsx) — a plain nested component, not its own hydration
@@ -23,8 +25,8 @@ export function SuggestionDropdown(
           left: 0,
           right: 0,
           zIndex: 20,
-          backgroundColor: '#fdf7f1',
-          border: '1px solid #3c3c3c',
+          backgroundColor: 'var(--paper)',
+          border: '1px solid var(--text)',
           borderRadius: '8px',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
           maxHeight: '320px',
@@ -38,48 +40,26 @@ export function SuggestionDropdown(
               alignItems: 'center',
               gap: '8px',
               padding: '12px',
-              color: '#888',
+              color: 'var(--muted)',
               fontSize: '13px',
             })}
           >
-            <span
-              aria-hidden="true"
-              mix={css({
-                '@keyframes suggestion-spin': {
-                  from: { transform: 'rotate(0deg)' },
-                  to: { transform: 'rotate(360deg)' },
-                },
-                display: 'inline-block',
-                width: '13px',
-                height: '13px',
-                borderRadius: '50%',
-                border: '2px solid currentColor',
-                borderTopColor: 'transparent',
-                animation: 'suggestion-spin 0.6s linear infinite',
-              })}
-            />
+            <Spinner />
             Searching…
           </div>
         ) : state.suggestions.length === 0 ? (
-          <div mix={css({ padding: '12px', color: '#888', fontSize: '13px' })}>No matches.</div>
+          <div mix={css({ padding: '12px', color: 'var(--muted)', fontSize: '13px' })}>No matches.</div>
         ) : (
           state.suggestions.map((suggestion) => (
-            <button
+            <Button
               key={suggestion.key}
               type="button"
+              variant="menu-choice"
               mix={[
-                css({
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: 'none',
-                  background: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.06)' },
-                }),
+                // Layout only: the row itself — no frame, left-aligned, the hover
+                // tint — is menu-choice in app.css, since Doodle's button rules are
+                // unlayered and a css() rule here can't set any of it.
+                css({ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }),
                 on('click', () => onSelect(suggestion)),
               ]}
             >
@@ -99,12 +79,12 @@ export function SuggestionDropdown(
               <span mix={css({ flex: '1 1 auto', minWidth: 0 })}>
                 {suggestion.label}
                 {suggestion.sublabel && (
-                  <span mix={css({ marginLeft: '6px', fontSize: '12px', color: '#888' })}>
+                  <span mix={css({ marginLeft: '6px', fontSize: '12px', color: 'var(--muted)' })}>
                     {suggestion.sublabel}
                   </span>
                 )}
               </span>
-            </button>
+            </Button>
           ))
         )}
       </div>

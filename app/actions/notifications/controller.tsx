@@ -3,12 +3,17 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { countUnreadNotifications, listNotifications, markNotificationRead } from '../../data/notifications.ts'
+import {
+  countUnreadNotifications,
+  listNotifications,
+  markNotificationRead,
+} from '../../data/notifications.ts'
 import { notifications } from '../../data/schema.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
+import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
 import { NotificationsPage } from './page.tsx'
 
 export default createController(routes.notifications, {
@@ -49,8 +54,16 @@ export default createController(routes.notifications, {
       await markNotificationRead(db, notificationId, auth.identity.id)
 
       // Each kind opens the thing it's about.
+      if (notification.type === 'title') {
+        return redirect(`${routes.profile.index.href()}?tab=${TITLES_TAB}`, 303)
+      }
       if (notification.type === 'follow') {
-        return redirect(routes.users.show.href({ userId: String(notification.actor_user_id) }), 303)
+        return redirect(
+          routes.users.show.href({
+            userId: String(notification.actor_user_id),
+          }),
+          303,
+        )
       }
 
       // Shouldn't exist, but a dangling redirect would 404 confusingly.
@@ -58,7 +71,12 @@ export default createController(routes.notifications, {
         return redirect(routes.notifications.index.href(), 303)
       }
 
-      return redirect(routes.recommendations.show.href({ runId: String(notification.run_id) }), 303)
+      return redirect(
+        routes.recommendations.show.href({
+          runId: String(notification.run_id),
+        }),
+        303,
+      )
     },
   },
 })

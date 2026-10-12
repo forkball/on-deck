@@ -24,7 +24,9 @@ describe('recommendation run listings', { skip: skipWithoutDatabase }, () => {
 
   const newUser = async (tag: string) => {
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    const { rows: [u] } = await pool.query<{ id: number }>(
+    const {
+      rows: [u],
+    } = await pool.query<{ id: number }>(
       `insert into users (email, password_hash, display_name, created_at)
        values ($1,'x',$2,$3) returning id`,
       [`runs-${tag}-${stamp}@example.test`, `runs-${tag}-${stamp}`, Date.now()],
@@ -54,7 +56,9 @@ describe('recommendation run listings', { skip: skipWithoutDatabase }, () => {
     await followUser(db, viewer, friend)
     await followUser(db, friend, viewer)
 
-    const { rows: [item] } = await pool.query<{ id: number }>(
+    const {
+      rows: [item],
+    } = await pool.query<{ id: number }>(
       `insert into media_items (type, external_source, external_id, title, metadata, created_at)
        values ('movie','test',$1,'Fixture','{}'::jsonb,$2) returning id`,
       [`runs-item-${Date.now()}`, Date.now()],
@@ -161,5 +165,24 @@ describe('recommendation run listings', { skip: skipWithoutDatabase }, () => {
     assert.equal(await getRecommendationRun(db, runId, viewer), null)
     await pool.query('delete from recommendation_runs where user_id = $1', [outsider])
     await pool.query('delete from users where id = $1', [outsider])
+  })
+
+  // A run can now be nothing but these, so the round trip is what the page rests on.
+  it("keeps the picks the catalog couldn't place, and reads none on a run without them", async () => {
+    const unmatched = [
+      { title: 'Engine Summer', year: 1979, creator: 'John Crowley', reason: 'Quiet and strange.' },
+    ]
+    const runId = await saveRun(db, {
+      requestingUserId: viewer,
+      memberUserIds: [viewer],
+      mediaType: 'game',
+      params: { sourceTypes: ['game'] },
+      results: [],
+      unmatched,
+    })
+    assert.deepEqual((await getRecommendationRun(db, runId, viewer))?.unmatched, unmatched)
+
+    const [plain] = await listRecommendationRuns(db, viewer, 'movie')
+    assert.deepEqual((await getRecommendationRun(db, plain.id, viewer))?.unmatched, [])
   })
 })

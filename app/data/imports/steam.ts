@@ -1,10 +1,11 @@
 import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
 import { runBounded } from './csv.ts'
+import { normalizeTitle } from '../titles.ts'
 import { IGDB_MAX_CONCURRENCY } from '../catalog/igdb.ts'
 import type { Db } from '../db.ts'
 import { logInteraction, type LogInteractionInput } from '../mediaItems.ts'
-import { INTERACTION_SOURCES } from '../schema.ts'
-import { fetchSteamLibrary, type SteamGame } from './steamApi.ts'
+import { INTERACTION_SOURCES, users } from '../schema.ts'
+import { fetchSteamLibrary, fetchSteamPersona, type SteamGame } from './steamApi.ts'
 
 export interface SteamImportResult {
   totalGames: number
@@ -27,9 +28,20 @@ const EDITION_SUFFIX =
 
 const TRAILING_PARENTHETICAL = /\s*\([^)]*\)\s*$/
 
-export async function importSteamLibrary(db: Db, userId: number, steamId: string): Promise<SteamImportResult> {
+export async function importSteamLibrary(
+  db: Db,
+  userId: number,
+  steamId: string,
+): Promise<SteamImportResult> {
   const outcome = await fetchSteamLibrary(steamId)
   if (!outcome.ok) throw new Error(outcome.message)
+
+  // Refreshed on the way past, since an import is already talking to Steam and
+  // a rename there would otherwise leave settings naming an account by a name
+  // its owner has stopped using. Null means Steam wouldn't say this time, which
+  // is no reason to throw away the name it gave last time.
+  const persona = await fetchSteamPersona(steamId)
+  if (persona) await db.update(users, userId, { steam_persona: persona })
 
   const games = outcome.games
   const playable = games.filter((game) => !NOT_A_GAME.test(game.name))
@@ -91,7 +103,7 @@ async function matchGame(steamName: string): Promise<CatalogSearchResult | null>
   // Searched separately rather than re-filtering the first result set: a query
   // like "Painkiller: Gold" doesn't return plain "Painkiller" at all.
   for (const query of searchVariants(steamName)) {
-    const results = await getCatalogProvider('game').search(query)
+    const results = await getCatalogProvider('game').search({ title: query })
     const wanted = normalizeTitle(query)
 
     const exact = results.find((result) => normalizeTitle(result.title) === wanted)
@@ -107,18 +119,11 @@ function searchVariants(steamName: string): string[] {
   const withoutYear = steamName.replace(TRAILING_PARENTHETICAL, '').trim()
   if (withoutYear && withoutYear !== steamName) variants.push(withoutYear)
 
+  // Trademark symbols and punctuation differ constantly between the two catalogues
+  // ("Sid Meier's Civilization® VI"), which is what the shared rule levels out.
   const normalized = normalizeTitle(withoutYear)
   const base = normalized.replace(EDITION_SUFFIX, '').trim()
   if (base && base !== normalized) variants.push(base)
 
   return variants
-}
-
-// Trademark symbols and punctuation differ constantly between the two catalogues
-// ("Sid Meier's Civilization® VI"), so compare on letters and digits only.
-function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
 }

@@ -1,5 +1,6 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
+import { ToggleLabel } from '../shared/form-controls.tsx'
 
 type CSSStyle = Parameters<typeof css>[0]
 
@@ -32,69 +33,84 @@ function modalStyle(id: string): CSSStyle {
 // which put modal state in the URL — after submitting and being redirected
 // away, Back returned to the fragment and silently reopened the modal.
 //
-// The trigger's look lives on an inner <span>, not the <label>: DoodleCSS
-// sets `.doodle label { padding: .25em 0 }` outside any @layer, and unlayered
-// rules beat layered ones regardless of specificity, so padding set on the
-// label itself is silently discarded.
+// The trigger is a ToggleLabel drawn as a button; the fab's larger frame,
+// paper and shadow are `label.modal-fab` in app.css.
 export function Modal(
   handle: Handle<{
     id: string
     // Omitted when nothing opens this by hand — see PasswordConfirmModal,
     // which is opened by a form submit or by the server rendering it open.
     triggerLabel?: string
+    // Drawn in place of the label, which becomes the trigger's accessible name
+    // and tooltip — as FloatingDropdown's `icon`.
+    triggerIcon?: RemixNode
     title?: string
     fab?: boolean
     // Renders already open. The server needs this to put a rejected modal
     // form back in front of someone — without it a 400 comes back as a page
     // with the error hidden behind a trigger they'd have to find again.
     defaultOpen?: boolean
+    // False when the content has its own way out.
+    closeButton?: boolean
+    // A narrower box, for a line or two of explanation rather than a form.
+    small?: boolean
+    // A tap on the dimmed page around the box closes it. Opt-in: a modal
+    // holding a half-written form shouldn't lose it to a stray tap.
+    closeOnOutsideTap?: boolean
     children?: RemixNode
   }>,
 ) {
   return () => {
-    const { id, triggerLabel, title, fab, defaultOpen, children } = handle.props
+    const {
+      id,
+      triggerLabel,
+      triggerIcon,
+      title,
+      fab,
+      defaultOpen,
+      closeButton = true,
+      small,
+      closeOnOutsideTap,
+      children,
+    } = handle.props
 
     return (
       <div mix={css(modalStyle(id))}>
         <input type="checkbox" id={id} class="modal-toggle" checked={defaultOpen} />
 
         {triggerLabel && (
-          <label
+          <ToggleLabel
             for={id}
-            class="modal-trigger"
-            mix={css(
-              fab
-                ? { position: 'fixed', bottom: '24px', right: '24px', zIndex: 900, cursor: 'pointer' }
-                : { cursor: 'pointer' },
-            )}
+            variant="button"
+            icon={!!triggerIcon}
+            aria-label={triggerIcon ? triggerLabel : undefined}
+            title={triggerIcon ? triggerLabel : undefined}
+            class={fab ? 'modal-fab' : undefined}
+            mix={fab ? css({ position: 'fixed', bottom: '24px', right: '24px', zIndex: 900 }) : undefined}
           >
-            {/* Padding comes from app.css, which states one box for every
-                button; setting it here would be layered and lose to it. */}
-            <span
-              class={fab ? 'doodle-border modal-fab' : 'doodle-border'}
-              mix={css(
-                fab
-                  ? {
-                      display: 'inline-block',
-                      textAlign: 'center',
-                      backgroundColor: '#fdf7f1',
-                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.3)',
-                    }
-                  : { display: 'inline-block' },
-              )}
-            >
-              {triggerLabel}
-            </span>
-          </label>
+            {triggerIcon ?? triggerLabel}
+          </ToggleLabel>
         )}
 
         <div class="modal-overlay">
+          {/* Behind the box and filling the overlay, so only a tap that
+              misses the box lands on it. Hidden from screen readers, which
+              have the ✕. */}
+          {closeOnOutsideTap && (
+            <ToggleLabel
+              for={id}
+              class="modal-backdrop"
+              aria-hidden="true"
+              mix={css({ position: 'absolute', inset: 0, cursor: 'default' })}
+            />
+          )}
           <div
             mix={css({
-              backgroundColor: '#fdf7f1',
+              position: 'relative',
+              backgroundColor: 'var(--paper)',
               borderRadius: '8px',
-              padding: '24px',
-              maxWidth: '480px',
+              padding: small ? '20px' : '24px',
+              maxWidth: small ? '320px' : '480px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
@@ -110,9 +126,11 @@ export function Modal(
               })}
             >
               {title && <h3 mix={css({ margin: 0 })}>{title}</h3>}
-              <label for={id} mix={css({ cursor: 'pointer' })}>
-                <span mix={css({ fontSize: '20px' })}>✕</span>
-              </label>
+              {closeButton && (
+                <ToggleLabel for={id} tapArea>
+                  <span mix={css({ fontSize: '20px' })}>✕</span>
+                </ToggleLabel>
+              )}
             </div>
             {children}
           </div>

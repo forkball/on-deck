@@ -1,6 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
 
 import { track } from './timings.ts'
+import { logger } from '../../log.ts'
+
+const log = logger('model')
 
 // Resolves ANTHROPIC_API_KEY from env.
 const claude = new Anthropic()
@@ -19,10 +22,10 @@ function recordUsage(name: string, maxTokens: number, response: Anthropic.Messag
     `think=${usage.output_tokens_details?.thinking_tokens ?? 'n/a'} in=${usage.input_tokens}`
 
   if (response.stop_reason !== 'end_turn' || usage.output_tokens >= maxTokens * TIGHT_BUDGET_RATIO) {
-    console.warn(line)
+    log.warn(line)
     return
   }
-  console.info(line)
+  log.info(line)
 }
 
 // The API reports what a call spent, never what it was allowed, so the budget
@@ -30,6 +33,10 @@ function recordUsage(name: string, maxTokens: number, response: Anthropic.Messag
 export async function requestStructured<T>(
   name: string,
   params: Anthropic.MessageCreateParamsNonStreaming,
+  // Handed the answer as it arrived, before parsing. The picks call keeps it, so a
+  // run that came back wrong can be read rather than guessed at — see
+  // transcripts.ts.
+  onRaw?: (text: string) => void,
 ): Promise<T> {
   const response = await track(name, () => claude.messages.create(params))
 
@@ -40,5 +47,7 @@ export async function requestStructured<T>(
   if (!textBlock) {
     throw new Error(`No text block in Claude response — stop_reason: ${response.stop_reason}`)
   }
+
+  onRaw?.(textBlock.text)
   return JSON.parse(textBlock.text) as T
 }

@@ -1,0 +1,12 @@
+-- The display name Steam shows for a linked account, so settings can name the
+-- connection instead of printing its SteamID64 at someone.
+--
+-- Stored rather than fetched per render: the settings page would otherwise call
+-- Steam on every load to redraw one line, and that line is worth no outbound
+-- request at all. Written when the account is linked and refreshed whenever a
+-- library import runs, which is already talking to Steam.
+--
+-- Nullable, and every reader falls back to the id. A rename on Steam's side
+-- leaves this stale until the next import, which is the right trade for a label
+-- that only has to answer "is this my account".
+alter table users add column steam_persona text;

@@ -18,10 +18,13 @@ import {
 } from '../../data/follows.ts'
 import { loadMediaSummaries } from '../../data/mediaSummary.ts'
 import { users, type User } from '../../data/schema.ts'
+import { checkTitleUnlocksQuietly, loadUnlockedTitleKeys } from '../../data/profileTitles/unlocks.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, searchUsers } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../mediaTypes.ts'
+import { TITLES } from '../../data/profileTitles/catalog.ts'
+import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { UserSearchPage } from './search-page.tsx'
 import { UserProfilePage } from './show-page.tsx'
@@ -58,7 +61,11 @@ export default createController(routes.users, {
       const db = context.get(Database)
       const query = context.url.searchParams.get('q')?.trim() ?? ''
       const results = query ? await searchUsers(db, query, auth.identity.id) : []
-      const followingIds = await listFollowingIds(db, auth.identity.id, results.map((r) => r.id))
+      const followingIds = await listFollowingIds(
+        db,
+        auth.identity.id,
+        results.map((r) => r.id),
+      )
       const followingByUserId = new Map(results.map((r) => [r.id, followingIds.has(r.id)]))
 
       return context.render(
@@ -118,8 +125,14 @@ export default createController(routes.users, {
         )
       }
 
-      const media = await loadMediaSummaries(db, userId, RECENT_COUNT)
-      const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
+      // Read, not checked: looking at someone's profile shouldn't be what sends
+      // them a notification.
+      const [media, earned] = await Promise.all([
+        loadMediaSummaries(db, userId, RECENT_COUNT),
+        loadUnlockedTitleKeys(db, userId),
+      ])
+      const tab = context.url.searchParams.get('tab')
+      const activeTab = tab === TITLES_TAB ? TITLES_TAB : (parseMediaType(tab) ?? DEFAULT_MEDIA_TYPE)
 
       return context.render(
         <UserProfilePage
@@ -131,6 +144,9 @@ export default createController(routes.users, {
           bio={target.bio ?? ''}
           followingCount={followingCount}
           followersCount={followersCount}
+          // Only what they hold: someone else's Titles tab lists their credits,
+          // not every credit with theirs ticked.
+          credits={TITLES.filter((title) => earned.has(title.key)).map((title) => ({ title, earned: true }))}
           displayName={displayLabel(auth.identity)}
         />,
       )
@@ -178,7 +194,11 @@ export default createController(routes.users, {
 
       const label = displayLabel(target)
       const targetUsers = await listFollowedUsers(db, userId)
-      const followingIds = await listFollowingIds(db, auth.identity.id, targetUsers.map((u) => u.id))
+      const followingIds = await listFollowingIds(
+        db,
+        auth.identity.id,
+        targetUsers.map((u) => u.id),
+      )
 
       return context.render(
         <FollowListPage
@@ -204,7 +224,11 @@ export default createController(routes.users, {
 
       const label = displayLabel(target)
       const targetUsers = await listFollowers(db, userId)
-      const followingIds = await listFollowingIds(db, auth.identity.id, targetUsers.map((u) => u.id))
+      const followingIds = await listFollowingIds(
+        db,
+        auth.identity.id,
+        targetUsers.map((u) => u.id),
+      )
 
       return context.render(
         <FollowListPage
@@ -226,6 +250,11 @@ export default createController(routes.users, {
       const userId = Number(context.params.userId)
       const db = context.get(Database)
       await followUser(db, auth.identity.id, userId)
+      // Both ends moved: one more followed, one more follower.
+      await Promise.all([
+        checkTitleUnlocksQuietly(db, auth.identity.id),
+        checkTitleUnlocksQuietly(db, userId),
+      ])
 
       const formData = context.get(FormData)
       const returnTo = String(formData.get('return_to') || '')

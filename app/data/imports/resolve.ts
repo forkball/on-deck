@@ -11,7 +11,8 @@
 // still allowed to share one — that is a rewatch, a real thing the review page
 // should ask about rather than a mistake to prevent.
 
-import { classifyMatch, normalizeTitle, type CandidateLike, type Verdict } from './classify.ts'
+import { classifyMatch, type CandidateLike, type Verdict } from './classify.ts'
+import { normalizeTitle } from '../titles.ts'
 
 export interface MatchInput {
   rowId: number

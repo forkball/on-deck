@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import { PasswordGate } from '../../browser/password-gate.tsx'
 import { Field } from '../shared/field.tsx'
 import { Modal } from './modal.tsx'
+import { Button, TextInput } from '../shared/form-controls.tsx'
 
 const MODAL_ID = 'confirm-password'
 const FIELD_NAME = 'current_password'
@@ -36,15 +37,15 @@ export function PasswordConfirmModal(handle: Handle<PasswordConfirmModalProps>) 
     return (
       <>
         <Modal id={MODAL_ID} title="Confirm it's you" defaultOpen={defaultOpen}>
-          <p mix={css({ margin: '0 0 12px', fontSize: '14px', color: '#555' })}>
+          <p mix={css({ margin: '0 0 12px', fontSize: '14px', color: 'var(--soft)' })}>
             Enter your current password to {action}.
           </p>
           <Field label="Current password" error={error}>
-            <input type="password" name={FIELD_NAME} autocomplete="current-password" />
+            <TextInput type="password" name={FIELD_NAME} autocomplete="current-password" />
           </Field>
-          <button type="submit" mix={css({ marginTop: '12px' })}>
+          <Button type="submit" mix={css({ marginTop: '12px' })}>
             Confirm and save
-          </button>
+          </Button>
         </Modal>
         <PasswordGate modalId={MODAL_ID} passwordField={FIELD_NAME} guardedFields={guardedFields} />
       </>

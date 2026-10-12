@@ -8,8 +8,25 @@ import { pool, type Db } from '../db.ts'
 import { getCatalogProvider, upsertCatalogItem } from '../catalog/provider.ts'
 import { logInteraction, type LogInteractionInput, type MediaType } from '../mediaItems.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
-import { importBatches, importRows, mediaItems, userMediaInteractions, type ImportBatch, type ImportRow } from '../schema.ts'
-import type { ConflictChoice, RowState } from './classify.ts'
+import {
+  importBatches,
+  importRows,
+  mediaItems,
+  userMediaInteractions,
+  type ImportBatch,
+  type ImportRow,
+} from '../schema.ts'
+import {
+  answerKey,
+  isReviewReason,
+  parseBulkKind,
+  REMEMBERED,
+  REVIEW_REASONS,
+  type BulkKind,
+  type CandidateLike,
+  type ConflictChoice,
+  type RowState,
+} from './classify.ts'
 import {
   buildReview,
   type CatalogEntry,
@@ -41,50 +58,42 @@ export async function createBatch(
   const id = crypto.randomUUID()
   const now = Date.now()
 
-  await db.create(importBatches, {
-    id,
-    user_id: userId,
-    media_type: mediaType,
-    source,
-    status: 'matching',
-    total_rows: rows.length,
-    matched_rows: 0,
-    conflict_choice: 'keep',
-    created_at: now,
-    updated_at: now,
-  })
-
-  // One statement rather than a create() per row: a 400-row export is 400 round
-  // trips to Supabase otherwise, which is most of the time the upload spends.
-  if (rows.length > 0) {
-    const COLUMNS = 12
-    const values: unknown[] = []
-    const tuples = rows.map((row, i) => {
-      const base = i * COLUMNS
-      values.push(
-        id,
-        row.rowIndex,
-        row.title,
-        row.year,
-        row.rating,
-        row.notes ?? null,
-        row.consumedAt,
-        row.logStatus ?? 'consumed',
-        row.author ?? null,
-        row.isbn ?? null,
-        now,
-        now,
-      )
-      return `(${Array.from({ length: COLUMNS }, (_, n) => `$${base + n + 1}`).join(', ')})`
+  // Batch and rows in one transaction, so the worker can never claim a batch
+  // whose rows aren't in yet — it would match nothing and send it to review.
+  await db.transaction(async (tx) => {
+    await tx.create(importBatches, {
+      id,
+      user_id: userId,
+      media_type: mediaType,
+      source,
+      status: 'matching',
+      total_rows: rows.length,
+      matched_rows: 0,
+      conflict_choice: 'keep',
+      created_at: now,
+      updated_at: now,
     })
-
-    await pool.query(
-      `insert into import_rows
-         (batch_id, row_index, raw_title, raw_year, rating, notes, consumed_at, log_status, author, isbn, created_at, updated_at)
-       values ${tuples.join(', ')}`,
-      values,
-    )
-  }
+    // One statement for all rows: a create() per row is a round trip each.
+    if (rows.length > 0) {
+      await tx.createMany(
+        importRows,
+        rows.map((row) => ({
+          batch_id: id,
+          row_index: row.rowIndex,
+          raw_title: row.title,
+          raw_year: row.year,
+          rating: row.rating,
+          notes: row.notes ?? null,
+          consumed_at: row.consumedAt,
+          log_status: row.logStatus ?? 'consumed',
+          author: row.author ?? null,
+          isbn: row.isbn ?? null,
+          created_at: now,
+          updated_at: now,
+        })),
+      )
+    }
+  })
 
   return id
 }
@@ -122,12 +131,25 @@ export async function touchClaim(db: Db, batchId: string): Promise<void> {
   await db.update(importBatches, batchId, { claimed_at: now, updated_at: now })
 }
 
+// node-postgres sends a bare array as a Postgres array, which jsonb rejects.
+function toJsonb(value: unknown): string | null {
+  return value == null ? null : JSON.stringify(value)
+}
+
 export async function recordMatch(
   db: Db,
   rowId: number,
-  result: { state: RowState; reason: string | null; yearDelta: number | null; externalId: string | null; mediaItemId: number | null },
+  result: {
+    state: RowState
+    reason: string | null
+    yearDelta: number | null
+    externalId: string | null
+    mediaItemId: number | null
+    alternates?: CandidateLike[] | null
+  },
 ): Promise<void> {
   await db.update(importRows, rowId, {
+    alternates: toJsonb(result.alternates),
     state: result.state,
     reason: result.reason ?? undefined,
     year_delta: result.yearDelta,
@@ -137,8 +159,50 @@ export async function recordMatch(
   })
 }
 
+// The member's answers from their saved imports of this media type: each
+// question's row id, keyed by answerKey, latest winning. Only questions a review
+// asked (not conflicts), and only where the film is still in the catalog.
+export async function loadPastAnswers(
+  db: Db,
+  userId: number,
+  mediaType: MediaType,
+): Promise<Map<string, number>> {
+  const { rows } = await pool.query<{ id: number; raw_title: string; raw_year: number | null }>(
+    `select r.id, r.raw_title, r.raw_year
+       from import_rows r
+       join import_batches b on b.id = r.batch_id
+       join media_items m on m.id = r.media_item_id
+      where b.user_id = $1 and b.media_type = $2 and b.status = 'done'
+        and r.state = 'confirmed' and (r.reason is null or r.reason = any($3))
+      order by r.updated_at`,
+    [userId, mediaType, REVIEW_REASONS],
+  )
+  return new Map(rows.map((row) => [answerKey(row.raw_title, row.raw_year), row.id]))
+}
+
+// Settles rows the way the member answered them last time, in one statement:
+// each copies its past row's match. Kept in their review section, so they can
+// still be changed.
+export async function rememberRows(db: Db, pairs: { rowId: number; pastId: number }[]): Promise<void> {
+  if (pairs.length === 0) return
+  await pool.query(
+    `update import_rows r
+        set state = 'confirmed', reason = p.reason, year_delta = p.year_delta,
+            matched_external_id = p.matched_external_id, media_item_id = p.media_item_id,
+            alternates = p.alternates, accepted_by = $3, updated_at = $4
+       from unnest($1::int[], $2::int[]) as m(id, past_id)
+       join import_rows p on p.id = m.past_id
+      where r.id = m.id`,
+    [pairs.map((pair) => pair.rowId), pairs.map((pair) => pair.pastId), REMEMBERED, Date.now()],
+  )
+}
+
 export async function setMatchedCount(db: Db, batchId: string, matched: number): Promise<void> {
-  await db.update(importBatches, batchId, { matched_rows: matched, claimed_at: Date.now(), updated_at: Date.now() })
+  await db.update(importBatches, batchId, {
+    matched_rows: matched,
+    claimed_at: Date.now(),
+    updated_at: Date.now(),
+  })
 }
 
 export async function finishMatching(db: Db, batchId: string): Promise<void> {
@@ -181,15 +245,54 @@ function toStagedRow(row: ImportRow): StagedRow {
     reason: (row.reason ?? null) as StagedRow['reason'],
     yearDelta: row.year_delta ?? null,
     mediaItemId: row.media_item_id ?? null,
+    matchedExternalId: row.matched_external_id ?? null,
+    alternates: readAlternates(row.alternates),
+    acceptedBy: parseBulkKind(row.accepted_by),
+    remembered: row.accepted_by === REMEMBERED,
+    updatedAt: row.updated_at,
   }
+}
+
+interface PreviousMatch {
+  mediaItemId: number | null
+  externalId: string | null
+  yearDelta: number | null
+}
+
+// Written only by pointRowAt, so it is trusted as that shape.
+function readPreviousMatch(value: unknown): PreviousMatch | null {
+  return value && typeof value === 'object' ? (value as PreviousMatch) : null
+}
+
+// Anything but a non-empty array reads as none.
+function readAlternates(value: unknown): CandidateLike[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null
+  const valid = value.every(
+    (entry) =>
+      typeof entry === 'object' &&
+      entry !== null &&
+      typeof entry.externalId === 'string' &&
+      typeof entry.title === 'string' &&
+      (entry.releaseYear === null || typeof entry.releaseYear === 'number'),
+  )
+  return valid ? (value as CandidateLike[]) : null
 }
 
 function toCatalogEntry(item: { id: number; title: string; metadata: unknown }): CatalogEntry {
   const { releaseYear, creator, posterUrl } = parseMediaMetadata(item.metadata)
-  return { id: item.id, title: item.title, releaseYear: releaseYear ?? null, creator: creator ?? null, posterUrl: posterUrl ?? null }
+  return {
+    id: item.id,
+    title: item.title,
+    releaseYear: releaseYear ?? null,
+    creator: creator ?? null,
+    posterUrl: posterUrl ?? null,
+  }
 }
 
-export async function loadReview(db: Db, batch: ImportBatch): Promise<{ rows: ImportRow[]; model: ReviewModel }> {
+export async function loadReview(
+  db: Db,
+  batch: ImportBatch,
+): Promise<{ rows: ImportRow[]; model: ReviewModel }> {
   const rows = await loadRows(db, batch.id)
   const staged = rows.map(toStagedRow)
 
@@ -219,7 +322,13 @@ export async function loadReview(db: Db, batch: ImportBatch): Promise<{ rows: Im
     ]),
   )
 
-  return { rows, model: buildReview(staged, itemMap, existing, batch.conflict_choice as ConflictChoice) }
+  return {
+    rows,
+    model: buildReview(staged, itemMap, existing, batch.conflict_choice as ConflictChoice, {
+      saved: batch.status === 'done',
+      since: batch.updated_at,
+    }),
+  }
 }
 
 async function ownedRow(db: Db, batch: ImportBatch, rowId: number): Promise<ImportRow | null> {
@@ -227,33 +336,51 @@ async function ownedRow(db: Db, batch: ImportBatch, rowId: number): Promise<Impo
   return row ?? null
 }
 
-// Marks an uncertain match as read and correct. It was already going to save —
-// this only clears it off the page.
-export async function confirmRow(db: Db, batch: ImportBatch, rowId: number): Promise<boolean> {
+// A decision on one row by hand. It also takes the row out of any bulk accept,
+// so unticking that accept leaves it alone.
+async function settleRow(db: Db, batch: ImportBatch, rowId: number, state: RowState): Promise<boolean> {
   const row = await ownedRow(db, batch, rowId)
   if (!row) return false
 
-  await db.update(importRows, row.id, { state: 'confirmed', updated_at: Date.now() })
+  await db.update(importRows, row.id, { state, accepted_by: undefined, updated_at: Date.now() })
   return true
 }
 
-// Resolves a conflict in favour of the log. Distinct from skipping, which is
-// how a row is thrown away — this one is a row that was already there.
-export async function keepRow(db: Db, batch: ImportBatch, rowId: number): Promise<boolean> {
+// Undo for one answer: the row is a question again. A found "couldn't find"
+// row goes back to not found.
+export async function reopenRow(db: Db, batch: ImportBatch, rowId: number): Promise<boolean> {
   const row = await ownedRow(db, batch, rowId)
-  if (!row) return false
+  if (!row || (row.state !== 'confirmed' && row.state !== 'skipped')) return false
 
-  await db.update(importRows, row.id, { state: 'kept', updated_at: Date.now() })
+  const reopened = { accepted_by: undefined, previous_match: null, updated_at: Date.now() }
+  if (isReviewReason(row.reason)) {
+    const previous = readPreviousMatch(row.previous_match)
+    await db.update(importRows, row.id, {
+      ...reopened,
+      state: 'uncertain',
+      ...(previous && {
+        media_item_id: previous.mediaItemId,
+        matched_external_id: previous.externalId ?? undefined,
+        year_delta: previous.yearDelta,
+      }),
+    })
+  } else if (row.reason == null) {
+    await db.update(importRows, row.id, {
+      ...reopened,
+      state: 'not_found',
+      media_item_id: null,
+      matched_external_id: undefined,
+    })
+  } else {
+    return false
+  }
   return true
 }
 
-export async function skipRow(db: Db, batch: ImportBatch, rowId: number): Promise<boolean> {
-  const row = await ownedRow(db, batch, rowId)
-  if (!row) return false
-
-  await db.update(importRows, row.id, { state: 'skipped', updated_at: Date.now() })
-  return true
-}
+export const confirmRow = (db: Db, batch: ImportBatch, rowId: number) =>
+  settleRow(db, batch, rowId, 'confirmed')
+export const keepRow = (db: Db, batch: ImportBatch, rowId: number) => settleRow(db, batch, rowId, 'kept')
+export const skipRow = (db: Db, batch: ImportBatch, rowId: number) => settleRow(db, batch, rowId, 'skipped')
 
 export type RepointResult = { ok: true } | { ok: false; error: string }
 
@@ -278,33 +405,58 @@ export async function repointRow(
   if (!detail) return { ok: false, error: provider.lookupFailedError }
 
   const item = await upsertCatalogItem(db, mediaType, detail, true)
+  await pointRowAt(db, row, item)
+  return { ok: true }
+}
 
+// The write half of repointRow. Keeps the match it replaces (the first one
+// only), so undo can put it back.
+export async function pointRowAt(
+  db: Db,
+  row: ImportRow,
+  item: { id: number; external_id: string },
+): Promise<void> {
   await db.update(importRows, row.id, {
+    previous_match: row.previous_match ?? {
+      mediaItemId: row.media_item_id ?? null,
+      externalId: row.matched_external_id ?? null,
+      yearDelta: row.year_delta ?? null,
+    },
     // Confirmed rather than re-classified: a person picking a film off the
     // shelf is better evidence than the year arithmetic that flagged it.
+    // The reason stays: it records which review section the row was settled
+    // in. verdictOf treats a confirmed row as settled whatever it says.
     state: 'confirmed',
-    reason: undefined,
+    accepted_by: undefined,
     year_delta: null,
     matched_external_id: item.external_id,
     media_item_id: item.id,
     updated_at: Date.now(),
   })
-
-  return { ok: true }
 }
 
-// The long tail of a large import, cleared in one click. Bounded to the rows
-// the page offered — anything wider would sweep up matches nobody vouched for.
-export async function acceptBulk(db: Db, batch: ImportBatch, rowIds: number[]): Promise<number> {
-  if (rowIds.length === 0) return 0
-
+// A section's one-tap accept. Each row records which accept took it, so
+// unticking gives back exactly those.
+export async function acceptBulk(
+  db: Db,
+  batch: ImportBatch,
+  kind: BulkKind,
+  rowIds: number[],
+): Promise<void> {
+  if (rowIds.length === 0) return
   await db.updateMany(
     importRows,
-    { state: 'confirmed', updated_at: Date.now() },
+    { state: 'confirmed', accepted_by: kind, updated_at: Date.now() },
     { where: and(eq('batch_id', batch.id), inList('id', rowIds)) },
   )
+}
 
-  return rowIds.length
+export async function unacceptBulk(db: Db, batch: ImportBatch, kind: BulkKind): Promise<void> {
+  await db.updateMany(
+    importRows,
+    { state: 'uncertain', accepted_by: undefined, updated_at: Date.now() },
+    { where: and(eq('batch_id', batch.id), eq('state', 'confirmed'), eq('accepted_by', kind)) },
+  )
 }
 
 export async function setConflictChoice(db: Db, batchId: string, choice: ConflictChoice): Promise<void> {
@@ -331,12 +483,31 @@ export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult>
     held.add(verdict.kind === 'different_films' ? verdict.move.id : verdict.drop.id)
   }
 
+  // Already in the log exactly as this file has them: nothing to write. Marked
+  // kept — the state for "decided in favour of the log" — so the saved page,
+  // which reads the batch back once the log agrees with every row, still
+  // counts them as unchanged rather than as saved.
+  const alreadyLogged = new Set(model.alreadyLoggedIds)
+  if (alreadyLogged.size > 0) {
+    await db.updateMany(
+      importRows,
+      { state: 'kept', updated_at: Date.now() },
+      { where: and(eq('batch_id', batch.id), inList('id', model.alreadyLoggedIds)) },
+    )
+  }
+
   const writable: ImportRow[] = []
 
   for (const row of rows) {
-    if (row.state === 'skipped' || row.state === 'kept' || row.state === 'not_found' || row.state === 'pending') continue
+    if (
+      row.state === 'skipped' ||
+      row.state === 'kept' ||
+      row.state === 'not_found' ||
+      row.state === 'pending'
+    )
+      continue
     if (row.media_item_id == null) continue
-    if (held.has(row.id)) continue
+    if (held.has(row.id) || alreadyLogged.has(row.id)) continue
     // A conflict is only written when the batch says take it, or this row was
     // confirmed by hand — which beats the batch default.
     if (conflicted.has(row.id) && batch.conflict_choice === 'keep' && row.state !== 'confirmed') continue
@@ -376,13 +547,49 @@ export async function listBatches(db: Db, userId: number, limit = 10): Promise<I
   })
 }
 
+// Whether this member has ever brought a library across for this media type.
+//
+// Asked rather than inferred from how many films are logged, because the
+// question is about provenance, not size: someone who logged two hundred films
+// by hand has a full log and no imported history, and someone whose export
+// held four films has imported history and a tiny one. Only a finished batch
+// counts — one abandoned halfway through review wrote nothing.
+export async function hasImportedLibrary(db: Db, userId: number, mediaType: MediaType): Promise<boolean> {
+  const batch = await db.findOne(importBatches, {
+    where: and(eq('user_id', userId), eq('media_type', mediaType), eq('status', 'done')),
+  })
+  return batch != null
+}
+
 // One unfinished import at a time, so a second upload can't quietly orphan the
 // batch someone is halfway through reviewing.
+const UNFINISHED = ['matching', 'review']
+
 export async function activeBatch(db: Db, userId: number, mediaType: MediaType): Promise<ImportBatch | null> {
   const batch = await db.findOne(importBatches, {
-    where: and(eq('user_id', userId), eq('media_type', mediaType), inList('status', ['matching', 'review'])),
+    where: and(eq('user_id', userId), eq('media_type', mediaType), inList('status', UNFINISHED)),
   })
   return batch ?? null
+}
+
+// Throws an unsaved import away: the batch and, by cascade, its rows. Staging is
+// all there is to lose — nothing reaches the log until saveBatch — so this never
+// touches a logged interaction. A failed batch can go too; one saving or done
+// cannot: the first is mid-write, the second is the record the import happened.
+const DISCARDABLE = [...UNFINISHED, 'failed']
+
+export async function discardBatch(db: Db, batch: ImportBatch): Promise<boolean> {
+  if (!DISCARDABLE.includes(batch.status)) return false
+  await db.delete(importBatches, batch.id)
+  return true
+}
+
+// Every import still matching or waiting for review, newest first.
+export async function activeBatches(db: Db, userId: number): Promise<ImportBatch[]> {
+  return db.findMany(importBatches, {
+    where: and(eq('user_id', userId), inList('status', UNFINISHED)),
+    orderBy: ['created_at', 'desc'],
+  })
 }
 
 export { toStagedRow }

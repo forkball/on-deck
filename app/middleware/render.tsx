@@ -19,9 +19,7 @@ export function render() {
           // Server rendering turns client entries into browser module URLs.
           async resolveClientEntry(entryId, component) {
             if (!entryId.startsWith('file://')) {
-              throw new Error(
-                `Expected \`import.meta.url\` for clientEntry ID, received '${entryId}'`,
-              )
+              throw new Error(`Expected \`import.meta.url\` for clientEntry ID, received '${entryId}'`)
             }
 
             return {

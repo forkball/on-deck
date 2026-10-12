@@ -122,9 +122,7 @@ export function createFileImportActions<Extra extends object = Record<string, ne
         <Page
           {...await props(context, {
             displayName: displayLabel(auth.identity),
-            pendingHref: pending
-              ? routes.profile.imports.show.href({ batchId: pending.id })
-              : undefined,
+            pendingHref: pending ? routes.profile.imports.show.href({ batchId: pending.id }) : undefined,
           })}
         />,
       )

@@ -1,0 +1,11 @@
+-- Which one-tap accept on the review page confirmed a row: 'year', 'subtitle'
+-- or 'sole' (see bulkKind in app/data/imports/classify.ts). Null for a row
+-- confirmed by hand, or not confirmed at all.
+--
+-- It is what lets an accept be unticked. The accepted cards leave the page, and
+-- unticking has to put back exactly those — not the rows of the same section
+-- someone confirmed one at a time, which read the same by state alone.
+--
+-- Safe to run before the code that writes it: an older server never sets it,
+-- and rows accepted before it existed simply can't be unticked.
+alter table import_rows add column accepted_by text;

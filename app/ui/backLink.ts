@@ -17,10 +17,26 @@ export function withReturnTo(href: string, returnTo: string): string {
   return `${href}?${RETURN_TO_PARAM}=${encodeURIComponent(returnTo)}`
 }
 
-// `from` is an untrusted query param: same-origin relative paths only, or every
-// detail page becomes an open redirect dressed up as a "back" link.
-function safeFrom(value: string | null | undefined): string | null {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return null
+// A return-to value is untrusted — a query param or a form field — so only a
+// same-origin relative path is let through. Otherwise every "back" link and
+// every redirect after a form post is an open redirect. The one copy of this
+// rule: the login form and the where-to-watch picker redirect with it too.
+//
+// Resolved rather than pattern-matched, because the browser resolves it too:
+// it reads `\` as `/` and drops tabs and newlines, so a path that doesn't start
+// with `//` as written can still start with `//` once parsed. Resolving against
+// a placeholder origin and checking we are still on it catches every such
+// spelling at once. The value itself is returned unchanged — it is the same
+// URL either way, and re-serialising would re-encode what the caller wrote.
+const RESOLVE_BASE = 'http://return-path.invalid'
+
+export function safeReturnPath(value: string | null | undefined): string | null {
+  if (!value || !value.startsWith('/')) return null
+  try {
+    if (new URL(value, RESOLVE_BASE).origin !== RESOLVE_BASE) return null
+  } catch {
+    return null
+  }
   return value
 }
 
@@ -46,7 +62,7 @@ const DESTINATIONS: [test: RegExp, label: string][] = [
 // would duplicate the nav; this appears only when the page was actually reached
 // from somewhere, and names that place.
 export function backLinkFrom(from: string | null | undefined): BackLink | null {
-  const href = safeFrom(from)
+  const href = safeReturnPath(from)
   if (!href) return null
 
   const path = href.split('?')[0]

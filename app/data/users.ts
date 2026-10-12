@@ -83,7 +83,11 @@ export async function findUserByEmail(db: Db, value: string, excludeUserId?: num
   })
 }
 
-export async function findUserByUsername(db: Db, value: string, excludeUserId?: number): Promise<User | null> {
+export async function findUserByUsername(
+  db: Db,
+  value: string,
+  excludeUserId?: number,
+): Promise<User | null> {
   const match = eq('display_name', value)
   return db.findOne(users, {
     where: excludeUserId === undefined ? match : and(match, ne('id', excludeUserId)),
@@ -113,6 +117,10 @@ export async function updateProfileSettings(
     profile_log_limit: settings.logLimit ?? undefined,
     profile_use_notes: settings.useNotes,
   })
+}
+
+export async function updateWatchRegion(db: Db, userId: number, region: string): Promise<void> {
+  await db.update(users, userId, { watch_region: region })
 }
 
 export async function updateUserPassword(db: Db, userId: number, passwordHash: string): Promise<void> {

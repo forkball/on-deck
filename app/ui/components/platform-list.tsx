@@ -10,12 +10,13 @@ const listStyle = css({
   marginTop: '4px',
 })
 
-const chipStyle = css({
+// The small rounded label a card's genres and platforms share.
+export const chipStyle = css({
   fontSize: '11px',
   padding: '2px 8px',
   borderRadius: '999px',
-  border: '1px solid #bbb',
-  color: '#666',
+  border: '1px solid var(--rule)',
+  color: 'var(--soft)',
 })
 
 // Grouped into families rather than listed raw — see platformFamilies, which

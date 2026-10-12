@@ -3,18 +3,25 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { getCatalogProvider } from '../../../data/catalog/provider.ts'
+import { getCatalogProvider, type CatalogSearchResult } from '../../../data/catalog/provider.ts'
 import {
   acceptBulk,
   confirmRow,
+  discardBatch,
   keepRow,
   loadBatch,
   loadReview,
+  loadRows,
+  reopenRow,
   repointRow,
   saveBatch,
   setConflictChoice,
-  skipRow,} from '../../../data/imports/batches.ts'
-import { isBulkAcceptable } from '../../../data/imports/classify.ts'
+  skipRow,
+  unacceptBulk,
+} from '../../../data/imports/batches.ts'
+import { checkTitleUnlocksQuietly } from '../../../data/profileTitles/unlocks.ts'
+import { looserQueries, parseBulkKind } from '../../../data/imports/classify.ts'
+import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import type { MediaType } from '../../../data/mediaItems.ts'
 import type { ImportBatch, User } from '../../../data/schema.ts'
 import { displayLabel } from '../../../data/users.ts'
@@ -37,9 +44,30 @@ async function findBatch(context: ImportBatchContext | ImportRowContext): Promis
   return { ok: true, batch, displayName: displayLabel(auth.identity) }
 }
 
-function backToReview(batch: ImportBatch, error?: string): Response {
+// Whether a saved import should offer to follow the diary it came from.
+//
+// Only after a Letterboxd import, and only to someone not already following:
+// the CSV has no username in it, so this is the first moment we could ask, and
+// the last moment it is obviously about the films they just brought across.
+// Books and games have their own importers and no feed behind them.
+export function offersFeed(batch: ImportBatch, identity: User): boolean {
+  return (
+    batch.status === 'done' &&
+    batch.source === 'letterboxd' &&
+    batch.media_type === 'movie' &&
+    identity.letterboxd_username == null &&
+    letterboxdSyncAvailableTo(identity)
+  )
+}
+
+// Where a no-JS post lands, so a long review doesn't restart at the top.
+const ANCHOR = /^(row-\d+|import-save)$/
+
+function backToReview(batch: ImportBatch, error?: string, anchor?: string): Response {
   const href = routes.profile.imports.review.href({ batchId: batch.id })
-  return redirect(error ? `${href}?error=${encodeURIComponent(error)}` : href, 303)
+  const query = error ? `?error=${encodeURIComponent(error)}` : ''
+  const fragment = anchor && ANCHOR.test(anchor) ? `#${anchor}` : ''
+  return redirect(`${href}${query}${fragment}`, 303)
 }
 
 export default createController(routes.profile.imports, {
@@ -66,6 +94,7 @@ export default createController(routes.profile.imports, {
           failed={batch.status === 'failed'}
           error={batch.error ?? undefined}
           progressHref={routes.profile.imports.progress.href({ batchId: batch.id })}
+          discardHref={routes.profile.imports.discard.href({ batchId: batch.id })}
           reviewHref={`${routes.profile.imports.review.href({ batchId: batch.id })}${partial}`}
         />,
       )
@@ -103,6 +132,7 @@ export default createController(routes.profile.imports, {
           batch={batch}
           model={model}
           saved={batch.status === 'done'}
+          offerFeed={offersFeed(batch, context.get(Auth).identity)}
           reviewsOnly={context.url.searchParams.get('partial') === 'reviews'}
           error={context.url.searchParams.get('error') ?? undefined}
         />,
@@ -117,15 +147,26 @@ export default createController(routes.profile.imports, {
       if (!found.ok) return found.response
       const { batch } = found
 
-      const { rows } = await loadReview(context.get(Database), batch)
+      const rows = await loadRows(context.get(Database), batch.id)
       const row = rows.find((candidate) => candidate.id === Number(context.params.rowId))
       if (!row) return new Response('Not found', { status: 404 })
 
       const provider = getCatalogProvider(batch.media_type as MediaType)
       const typed = context.url.searchParams.get('q')?.trim()
-      const query = typed || [row.raw_title, row.raw_year].filter(Boolean).join(' ')
+      const queries = typed
+        ? [{ query: typed, step: 'typed' as const }]
+        : looserQueries(row.raw_title, row.raw_year ?? null)
 
-      const results = await provider.search(query)
+      let searched = queries[0]!
+      let results: CatalogSearchResult[] = []
+      for (searched of queries) {
+        // What the person typed is free text; the looser queries are spellings of
+        // the row's own title.
+        results = await provider.search(
+          searched.step === 'typed' ? { text: searched.query } : { title: searched.query },
+        )
+        if (results.length > 0) break
+      }
 
       // Which catalog entries other rows already use, so the picker can say so
       // rather than let someone silently recreate the duplicate they opened it
@@ -140,7 +181,8 @@ export default createController(routes.profile.imports, {
         rowIndex: row.row_index,
         title: row.raw_title,
         year: row.raw_year ?? null,
-        query,
+        query: searched.query,
+        step: searched.step,
         suggestedExternalId: row.matched_external_id ?? null,
         candidates: results.slice(0, 8).map((result) => ({
           externalId: result.externalId,
@@ -162,6 +204,7 @@ export default createController(routes.profile.imports, {
       const formData = context.get(FormData)
       const rowId = Number(context.params.rowId)
       const action = String(formData.get('action') ?? '')
+      const anchor = String(formData.get('anchor') ?? '')
 
       if (action === 'confirm' || action === 'take') {
         await confirmRow(db, batch, rowId)
@@ -169,33 +212,37 @@ export default createController(routes.profile.imports, {
         await keepRow(db, batch, rowId)
       } else if (action === 'skip') {
         await skipRow(db, batch, rowId)
+      } else if (action === 'reopen') {
+        await reopenRow(db, batch, rowId)
       } else if (action === 'repoint') {
         const externalId = String(formData.get('external_id') ?? '').trim()
         if (!externalId) return backToReview(batch, 'Choose a film first.')
 
         const outcome = await repointRow(db, batch, rowId, externalId)
-        if (!outcome.ok) return backToReview(batch, outcome.error)
+        if (!outcome.ok) return backToReview(batch, outcome.error, anchor)
       }
 
-      return backToReview(batch)
+      return backToReview(batch, undefined, anchor)
     },
 
-    // The one bulk accept the page offers. Which rows qualify is recomputed
-    // here rather than taken from the form: the button says "the remaining N
-    // off-by-one matches", and that has to be what it does.
     async bulk(context: ImportBatchContext) {
       const found = await findBatch(context)
       if (!found.ok) return found.response
       const { batch } = found
 
       const db = context.get(Database)
-      const { model } = await loadReview(db, batch)
+      const form = context.get(FormData)
+      const kind = parseBulkKind(form.get('kind'))
+      if (!kind) return backToReview(batch)
 
-      const rowIds = model.uncertain
-        .filter(({ row }) => isBulkAcceptable({ state: 'uncertain', reason: row.reason, yearDelta: row.yearDelta }))
-        .map(({ row }) => row.id)
-
-      await acceptBulk(db, batch, rowIds)
+      // A toggle: ticked, the same press gives back the rows that accept took.
+      if (form.get('undo') === '1') {
+        await unacceptBulk(db, batch, kind)
+      } else {
+        // Recomputed rather than read from the form, so it takes what the page offered.
+        const { model } = await loadReview(db, batch)
+        await acceptBulk(db, batch, kind, model.bulk[kind])
+      }
       return backToReview(batch)
     },
 
@@ -218,8 +265,25 @@ export default createController(routes.profile.imports, {
       // Saving twice would re-upsert every row over the log it just wrote.
       if (batch.status !== 'review') return backToReview(batch)
 
-      await saveBatch(context.get(Database), batch)
+      const db = context.get(Database)
+      await saveBatch(db, batch)
+      await checkTitleUnlocksQuietly(db, batch.user_id)
       return backToReview(batch)
+    },
+
+    // Abandons an import that isn't saved yet, from either the wait or the
+    // review, and lands back on the import page to pick a source again.
+    async discard(context: ImportBatchContext) {
+      const found = await findBatch(context)
+      if (!found.ok) return found.response
+      const { batch } = found
+
+      // Refused only once saving has begun, so show sends it wherever it now belongs.
+      if (!(await discardBatch(context.get(Database), batch))) {
+        return redirect(routes.profile.imports.show.href({ batchId: batch.id }), 303)
+      }
+
+      return redirect(routes.profile.import.href(), 303)
     },
   },
 })

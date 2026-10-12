@@ -1,5 +1,5 @@
 import { headerIndex, parseCsv } from './csv.ts'
-import { normalizeTitle } from './classify.ts'
+import { normalizeTitle } from '../titles.ts'
 import { looksLikeZip, openZip } from './zip.ts'
 import { normalizeRating } from '../mediaItems.ts'
 import type { ParsedRow } from './batches.ts'

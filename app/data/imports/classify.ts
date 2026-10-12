@@ -1,27 +1,34 @@
 // How sure we are that a CSV row landed on the right catalog entry, and what to
 // tell someone about it. Deliberately free of the database and the catalog: the
 // rules are the part worth testing, and they only need the row and the result.
+import { normalizeTitle } from '../titles.ts'
 
 export type MatchReason = 'exact' | 'year_drift' | 'no_year' | 'title_differs'
+
+// The reasons review asks a question about, in page order; each is a section.
+export const REVIEW_REASONS = ['title_differs', 'no_year', 'year_drift'] as const
+export type ReviewReason = (typeof REVIEW_REASONS)[number]
+
+export function isReviewReason(reason: unknown): reason is ReviewReason {
+  return REVIEW_REASONS.includes(reason as ReviewReason)
+}
+
+// A subtitle follows a colon or a spaced dash.
+const SUBTITLE_SEPARATOR = /\s*(?::|\s[-–—])\s+/g
 
 // pending is the state a row is written in before matching reaches it.
 // confident/uncertain/not_found are what matching leaves behind; the rest are
 // what review writes over them. `kept` is a conflict decided in favour of the
 // log — nothing is written, but nothing is lost either, which is why it is not
 // the same as `skipped`.
-export type RowState =
-  | 'pending'
-  | 'confident'
-  | 'uncertain'
-  | 'not_found'
-  | 'confirmed'
-  | 'skipped'
-  | 'kept'
+export type RowState = 'pending' | 'confident' | 'uncertain' | 'not_found' | 'confirmed' | 'skipped' | 'kept'
 
 export interface CandidateLike {
   externalId: string
   title: string
   releaseYear: number | null
+  // Director or author, when known; tells namesakes apart.
+  creator?: string | null
 }
 
 export interface RowLike {
@@ -35,16 +42,6 @@ export interface Verdict {
   // Signed, so "matched 30 years later" and "30 years earlier" stay
   // distinguishable; the copy only uses its magnitude.
   yearDelta: number | null
-}
-
-// Trademark symbols, punctuation and spacing differ constantly between an
-// export and a catalog ("WALL·E" / "WALL-E"), so titles compare on letters and
-// digits only. Same normalization the Steam importer settled on.
-export function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
 }
 
 // `results` is the whole result set the match came from, not just the winner:
@@ -101,19 +98,30 @@ export function suspicion(verdict: Verdict): number {
   }
 }
 
-// Fits after the row, as a chip.
-export function describeReason(verdict: Verdict): string | null {
-  const magnitude = Math.abs(verdict.yearDelta ?? 0)
-
-  switch (verdict.reason) {
+// Heading and blurb for a review group.
+export function reasonGroup(
+  reason: MatchReason | null,
+  singular: string,
+  plural: string,
+): { title: string; blurb: string } {
+  switch (reason) {
     case 'title_differs':
-      return 'Title differs'
+      return {
+        title: 'Different title',
+        blurb: `The catalog's title isn't the one in your file — often a subtitle, or a different ${singular}.`,
+      }
     case 'no_year':
-      return 'No year in your CSV'
+      return {
+        title: 'No year in your file',
+        blurb: `Your file gives no year for these ${plural}, and some names belong to more than one. Pick the one you meant.`,
+      }
     case 'year_drift':
-      return magnitude === 1 ? 'Year off by 1' : `Year off by ${magnitude}`
+      return {
+        title: "Year doesn't match",
+        blurb: 'A year or so out is usually a festival or re-release date; further out may be a remake.',
+      }
     default:
-      return null
+      return { title: 'Worth checking', blurb: '' }
   }
 }
 
@@ -124,6 +132,46 @@ export const BULK_ACCEPT_MAX_DRIFT = 1
 
 export function isBulkAcceptable(verdict: Verdict): boolean {
   return verdict.reason === 'year_drift' && Math.abs(verdict.yearDelta ?? 0) <= BULK_ACCEPT_MAX_DRIFT
+}
+
+// The catalog title is the row's title plus a subtitle after a colon or spaced dash.
+export function isSubtitleOnly(rowTitle: string, matchTitle: string): boolean {
+  const wanted = normalizeTitle(rowTitle)
+  if (!wanted) return false
+
+  for (const separator of matchTitle.matchAll(SUBTITLE_SEPARATOR)) {
+    const before = matchTitle.slice(0, separator.index)
+    const after = matchTitle.slice(separator.index + separator[0].length)
+    if (normalizeTitle(before) === wanted && after.trim()) return true
+  }
+  return false
+}
+
+// Which one-tap accept, if any, covers a row: year off by at most one, a subtitle
+// added in the same year, or a no-year title the catalog has only one film for.
+export type BulkKind = 'year' | 'subtitle' | 'sole'
+
+export function parseBulkKind(value: unknown): BulkKind | null {
+  return value === 'year' || value === 'subtitle' || value === 'sole' ? value : null
+}
+
+export function bulkKind(
+  verdict: Verdict,
+  rowTitle: string,
+  matchTitle: string | null,
+  namesakes: number | null = null,
+): BulkKind | null {
+  if (isBulkAcceptable(verdict)) return 'year'
+  if (verdict.reason === 'no_year' && namesakes === 1) return 'sole'
+  if (
+    verdict.reason === 'title_differs' &&
+    verdict.yearDelta === 0 &&
+    matchTitle != null &&
+    isSubtitleOnly(rowTitle, matchTitle)
+  ) {
+    return 'subtitle'
+  }
+  return null
 }
 
 export interface DuplicateRow {
@@ -207,3 +255,66 @@ function normalizeNote(note: string | null): string {
 // What a conflicting row does when the person hasn't said otherwise. `keep` is
 // the default because it is the only direction that destroys nothing.
 export type ConflictChoice = 'keep' | 'take'
+
+// A no-year row's namesakes, matching's pick first, capped at three. One entry
+// means the catalog has only that film.
+export const MAX_INLINE_ALTERNATES = 3
+
+export function inlineAlternates(
+  row: RowLike,
+  verdict: Verdict,
+  chosen: CandidateLike | null,
+  results: CandidateLike[],
+): CandidateLike[] | null {
+  if (verdict.reason !== 'no_year' || !chosen) return null
+
+  const wanted = normalizeTitle(row.title)
+  const seen = new Set<string>()
+  const namesakes: CandidateLike[] = []
+
+  for (const result of [chosen, ...results]) {
+    if (seen.has(result.externalId) || normalizeTitle(result.title) !== wanted) continue
+    seen.add(result.externalId)
+    namesakes.push({
+      externalId: result.externalId,
+      title: result.title,
+      releaseYear: result.releaseYear,
+      // Books and games carry it in search results; addCreators fetches the rest.
+      creator: result.creator ?? null,
+    })
+  }
+
+  return namesakes.slice(0, MAX_INLINE_ALTERNATES)
+}
+
+// Written to accepted_by for a row settled by the member's answer in an earlier
+// saved import, keyed by answerKey, so re-uploading an export asks nothing twice.
+export const REMEMBERED = 'remembered'
+
+export function answerKey(title: string, year: number | null): string {
+  return `${normalizeTitle(title)}|${year ?? ''}`
+}
+
+// What "Find it" searches for, tightest first; the first with results is shown.
+// Each step drops something exports add that catalogs often don't: the year,
+// a bracketed aside, a subtitle, accents and "&". `step` says which the shown
+// results came from, so the picker can say so.
+export type QueryStep = 'year' | 'title' | 'simplified'
+
+export function looserQueries(title: string, year: number | null): { query: string; step: QueryStep }[] {
+  const bare = title.replace(/\s*[([][^)\]]*[)\]]/g, '').trim() || title
+  const main = bare.split(SUBTITLE_SEPARATOR)[0]!.trim() || bare
+  const plain = main
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s*&\s*/g, ' and ')
+  const steps: { query: string; step: QueryStep }[] = [
+    ...(year == null ? [] : [{ query: `${title} ${year}`, step: 'year' as const }]),
+    { query: title, step: 'title' },
+    ...[bare, main, plain].map((query) => ({ query, step: 'simplified' as const })),
+  ]
+  const seen = new Set<string>()
+  return steps
+    .map(({ query, step }) => ({ query: query.trim(), step }))
+    .filter(({ query }) => query.length >= 2 && !seen.has(query) && seen.add(query))
+}

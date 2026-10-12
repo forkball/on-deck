@@ -9,7 +9,8 @@ const STAR_SIZE = 24
 function StarIcon(handle: Handle<{ variant: 'outline' | 'filled' }>) {
   return () => {
     const { variant } = handle.props
-    const d = 'M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279L12 19.771l-7.416 3.642 1.48-8.279L.001 9.306l8.332-1.151z'
+    const d =
+      'M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279L12 19.771l-7.416 3.642 1.48-8.279L.001 9.306l8.332-1.151z'
     return (
       <svg viewBox="0 0 24 24" width={STAR_SIZE} height={STAR_SIZE} mix={css({ display: 'block' })}>
         <path
@@ -39,7 +40,12 @@ export function StarRatingDisplay(handle: Handle<{ value: number }>) {
           return (
             <span
               key={i}
-              mix={css({ position: 'relative', display: 'inline-block', width: `${STAR_SIZE}px`, height: `${STAR_SIZE}px` })}
+              mix={css({
+                position: 'relative',
+                display: 'inline-block',
+                width: `${STAR_SIZE}px`,
+                height: `${STAR_SIZE}px`,
+              })}
             >
               <span mix={css({ position: 'absolute', inset: 0 })}>
                 <StarIcon variant="outline" />
@@ -87,8 +93,8 @@ const CHOICE_GROUP = {
   '& label': {
     display: 'inline-block',
     borderRadius: '999px',
-    border: '1px solid #ccc',
-    color: '#666',
+    border: '1px solid var(--rule)',
+    color: 'var(--soft)',
     cursor: 'pointer',
     // Off the same constant as the stars it sits beside, so the two can't drift.
     // `box-sizing: border-box` makes this the outer height, and line-height less
@@ -98,13 +104,13 @@ const CHOICE_GROUP = {
     whiteSpace: 'nowrap',
   },
   '& label:hover': {
-    borderColor: '#999',
-    color: '#3c3c3c',
+    borderColor: 'var(--muted)',
+    color: 'var(--text)',
   },
   '& input:checked + label': {
-    borderColor: '#3c3c3c',
-    backgroundColor: '#3c3c3c',
-    color: '#fdf9f0',
+    borderColor: 'var(--text)',
+    backgroundColor: 'var(--text)',
+    color: 'var(--paper)',
   },
 } as const
 
@@ -187,7 +193,7 @@ export function StarRatingInput(
           })}
         </span>
 
-        <span mix={css({ fontSize: '13px', color: '#888' })}>or</span>
+        <span mix={css({ fontSize: '13px', color: 'var(--muted)' })}>or</span>
 
         {/* Same radio group as the stars, so picking this deselects them. It
             sits outside the strip above, whose `input:checked ~ label` fill

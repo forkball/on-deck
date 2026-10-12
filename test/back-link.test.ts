@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { backLinkFrom, RETURN_TO_PARAM, withReturnTo } from '../app/ui/backLink.ts'
+import { backLinkFrom, RETURN_TO_PARAM, safeReturnPath, withReturnTo } from '../app/ui/backLink.ts'
 
 // Both ends of the return-path contract: a list writes where it was opened
 // from, and the page it opens reads that back to offer a way there. They only
@@ -89,5 +89,30 @@ describe('backLinkFrom', () => {
 
   it('matches on the path, ignoring the query', () => {
     assert.equal(backLinkFrom('/profile/watched?page=9&type=game')?.label, '← Back to your log')
+  })
+})
+
+describe('safeReturnPath', () => {
+  it('lets a same-site path through unchanged', () => {
+    for (const path of ['/', '/profile', '/profile?x=1#y', '/users/3?tab=game', '/profile?q=a b&e=🎲']) {
+      assert.equal(safeReturnPath(path), path)
+    }
+  })
+
+  it('refuses a path the browser would resolve to another host', () => {
+    // Not starting with `//` as written is not enough: the browser reads `\` as
+    // `/` and drops tabs and newlines, so all of these become `//evil.test` by
+    // the time a redirect or a link is followed. The first assertion pins that
+    // down, so the list stays a list of real bypasses.
+    for (const hostile of [
+      '//evil.test',
+      '/\\evil.test',
+      '/\\/evil.test',
+      '/\t/evil.test',
+      '/\n/evil.test',
+    ]) {
+      assert.equal(new URL(hostile, 'https://app.test').host, 'evil.test', JSON.stringify(hostile))
+      assert.equal(safeReturnPath(hostile), null, JSON.stringify(hostile))
+    }
   })
 })

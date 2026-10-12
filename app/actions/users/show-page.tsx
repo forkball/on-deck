@@ -1,6 +1,8 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import { DisclosureChevron } from '../../ui/shared/collapsible.tsx'
+
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
 import {
   ACTIVE_MEDIA_TYPES,
@@ -12,11 +14,14 @@ import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { Document } from '../../ui/components/document.tsx'
+import { Page } from '../../ui/components/page.tsx'
+import { CreditGroups, TITLES_TAB, type Credit } from '../../ui/components/credit-tiles.tsx'
+import { UserTitle } from '../../ui/components/user-title.tsx'
+import { composeTitle } from '../../data/profileTitles/catalog.ts'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
-import { Nav } from '../../ui/components/nav.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
 import { withReturnTo } from '../../ui/backLink.ts'
+import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 
@@ -28,10 +33,15 @@ export interface UserProfilePageProps {
   viewerFollows: boolean
   // Absent when `locked` — there's nothing to show them.
   media?: MediaSummaries
-  activeTab?: ActiveMediaType
+  activeTab?: ActiveMediaType | typeof TITLES_TAB
   bio?: string
   followingCount: number
   followersCount: number
+  // The credits they've earned, for the Titles tab — only those, without the
+  // rest or their progress toward them, which would read out their counts (how
+  // many things they've disliked, say). Absent when `locked`: what someone has earned says what
+  // they've logged.
+  credits?: Credit[]
   displayName: string
 }
 
@@ -41,14 +51,22 @@ function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>)
 
     return (
       <details>
-        <summary mix={css({ cursor: 'pointer' })}>
-          <h2 mix={css({ display: 'inline' })}>{label}</h2>
+        <summary class="disclosure">
+          <h2 mix={css({ margin: 0 })}>{label}</h2>
+          <DisclosureChevron />
         </summary>
-        <div mix={css({ border: '1px solid #ddd', borderRadius: '8px', padding: '16px', marginTop: '12px' })}>
+        <div
+          mix={css({
+            border: '1px solid var(--rule)',
+            borderRadius: '8px',
+            padding: '16px',
+            marginTop: '12px',
+          })}
+        >
           {summary ? (
             <p mix={css({ margin: 0 })}>{summary}</p>
           ) : (
-            <p mix={css({ margin: 0, color: '#555' })}>Nothing written yet.</p>
+            <p mix={css({ margin: 0, color: 'var(--soft)' })}>Nothing written yet.</p>
           )}
         </div>
       </details>
@@ -71,7 +89,16 @@ function LoggedList(
 
     return (
       <>
-        <ul mix={css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '16px' })}>
+        <ul
+          mix={css({
+            listStyle: 'none',
+            margin: 0,
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          })}
+        >
           {log.map(({ interaction, item }) => (
             <WatchedListItem
               key={interaction.id}
@@ -83,7 +110,7 @@ function LoggedList(
         </ul>
         {seeAllHref && total > log.length && (
           <p mix={css({ marginTop: '16px' })}>
-            <a href={seeAllHref}>See all {total} →</a>
+            <Link href={seeAllHref}>See all {total} →</Link>
           </p>
         )}
       </>
@@ -106,9 +133,9 @@ function FollowButton(handle: Handle<{ userId: number; following: boolean; retur
         }
       >
         <input type="hidden" name="return_to" value={returnTo} />
-        <button type="submit" mix={css({ width: '100%', padding: '8px 12px' })}>
+        <Button type="submit" mix={css({ width: '100%' })}>
           {following ? 'Unfollow' : 'Follow'}
-        </button>
+        </Button>
       </form>
     )
   }
@@ -116,73 +143,92 @@ function FollowButton(handle: Handle<{ userId: number; following: boolean; retur
 
 export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
   return () => {
-    const { user, locked, viewerFollows, media, activeTab, bio, followingCount, followersCount, displayName } =
-      handle.props
+    const {
+      user,
+      locked,
+      viewerFollows,
+      media,
+      activeTab,
+      bio,
+      followingCount,
+      followersCount,
+      credits,
+      displayName,
+    } = handle.props
     const label = displayLabel(user)
     const returnTo = routes.users.show.href({ userId: String(user.id) })
 
     return (
-      <Document title={`${label} | On Deck`}>
-        <Nav authed={true} displayName={displayName} />
-        <main mix={css({ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' })}>
-          <h1 mix={css({ margin: '0 0 4px', overflowWrap: 'break-word' })}>{label}</h1>
-          <p mix={css({ margin: '0 0 12px', color: '#555' })}>
-            {locked ? (
-              <>
-                {followingCount} following · {followersCount} follower{followersCount === 1 ? '' : 's'}
-              </>
-            ) : (
-              <>
-                <a href={routes.users.following.href({ userId: String(user.id) })}>{followingCount} following</a> ·{' '}
-                <a href={routes.users.followers.href({ userId: String(user.id) })}>
-                  {followersCount} follower{followersCount === 1 ? '' : 's'}
-                </a>
-              </>
-            )}
-          </p>
-          <FollowButton userId={user.id} following={viewerFollows} returnTo={returnTo} />
-
+      <Page title={label} displayName={displayName}>
+        <h1 mix={css({ marginBottom: '4px', overflowWrap: 'break-word' })}>{label}</h1>
+        {/* Worn in public: shown even on a private profile, like the name. */}
+        <UserTitle title={composeTitle(user.title_adjective, user.title_noun)} margin="0 0 8px" />
+        <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>
           {locked ? (
-            <p>This profile is private. Follow {label} to see their bio and log.</p>
+            <>
+              {followingCount} following · {followersCount} follower{followersCount === 1 ? '' : 's'}
+            </>
           ) : (
             <>
-              {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
-
-              <MediaTabs
-                idPrefix="user-profile"
-                active={activeTab!}
-                panels={Object.fromEntries(
-                  ACTIVE_MEDIA_TYPES.map((type) => {
-                    const ui = MEDIA_TYPE_UI[type]
-                    const { summary, log, total } = media![type]
-                    const watchedHref = routes.users.watched.href({ userId: String(user.id) })
-
-                    return [
-                      type,
-                      <>
-                        <TasteProfileSummary label={`${label}'s ${ui.attributive} taste profile`} summary={summary} />
-                        <h2>
-                          What {label} has {ui.pastParticiple}
-                        </h2>
-                        <LoggedList
-                          log={log}
-                          total={total}
-                          detailHref={(id) =>
-                            withReturnTo(ui.hrefs.show(id), `${returnTo}?tab=${type}`)
-                          }
-                          seeAllHref={
-                            type === DEFAULT_MEDIA_TYPE ? watchedHref : `${watchedHref}?type=${type}`
-                          }
-                        />
-                      </>,
-                    ]
-                  }),
-                )}
-              />
+              <Link href={routes.users.following.href({ userId: String(user.id) })}>
+                {followingCount} following
+              </Link>{' '}
+              ·{' '}
+              <Link href={routes.users.followers.href({ userId: String(user.id) })}>
+                {followersCount} follower{followersCount === 1 ? '' : 's'}
+              </Link>
             </>
           )}
-        </main>
-      </Document>
+        </p>
+        <FollowButton userId={user.id} following={viewerFollows} returnTo={returnTo} />
+
+        {locked ? (
+          <p>This profile is private. Follow {label} to see their bio and log.</p>
+        ) : (
+          <>
+            {bio && <p mix={css({ whiteSpace: 'pre-wrap' })}>{bio}</p>}
+
+            <MediaTabs
+              idPrefix="user-profile"
+              active={activeTab!}
+              extraTabs={[
+                {
+                  id: TITLES_TAB,
+                  label: 'Titles',
+                  end: true,
+                  panel: <CreditGroups credits={credits ?? []} earnedOnly />,
+                },
+              ]}
+              panels={Object.fromEntries(
+                ACTIVE_MEDIA_TYPES.map((type) => {
+                  const ui = MEDIA_TYPE_UI[type]
+                  const { summary, log, total } = media![type]
+                  const watchedHref = routes.users.watched.href({ userId: String(user.id) })
+
+                  return [
+                    type,
+                    <>
+                      <TasteProfileSummary
+                        label={`${label}'s ${ui.attributive} taste profile`}
+                        summary={summary}
+                      />
+                      <h2>
+                        What {label} has {ui.pastParticiple}
+                      </h2>
+                      <LoggedList
+                        log={log}
+                        total={total}
+                        detailHref={(id) => withReturnTo(ui.hrefs.show(id), `${returnTo}?tab=${type}`)}
+                        seeAllHref={type === DEFAULT_MEDIA_TYPE ? watchedHref : `${watchedHref}?type=${type}`}
+                      />
+                    </>,
+                  ]
+                }),
+              )}
+            />
+          </>
+        )}
+      </Page>
     )
   }
 }

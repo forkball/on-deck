@@ -5,11 +5,13 @@ import type { UserMediaInteraction } from '../../data/schema.ts'
 import type { ActiveMediaType } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
 import { FrameForm } from '../../browser/frame-form.tsx'
+import { PencilIcon } from './log-icons.tsx'
 import { Modal } from './modal.tsx'
 import { NotesField } from './notes-field.tsx'
 import { StarRatingInput } from './star-rating.tsx'
 import { StatusSelect } from './status-select.tsx'
 import { Field } from '../shared/field.tsx'
+import { Button } from '../shared/form-controls.tsx'
 
 export interface MediaLogEditModalProps {
   interaction: UserMediaInteraction
@@ -27,7 +29,12 @@ export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
     const { interaction, title, returnTo, mediaType } = handle.props
 
     return (
-      <Modal id={`edit-log-${interaction.id}`} triggerLabel="Edit" title={title}>
+      <Modal
+        id={`edit-log-${interaction.id}`}
+        triggerLabel="Edit log"
+        triggerIcon={<PencilIcon />}
+        title={title}
+      >
         <form
           id={`edit-log-form-${interaction.id}`}
           method="post"
@@ -65,14 +72,19 @@ export function MediaLogEditModal(handle: Handle<MediaLogEditModalProps>) {
           >
             <input type="hidden" name="_method" value="DELETE" />
             <input type="hidden" name="return_to" value={returnTo} />
-            <button type="submit" class="danger">
+            <Button type="submit" variant="danger">
               Delete log
-            </button>
+            </Button>
             <FrameForm />
           </form>
-          <button type="submit" form={`edit-log-form-${interaction.id}`} mix={css({ marginLeft: 'auto' })}>
+          <Button
+            type="submit"
+            variant="primary"
+            form={`edit-log-form-${interaction.id}`}
+            mix={css({ marginLeft: 'auto' })}
+          >
             Save
-          </button>
+          </Button>
         </div>
       </Modal>
     )

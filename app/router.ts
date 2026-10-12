@@ -5,6 +5,7 @@ import { methodOverride } from 'remix/middleware/method-override'
 import { session } from 'remix/middleware/session'
 
 import controller from './actions/controller.tsx'
+import adminController from './actions/admin/controller.tsx'
 import authController from './actions/auth/controller.tsx'
 import authLoginController from './actions/auth/login/controller.tsx'
 import authSignupController from './actions/auth/signup/controller.tsx'
@@ -28,6 +29,8 @@ import usersController from './actions/users/controller.tsx'
 import { loadDatabase } from './data/db.ts'
 import type { AppContext } from './middleware/context.ts'
 import { loadAuth } from './middleware/auth.ts'
+import { accessLog } from './middleware/accessLog.ts'
+import { inPlace } from './middleware/inPlace.ts'
 import { render } from './middleware/render.tsx'
 import { sessionCookie, sessionStorage } from './middleware/session.ts'
 import { routes } from './routes.ts'
@@ -41,6 +44,8 @@ declare module 'remix/router' {
 export const router = createRouter<AppContext>({
   middleware: [
     staticFiles('./public', { index: false }),
+    accessLog(),
+    inPlace(),
     render(),
     // Default max file size (2 MiB) is too small for some ratings.csv exports.
     formData({ maxFileSize: 25 * 1024 * 1024 }),
@@ -52,6 +57,7 @@ export const router = createRouter<AppContext>({
 })
 
 router.map(routes, controller)
+router.map(routes.admin, adminController)
 router.map(routes.auth, authController)
 router.map(routes.auth.login, authLoginController)
 router.map(routes.auth.signup, authSignupController)

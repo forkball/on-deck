@@ -1,4 +1,5 @@
 import type { TmdbSearchResult as CatalogSearchResult } from './tmdb.ts'
+import { normalizeTitle } from '../titles.ts'
 
 // `search` cannot be combined with `sort` — that pairing 406s — so relevance
 // ranking happens here rather than in the query.
@@ -46,15 +47,26 @@ export function platformFamilies(platforms: string[]): string[] {
     else if (!unmatched.includes(platform)) unmatched.push(platform)
   }
 
-  return [...PLATFORM_FAMILIES.filter((family) => found.has(family.label)).map((family) => family.label), ...unmatched]
+  return [
+    ...PLATFORM_FAMILIES.filter((family) => found.has(family.label)).map((family) => family.label),
+    ...unmatched,
+  ]
 }
 
+// IGDB's own genre names, lowercased, because that is what a game's tags are compared
+// against — provider.genres feeds the form's dropdown and the value it submits is
+// matched against `genres.name` from the API. A spelling that IGDB never returns is a
+// filter that can only answer nothing: "hack and slash/beat em up" was written here
+// without the apostrophe IGDB uses, so choosing it kept 0 of 3 games that carry the
+// genre (Devil May Cry 5, Bayonetta, Hades).
+//
+// test/catalog-genres.test.ts checks this list against the live API.
 export const GAME_GENRES: string[] = [
   'adventure',
   'arcade',
   'card & board game',
   'fighting',
-  'hack and slash/beat em up',
+  "hack and slash/beat 'em up",
   'indie',
   'moba',
   'music',
@@ -82,6 +94,9 @@ interface IgdbImage {
 interface IgdbGame {
   id: number
   name?: string
+  // The game's page on igdb.com. Carried because the page is addressed by slug,
+  // which external_id (the numeric id) can't be turned back into.
+  url?: string
   first_release_date?: number
   summary?: string | null
   cover?: IgdbImage
@@ -90,6 +105,12 @@ interface IgdbGame {
   game_modes?: { name: string }[]
   involved_companies?: { developer?: boolean; company?: { name?: string } }[]
   platforms?: { name?: string; abbreviation?: string }[]
+  // IGDB's two groupings, both carried because they answer different halves of "is
+  // this the same series": a collection is the numbered line (Portal), a franchise
+  // the umbrella over several (The Legend of Zelda, whose games sit in different
+  // collections). Either overlapping is enough to call two games the same series.
+  collections?: { name?: string }[]
+  franchises?: { name?: string }[]
   total_rating_count?: number
 }
 
@@ -184,8 +205,12 @@ async function igdbQuery<T>(endpoint: string, body: string): Promise<T[]> {
 }
 
 const GAME_FIELDS =
-  'fields name,first_release_date,summary,total_rating_count,cover.url,screenshots.url,genres.name,game_modes.name,' +
-  'involved_companies.developer,involved_companies.company.name,platforms.name,platforms.abbreviation;'
+  'fields name,url,first_release_date,summary,total_rating_count,cover.url,screenshots.url,genres.name,game_modes.name,' +
+  'involved_companies.developer,involved_companies.company.name,platforms.name,platforms.abbreviation,' +
+  // Free: search and by-id share this clause, so the series arrives with every hit
+  // and costs no extra request. Google Books has no equivalent, which is why books
+  // ask the model instead.
+  'collections.name,franchises.name;'
 
 // IGDB's game_modes vocabulary (/v4/game_modes) has no "versus" mode, and its
 // plain "Multiplayer" means "more than one player", not "competitive" — It Takes
@@ -228,7 +253,10 @@ function toResult(game: IgdbGame, hoursToBeat: number | null): CatalogSearchResu
     externalId: String(game.id),
     title: game.name ?? 'Untitled',
     releaseYear: game.first_release_date ? new Date(game.first_release_date * 1000).getUTCFullYear() : null,
-    tags: [...(game.genres ?? []).map((genre) => genre.name.toLowerCase()), ...derivePlayerTags(game.game_modes)],
+    tags: [
+      ...(game.genres ?? []).map((genre) => genre.name.toLowerCase()),
+      ...derivePlayerTags(game.game_modes),
+    ],
     posterUrl: image(game.cover?.url, 't_cover_big'),
     popularity: game.total_rating_count ?? 0,
     overview: game.summary?.trim() || null,
@@ -236,12 +264,22 @@ function toResult(game: IgdbGame, hoursToBeat: number | null): CatalogSearchResu
     pageCount: null,
     playtimeHours: hoursToBeat,
     creator: developerOf(game),
+    sourceUrl: pageUrlOf(game),
+    series: [...(game.collections ?? []), ...(game.franchises ?? [])]
+      .map((entry) => entry.name)
+      .filter((name): name is string => Boolean(name)),
     images: stills,
     // Abbreviations — the full names ("PC (Microsoft Windows)") don't fit a card.
     platforms: (game.platforms ?? [])
       .map((platform) => platform.abbreviation || platform.name)
       .filter((name): name is string => Boolean(name)),
   }
+}
+
+// Only an igdb.com address is kept: it is rendered as a link, so anything else
+// the field ever held would be a link to somewhere we didn't mean to send people.
+function pageUrlOf(game: IgdbGame): string | null {
+  return game.url && /^https:\/\/www\.igdb\.com\/games\/[a-z0-9-]+$/i.test(game.url) ? game.url : null
 }
 
 function developerOf(game: IgdbGame): string | null {
@@ -276,9 +314,10 @@ export async function searchGames(query: string): Promise<CatalogSearchResult[]>
 
   // IGDB's relevance puts "Elden Ring Nightreign" above "Elden Ring", and it
   // won't sort a search server-side. Exact title first, then rating count.
-  const wanted = normalize(query)
+  const wanted = normalizeTitle(query)
   const ranked = [...games].sort((a, b) => {
-    const exact = Number(normalize(b.name ?? '') === wanted) - Number(normalize(a.name ?? '') === wanted)
+    const exact =
+      Number(normalizeTitle(b.name ?? '') === wanted) - Number(normalizeTitle(a.name ?? '') === wanted)
     if (exact !== 0) return exact
     return (b.total_rating_count ?? 0) - (a.total_rating_count ?? 0)
   })
@@ -309,10 +348,6 @@ export async function getGameById(externalId: string): Promise<CatalogSearchResu
   } catch {
     return null
   }
-}
-
-function normalize(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
 export function slugifyTitle(title: string): string {

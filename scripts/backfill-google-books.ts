@@ -6,8 +6,16 @@
 // finding the old one.
 //
 // Dry run by default — prints what it would do without writing anything.
-// Pass --apply to actually update rows. Pass --limit N to try it on a
-// handful first.
+// Pass --apply to actually update rows. Pass --limit=N to try it on a handful
+// first, --max-requests=N to stop at a spend you choose, --retry-settled to
+// re-ask about rows a previous run already gave a verdict on, --user=<display
+// name> to do one person's shelf rather than the whole table, and
+// --skip=<id>,<id> to leave named rows alone.
+//
+// Every attempt is recorded in book_backfill_attempts, and a row with a settled
+// verdict is left out of the next run. Without that the rows this can't match stay
+// in the set it selects — over half of them — so a second run spends most of its
+// quota re-deriving failures it already knew. That quota is shared with the live app.
 //
 // No stored ISBN exists on these rows to anchor a match, so this recovers
 // one from Open Library's own edition data first and matches Google Books by
@@ -15,6 +23,24 @@
 // overwrite a row's metadata (poster, description, page count) while a
 // user's rating/notes stay attached to it. Rows that don't clear an ISBN and
 // a title sanity check are left untouched rather than forced.
+//
+// Where no ISBN turns up, or the one that does leads to a different book, there
+// is a second attempt by title and author — `intitle:`/`inauthor:`, which is a
+// question precise enough to be worth asking (app/data/catalog/googleBooks.ts).
+// It has to clear the title check *and* the author, since a title alone is what
+// this refuses to match on. Open Library's ISBN is often an edition in another
+// language: "La Mort heureuse" resolves to an ISBN for "A Happy Death", which
+// fails the title check and leaves the row untouched though Google holds the
+// French edition too.
+//
+// Pass --production to run it against production. That is the only way this
+// reaches production: without it the connection is DATABASE_URL, so a run with a
+// flag forgotten touches development rather than everyone's rows. Same reasoning
+// as scripts/prod-query.ts, which reads PRODUCTION_DATABASE_URL and never
+// DATABASE_URL — a script that touches production should say so rather than
+// inherit whatever the ambient environment points at. `npm run
+// prod:backfill-books` is that spelling, and the narrow capability the settings
+// can allow.
 //
 // Deliberately its own pool rather than the app's (app/data/db.ts) — see
 // db/migrate.ts for why.
@@ -24,20 +50,68 @@ import { Pool, types } from 'pg'
 import { createDatabase } from 'remix/data-table'
 import { createPostgresDatabaseAdapter } from 'remix/data-table/postgres'
 
-import { mediaItems, type MediaItem } from '../app/data/schema.ts'
 import { rematchMediaItem } from '../app/data/mediaItems.ts'
-import { getBookById, searchGoogleBooksOnly } from '../app/data/catalog/googleBooks.ts'
+import {
+  fieldedBookQuery,
+  getBookById,
+  plainBookQuery,
+  searchGoogleBooksOnly,
+} from '../app/data/catalog/googleBooks.ts'
 import type { TmdbSearchResult as CatalogSearchResult } from '../app/data/catalog/tmdb.ts'
 import { runBounded } from '../app/data/imports/csv.ts'
+import { normalizeName, titleWordsFitInside, titlesNameSameWork } from '../app/data/titles.ts'
+import { parseMediaMetadata } from '../app/data/mediaMetadata.ts'
 
 types.setTypeParser(types.builtins.INT8, (value) => parseInt(value, 10))
 types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value))
 
-const APPLY = process.argv.includes('--apply')
-const limitArg = process.argv.find((arg) => arg.startsWith('--limit='))
-const LIMIT = limitArg ? Number(limitArg.slice('--limit='.length)) : undefined
+// Shared by the row selection and the already-settled count, so the two cannot drift
+// and report a tally for a different set than the one being worked on.
+const LOGGED_BY = `and exists (
+  select 1 from user_media_interactions i
+    join users u on u.id = i.user_id
+   where i.media_item_id = m.id and u.display_name = $1)`
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const APPLY = process.argv.includes('--apply')
+const RETRY_SETTLED = process.argv.includes('--retry-settled')
+
+function numericFlag(name: string): number | undefined {
+  const arg = process.argv.find((candidate) => candidate.startsWith(`--${name}=`))
+  return arg ? Number(arg.slice(name.length + 3)) : undefined
+}
+
+const LIMIT = numericFlag('limit')
+
+// Whose books to repoint, by display name. Every remaining Open Library row is in
+// someone's shelf now, so a run is no longer a faceless batch: this is what makes it
+// possible to do one person's books, read every line, and stop — which is the pace the
+// matching rules have earned, having produced a new kind of wrong match in each of
+// four consecutive rounds.
+const userArg = process.argv.find((candidate) => candidate.startsWith('--user='))
+const USER = userArg?.slice('--user='.length)
+
+// Rows to leave alone, by id. For the ones a dry run shows this cannot settle and no
+// rule is going to: a comic titled "Batman" or "Punisher" gives the title check
+// nothing to work with, and the author agrees across a publisher's whole line, so
+// every candidate passes and the pick comes down to a tiebreak. Those are better
+// repointed by hand, by someone who knows which book they own, than by a heuristic
+// tuned until it happens to agree.
+const skipArg = process.argv.find((candidate) => candidate.startsWith('--skip='))
+const SKIP = new Set(
+  (skipArg?.slice('--skip='.length) ?? '')
+    .split(',')
+    .map((id) => Number(id.trim()))
+    .filter((id) => Number.isInteger(id) && id > 0),
+)
+// A ceiling on Google Books requests for this run, counted across both the
+// search and the by-id lookup that applying a match costs. Rows are left for the
+// next run rather than half-done: the budget is checked before a row starts.
+const MAX_REQUESTS = numericFlag('max-requests')
+
+const PRODUCTION = process.argv.includes('--production')
+const CONNECTION = PRODUCTION ? process.env.PRODUCTION_DATABASE_URL : process.env.DATABASE_URL
+
+const pool = new Pool({ connectionString: CONNECTION })
 const db = createDatabase(createPostgresDatabaseAdapter(pool))
 
 // Google Books' quota is 100 requests/minute/user — measured live, a plain
@@ -58,53 +132,119 @@ async function throttleGoogleBooks(): Promise<void> {
       googleBooksCallTimes.push(now)
       return
     }
-    await new Promise((resolve) => setTimeout(resolve, GOOGLE_BOOKS_RATE_WINDOW_MS - (now - googleBooksCallTimes[0])))
+    await new Promise((resolve) =>
+      setTimeout(resolve, GOOGLE_BOOKS_RATE_WINDOW_MS - (now - googleBooksCallTimes[0])),
+    )
   }
 }
 
-// Same title-similarity check app/data/recommendations/matching.ts uses,
-// copied rather than imported — that module pulls in the app's live db pool
-// and the Claude client at import time, neither of which this script wants.
-function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
+// The budget, alongside the window above. The window keeps a run under Google's
+// per-minute cap; this is what keeps one run from taking the whole day's quota,
+// which the live app draws on too. Checked before a row starts rather than before
+// each request, so a row in flight finishes rather than being left half-applied —
+// a run can overshoot by the two requests one row costs.
+let requestsSpent = 0
+
+function budgetSpent(): boolean {
+  return MAX_REQUESTS != null && requestsSpent >= MAX_REQUESTS
 }
 
-function levenshteinDistance(a: string, b: string): number {
-  const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0))
-  for (let i = 0; i <= a.length; i++) dp[i][0] = i
-  for (let j = 0; j <= b.length; j++) dp[0][j] = j
-  for (let i = 1; i <= a.length; i++) {
-    for (let j = 1; j <= b.length; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+async function spendGoogleBooksRequest<T>(work: () => Promise<T>): Promise<T> {
+  await throttleGoogleBooks()
+  requestsSpent++
+  return work()
+}
+
+// An empty `items` from Google Books is not reliably an answer: measured twice in
+// twenty searches, with the same query returning results moments later. Now that a
+// verdict is recorded and honoured, believing the first empty response writes the
+// row off for good — so it is asked a second time before that.
+const EMPTY_RETRY_DELAY_MS = 1_000
+
+async function searchGoogleBooksTwice(query: string): Promise<CatalogSearchResult[]> {
+  const first = await spendGoogleBooksRequest(() => searchGoogleBooksOnly(query))
+  if (first.length > 0) return first
+
+  await new Promise((resolve) => setTimeout(resolve, EMPTY_RETRY_DELAY_MS))
+  return spendGoogleBooksRequest(() => searchGoogleBooksOnly(query))
+}
+
+// A query whose answer is not in doubt, asked before an empty result is believed.
+//
+// Google Books answers a query it will not serve with HTTP 200 and `totalItems: 0`,
+// which is indistinguishable from "no such book" — nothing throws, so no retry helps.
+// A run once recorded 29 of 30 rows as "no hit" that way while the field qualifiers
+// were down, and those verdicts are settled, so they would never be re-asked.
+//
+// So "no hit" has to be a fact about the catalogue rather than about the day. If the
+// canary is empty too, the run stops rather than record fiction.
+// Unqualified on purpose. A qualified canary cannot survive the thing it watches for:
+// when the field qualifiers went dead it would have aborted every run while the
+// catalogue was answering plain queries perfectly well.
+const CANARY_QUERY = 'dune'
+
+// How long a passing canary stands for. Not once per run: a run of 500 rows takes
+// twenty minutes, and an outage starting in the middle of one would poison every
+// verdict after it while an answer from minute one vouched for them.
+const CANARY_GOOD_FOR_MS = 30_000
+
+let canaryCheckedAt = 0
+let abortReason: string | null = null
+
+// A 429 answers for every row at once: the limit is on the key, not the query, so the
+// next request cannot do better than the last. A run that kept going through one spent
+// 174 requests to settle 16 rows. Needs no second opinion, unlike an empty result.
+function looksRateLimited(error: unknown): boolean {
+  return /\b429\b|rate limit|quota/i.test(error instanceof Error ? error.message : String(error))
+}
+
+function stopForRateLimit(): void {
+  abortReason ??=
+    'Google Books answered 429 — the key is over its rate or daily limit, so every ' +
+    'further request would fail the same way. Rows reached after this are recorded as ' +
+    'unavailable, which is not a settled verdict: a later run retries them with no flag.'
+}
+
+// Whether the field qualifiers are answering today, asked once. When they work an
+// ISBN settles most rows in one request; when they don't, each is a request spent to
+// be told nothing — 5.5 per row against 1.6. So they are dropped for the rest of a run
+// if the first one comes back empty.
+const QUALIFIED_CANARY = 'intitle:"dune"'
+
+let qualifiersAnswer: boolean | null = null
+
+async function qualifiersWork(): Promise<boolean> {
+  if (qualifiersAnswer == null) {
+    const probe = await spendGoogleBooksRequest(() => searchGoogleBooksOnly(QUALIFIED_CANARY))
+    qualifiersAnswer = probe.length > 0
+    if (!qualifiersAnswer) {
+      console.log(
+        `Google Books answered ${JSON.stringify(QUALIFIED_CANARY)} with nothing while plain ` +
+          'text still works, so the field qualifiers are not answering. Asking by ISBN is ' +
+          'skipped for this run; rows are settled on title and author instead.',
+      )
     }
   }
-  return dp[a.length][b.length]
+  return qualifiersAnswer
 }
 
-const TITLE_SIMILARITY_THRESHOLD = 0.5
+async function believesEmptyResults(): Promise<boolean> {
+  if (abortReason != null) return false
+  if (Date.now() - canaryCheckedAt < CANARY_GOOD_FOR_MS) return true
 
-// Google's book titles often carry a marketing subtitle Open Library's don't
-// ("Night Shift" vs "Night Shift: INCLUDES THE STORY OF 'THE BOOGEYMAN'...")
-// — stripped at the first colon before falling back to Levenshtein, same as
-// matching.ts's withoutSubtitle. Missing this dropped 51 of 93 mismatches in
-// an earlier dry run down to a formatting difference, not a wrong book.
-function withoutSubtitle(title: string): string {
-  const [main] = title.split(/\s*[:–—]\s*/)
-  return normalizeTitle(main ?? title)
-}
+  const canary = await spendGoogleBooksRequest(() => searchGoogleBooksOnly(CANARY_QUERY))
+  if (canary.length > 0) {
+    canaryCheckedAt = Date.now()
+    return true
+  }
 
-function titlesLikelyMatch(a: string, b: string): boolean {
-  const na = normalizeTitle(a)
-  const nb = normalizeTitle(b)
-  if (!na || !nb) return false
-  if (na === nb) return true
-  if (na === withoutSubtitle(b) || withoutSubtitle(a) === nb) return true
-  const distance = levenshteinDistance(na, nb)
-  return 1 - distance / Math.max(na.length, nb.length) >= TITLE_SIMILARITY_THRESHOLD
+  abortReason =
+    `Google Books answered ${JSON.stringify(CANARY_QUERY)} with nothing, so it is not ` +
+    'answering at all. Stopping rather than recording verdicts that would take an outage ' +
+    'to justify. Google reports this as an empty result rather than an error, so there is ' +
+    'nothing in the response to read — try the same query in a browser to see whether it ' +
+    'is the catalogue or us.'
+  return false
 }
 
 const OPEN_LIBRARY_BASE = 'https://openlibrary.org'
@@ -166,7 +306,7 @@ async function findIsbnForWork(workExternalId: string): Promise<string | null> {
   }
 
   // No English-tagged edition carried an ISBN — fall back to the first one
-  // that has any, same as before. titlesLikelyMatch still gates the result,
+  // that has any, same as before. titlesNameSameWork still gates the result,
   // so a foreign match here gets caught rather than written.
   for (const edition of entries) {
     const isbn = pickIsbn(edition)
@@ -176,75 +316,297 @@ async function findIsbnForWork(workExternalId: string): Promise<string | null> {
   return null
 }
 
-type Row = MediaItem
+interface Row {
+  id: number
+  external_id: string
+  title: string
+  metadata: unknown
+}
+
+type Outcome =
+  | 'matched'
+  | 'matched-by-title'
+  | 'isbn-not-asked'
+  | 'no-isbn'
+  | 'no-google-hit'
+  | 'google-unavailable'
+  | 'title-mismatch'
+  | 'error'
 
 interface ReportLine {
   row: Row
-  outcome: 'matched' | 'no-isbn' | 'no-google-hit' | 'google-unavailable' | 'title-mismatch' | 'error'
+  outcome: Outcome
   detail: string
+  // Whether the volume this row is being moved onto carries the two fields the
+  // move is for. Without an overview there is nothing to verify a recommendation
+  // against and the local-catalog shortcut skips the row anyway, so a match with
+  // none of its own has changed the source and fixed nothing. Counted in the dry
+  // run so the decision to spend the quota can be made on it.
+  gains?: string
+}
+
+// A verdict asking again would only re-derive. The ones left out are about Google or
+// about us, not about the book: 'google-unavailable' means Google didn't answer, and
+// a re-run is what turns it into an answer. 'isbn-not-asked' is the same thing in
+// slower motion — the row has an ISBN and that ISBN is the best question there is, so
+// a run that couldn't ask it has not learned anything about the row worth keeping.
+const SETTLED: ReadonlySet<Outcome> = new Set([
+  'matched',
+  'matched-by-title',
+  'no-isbn',
+  'no-google-hit',
+  'title-mismatch',
+])
+
+// Only ever written under --apply. A dry run is defined by writing nothing, and a
+// recorded 'matched' from a dry run would take the row out of the run that applies it.
+async function recordAttempt(line: ReportLine): Promise<void> {
+  await pool.query(
+    `insert into book_backfill_attempts (media_item_id, outcome, detail, attempted_at)
+     values ($1,$2,$3,$4)
+     on conflict (media_item_id) do update
+        set outcome = excluded.outcome, detail = excluded.detail, attempted_at = excluded.attempted_at`,
+    [line.row.id, line.outcome, line.detail, Date.now()],
+  )
+}
+
+// Whether a candidate is the row's book. The titles agreeing on their own is enough;
+// short of that the author has to agree too, which is what separates a subtitle from
+// a sequel — "Dune" fits inside "Dune: House Harkonnen" as neatly as "The Goldfinch"
+// fits inside "The Goldfinch: A Novel", and only the author says which is which.
+//
+// The same rule the recommendation pipeline settled on for books in #177: a reprint
+// changes the year, the subtitle and the cover, and not who wrote it.
+function isSameBook(row: Row, candidate: CatalogSearchResult): boolean {
+  if (titlesNameSameWork(row.title, candidate.title)) return true
+
+  const stored = normalizeName(parseMediaMetadata(row.metadata).creator)
+  const found = normalizeName(candidate.creator)
+  if (!stored || !found || stored !== found) return false
+
+  // Above this, a containment match is a collection rather than the book. The tiebreak
+  // elsewhere prefers the longer candidate, which is right between a comic adaptation
+  // and the novel it adapts and wrong against an omnibus — "Navigators of Dune" once
+  // landed on an 11,953-page collection that contained it.
+  //
+  // A ceiling rather than a ratio, because the row's own page count is usually missing.
+  // Only containment matches are capped; an outright title match is the book at any
+  // length.
+  const SINGLE_WORK_MAX_PAGES = 1500
+
+  // One direction only. The row's title fitting inside the candidate's is a subtitle
+  // Google spells out — "The Goldfinch" filed as "The Goldfinch: A Novel". The reverse
+  // is a candidate *less* specific than the row, which is a different book every time:
+  // "House Corrino: Dune" matched plain "Dune" this way, 696 pages of the wrong novel,
+  // with the author agreeing because the series shares one.
+  if (!titleWordsFitInside(row.title, candidate.title)) return false
+  return (candidate.pageCount ?? 0) <= SINGLE_WORK_MAX_PAGES
+}
+
+// Which of several passing candidates to take. `find` took the first, and Google's
+// first is not the best: "Dune House Corrino" landed on "Dune: House Corrino Vol. 3",
+// a 117-page comic adaptation, while the novel sat further down the same results.
+//
+// A title that agrees outright beats one that merely contains the row's, and then
+// length breaks the tie — an adaptation or an abridgement is short, and the row being
+// repointed is the full work.
+function bestOf(row: Row, candidates: CatalogSearchResult[]): CatalogSearchResult | null {
+  const passing = candidates.filter((candidate) => isSameBook(row, candidate))
+  if (passing.length === 0) return null
+
+  // The year is a tiebreak and never a filter, because a book's stored year is the year
+  // of a printing — the whole reason #177 identifies books by their author instead.
+  // Among candidates that already agree on title and author it is the sharpest thing
+  // left, and it is what tells one Vol. 1 from another: "Daredevil by Chip Zdarsky
+  // Vol. 1" is 2019, and the 2022 "Daredevil & Elektra Vol. 1" is a different book by
+  // the same writer. Comics are where this bites, because their titles are generic
+  // enough — "Batman", "Punisher" — that the author agrees across a publisher's line
+  // and the title check has almost nothing to go on.
+  const wanted = parseMediaMetadata(row.metadata).releaseYear
+  const apart = (candidate: CatalogSearchResult) =>
+    wanted == null || candidate.releaseYear == null ? 50 : Math.abs(candidate.releaseYear - wanted)
+
+  return passing.sort((a, b) => {
+    const exact = (candidate: CatalogSearchResult) => (titlesNameSameWork(row.title, candidate.title) ? 0 : 1)
+    const described = (candidate: CatalogSearchResult) => (candidate.overview ? 0 : 1)
+    return (
+      exact(a) - exact(b) ||
+      described(a) - described(b) ||
+      apart(a) - apart(b) ||
+      (b.pageCount ?? 0) - (a.pageCount ?? 0)
+    )
+  })[0]!
+}
+
+// The second attempt, for a row an ISBN couldn't place. Accepted only when the
+// author agrees as well as the title: a title on its own is exactly what this
+// script refuses to repoint a row on, and the author is the one thing a reprint
+// or a translation doesn't change.
+async function findByTitleAndAuthor(row: Row): Promise<CatalogSearchResult | null> {
+  const creator = parseMediaMetadata(row.metadata).creator
+  if (!creator) return null
+
+  // Qualified first, then plain, exactly as searchBooks does — and for a reason it
+  // learned the hard way. When the qualifiers went dead this was the whole second
+  // attempt, so a row the ISBN could not place had nowhere left to go. Plain text is
+  // safe here because the verdict is not the query's to give: isSameBook has to agree
+  // on the title and normalizeName on the author before anything is repointed.
+  const asked = normalizeName(creator)
+  const plain = plainBookQuery({ title: row.title, creator })
+  const fielded = fieldedBookQuery({ title: row.title, creator })
+
+  let candidates = fielded == null || !(await qualifiersWork()) ? [] : await searchGoogleBooksTwice(fielded)
+  if (candidates.length === 0) candidates = await searchGoogleBooksTwice(plain)
+
+  return bestOf(
+    row,
+    candidates.filter((candidate) => normalizeName(candidate.creator) === asked),
+  )
 }
 
 async function main() {
   if (!process.env.GOOGLE_BOOKS_API_KEY) throw new Error('GOOGLE_BOOKS_API_KEY is required')
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required')
+  if (!CONNECTION) {
+    throw new Error(PRODUCTION ? 'PRODUCTION_DATABASE_URL is required' : 'DATABASE_URL is required')
+  }
 
-  const allRows: Row[] = await db.findMany(mediaItems, {
-    where: { type: 'book', external_source: 'openlibrary' },
-  })
+  // Raw SQL rather than db.findMany for the one thing findMany can't express: the
+  // rows a previous run has already settled, which are the whole point of the table.
+  const { rows: allRows } = await pool.query<Row>(
+    `select m.id, m.external_id, m.title, m.metadata
+       from media_items m
+       left join book_backfill_attempts a on a.media_item_id = m.id
+      where m.type = 'book'
+        and m.external_source = 'openlibrary'
+        ${RETRY_SETTLED ? '' : `and (a.outcome is null or a.outcome not in (${[...SETTLED].map((o) => `'${o}'`).join(',')}))`}
+        ${USER == null ? '' : LOGGED_BY}
+      order by m.id`,
+    USER == null ? [] : [USER],
+  )
+
+  // A name nobody has reads as "all done" rather than as a typo, so it says so.
+  if (USER != null && allRows.length === 0) {
+    const { rows: known } = await pool.query<{ display_name: string }>(
+      `select distinct u.display_name
+         from user_media_interactions i
+         join users u on u.id = i.user_id
+         join media_items m on m.id = i.media_item_id
+        where m.type = 'book' and m.external_source = 'openlibrary'
+        order by 1`,
+    )
+    if (!known.some((row) => row.display_name === USER)) {
+      throw new Error(
+        `No Open Library books are logged by ${JSON.stringify(USER)}. ` +
+          `Those who have some: ${known.map((row) => row.display_name).join(', ') || '(nobody)'}`,
+      )
+    }
+  }
   const rows = LIMIT ? allRows.slice(0, LIMIT) : allRows
 
-  console.log(`${rows.length} Open Library book row(s). Mode: ${APPLY ? 'APPLY' : 'DRY RUN'}`)
+  const {
+    rows: [settled],
+  } = await pool.query<{ count: number }>(
+    `select count(*)::int as count from book_backfill_attempts a
+       join media_items m on m.id = a.media_item_id
+      where m.external_source = 'openlibrary' and a.outcome = any($1)
+        ${USER == null ? '' : LOGGED_BY.replace('$1', '$2')}`,
+    USER == null ? [[...SETTLED]] : [[...SETTLED], USER],
+  )
+
+  console.log(
+    `${rows.length} Open Library book row(s) to try${USER == null ? '' : `, from ${USER}'s shelf`}. ` +
+      `Database: ${PRODUCTION ? 'PRODUCTION' : 'development'}. Mode: ${APPLY ? 'APPLY' : 'DRY RUN'}` +
+      `${MAX_REQUESTS == null ? '' : `, budget ${MAX_REQUESTS} Google Books request(s)`}` +
+      `${settled && settled.count > 0 ? `. ${settled.count} already settled and skipped${RETRY_SETTLED ? ' — no, re-asked, --retry-settled is set' : ''}` : ''}`,
+  )
 
   const lines: ReportLine[] = []
+  let skippedForBudget = 0
+  let skipped = 0
+
+  const report = async (row: Row, outcome: Outcome, detail: string, found?: CatalogSearchResult) => {
+    const gains = found
+      ? `overview ${found.overview ? 'yes' : 'no'}, ${found.pageCount ?? 'no'} page(s)`
+      : undefined
+    lines.push({ row, outcome, detail, gains })
+    if (APPLY) await recordAttempt({ row, outcome, detail })
+  }
 
   // Per-row, not per-batch: Google Books and Open Library both wobble
   // (measured live 503s from both), and one row's failure shouldn't lose the
   // report for every other row already resolved by the time it happens.
   await runBounded(rows, 5, async (row) => {
+    if (abortReason != null) return
+    if (SKIP.has(row.id)) {
+      skipped++
+      return
+    }
+    if (budgetSpent()) {
+      skippedForBudget++
+      return
+    }
+
     try {
       const isbn = await findIsbnForWork(row.external_id)
-      if (!isbn) {
-        lines.push({ row, outcome: 'no-isbn', detail: 'no ISBN on any Open Library edition' })
-        return
-      }
 
-      await throttleGoogleBooks()
       // Google Books only, never searchBooks: that one falls back to Open
       // Library, which would answer with the source this row is being moved off
       // and report it as a match. fetchWithRetry has already spent its attempts
       // by the time this throws, so a throw here means Google would not answer,
       // which is a row to leave alone rather than resolve some other way.
-      let candidates: CatalogSearchResult[]
+      let candidate: CatalogSearchResult | null = null
+      let how: 'matched' | 'matched-by-title' = 'matched'
+      let missed: Outcome = isbn ? 'isbn-not-asked' : 'no-isbn'
+      let detail = isbn
+        ? `ISBN ${isbn} not asked — Google Books is not answering qualified queries`
+        : 'no ISBN on any Open Library edition'
+
       try {
-        candidates = await searchGoogleBooksOnly(`isbn:${isbn}`)
+        if (isbn && (await qualifiersWork())) {
+          const [first] = await searchGoogleBooksTwice(`isbn:${isbn}`)
+          if (!first) {
+            if (!(await believesEmptyResults())) return
+            missed = 'no-google-hit'
+            detail = `ISBN ${isbn} — no Google Books hit`
+          } else if (!isSameBook(row, first)) {
+            missed = 'title-mismatch'
+            detail = `ISBN ${isbn} matched "${first.title}", too different from "${row.title}"`
+          } else {
+            candidate = first
+            detail = `ISBN ${isbn} -> ${first.externalId} "${first.title}"`
+          }
+        }
+
+        // Whatever the ISBN did or didn't settle, the title and author are still
+        // worth one question — see the note at the top of the file.
+        if (!candidate) {
+          const found = await findByTitleAndAuthor(row)
+          if (!found && !(await believesEmptyResults())) return
+          if (found) {
+            candidate = found
+            how = 'matched-by-title'
+            detail = `title and author -> ${found.externalId} "${found.title}" (${detail})`
+          }
+        }
       } catch (error) {
-        lines.push({
+        if (looksRateLimited(error)) stopForRateLimit()
+        await report(
           row,
-          outcome: 'google-unavailable',
+          'google-unavailable',
           // Kept apart from no-google-hit: one means Google says this book does
           // not exist, the other means Google did not answer. Only the first is
           // a fact about the catalogue, and a re-run turns the second into one.
-          detail: `ISBN ${isbn} — Google Books did not answer: ${error instanceof Error ? error.message : String(error)}`,
-        })
+          `Google Books did not answer: ${error instanceof Error ? error.message : String(error)}`,
+        )
         return
       }
 
-      const candidate = candidates[0]
       if (!candidate) {
-        lines.push({ row, outcome: 'no-google-hit', detail: `ISBN ${isbn} — no Google Books hit` })
+        await report(row, missed, detail)
         return
       }
 
-      if (!titlesLikelyMatch(row.title, candidate.title)) {
-        lines.push({
-          row,
-          outcome: 'title-mismatch',
-          detail: `ISBN ${isbn} matched "${candidate.title}", too different from "${row.title}"`,
-        })
-        return
-      }
-
-      lines.push({ row, outcome: 'matched', detail: `ISBN ${isbn} -> ${candidate.externalId} "${candidate.title}"` })
+      await report(row, how, detail, candidate)
 
       if (APPLY) {
         const result = await rematchMediaItem(
@@ -252,10 +614,7 @@ async function main() {
           'book',
           row.id,
           candidate.externalId,
-          async (externalId) => {
-            await throttleGoogleBooks()
-            return getBookById(externalId)
-          },
+          (externalId) => spendGoogleBooksRequest(() => getBookById(externalId)),
           'google-books',
           'Google Books lookup failed during backfill.',
         )
@@ -264,12 +623,16 @@ async function main() {
         }
       }
     } catch (error) {
-      lines.push({ row, outcome: 'error', detail: error instanceof Error ? error.message : String(error) })
+      if (looksRateLimited(error)) stopForRateLimit()
+      await report(row, 'error', error instanceof Error ? error.message : String(error))
     }
   })
 
   for (const line of lines) {
-    console.log(`[${line.outcome}] row ${line.row.id} "${line.row.title}" — ${line.detail}`)
+    console.log(
+      `[${line.outcome}] row ${line.row.id} "${line.row.title}" — ${line.detail}` +
+        `${line.gains ? ` [${line.gains}]` : ''}`,
+    )
   }
 
   const counts = lines.reduce<Record<string, number>>((acc, line) => {
@@ -277,7 +640,27 @@ async function main() {
     return acc
   }, {})
   console.log('\nSummary:', counts)
-  if (!APPLY) console.log('Dry run — nothing was written. Re-run with --apply to write these changes.')
+
+  // The number the whole job is for. 498 of the 549 Open Library book rows carry no
+  // overview, against 179 of 283 Google Books ones — so a matched row that gains one
+  // is a row a recommendation can be verified against and the local catalog can
+  // answer for. A match that gains nothing has moved the source and nothing else.
+  const matches = lines.filter((line) => line.gains)
+  const withOverview = matches.filter((line) => line.gains?.includes('overview yes')).length
+  console.log(`${withOverview} of ${matches.length} match(es) bring an overview`)
+  console.log(`Google Books requests spent: ${requestsSpent}`)
+  if (skipped > 0) console.log(`${skipped} row(s) left alone by --skip.`)
+  if (skippedForBudget > 0) {
+    console.log(`${skippedForBudget} row(s) left for the next run — the budget ran out.`)
+  }
+  if (abortReason != null) {
+    console.error(`\nStopped: ${abortReason}`)
+    console.error('Rows reached after that point were left untouched and unrecorded.')
+    process.exitCode = 1
+  }
+  if (!APPLY) {
+    console.log('Dry run — nothing was written, and no attempt was recorded. Re-run with --apply.')
+  }
 
   await pool.end()
 }

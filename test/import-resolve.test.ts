@@ -65,10 +65,7 @@ describe('resolveBatch', () => {
 
   it('still lets two exact rows share one film, so a rewatch stays visible', () => {
     const drive = film('tmdb-3', 'Drive', 2011)
-    const outcomes = resolveBatch([
-      input(12, 'Drive', 2011, [drive]),
-      input(210, 'Drive', 2011, [drive]),
-    ])
+    const outcomes = resolveBatch([input(12, 'Drive', 2011, [drive]), input(210, 'Drive', 2011, [drive])])
 
     // Forcing these apart would invent a wrong match to dodge a question the
     // review page is built to ask.
@@ -97,7 +94,10 @@ describe('resolveBatch', () => {
       input(2, 'Heat', 1995, []),
     ])
 
-    assert.deepEqual(outcomes.map((o) => o.rowId), [3, 1, 2])
+    assert.deepEqual(
+      outcomes.map((o) => o.rowId),
+      [3, 1, 2],
+    )
   })
 })
 
