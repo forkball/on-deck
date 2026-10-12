@@ -46,6 +46,7 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
               from rather than part of the filter. Picking a status submits it
               (SubmitOnChange); the button is for when there's no JS. */}
         <form
+          id="log-filter"
           method="get"
           action={routes.profile.watched.href()}
           mix={css({ display: 'flex', alignItems: 'flex-end', gap: '8px', margin: '0 0 24px' })}
@@ -72,38 +73,41 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
           <noscript>
             <Button type="submit">Filter</Button>
           </noscript>
-          <SubmitOnChange />
         </form>
 
-        {movieLog.length === 0 && (
-          <p mix={css({ color: 'var(--soft)' })}>
-            Nothing in your {ui.attributive} log
-            {status ? ` under "${statusLabelsFor(mediaType)[status]}"` : ''}.
-          </p>
-        )}
+        {/* A spinner in the list's place while a new filter loads. */}
+        <SubmitOnChange form="log-filter" results="log-filter-results" />
+        <div id="log-filter-results">
+          {movieLog.length === 0 && (
+            <p mix={css({ color: 'var(--soft)' })}>
+              Nothing in your {ui.attributive} log
+              {status ? ` under "${statusLabelsFor(mediaType)[status]}"` : ''}.
+            </p>
+          )}
 
-        {/* Your own log, so every row can be edited in place. */}
-        <WatchedList
-          log={movieLog}
-          mediaType={mediaType}
-          returnTo={returnTo}
-          actions={({ interaction, item }) => (
-            <MediaLogEditModal
-              mediaType={mediaType}
-              interaction={interaction}
-              title={item?.title ?? 'Unknown title'}
-              returnTo={returnTo}
+          {/* Your own log, so every row can be edited in place. */}
+          <WatchedList
+            log={movieLog}
+            mediaType={mediaType}
+            returnTo={returnTo}
+            actions={({ interaction, item }) => (
+              <MediaLogEditModal
+                mediaType={mediaType}
+                interaction={interaction}
+                title={item?.title ?? 'Unknown title'}
+                returnTo={returnTo}
+              />
+            )}
+          />
+
+          {totalPages > 1 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              pageHref={(p) => `${routes.profile.watched.href()}?page=${p}${filterQuery}`}
             />
           )}
-        />
-
-        {totalPages > 1 && (
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            pageHref={(p) => `${routes.profile.watched.href()}?page=${p}${filterQuery}`}
-          />
-        )}
+        </div>
       </Page>
     )
   }
