@@ -87,10 +87,11 @@ function TasteProfileSummary(
     const source = describeProfileSource(settings, mediaType)
 
     return (
-      // A rule above it, so it doesn't read as one more line of the log.
-      <details mix={css({ borderTop: '1px solid var(--rule)', marginTop: '24px', paddingTop: '16px' })}>
+      <details mix={css({ marginTop: '24px' })}>
         <summary class="tap-area" mix={css({ cursor: 'pointer' })}>
-          <h2 mix={css({ display: 'inline' })}>{label}</h2>
+          {/* Smaller than the log's heading above it: it's something to check now
+              and then, not what the tab is for. */}
+          <h2 mix={css({ display: 'inline', fontSize: '18px' })}>{label}</h2>
         </summary>
         <div
           mix={css({
