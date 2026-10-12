@@ -49,8 +49,9 @@ function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>)
 
     return (
       <details>
-        <summary mix={css({ cursor: 'pointer' })}>
-          <h2 mix={css({ display: 'inline' })}>{label}</h2>
+        <summary class="disclosure">
+          <h2 mix={css({ margin: 0 })}>{label}</h2>
+          <span class="disclosure-chevron" aria-hidden="true" />
         </summary>
         <div
           mix={css({

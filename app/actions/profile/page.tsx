@@ -88,8 +88,9 @@ function TasteProfileSummary(
 
     return (
       <details mix={css({ marginTop: '24px' })}>
-        <summary class="tap-area" mix={css({ cursor: 'pointer' })}>
-          <h2 mix={css({ display: 'inline' })}>{label}</h2>
+        <summary class="disclosure">
+          <h2 mix={css({ margin: 0 })}>{label}</h2>
+          <span class="disclosure-chevron" aria-hidden="true" />
         </summary>
         <div
           mix={css({
