@@ -1,6 +1,8 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import { DisclosureChevron } from '../../ui/shared/collapsible.tsx'
+
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
 import {
   ACTIVE_MEDIA_TYPES,
@@ -35,9 +37,9 @@ export interface UserProfilePageProps {
   bio?: string
   followingCount: number
   followersCount: number
-  // Every credit, theirs marked, for the Titles tab — without their progress on
-  // the rest, which would read out their counts (how many things they've
-  // disliked, say). Absent when `locked`: what someone has earned says what
+  // The credits they've earned, for the Titles tab — only those, without the
+  // rest or their progress toward them, which would read out their counts (how
+  // many things they've disliked, say). Absent when `locked`: what someone has earned says what
   // they've logged.
   credits?: Credit[]
   displayName: string
@@ -49,8 +51,9 @@ function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>)
 
     return (
       <details>
-        <summary mix={css({ cursor: 'pointer' })}>
-          <h2 mix={css({ display: 'inline' })}>{label}</h2>
+        <summary class="disclosure">
+          <h2 mix={css({ margin: 0 })}>{label}</h2>
+          <DisclosureChevron />
         </summary>
         <div
           mix={css({
@@ -193,7 +196,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
                   id: TITLES_TAB,
                   label: 'Titles',
                   end: true,
-                  panel: <CreditGroups credits={credits ?? []} />,
+                  panel: <CreditGroups credits={credits ?? []} earnedOnly />,
                 },
               ]}
               panels={Object.fromEntries(

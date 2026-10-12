@@ -1,6 +1,7 @@
 import { clientEntry, css, on } from 'remix/ui'
 
 import { Field } from '../ui/shared/field.tsx'
+import { DisclosureChevron } from '../ui/shared/collapsible.tsx'
 import { SEEN_BY_OPTIONS, type SeenBy } from '../ui/shared/seen-by.ts'
 import { FriendPicker, type FriendOption } from './friend-picker.tsx'
 import {
@@ -299,14 +300,17 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
               {/* Named on the summary when closed and not what the page
                   implies — folded away with no sign of it, a run drawn from a
                   different taste would look like a bug. */}
-              <summary class="tap-area" mix={[sectionLabel, css({ cursor: 'pointer' })]}>
-                Settings (optional)
-                {!settingsOpen && hasSource && !sourcesAreDefault && (
-                  <span mix={css({ textTransform: 'none', letterSpacing: 0, fontWeight: 400 })}>
-                    {' '}
-                    — based on {[...selectedSources].map(sourceLabel).join(', ')}
-                  </span>
-                )}
+              <summary class="disclosure" mix={sectionLabel}>
+                <span>
+                  Settings (optional)
+                  {!settingsOpen && hasSource && !sourcesAreDefault && (
+                    <span mix={css({ textTransform: 'none', letterSpacing: 0, fontWeight: 400 })}>
+                      {' '}
+                      — based on {[...selectedSources].map(sourceLabel).join(', ')}
+                    </span>
+                  )}
+                </span>
+                <DisclosureChevron />
               </summary>
 
               <ChoiceGroup

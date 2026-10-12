@@ -838,3 +838,46 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
     gap: 0;
   }
 }
+
+/* A <details> whose open/closed chevron sits at the right end of its summary
+   rather than the browser's triangle at the left — every disclosure on the
+   site: Collapsible, the taste profile on both profiles, the recommendation
+   form's settings and the activity feed's folded groups. The chevron is a
+   span (DisclosureChevron) rather than ::after, since `tap-area` already draws
+   with that; a summary laid out on its own, as the feed's is, places the span
+   itself and leaves off `.disclosure`. Down when closed, up when open; no
+   transition, so nothing to turn off for reduced motion. */
+.doodle summary.disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.doodle summary.disclosure::-webkit-details-marker {
+  display: none;
+}
+
+/* The whole row is the target, and never shorter than a finger. */
+@media (pointer: coarse) {
+  .doodle summary.disclosure {
+    min-height: 44px;
+  }
+}
+
+.doodle .disclosure-chevron {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin: 0 6px 4px 0;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.doodle details[open] > summary .disclosure-chevron {
+  margin-bottom: -4px;
+  transform: rotate(-135deg);
+}
