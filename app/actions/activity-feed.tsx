@@ -7,6 +7,7 @@ import { mediaTypeUiFor } from '../mediaTypes.ts'
 import { routes } from '../routes.ts'
 import { RunListItem } from '../ui/components/run-list.tsx'
 import { WatchedListItem } from '../ui/components/watched-list-item.tsx'
+import { DisclosureChevron } from '../ui/shared/collapsible.tsx'
 
 // The id the list is reached by. The auto-loader appends to it from the browser
 // and the fragment route renders rows for it, so the two have to agree on a
@@ -90,12 +91,6 @@ const GROUP_STYLE = css({
   // The title's phrases are flex items, so a long one wraps between them —
   // never partway through the count.
   '& .title': { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '6px' },
-  '& .chevron': {
-    display: 'inline-block',
-    transition: 'transform 120ms ease',
-    '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
-  },
-  '& > details[open] > summary .chevron': { transform: 'rotate(90deg)' },
   // Grows to fill the gap on a wide screen; shrinks to nothing rather than
   // forcing the date onto the title's line where there isn't room.
   '& .rule': { flex: '1 1 12px', minWidth: '12px', borderTop: '1px dashed var(--rule)' },
@@ -113,11 +108,14 @@ const GROUP_STYLE = css({
   '& > details[open] > summary .count': { display: 'none' },
   // On a phone there isn't room for the date beside the title without
   // crowding it, so it drops to its own line — left-aligned under the title,
-  // past the chevron, rather than over at the right edge.
+  // with the chevron at the other end of it.
   '@media (max-width: 600px)': {
     '& > details > summary': { alignItems: 'flex-start' },
     '& .rule': { display: 'none' },
-    '& .when': { marginLeft: 0, flexBasis: '100%', paddingLeft: '1.1em' },
+    // The chevron shares the date's line, which grows to push it to the
+    // right edge. Grown rather than given marginLeft: auto, which app.css's
+    // own margin on the chevron would beat.
+    '& .when': { marginLeft: 0, flexGrow: 1 },
     // The title itself only needs its content's width, so on its own it
     // wouldn't give marginLeft: auto below anything to push against — this is
     // what puts the rest of that first line's width at the count's disposal.
@@ -156,14 +154,12 @@ function FeedGroup(handle: Handle<{ items: FeedItem[] }>) {
         <details open={items.length < COLLAPSE_THRESHOLD}>
           <summary>
             <span class="title">
-              <span class="chevron" aria-hidden="true">
-                ▸
-              </span>{' '}
               <strong>{who}</strong> {what}
               <span class="count">{items.length} entries</span>
             </span>
             <span class="rule" aria-hidden="true" />
             <span class="when">{when}</span>
+            <DisclosureChevron />
           </summary>
           <ul mix={GROUP_BODY_STYLE}>
             {items.map((item) => (

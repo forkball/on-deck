@@ -10,6 +10,7 @@ import {
   type ActiveMediaType,
 } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
+import { DisclosureChevron } from '../../ui/shared/collapsible.tsx'
 import { Toast } from '../../ui/components/toast.tsx'
 import { PART_NAMES } from '../../data/profileTitles/catalog.ts'
 import { CreditGroups, TITLES_TAB, type Credit } from '../../ui/components/credit-tiles.tsx'
@@ -90,7 +91,7 @@ function TasteProfileSummary(
       <details mix={css({ marginTop: '24px' })}>
         <summary class="disclosure">
           <h2 mix={css({ margin: 0 })}>{label}</h2>
-          <span class="disclosure-chevron" aria-hidden="true" />
+          <DisclosureChevron />
         </summary>
         <div
           mix={css({

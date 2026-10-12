@@ -4,7 +4,6 @@ import { css } from 'remix/ui'
 // Same reason as field.tsx for living here: app/ui/shared is the part of app/ui
 // that client entries are allowed to import.
 
-const summaryStyle = css({ cursor: 'pointer' })
 const boxedBodyStyle = css({
   border: '1px solid var(--rule)',
   borderRadius: '8px',
@@ -23,6 +22,13 @@ export interface CollapsibleProps {
   boxed?: boolean
 }
 
+// The chevron at the right end of a disclosure's summary, which turns over
+// when it opens. Its look is `.disclosure-chevron` in app.css; a summary with
+// `class="disclosure"` puts it at the far end of the row.
+export function DisclosureChevron() {
+  return () => <span class="disclosure-chevron" aria-hidden="true" />
+}
+
 // A plain <details>/<summary> disclosure, matching the one on the profile.
 //
 // Deliberately native rather than the checkbox+`:has()` trick used for the
@@ -35,7 +41,10 @@ export function Collapsible(handle: Handle<CollapsibleProps>) {
 
     return (
       <details open={open}>
-        <summary mix={summaryStyle}>{summary}</summary>
+        <summary class="disclosure">
+          <span>{summary}</span>
+          <DisclosureChevron />
+        </summary>
         {boxed ? <div mix={boxedBodyStyle}>{children}</div> : children}
       </details>
     )

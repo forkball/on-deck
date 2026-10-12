@@ -1,6 +1,8 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import { DisclosureChevron } from '../../ui/shared/collapsible.tsx'
+
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
 import {
   ACTIVE_MEDIA_TYPES,
@@ -51,7 +53,7 @@ function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>)
       <details>
         <summary class="disclosure">
           <h2 mix={css({ margin: 0 })}>{label}</h2>
-          <span class="disclosure-chevron" aria-hidden="true" />
+          <DisclosureChevron />
         </summary>
         <div
           mix={css({
