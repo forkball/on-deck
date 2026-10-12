@@ -107,20 +107,18 @@ const GROUP_STYLE = css({
   // Only while folded: open, the rows are right there to count.
   '& > details[open] > summary .count': { display: 'none' },
   // On a phone there isn't room for the date beside the title without
-  // crowding it, so it drops to its own line — left-aligned under the title,
-  // with the chevron at the other end of it.
+  // crowding it, so it drops to its own line, left-aligned under the title.
+  // The chevron stays on the title's line, at the right edge after the count:
+  // `order` moves it ahead of the date, which then wraps under both.
   '@media (max-width: 600px)': {
-    '& > details > summary': { alignItems: 'flex-start' },
+    '& > details > summary': { alignItems: 'center' },
     '& .rule': { display: 'none' },
-    // The chevron shares the date's line, which grows to push it to the
-    // right edge. Grown rather than given marginLeft: auto, which app.css's
-    // own margin on the chevron would beat.
-    '& .when': { marginLeft: 0, flexGrow: 1 },
-    // The title itself only needs its content's width, so on its own it
-    // wouldn't give marginLeft: auto below anything to push against — this is
-    // what puts the rest of that first line's width at the count's disposal.
-    '& .title': { flexBasis: '100%' },
+    // Grows to take the line's width, leaving the chevron at the end of it —
+    // and so gives the count's marginLeft: auto something to push against.
+    '& .title': { flex: '1 1 0', minWidth: 0 },
     '& .count': { marginLeft: 'auto' },
+    '& .disclosure-chevron': { order: 1 },
+    '& .when': { order: 2, marginLeft: 0, flexBasis: '100%' },
   },
 })
 
