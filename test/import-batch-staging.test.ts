@@ -13,7 +13,7 @@ describe('staging an import batch', { skip: skipWithoutDatabase }, () => {
   let batchId: string
 
   before(async () => {
-    userId = await insertUser('import-staging')
+    userId = (await insertUser('import-staging')).id
     batchId = await createBatch(db, userId, 'movie', 'letterboxd', [
       { rowIndex: 2, title: 'Heat', year: 1995, rating: 4.5, consumedAt: null },
       { rowIndex: 3, title: 'Dune', year: null, rating: 3, consumedAt: null },

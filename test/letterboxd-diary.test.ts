@@ -45,7 +45,7 @@ describe('syncing a diary that changed', { skip: skipWithoutDatabase }, () => {
   before(async () => {
     globalThis.fetch = (async () => new Response(body, { status: 200 })) as typeof fetch
 
-    userId = await insertUser('diary-test')
+    userId = (await insertUser('diary-test')).id
 
     // Seeded so resolveMovie finds them and the sync never reaches TMDB — the
     // catalog lookup is not what is under test here.
@@ -165,7 +165,7 @@ describe('the oldest entry the feed carries', { skip: skipWithoutDatabase }, () 
 
   before(async () => {
     globalThis.fetch = (async () => new Response(body, { status: 200 })) as typeof fetch
-    userId = await insertUser('window-test')
+    userId = (await insertUser('window-test')).id
 
     for (const name of ['newest', 'middle', 'oldest', 'fresh']) {
       const {
@@ -265,7 +265,7 @@ describe('connecting a diary that already has history', { skip: skipWithoutDatab
 
   before(async () => {
     globalThis.fetch = (async () => new Response(body, { status: 200 })) as typeof fetch
-    userId = await insertUser('connect-test')
+    userId = (await insertUser('connect-test')).id
     await db.update(users, userId, { letterboxd_connected_at: CONNECTED_AT })
 
     for (const name of ['old-one', 'old-two', 'new-one', 'new-two']) {

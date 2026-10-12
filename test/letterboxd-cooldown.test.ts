@@ -40,7 +40,7 @@ describe('the Letterboxd sync cooldown', { skip: skipWithoutDatabase }, () => {
       return new Response(EMPTY, { status: 200 })
     }) as typeof fetch
 
-    userId = await insertUser('cooldown-test')
+    userId = (await insertUser('cooldown-test')).id
     await db.update(users, userId, { letterboxd_username: 'someone' })
   })
 

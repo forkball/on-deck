@@ -76,7 +76,7 @@ describe('unconfirmed runs', { skip: skipWithoutDatabase }, () => {
   // share a database with the rest of the suite.
   const created: number[] = []
   const newUser = async (tag: string) => {
-    const id = await insertUser(`unconfirmed-${tag}`)
+    const id = (await insertUser(`unconfirmed-${tag}`)).id
     created.push(id)
     return id
   }
