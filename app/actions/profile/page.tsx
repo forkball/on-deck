@@ -87,7 +87,8 @@ function TasteProfileSummary(
     const source = describeProfileSource(settings, mediaType)
 
     return (
-      <details mix={css({ marginTop: '24px' })}>
+      // A rule above it, so it doesn't read as one more line of the log.
+      <details mix={css({ borderTop: '1px solid var(--rule)', marginTop: '24px', paddingTop: '16px' })}>
         <summary class="tap-area" mix={css({ cursor: 'pointer' })}>
           <h2 mix={css({ display: 'inline' })}>{label}</h2>
         </summary>
