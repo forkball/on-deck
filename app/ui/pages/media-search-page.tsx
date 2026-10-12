@@ -16,6 +16,8 @@ import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
+  // The viewer's order for the media-type tabs (parseMediaOrder).
+  mediaOrder: ActiveMediaType[]
   query: string
   results: MediaItem[]
   // How many are visible before scrolling reveals the rest.
@@ -46,8 +48,16 @@ function summarize(overview: string): string {
 // MEDIA_TYPE_UI.
 export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
   return () => {
-    const { mediaType, query, results, initialVisible, interactionsByItemId, message, displayName } =
-      handle.props
+    const {
+      mediaType,
+      mediaOrder,
+      query,
+      results,
+      initialVisible,
+      interactionsByItemId,
+      message,
+      displayName,
+    } = handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
     const returnTo = `${ui.hrefs.search()}?q=${encodeURIComponent(query)}`
 
@@ -56,6 +66,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
         {message && <Toast message={message} />}
         <MediaTabLinks
           current={mediaType}
+          order={mediaOrder}
           // Switching type starts a fresh search rather than carrying the
           // query across: a title rarely means the same thing in two
           // catalogs, so carrying it just fills the new tab with noise.

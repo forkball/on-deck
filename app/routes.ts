@@ -53,6 +53,9 @@ export const routes = route({
     // watchRegion is: the profile form asks for a password on some changes, and
     // picking a title should never be one of them.
     title: post('title'),
+    // The order the media-type tabs come in. Its own POST for the same reason
+    // again: each move button submits the whole new order on its own.
+    mediaOrder: post('media-order'),
     rebuild: post('rebuild/:mediaType'),
     password: form('password', { formMethod: 'PUT', names: { action: 'update' } }),
     // Every source in one place: the page that links out to each importer

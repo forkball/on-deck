@@ -29,7 +29,13 @@ import {
 } from '../../data/recommendations/runs.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType, type ActiveMediaType } from '../../mediaTypes.ts'
+import {
+  DEFAULT_MEDIA_TYPE,
+  mediaTypeUiFor,
+  parseMediaOrder,
+  parseMediaType,
+  type ActiveMediaType,
+} from '../../mediaTypes.ts'
 import { RETURN_TO_PARAM } from '../../ui/backLink.ts'
 import { SEEN_BY_OPTIONS } from '../../ui/shared/seen-by.ts'
 import { LUCKY_PAGE_ORIGIN } from '../../browser/draw-lucky-form.tsx'
@@ -165,7 +171,14 @@ async function indexPage(
   extras: Pick<RecommendationsPageProps, 'error' | 'errorLink' | 'duplicate'> = {},
 ) {
   const data = await loadIndexData(db, user, mediaType)
-  return <RecommendationsPage {...data} mediaType={mediaType} {...extras} />
+  return (
+    <RecommendationsPage
+      {...data}
+      mediaType={mediaType}
+      mediaOrder={parseMediaOrder(user.media_order)}
+      {...extras}
+    />
+  )
 }
 
 async function loadLuckyPageData(db: Db, user: User, mediaType: ActiveMediaType) {
@@ -194,7 +207,13 @@ async function luckyDrawPage(
 ) {
   const data = await loadLuckyPageData(db, user, mediaType)
   return (
-    <LuckyPickPage {...data} mediaType={mediaType} findPeopleHref={routes.users.search.href()} {...extras} />
+    <LuckyPickPage
+      {...data}
+      mediaType={mediaType}
+      mediaOrder={parseMediaOrder(user.media_order)}
+      findPeopleHref={routes.users.search.href()}
+      {...extras}
+    />
   )
 }
 
@@ -204,7 +223,10 @@ export default createController(routes.recommendations, {
     async index(context) {
       const auth = context.get(Auth)
 
-      const mediaType = parseMediaType(context.url.searchParams.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
+      // No type in the URL opens on the viewer's first tab, not the registry's.
+      const mediaType =
+        parseMediaType(context.url.searchParams.get('mediaType')) ??
+        parseMediaOrder(auth.identity.media_order)[0]
 
       const db = context.get(Database)
 
@@ -214,7 +236,10 @@ export default createController(routes.recommendations, {
     async luckyPage(context) {
       const auth = context.get(Auth)
 
-      const mediaType = parseMediaType(context.url.searchParams.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
+      // No type in the URL opens on the viewer's first tab, not the registry's.
+      const mediaType =
+        parseMediaType(context.url.searchParams.get('mediaType')) ??
+        parseMediaOrder(auth.identity.media_order)[0]
 
       const db = context.get(Database)
 

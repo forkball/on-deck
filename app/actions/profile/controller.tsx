@@ -22,7 +22,7 @@ import {
   loadUnlockedTitleKeys,
   loadWornTitle,
 } from '../../data/profileTitles/unlocks.ts'
-import { updateProfileSettings, updateWatchRegion } from '../../data/users.ts'
+import { updateMediaOrder, updateProfileSettings, updateWatchRegion } from '../../data/users.ts'
 import { parseWatchRegion } from '../../data/watchRegion.ts'
 
 import {
@@ -38,9 +38,16 @@ import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes, titleSettingsHref } from '../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
+import {
+  DEFAULT_MEDIA_TYPE,
+  mediaTypeUiFor,
+  parseMediaOrder,
+  parseMediaType,
+  serializeMediaOrder,
+} from '../../mediaTypes.ts'
 import { parseInteractionStatus } from '../../interactionStatus.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
+import { PROFILE_TABS } from './edit/page.tsx'
 import { ImportPage } from './import-page.tsx'
 import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
 import { ProfilePage } from './page.tsx'
@@ -58,8 +65,9 @@ export default createController(routes.profile, {
       const auth = context.get(Auth)
 
       const db = context.get(Database)
+      const mediaOrder = parseMediaOrder(auth.identity.media_order)
       const tab = context.url.searchParams.get('tab')
-      const activeTab = tab === TITLES_TAB ? TITLES_TAB : (parseMediaType(tab) ?? DEFAULT_MEDIA_TYPE)
+      const activeTab = tab === TITLES_TAB ? TITLES_TAB : (parseMediaType(tab) ?? mediaOrder[0])
 
       // Only the log waits on the feed; everything else loads alongside it. The
       // title check waits too, so whatever the feed just logged can earn one.
@@ -83,6 +91,7 @@ export default createController(routes.profile, {
         <ProfilePage
           media={media}
           activeTab={activeTab}
+          mediaOrder={mediaOrder}
           bio={auth.identity.bio ?? ''}
           followingCount={followingCount}
           followersCount={followersCount}
@@ -154,6 +163,19 @@ export default createController(routes.profile, {
       })
 
       return redirect(`${routes.profile.edit.index.href()}?tab=taste&saved=1`, 303)
+    },
+
+    // Posted by the move buttons on the settings tab, each carrying the whole
+    // order it would leave. Parsed rather than trusted, so a hand-made value can
+    // only ever come out as some order of the real types.
+    async mediaOrder(context) {
+      const auth = context.get(Auth)
+      const formData = context.get(FormData)
+
+      const order = parseMediaOrder(String(formData.get('media_order') ?? ''))
+      await updateMediaOrder(context.get(Database), auth.identity.id, serializeMediaOrder(order))
+
+      return redirect(`${routes.profile.edit.index.href()}?tab=${PROFILE_TABS.mediaOrder}`, 303)
     },
 
     // Posted from a detail page's "where to watch" list, and sends you back to

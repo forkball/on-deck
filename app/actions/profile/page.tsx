@@ -30,6 +30,8 @@ export interface ProfilePageProps {
   // Keyed by media type rather than a prop per type — see loadMediaSummaries.
   media: MediaSummaries
   activeTab: ActiveMediaType | typeof TITLES_TAB
+  // Your order for the media-type tabs (parseMediaOrder).
+  mediaOrder: ActiveMediaType[]
   bio: string
   followingCount: number
   followersCount: number
@@ -241,6 +243,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
     const {
       media,
       activeTab,
+      mediaOrder,
       bio,
       followingCount,
       followersCount,
@@ -289,6 +292,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
         <MediaTabs
           idPrefix="profile"
           active={activeTab}
+          order={mediaOrder}
           extraTabs={[
             {
               id: TITLES_TAB,

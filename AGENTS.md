@@ -28,6 +28,11 @@ and middleware modules after the export they carry.
   `parseMediaType`) plus the per-type table of nouns, copy, status verbs and href
   builders. Lives at the app root because every layer reads it and it depends on
   `routes.ts`.
+  It also holds `parseMediaOrder`, a member's chosen order for the media-type
+  tabs (`users.media_order`, set on the Media order tab in settings). Pages that
+  lay out a tab per type take it as `order` on `MediaTabs`/`MediaTabLinks`, and
+  open on its first entry when the URL names no type — not on
+  `DEFAULT_MEDIA_TYPE`, which stays the type a `?type=`-less URL means.
 - `app/interactionStatus.ts` holds the interaction-status vocabulary — parsing,
   per-type labels and badge colors for `want_to_consume`/`in_progress`/`consumed`/
   `not_interested`. Split out from `mediaTypes.ts` since a status isn't a media

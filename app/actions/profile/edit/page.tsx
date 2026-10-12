@@ -4,12 +4,14 @@ import { css } from 'remix/ui'
 import { BIO_MAX_LENGTH, USERNAME_HINT, USERNAME_MAX_LENGTH } from '../../../data/users.ts'
 import type { TasteProfileSettings } from '../../../data/recommendations/tasteProfile.ts'
 import { Toast } from '../../../ui/components/toast.tsx'
+import type { ActiveMediaType } from '../../../mediaTypes.ts'
 import { routes, TITLES_SETTINGS_TAB } from '../../../routes.ts'
 import { Page } from '../../../ui/components/page.tsx'
 import { PasswordConfirmModal } from '../../../ui/components/password-confirm-modal.tsx'
 import { Field } from '../../../ui/shared/field.tsx'
 import { Tabs } from '../../../ui/components/tabs.tsx'
 import { Connections, type ConnectionsProps } from './connections.tsx'
+import { MediaOrder } from './media-order.tsx'
 import { Titles, type TitlesProps } from './titles.tsx'
 import {
   Button,
@@ -32,6 +34,7 @@ export const PROFILE_TABS = {
   profile: 'profile',
   taste: 'taste',
   titles: TITLES_SETTINGS_TAB,
+  mediaOrder: 'media-order',
   connections: 'connections',
 } as const
 
@@ -51,6 +54,7 @@ export interface ProfileEditPageProps {
   displayName: string
   connections: ConnectionsProps
   titles: TitlesProps
+  mediaOrder: ActiveMediaType[]
   // Set when a title was just chosen.
   titleSaved?: boolean
   activeTab?: ProfileTab
@@ -137,6 +141,7 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
       displayName,
       connections,
       titles,
+      mediaOrder,
       titleSaved,
       activeTab,
     } = handle.props
@@ -234,6 +239,11 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
               id: PROFILE_TABS.titles,
               label: 'Titles',
               panel: <Titles {...titles} />,
+            },
+            {
+              id: PROFILE_TABS.mediaOrder,
+              label: 'Media order',
+              panel: <MediaOrder order={mediaOrder} />,
             },
             {
               id: PROFILE_TABS.connections,

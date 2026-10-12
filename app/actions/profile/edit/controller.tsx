@@ -21,6 +21,7 @@ import { hasImportedLibrary } from '../../../data/imports/batches.ts'
 import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import { checkTitleUnlocks, loadWornTitle } from '../../../data/profileTitles/unlocks.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
+import { parseMediaOrder } from '../../../mediaTypes.ts'
 import { routes, titleSettingsHref } from '../../../routes.ts'
 import { verifyPassword } from '../../auth/password.ts'
 import { profileSettingsFor } from '../../../data/recommendations/tasteProfile.ts'
@@ -95,7 +96,8 @@ async function titlesFor(db: Db, identity: User): Promise<TitlesProps> {
 // rather than to the profile form.
 function activeTab(url: URL): ProfileTab | undefined {
   const tab = url.searchParams.get('tab')
-  return tab != null && tab in PROFILE_TABS ? (tab as ProfileTab) : undefined
+  // The values, not the keys: `mediaOrder` is spelled `media-order` in the URL.
+  return (Object.values(PROFILE_TABS) as string[]).includes(tab ?? '') ? (tab as ProfileTab) : undefined
 }
 
 // Whatever was typed, so a rejected submit comes back with the person's own
@@ -129,6 +131,7 @@ export default createController(routes.profile.edit, {
           displayName={displayLabel(auth.identity)}
           connections={await connectionsFor(db, auth.identity, context.url)}
           titles={await titlesFor(db, auth.identity)}
+          mediaOrder={parseMediaOrder(auth.identity.media_order)}
           titleSaved={context.url.searchParams.get('titleSaved') === '1'}
           activeTab={activeTab(context.url)}
         />,
@@ -153,6 +156,7 @@ export default createController(routes.profile.edit, {
             displayName={displayLabel(auth.identity)}
             connections={await connectionsFor(db, auth.identity, context.url)}
             titles={await titlesFor(db, auth.identity)}
+            mediaOrder={parseMediaOrder(auth.identity.media_order)}
             // This form is the profile pane, and it is the one that failed —
             // so the errors are rendered where the fields carrying them are.
             activeTab={PROFILE_TABS.profile}
