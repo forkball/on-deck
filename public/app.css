@@ -102,15 +102,12 @@
   padding: 0;
 }
 
-/* An earned tile's ⓘ badge, which opens how it was earned: sized and placed
-   on the tile's corner by credit-tiles.tsx. Its centring is here because
-   Doodle's unlayered `label { display: inline-block; padding }` would beat a
-   css() rule and leave the "i" off centre in its circle. */
-.doodle label.credit-info {
+/* A modal's backdrop (modal.tsx, closeOnOutsideTap): the label filling the
+   overlay behind the box. Doodle's label padding would only shift it, but its
+   cursor would read as clickable text. */
+.doodle label.modal-backdrop {
   padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  cursor: default;
 }
 
 /* The wordmark as a torn ticket stub: soft gold, blue type, notched at both
@@ -544,7 +541,7 @@
 
 .doodle .choice-options.column {
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .doodle .choice-options.row {
@@ -830,8 +827,11 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
     min-height: 44px;
   }
 
+  /* 36px rather than the 44px the other small controls get: a stack of 44px
+     rows spread a three-option group over most of a phone screen. Still well
+     clear of the 24px control, and the rows touch, so no tap falls between. */
   .doodle label.choice-label {
-    min-height: 44px;
+    min-height: 36px;
   }
 
   .doodle .choice-options.column {

@@ -80,13 +80,11 @@ const wornStyle = css({
   '&:hover': { borderColor: 'var(--accent)' },
 })
 
-const tileButtonStyle = css({ display: 'block', width: '100%' })
-
-// An earned tile you can wear: a form of its own posting the whole pair — this
-// word in its slot, whatever you wear in the other — so the action is the same
-// one, checked the same way, as when the pair came from two dropdowns. Tapping
-// the one you're wearing takes it off.
-function WearTile(handle: Handle<{ title: TitleDefinition; picking: Picking }>) {
+// Puts an earned credit on, or takes off the one you're wearing: a form
+// posting the whole pair — this word in its slot, whatever you wear in the
+// other — so the action is the same one, checked the same way, as when the
+// pair came from two dropdowns.
+function WearForm(handle: Handle<{ title: TitleDefinition; picking: Picking }>) {
   return () => {
     const { title, picking } = handle.props
     const slot = title.part
@@ -95,23 +93,12 @@ function WearTile(handle: Handle<{ title: TitleDefinition; picking: Picking }>) 
     const slotName = PART_NAMES[slot].one.toLowerCase()
 
     return (
-      <form method="post" action={routes.profile.title.href()}>
+      <form method="post" action={routes.profile.title.href()} mix={css({ marginTop: '16px' })}>
         <input type="hidden" name="adjective" value={next.adjective ?? ''} />
         <input type="hidden" name="noun" value={next.noun ?? ''} />
         <input type="hidden" name="return_to" value={picking.returnTo} />
-        <Button
-          type="submit"
-          variant="plain"
-          aria-pressed={worn ? 'true' : 'false'}
-          title={worn ? `Take off ${title.word}` : `Wear ${title.word} as your ${slotName}`}
-          mix={tileButtonStyle}
-        >
-          <span mix={[tileStyle, earnedStyle, worn ? wornStyle : undefined]}>
-            <span mix={wordStyle}>
-              <span aria-hidden="true">{worn ? '● ' : '✓ '}</span>
-              {title.word}
-            </span>
-          </span>
+        <Button type="submit" variant={worn ? 'default' : 'primary'}>
+          {worn ? 'Take it off' : `Wear as your ${slotName}`}
         </Button>
       </form>
     )
@@ -119,17 +106,26 @@ function WearTile(handle: Handle<{ title: TitleDefinition; picking: Picking }>) 
 }
 
 // What earns a credit, and how far along you are or that you have it. Opened by
-// a locked tile, someone else's tile, or an earned tile's ⓘ.
+// any tile; on your own earned ones it is also where you put the credit on.
 function CreditModal(
-  handle: Handle<{ id: string; title: TitleDefinition; earned: boolean; current?: number }>,
+  handle: Handle<{
+    id: string
+    title: TitleDefinition
+    earned: boolean
+    current?: number
+    picking?: Picking
+  }>,
 ) {
   return () => {
-    const { id, title, earned, current } = handle.props
+    const { id, title, earned, current, picking } = handle.props
+    const worn = picking != null && picking[title.part] === title.key
     return (
-      <Modal id={id} title={title.word} small>
+      <Modal id={id} title={title.word} small closeOnOutsideTap>
         <p mix={css({ margin: '0 0 12px' })}>{title.requirement}.</p>
         {earned ? (
-          <p mix={css({ margin: 0, color: 'var(--success)', fontWeight: 700 })}>✓ Earned</p>
+          <p mix={css({ margin: 0, color: 'var(--success)', fontWeight: 700 })}>
+            {worn ? `● Earned — you're wearing it` : '✓ Earned'}
+          </p>
         ) : current != null ? (
           <>
             <ProgressBar current={current} goal={title.goal} />
@@ -140,51 +136,11 @@ function CreditModal(
         ) : (
           <p mix={css({ margin: 0, fontSize: '13px', color: 'var(--muted)' })}>Not earned yet</p>
         )}
+        {earned && picking && <WearForm title={title} picking={picking} />}
       </Modal>
     )
   }
 }
-
-// An earned tile you can wear, with its ⓘ as a badge on the top-right corner:
-// off the line the word is on, so it never takes room from a long word — which
-// on a phone is room the word doesn't have. It has its own touch target rather
-// than the shared `tap-area`, which also sets `position: relative` and would
-// pull the badge off the corner.
-const wearRowStyle = css({
-  position: 'relative',
-  '& .credit-info': {
-    position: 'absolute',
-    top: '-7px',
-    right: '-7px',
-    width: '18px',
-    height: '18px',
-    borderRadius: '50%',
-    background: 'var(--paper)',
-    border: '1px solid var(--rule)',
-    // Centred in public/app.css: Doodle's label display would beat it here.
-    fontSize: '12px',
-    fontWeight: 700,
-    fontStyle: 'italic',
-    lineHeight: 1,
-    color: 'var(--muted)',
-    cursor: 'pointer',
-  },
-  // On a touch screen, a 44px target — the size the rest of the site's small
-  // controls get. It reaches only as far out as the badge does (the 8px grid
-  // gap never gets crossed) and grows down and left over its own tile's corner,
-  // so it can't catch a tap meant for the next tile or the row above.
-  '@media (pointer: coarse)': {
-    '& .credit-info::after': {
-      content: '""',
-      position: 'absolute',
-      top: '-1px',
-      right: '-1px',
-      width: '44px',
-      height: '44px',
-    },
-  },
-  '& .credit-info:hover': { color: 'var(--accent)', borderColor: 'var(--accent)' },
-})
 
 const barStyle = css({
   display: 'block',
@@ -214,8 +170,9 @@ function ProgressBar(handle: Handle<{ current: number; goal: number }>) {
 
 // One kind of credit, every one there is, as tiles carrying just the word. A
 // tap opens a small modal saying what earns it and, on your own, how close you
-// are — or, with `picking`, puts an earned one on — the list is for browsing the words, and thirty sentences at once buried
-// them. Shared by the settings tab and the Titles tab on someone's profile.
+// are — and, with `picking`, a button there to wear an earned one. The list is
+// for browsing the words; thirty sentences at once buried them. Shared by the
+// settings tab and the Titles tab on a profile.
 //
 // Showing words before they're earned is deliberate: "Jump-Scared" is a better
 // reason to watch ten horror films than a padlock is.
@@ -249,36 +206,39 @@ export function CreditTiles(
                 data-group={groupSlug(title.group)}
                 data-earned={String(isEarned)}
               >
-                {picking && isEarned ? (
-                  // Tapping the tile wears it, so how it was earned needs a way
-                  // in of its own: the ⓘ badge on its corner. A sibling of the
-                  // form rather than inside it, since a label can't sit inside
-                  // a button.
-                  <div mix={wearRowStyle}>
-                    <WearTile title={title} picking={picking} />
-                    <ToggleLabel
-                      for={modalId}
-                      class="credit-info"
-                      aria-label={`How you earned ${title.word}`}
-                    >
-                      <span aria-hidden="true">i</span>
-                    </ToggleLabel>
-                    <CreditModal id={modalId} title={title} earned current={current} />
-                  </div>
-                ) : (
-                  <>
-                    <ToggleLabel for={modalId} class="credit-tile">
-                      <span mix={[tileStyle, isEarned ? earnedStyle : lockedStyle]}>
-                        <span mix={wordStyle} title={title.word}>
-                          {isEarned && <span aria-label="Earned">✓ </span>}
-                          {title.word}
+                <ToggleLabel for={modalId} class="credit-tile">
+                  <span
+                    mix={[
+                      tileStyle,
+                      isEarned ? earnedStyle : lockedStyle,
+                      picking && picking[title.part] === title.key ? wornStyle : undefined,
+                    ]}
+                  >
+                    <span mix={wordStyle} title={title.word}>
+                      {isEarned && (
+                        <span aria-label="Earned">
+                          {picking && picking[title.part] === title.key ? '● ' : '✓ '}
                         </span>
-                        {!isEarned && current != null && <ProgressBar current={current} goal={title.goal} />}
-                      </span>
-                    </ToggleLabel>
-                    <CreditModal id={modalId} title={title} earned={isEarned} current={current} />
-                  </>
-                )}
+                      )}
+                      {title.word}
+                    </span>
+                    {/* An earned tile keeps the bar's room, empty, so a row of
+                        tiles stays one height whichever of them are done. */}
+                    {current != null &&
+                      (isEarned ? (
+                        <span mix={css({ display: 'block', height: '4px' })} aria-hidden="true" />
+                      ) : (
+                        <ProgressBar current={current} goal={title.goal} />
+                      ))}
+                  </span>
+                </ToggleLabel>
+                <CreditModal
+                  id={modalId}
+                  title={title}
+                  earned={isEarned}
+                  current={current}
+                  picking={picking}
+                />
               </li>
             )
           })}
@@ -342,7 +302,9 @@ const filterBarStyle = css({
   display: 'flex',
   flexWrap: 'wrap',
   alignItems: 'flex-end',
-  gap: '8px 24px',
+  // The row gap is what separates the dropdown from Show once they wrap onto
+  // two lines, as they always do on a phone.
+  gap: '20px 24px',
   margin: '16px 0 0',
 })
 
@@ -393,6 +355,8 @@ export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picki
               ))}
             </Select>
           </Field>
+          {/* Stacked: in a row, "Still to earn" wrapped onto a line of its
+              own on a phone and read as a separate choice. */}
           {!earnedOnly && (
             <ChoiceGroup legend="Show">
               {STATUSES.map(({ value, label }) => (
