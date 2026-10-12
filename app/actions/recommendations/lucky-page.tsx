@@ -15,6 +15,8 @@ export interface LuckyPickPageProps {
   friends: FriendOption[]
   viewerLoggedTypes: string[]
   mediaType: ActiveMediaType
+  // The viewer's order for the media-type tabs (parseMediaOrder).
+  mediaOrder: ActiveMediaType[]
   lucky: LuckyState
   displayName: string
   findPeopleHref: string
@@ -26,8 +28,17 @@ export interface LuckyPickPageProps {
 // skips the general recommendations page's shortlist-only questions.
 export function LuckyPickPage(handle: Handle<LuckyPickPageProps>) {
   return () => {
-    const { friends, viewerLoggedTypes, mediaType, lucky, displayName, findPeopleHref, error, errorLink } =
-      handle.props
+    const {
+      friends,
+      viewerLoggedTypes,
+      mediaType,
+      mediaOrder,
+      lucky,
+      displayName,
+      findPeopleHref,
+      error,
+      errorLink,
+    } = handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
     const luckyPageHref = routes.recommendations.luckyPage.href()
 
@@ -37,7 +48,11 @@ export function LuckyPickPage(handle: Handle<LuckyPickPageProps>) {
           One thing to watch, read or play — no filters, nothing to decide.
         </p>
 
-        <MediaTabLinks current={mediaType} hrefFor={(type) => `${luckyPageHref}?mediaType=${type}`} />
+        <MediaTabLinks
+          current={mediaType}
+          order={mediaOrder}
+          hrefFor={(type) => `${luckyPageHref}?mediaType=${type}`}
+        />
 
         {error && <ErrorNotice error={error} link={errorLink} />}
 

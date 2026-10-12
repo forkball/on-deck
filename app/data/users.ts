@@ -123,6 +123,12 @@ export async function updateWatchRegion(db: Db, userId: number, region: string):
   await db.update(users, userId, { watch_region: region })
 }
 
+// Already serialized (serializeMediaOrder): null is "the default order", and
+// `undefined` is what writes NULL.
+export async function updateMediaOrder(db: Db, userId: number, order: string | null): Promise<void> {
+  await db.update(users, userId, { media_order: order ?? undefined })
+}
+
 export async function updateUserPassword(db: Db, userId: number, passwordHash: string): Promise<void> {
   await db.update(users, userId, { password_hash: passwordHash })
 }

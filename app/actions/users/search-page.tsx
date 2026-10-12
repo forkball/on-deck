@@ -6,11 +6,13 @@ import type { User } from '../../data/schema.ts'
 import { routes } from '../../routes.ts'
 import { MediaTabLinks } from '../../ui/components/media-tab-links.tsx'
 import { Page } from '../../ui/components/page.tsx'
-import { MEDIA_TYPE_UI } from '../../mediaTypes.ts'
+import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import { UserCard } from '../../ui/components/user-card.tsx'
 
 export interface UserSearchPageProps {
   query: string
+  // The viewer's order for the media-type tabs (parseMediaOrder).
+  mediaOrder: ActiveMediaType[]
   results: User[]
   followingByUserId: Map<number, boolean>
   displayName: string
@@ -18,7 +20,7 @@ export interface UserSearchPageProps {
 
 export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
   return () => {
-    const { query, results, followingByUserId, displayName } = handle.props
+    const { query, mediaOrder, results, followingByUserId, displayName } = handle.props
     const returnTo = query
       ? `${routes.users.search.href()}?q=${encodeURIComponent(query)}`
       : routes.users.search.href()
@@ -28,6 +30,7 @@ export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
       <Page heading="Search people" width="wide" displayName={displayName}>
         <MediaTabLinks
           current="people"
+          order={mediaOrder}
           hrefFor={(type) => MEDIA_TYPE_UI[type].hrefs.search()}
           peopleHref={routes.users.search.href()}
         />

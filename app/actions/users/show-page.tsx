@@ -34,6 +34,9 @@ export interface UserProfilePageProps {
   // Absent when `locked` — there's nothing to show them.
   media?: MediaSummaries
   activeTab?: ActiveMediaType | typeof TITLES_TAB
+  // The viewer's order for the media-type tabs (parseMediaOrder) — theirs,
+  // not the profile owner's.
+  mediaOrder?: ActiveMediaType[]
   bio?: string
   followingCount: number
   followersCount: number
@@ -140,6 +143,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
       viewerFollows,
       media,
       activeTab,
+      mediaOrder,
       bio,
       followingCount,
       followersCount,
@@ -184,6 +188,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
             <MediaTabs
               idPrefix="user-profile"
               active={activeTab!}
+              order={mediaOrder}
               extraTabs={[
                 {
                   id: TITLES_TAB,

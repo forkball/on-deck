@@ -20,6 +20,7 @@ import {
 import { hasImportedLibrary } from '../../../data/imports/batches.ts'
 import { letterboxdSyncAvailableTo } from '../../../data/imports/letterboxdFeed.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
+import { parseMediaOrder } from '../../../mediaTypes.ts'
 import { routes } from '../../../routes.ts'
 import { verifyPassword } from '../../auth/password.ts'
 import { profileSettingsFor } from '../../../data/recommendations/tasteProfile.ts'
@@ -79,7 +80,8 @@ async function connectionsFor(db: Db, identity: User, url: URL): Promise<Connect
 // rather than to the profile form.
 function activeTab(url: URL): ProfileTab | undefined {
   const tab = url.searchParams.get('tab')
-  return tab != null && tab in PROFILE_TABS ? (tab as ProfileTab) : undefined
+  // The values, not the keys: `mediaOrder` is spelled `media-order` in the URL.
+  return (Object.values(PROFILE_TABS) as string[]).includes(tab ?? '') ? (tab as ProfileTab) : undefined
 }
 
 // Whatever was typed, so a rejected submit comes back with the person's own
@@ -112,6 +114,7 @@ export default createController(routes.profile.edit, {
           saved={context.url.searchParams.get('saved') === '1'}
           displayName={displayLabel(auth.identity)}
           connections={await connectionsFor(db, auth.identity, context.url)}
+          mediaOrder={parseMediaOrder(auth.identity.media_order)}
           activeTab={activeTab(context.url)}
         />,
       )
@@ -134,6 +137,7 @@ export default createController(routes.profile.edit, {
             settings={profileSettingsFor(auth.identity)}
             displayName={displayLabel(auth.identity)}
             connections={await connectionsFor(db, auth.identity, context.url)}
+            mediaOrder={parseMediaOrder(auth.identity.media_order)}
             // This form is the profile pane, and it is the one that failed —
             // so the errors are rendered where the fields carrying them are.
             activeTab={PROFILE_TABS.profile}

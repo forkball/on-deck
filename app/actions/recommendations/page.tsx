@@ -18,7 +18,7 @@ import { Page } from '../../ui/components/page.tsx'
 import { ErrorNotice, type ErrorLink } from './error-notice.tsx'
 import { RunList } from '../../ui/components/run-list.tsx'
 import type { UnconfirmedRunDetail } from '../../data/recommendations/unconfirmed.ts'
-import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, mediaTypeUiFor, type ActiveMediaType } from '../../mediaTypes.ts'
+import { MEDIA_TYPE_UI, mediaTypeUiFor, type ActiveMediaType } from '../../mediaTypes.ts'
 import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 export interface RecommendationsPageProps {
@@ -36,6 +36,8 @@ export interface RecommendationsPageProps {
   loggedTypes: Record<number, string[]>
   viewerLoggedTypes: string[]
   mediaType: ActiveMediaType
+  // The viewer's order for the media-type tabs (parseMediaOrder).
+  mediaOrder: ActiveMediaType[]
   genres: string[]
   lengthOptions: { value: string; label: string }[]
   playerTypes: string[]
@@ -179,6 +181,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       loggedTypes,
       viewerLoggedTypes,
       mediaType,
+      mediaOrder,
       genres,
       lengthOptions,
       playerTypes,
@@ -204,7 +207,11 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
         <p mix={css({ margin: '4px 0 0', color: 'var(--muted)', fontSize: '13px' })}>
           Only your last {MAX_RUNS_PER_USER} runs are kept — generating a new one deletes the oldest.
         </p>
-        <MediaTabLinks current={mediaType} hrefFor={(type) => `${recsHref}?mediaType=${type}`} />
+        <MediaTabLinks
+          current={mediaType}
+          order={mediaOrder}
+          hrefFor={(type) => `${recsHref}?mediaType=${type}`}
+        />
 
         {duplicate && <DuplicateNotice duplicate={duplicate} />}
 
@@ -224,7 +231,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
           runsLeftLabel={runsLeftLabel(dailyRuns)}
           runsRemaining={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.remaining : undefined}
           runsLimit={!dailyRuns.unlimited && dailyRuns.remaining > 0 ? dailyRuns.limit : undefined}
-          sources={ACTIVE_MEDIA_TYPES.map((type) => ({
+          sources={mediaOrder.map((type) => ({
             value: type,
             label: MEDIA_TYPE_UI[type].tabLabel,
           }))}

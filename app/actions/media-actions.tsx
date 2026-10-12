@@ -24,7 +24,7 @@ import { checkTitleUnlocksQuietly } from '../data/profileTitles/unlocks.ts'
 import { INTERACTION_SOURCES, INTERACTION_STATUSES, type User } from '../data/schema.ts'
 import type { MediaControllerContext, MediaItemControllerContext } from '../middleware/context.ts'
 import { displayLabel } from '../data/users.ts'
-import { MEDIA_TYPE_UI, type ActiveMediaType } from '../mediaTypes.ts'
+import { MEDIA_TYPE_UI, parseMediaOrder, type ActiveMediaType } from '../mediaTypes.ts'
 import { parseMediaMetadata } from '../data/mediaMetadata.ts'
 import { loadWatchProviders } from '../data/watchProviders.ts'
 import { guessWatchRegion, parseWatchRegion } from '../data/watchRegion.ts'
@@ -72,6 +72,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       return context.render(
         <MediaSearchPage
           mediaType={mediaType}
+          mediaOrder={parseMediaOrder(identity.media_order)}
           query={query}
           results={results}
           initialVisible={SEARCH_INITIAL_VISIBLE}

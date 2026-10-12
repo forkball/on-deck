@@ -22,7 +22,7 @@ import { checkTitleUnlocksQuietly, loadUnlockedTitleKeys } from '../../data/prof
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, searchUsers } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, parseMediaType } from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, parseMediaOrder, parseMediaType } from '../../mediaTypes.ts'
 import { TITLES } from '../../data/profileTitles/catalog.ts'
 import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
@@ -71,6 +71,7 @@ export default createController(routes.users, {
       return context.render(
         <UserSearchPage
           query={query}
+          mediaOrder={parseMediaOrder(auth.identity.media_order)}
           results={results}
           followingByUserId={followingByUserId}
           displayName={displayLabel(auth.identity)}
@@ -131,8 +132,11 @@ export default createController(routes.users, {
         loadMediaSummaries(db, userId, RECENT_COUNT),
         loadUnlockedTitleKeys(db, userId),
       ])
+      // The viewer's order, not the profile owner's: it is how they asked to
+      // see the tabs, wherever the tabs are.
+      const mediaOrder = parseMediaOrder(auth.identity.media_order)
       const tab = context.url.searchParams.get('tab')
-      const activeTab = tab === TITLES_TAB ? TITLES_TAB : (parseMediaType(tab) ?? DEFAULT_MEDIA_TYPE)
+      const activeTab = tab === TITLES_TAB ? TITLES_TAB : (parseMediaType(tab) ?? mediaOrder[0])
 
       return context.render(
         <UserProfilePage
@@ -141,6 +145,7 @@ export default createController(routes.users, {
           viewerFollows={viewerFollows}
           media={media}
           activeTab={activeTab}
+          mediaOrder={mediaOrder}
           bio={target.bio ?? ''}
           followingCount={followingCount}
           followersCount={followersCount}

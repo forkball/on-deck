@@ -15,6 +15,9 @@ export interface MediaTabLinksProps {
   // Given, a People tab at the far end of the bar: the search pages offer
   // finding people beside finding things, so the two are one Search in the nav.
   peopleHref?: string
+  // The viewer's order for the media types (parseMediaOrder); the registry's
+  // when not given.
+  order?: readonly ActiveMediaType[]
 }
 
 // The navigation counterpart to media-tabs.tsx, which can toggle in CSS because
@@ -26,7 +29,7 @@ export interface MediaTabLinksProps {
 // their original props, so the TV search page would fire /movies/suggest.
 export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
   return () => {
-    const { current, hrefFor, peopleHref } = handle.props
+    const { current, hrefFor, peopleHref, order = ACTIVE_MEDIA_TYPES } = handle.props
 
     // Colour and weight are in public/app.css (`a.media-tab`): `.doodle a` is
     // unlayered, so a css() colour here is dropped.
@@ -42,7 +45,7 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
           marginBottom: '20px',
         })}
       >
-        {ACTIVE_MEDIA_TYPES.map((type) => (
+        {order.map((type) => (
           <Link
             key={type}
             href={hrefFor(type)}

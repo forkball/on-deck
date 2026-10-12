@@ -43,6 +43,9 @@ export const users = table({
     // A country code for the "where to watch" list, chosen by the member. Null
     // means guess from the browser's language — see watchRegion.ts.
     watch_region: c.text().nullable(),
+    // The order the media-type tabs come in, comma-separated — see
+    // parseMediaOrder in app/mediaTypes.ts. Null means the registry's order.
+    media_order: c.text().nullable(),
     // The title worn on the profile, as two keys into the catalog in
     // app/data/profileTitles/catalog.ts — see the 20261011120000 migration.
     title_adjective: c.text().nullable(),

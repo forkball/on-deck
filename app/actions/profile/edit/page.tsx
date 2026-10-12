@@ -4,12 +4,14 @@ import { css } from 'remix/ui'
 import { BIO_MAX_LENGTH, USERNAME_HINT, USERNAME_MAX_LENGTH } from '../../../data/users.ts'
 import type { TasteProfileSettings } from '../../../data/recommendations/tasteProfile.ts'
 import { Toast } from '../../../ui/components/toast.tsx'
+import type { ActiveMediaType } from '../../../mediaTypes.ts'
 import { routes } from '../../../routes.ts'
 import { Page } from '../../../ui/components/page.tsx'
 import { PasswordConfirmModal } from '../../../ui/components/password-confirm-modal.tsx'
 import { Field } from '../../../ui/shared/field.tsx'
 import { Tabs } from '../../../ui/components/tabs.tsx'
 import { Connections, type ConnectionsProps } from './connections.tsx'
+import { MediaOrder } from './media-order.tsx'
 import {
   Button,
   CheckboxOption,
@@ -30,6 +32,7 @@ import {
 export const PROFILE_TABS = {
   profile: 'profile',
   taste: 'taste',
+  mediaOrder: 'media-order',
   connections: 'connections',
 } as const
 
@@ -48,6 +51,7 @@ export interface ProfileEditPageProps {
   saved?: boolean
   displayName: string
   connections: ConnectionsProps
+  mediaOrder: ActiveMediaType[]
   activeTab?: ProfileTab
 }
 
@@ -123,7 +127,8 @@ function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSetting
 
 export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
   return () => {
-    const { values, errors, confirming, settings, saved, displayName, connections, activeTab } = handle.props
+    const { values, errors, confirming, settings, saved, displayName, connections, mediaOrder, activeTab } =
+      handle.props
 
     // The default width, like the profile page, so this heading lands on the same
     // left edge as the name it edits. The form keeps its own narrower measure.
@@ -212,6 +217,11 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
               id: PROFILE_TABS.taste,
               label: 'Taste',
               panel: <TasteProfileSettingsForm settings={settings} saved={saved} />,
+            },
+            {
+              id: PROFILE_TABS.mediaOrder,
+              label: 'Media order',
+              panel: <MediaOrder order={mediaOrder} />,
             },
             {
               id: PROFILE_TABS.connections,

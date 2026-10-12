@@ -10,6 +10,7 @@ import { countFollowing } from '../data/follows.ts'
 import { getLuckyState } from '../data/recommendations/lucky.ts'
 import type { User } from '../data/schema.ts'
 import { displayLabel } from '../data/users.ts'
+import { MEDIA_TYPE_UI, parseMediaOrder } from '../mediaTypes.ts'
 import { routes } from '../routes.ts'
 import { FeedRows } from './activity-feed.tsx'
 import { HomePage, type HomeDashboard } from './home-page.tsx'
@@ -103,8 +104,12 @@ export default createController(routes, {
 
       return Response.json({ html, cursor: page.cursor && JSON.stringify(page.cursor) })
     },
-    media() {
-      return redirect(routes.movies.search.href(), 303)
+    // The nav's Search, which opens on the first of the viewer's tabs. A
+    // visitor has none, and is sent where the search's own auth sends them.
+    media(context) {
+      const auth = context.get(Auth)
+      const first = parseMediaOrder(auth.ok ? auth.identity.media_order : null)[0]
+      return redirect(MEDIA_TYPE_UI[first].hrefs.search(), 303)
     },
   },
 })

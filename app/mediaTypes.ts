@@ -11,6 +11,27 @@ export function parseMediaType(value: unknown): ActiveMediaType | null {
   return ACTIVE_MEDIA_TYPES.includes(value as ActiveMediaType) ? (value as ActiveMediaType) : null
 }
 
+// A member's order for the media-type tabs, as users.media_order stores it:
+// the types comma-separated, first tab first. Whatever is stored, the answer
+// names every active type exactly once — unknown and repeated entries are
+// dropped, and a type it doesn't mention (null, or one added since the order
+// was saved) goes on the end in registry order — so no caller has to cope with
+// a tab going missing. Null and the empty string both mean "never chosen".
+export function parseMediaOrder(value: string | null | undefined): ActiveMediaType[] {
+  const chosen = (value ?? '')
+    .split(',')
+    .map((part) => parseMediaType(part.trim()))
+    .filter((type): type is ActiveMediaType => type !== null)
+  return [...new Set([...chosen, ...ACTIVE_MEDIA_TYPES])]
+}
+
+// Null for the registry's own order, so someone who puts it back the way it
+// was follows the default again rather than a saved copy of it.
+export function serializeMediaOrder(order: readonly ActiveMediaType[]): string | null {
+  const normalized = parseMediaOrder(order.join(','))
+  return normalized.every((type, index) => type === ACTIVE_MEDIA_TYPES[index]) ? null : normalized.join(',')
+}
+
 // The `type` a list URL carries, for appending to a query string that already
 // has something in it — hence the leading `&`. Empty for the default type,
 // because a reader that finds no `type` falls back to DEFAULT_MEDIA_TYPE: the
