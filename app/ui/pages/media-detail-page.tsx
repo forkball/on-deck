@@ -338,6 +338,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                   // cleaned text changes nothing.
                   text={mediaType === 'book' ? stripPublisherPromo(overview) : overview}
                   id={`overview-${item.id}`}
+                  markdown
                 />
               ) : (
                 <p>No description available.</p>

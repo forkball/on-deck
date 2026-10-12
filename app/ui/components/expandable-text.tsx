@@ -1,6 +1,8 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import { Markdown, markdownToPlainText } from './markdown.tsx'
+
 // Roughly one clamped line at the detail page's width. Only decides whether a
 // toggle is worth rendering — CSS does the clamping. Erring low costs a
 // redundant toggle; erring high clips text with no way to expand it.
@@ -48,6 +50,9 @@ export interface ExpandableTextProps {
   // Must be unique on the page — drives the checkbox id the CSS keys off.
   id: string
   maxLines?: number
+  // Render the text as Markdown — catalogue descriptions, which Open Library
+  // writes in it. Off for text the app composed itself.
+  markdown?: boolean
 }
 
 // CSS-only, like the rest of the app: a hidden checkbox holds the state and two
@@ -55,11 +60,13 @@ export interface ExpandableTextProps {
 // and, despite the prefix, is supported everywhere current.
 export function ExpandableText(handle: Handle<ExpandableTextProps>) {
   return () => {
-    const { text, id, maxLines = 5 } = handle.props
+    const { text, id, maxLines = 5, markdown = false } = handle.props
+    // Measured without the markup, which takes no room once rendered.
+    const length = markdown ? markdownToPlainText(text).length : text.length
 
     // Short enough that a toggle would be noise — render it plainly.
-    if (text.length <= CHARS_PER_LINE * maxLines) {
-      return <p mix={css(paragraphStyle)}>{text}</p>
+    if (length <= CHARS_PER_LINE * maxLines) {
+      return markdown ? <Markdown text={text} /> : <p mix={css(paragraphStyle)}>{text}</p>
     }
 
     const toggle = css({
@@ -72,7 +79,7 @@ export function ExpandableText(handle: Handle<ExpandableTextProps>) {
     return (
       <div mix={css(clampStyle(id, maxLines))}>
         <input type="checkbox" id={id} />
-        <p class="clamped">{text}</p>
+        {markdown ? <Markdown text={text} class="clamped" /> : <p class="clamped">{text}</p>}
         <span class="toggle more">
           <label for={id} mix={toggle}>
             Read more
