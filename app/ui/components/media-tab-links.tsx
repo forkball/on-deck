@@ -2,7 +2,9 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import { ActiveTabScroller } from '../../browser/active-tab-scroller.tsx'
 import { Link } from '../shared/form-controls.tsx'
+import { TAB_BAR_SCROLL } from './tabs.tsx'
 
 const PLACEHOLDER_TYPES: string[] = []
 
@@ -38,10 +40,11 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
     return (
       <div
         mix={css({
-          display: 'flex',
+          ...TAB_BAR_SCROLL,
           gap: '20px',
           borderBottom: '1px solid var(--rule)',
-          marginTop: '20px',
+          // 20px from what's above, less the 8px of padding the scroll adds.
+          marginTop: '12px',
           marginBottom: '20px',
         })}
       >
@@ -70,6 +73,7 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
             People
           </Link>
         )}
+        <ActiveTabScroller />
         {PLACEHOLDER_TYPES.map((label) => (
           <span key={label} mix={css({ padding: '0 0 8px', color: 'var(--rule)' })} title="Coming soon">
             {label}
