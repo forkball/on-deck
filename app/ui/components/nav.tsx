@@ -3,7 +3,7 @@ import { css } from 'remix/ui'
 
 import { NotificationBell } from '../../browser/notification-bell.tsx'
 import { ProfileMenu } from '../../browser/profile-menu.tsx'
-import { routes, titleSettingsHref } from '../../routes.ts'
+import { routes } from '../../routes.ts'
 import { Link } from '../shared/form-controls.tsx'
 
 // The widest a page gets: Page's `wide` column matches it, so wide content
@@ -36,7 +36,14 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
             On Deck
           </Link>
           {authed ? (
-            <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: 'auto' })}>
+            <div
+              mix={css({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                marginLeft: 'auto',
+              })}
+            >
               <NotificationBell
                 href={routes.notifications.index.href()}
                 countHref={routes.notifications.unreadCount.href()}
@@ -46,9 +53,11 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
                 links={[
                   // One entry for both: People is a tab on the search pages.
                   { href: routes.media.href(), label: 'Search' },
-                  { href: routes.recommendations.index.href(), label: 'Recommendations' },
+                  {
+                    href: routes.recommendations.index.href(),
+                    label: 'Recommendations',
+                  },
                   { href: routes.profile.index.href(), label: 'Profile' },
-                  { href: titleSettingsHref(), label: 'Titles' },
                   // Its own entry rather than something to find behind the
                   // profile: it holds the connected accounts, and this is the
                   // only link to it.
@@ -58,7 +67,14 @@ export function Nav(handle: Handle<{ authed: boolean; displayName?: string }>) {
               />
             </div>
           ) : (
-            <div mix={css({ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: 'auto' })}>
+            <div
+              mix={css({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                marginLeft: 'auto',
+              })}
+            >
               <Link href={routes.auth.login.index.href()} tapArea>
                 Log in
               </Link>

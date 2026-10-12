@@ -11,6 +11,8 @@ import {
 } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { Toast } from '../../ui/components/toast.tsx'
+import { PART_NAMES } from '../../data/profileTitles/catalog.ts'
+import { CreditGroups, TITLES_TAB, type Credit } from '../../ui/components/credit-tiles.tsx'
 import { UserTitle } from '../../ui/components/user-title.tsx'
 import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
@@ -26,7 +28,7 @@ type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
 export interface ProfilePageProps {
   // Keyed by media type rather than a prop per type — see loadMediaSummaries.
   media: MediaSummaries
-  activeTab: ActiveMediaType
+  activeTab: ActiveMediaType | typeof TITLES_TAB
   bio: string
   followingCount: number
   followersCount: number
@@ -39,9 +41,15 @@ export interface ProfilePageProps {
   // Imports still matching or waiting for review, each a way back to it.
   waitingImports: WaitingImport[]
   displayName: string
-  // The title worn, already put into words, or null for none. Choosing it, and
-  // the credits behind it, are under Titles in the nav.
+  // The title worn, already put into words, or null for none.
   title: string | null
+  // Every credit, with yours marked and your progress on the rest, for the
+  // Titles tab.
+  credits: Credit[]
+  // The keys worn now, so the Titles tab can mark them and swap one on a tap.
+  worn: { adjective: string | null; noun: string | null }
+  // Set when a title was just chosen from the Titles tab.
+  titleSaved?: boolean
 }
 
 // What the settings amount to, in the words someone would use for their own
@@ -79,7 +87,7 @@ function TasteProfileSummary(
     const source = describeProfileSource(settings, mediaType)
 
     return (
-      <details>
+      <details mix={css({ marginTop: '24px' })}>
         <summary class="tap-area" mix={css({ cursor: 'pointer' })}>
           <h2 mix={css({ display: 'inline' })}>{label}</h2>
         </summary>
@@ -251,6 +259,9 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       waitingImports,
       displayName,
       title,
+      credits,
+      worn,
+      titleSaved,
     } = handle.props
     const profileHref = routes.profile.index.href()
     const savedReturnTo = `${profileHref}?saved=1`
@@ -265,6 +276,8 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
           <Toast message="Taste profile rewritten." />
         ) : saved ? (
           <Toast message="Saved." />
+        ) : titleSaved ? (
+          <Toast message="Title saved." />
         ) : null}
         <UserTitle title={title} />
         <p mix={css({ margin: '-8px 0 16px', color: 'var(--soft)' })}>
@@ -283,6 +296,28 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
         <MediaTabs
           idPrefix="profile"
           active={activeTab}
+          extraTabs={[
+            {
+              id: TITLES_TAB,
+              label: 'Titles',
+              end: true,
+              panel: (
+                <>
+                  <p mix={css({ margin: 0, color: 'var(--soft)' })}>
+                    Tap a {PART_NAMES.adjective.one.toLowerCase()} and a {PART_NAMES.noun.one.toLowerCase()}{' '}
+                    you've earned to wear them.
+                  </p>
+                  <CreditGroups
+                    credits={credits}
+                    picking={{
+                      ...worn,
+                      returnTo: `${profileHref}?tab=${TITLES_TAB}`,
+                    }}
+                  />
+                </>
+              ),
+            },
+          ]}
           panels={Object.fromEntries(
             ACTIVE_MEDIA_TYPES.map((type) => {
               const ui = MEDIA_TYPE_UI[type]
@@ -295,15 +330,6 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
               return [
                 type,
                 <>
-                  <TasteProfileSummary
-                    label={`My ${ui.attributive} taste profile`}
-                    summary={summary}
-                    updatedAt={profileUpdatedAt}
-                    mediaType={type}
-                    settings={settings}
-                    loggedCount={total}
-                    rebuildsLeft={rebuildsLeft}
-                  />
                   <h2>What I've {ui.pastParticiple}</h2>
                   <LoggedList
                     log={log}
@@ -315,6 +341,17 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                     emptyLabel={`search for a ${ui.itemNoun}`}
                     returnTo={savedReturnTo}
                     mediaType={type}
+                  />
+                  {/* Under the log: what you've logged is what you come here for, and the
+                      profile written from it is something to check now and then. */}
+                  <TasteProfileSummary
+                    label={`My ${ui.attributive} taste profile`}
+                    summary={summary}
+                    updatedAt={profileUpdatedAt}
+                    mediaType={type}
+                    settings={settings}
+                    loggedCount={total}
+                    rebuildsLeft={rebuildsLeft}
                   />
                 </>,
               ]

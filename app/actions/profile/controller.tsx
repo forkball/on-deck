@@ -42,6 +42,7 @@ import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType } from '../../mediaT
 import { parseInteractionStatus } from '../../interactionStatus.ts'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { ImportPage } from './import-page.tsx'
+import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
 import { ProfilePage } from './page.tsx'
 import { loadWaitingImports } from './waiting-imports.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
@@ -57,16 +58,19 @@ export default createController(routes.profile, {
       const auth = context.get(Auth)
 
       const db = context.get(Database)
-      const activeTab = parseMediaType(context.url.searchParams.get('tab')) ?? DEFAULT_MEDIA_TYPE
+      const tab = context.url.searchParams.get('tab')
+      const activeTab = tab === TITLES_TAB ? TITLES_TAB : (parseMediaType(tab) ?? DEFAULT_MEDIA_TYPE)
 
       // Only the log waits on the feed; everything else loads alongside it. The
       // title check waits too, so whatever the feed just logged can earn one.
-      const [[media, worn], followingCount, followersCount, rebuildAllowance, waitingImports] =
+      const [[media, [check, worn]], followingCount, followersCount, rebuildAllowance, waitingImports] =
         await Promise.all([
           syncLetterboxdBeforeReading(db, auth.identity).then(() =>
             Promise.all([
               loadMediaSummaries(db, auth.identity.id, RECENT_COUNT),
-              checkTitleUnlocksQuietly(db, auth.identity.id).then(() => loadWornTitle(db, auth.identity.id)),
+              checkTitleUnlocksQuietly(db, auth.identity.id).then((result) =>
+                Promise.all([result, loadWornTitle(db, auth.identity.id)]),
+              ),
             ]),
           ),
           countFollowing(db, auth.identity.id),
@@ -90,6 +94,13 @@ export default createController(routes.profile, {
           waitingImports={waitingImports}
           displayName={displayLabel(auth.identity)}
           title={composeTitle(worn.adjective, worn.noun)}
+          worn={worn}
+          titleSaved={context.url.searchParams.get('titleSaved') === '1'}
+          credits={(check?.progress ?? []).map(({ title, current }) => ({
+            title,
+            earned: check?.unlocked.has(title.key) ?? false,
+            current,
+          }))}
         />,
       )
     },
@@ -116,7 +127,10 @@ export default createController(routes.profile, {
       const db = context.get(Database)
 
       const choice = parseTitleChoice(
-        { adjective: String(formData.get('adjective') ?? ''), noun: String(formData.get('noun') ?? '') },
+        {
+          adjective: String(formData.get('adjective') ?? ''),
+          noun: String(formData.get('noun') ?? ''),
+        },
         await loadUnlockedTitleKeys(db, auth.identity.id),
       )
       if (!choice) return new Response("You haven't earned that title.", { status: 400 })
