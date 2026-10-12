@@ -1,3 +1,4 @@
+import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 // The ring shown beside "Searching…"/"Importing…" while a request is in
@@ -19,6 +20,18 @@ const spinnerStyle = css({
   '@media (prefers-reduced-motion: reduce)': { animationDuration: '2s' },
 })
 
-export function Spinner() {
-  return () => <span aria-hidden="true" mix={spinnerStyle} />
+// `size` for a ring standing in for a whole list rather than beside a word.
+export function Spinner(handle: Handle<{ size?: number }>) {
+  return () => {
+    const { size } = handle.props
+    return (
+      <span
+        aria-hidden="true"
+        mix={[
+          spinnerStyle,
+          size ? css({ width: `${size}px`, height: `${size}px`, borderWidth: '3px' }) : undefined,
+        ]}
+      />
+    )
+  }
 }

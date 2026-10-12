@@ -1,22 +1,57 @@
-import { clientEntry, ref } from 'remix/ui'
+import { clientEntry, css, ref } from 'remix/ui'
 
-// A leaf sentinel placed inside a GET filter form: any change to the form
-// submits it, so a pick takes effect without a button. The form's own submit
-// button is hidden once this runs — with JS off it stays, and the form still
-// works by pressing it.
-export const SubmitOnChange = clientEntry(import.meta.url, function SubmitOnChange() {
-  return () => (
-    <span
-      hidden
-      mix={ref((node, signal) => {
-        const form = node.closest('form')
-        if (!form) return
+import { Spinner } from './shared/spinner.tsx'
 
-        for (const button of form.querySelectorAll<HTMLElement>('[type="submit"]')) {
-          button.style.display = 'none'
-        }
-        form.addEventListener('change', () => form.requestSubmit(), { signal })
-      })}
-    />
-  )
+const spinnerSlot = css({
+  display: 'flex',
+  justifyContent: 'center',
+  padding: '48px 0',
+  color: 'var(--muted)',
+  // `display: flex` would otherwise beat the attribute's own display: none.
+  '&[hidden]': { display: 'none' },
 })
+
+// Placed where a GET filter form's results are, and handed the form's id and
+// the results' id. Any change to the form submits it, so a pick takes effect
+// without a button, and until the new page arrives the results are swapped for
+// a spinner — the form itself stays put. Put the form's own submit button in a
+// <noscript>: with JS off the form still works by pressing it.
+//
+// The swap is done on the DOM directly rather than by re-rendering: once the
+// submit starts the navigation, the page no longer paints a scheduled update.
+export const SubmitOnChange = clientEntry<{ form: string; results: string }>(
+  import.meta.url,
+  function SubmitOnChange(handle) {
+    return () => (
+      <div
+        hidden
+        mix={[
+          spinnerSlot,
+          ref((node, signal) => {
+            const form = document.getElementById(handle.props.form)
+            const results = document.getElementById(handle.props.results)
+            if (!(form instanceof HTMLFormElement)) return
+
+            const loading = (on: boolean) => {
+              node.hidden = !on
+              if (results) results.hidden = on
+            }
+            form.addEventListener(
+              'change',
+              () => {
+                loading(true)
+                form.requestSubmit()
+              },
+              { signal },
+            )
+            // Coming back from the back/forward cache restores the page as it
+            // was left — mid-submit — so the list comes back.
+            window.addEventListener('pageshow', () => loading(false), { signal })
+          }),
+        ]}
+      >
+        <Spinner size={28} />
+      </div>
+    )
+  },
+)
