@@ -1,6 +1,8 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import { ActiveTabScroller } from '../../browser/active-tab-scroller.tsx'
+
 // Radio-driven CSS-only tabs: `:has()` on the wrapper reads each radio's
 // `:checked`, so the bar and the panels need no sibling-order relationship and
 // nothing has to run in the browser to switch between them.
@@ -136,6 +138,7 @@ export function Tabs(handle: Handle<TabsProps>) {
               {tab.label}
             </label>
           ))}
+          <ActiveTabScroller />
         </div>
 
         {tabs.map((tab) => (
