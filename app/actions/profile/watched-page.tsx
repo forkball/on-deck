@@ -67,7 +67,11 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
               </Select>
             </Field>
           </div>
-          <Button type="submit">Filter</Button>
+          {/* Only without JS: drawn and then hidden by script, it flashed on
+              every load. */}
+          <noscript>
+            <Button type="submit">Filter</Button>
+          </noscript>
           <SubmitOnChange />
         </form>
 
