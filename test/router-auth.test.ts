@@ -89,7 +89,11 @@ describe('login route', { skip: skipWithoutDatabase, concurrency: true }, () => 
 
     for (const value of offSite) {
       it(`ignores an off-site return_to (${value})`, async () => {
-        const response = await post('/auth/login', { identifier: email, password: PASSWORD, return_to: value })
+        const response = await post('/auth/login', {
+          identifier: email,
+          password: PASSWORD,
+          return_to: value,
+        })
         assert.equal(response.status, 303)
         assert.ok(response.location, 'expected a redirect target')
         assert.ok(
