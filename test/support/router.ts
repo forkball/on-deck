@@ -34,15 +34,19 @@ export async function get(path: string): Promise<RouterResponse> {
 }
 
 // Posts a form the way a browser would, so the form-data middleware sees the
-// content type it expects. Pass a string to send something malformed on purpose.
-export async function post(path: string, body: Record<string, string> | string): Promise<RouterResponse> {
+// content type it expects. Pass a string to send something malformed on purpose,
+// and pairs rather than a record to repeat a field the way checkboxes do. A
+// session cookie (from sessionCookieFrom) makes it a signed-in post.
+export async function post(
+  path: string,
+  body: Record<string, string> | [string, string][] | string,
+  cookie?: string,
+): Promise<RouterResponse> {
   const encoded = typeof body === 'string' ? body : new URLSearchParams(body).toString()
+  const headers: Record<string, string> = { 'content-type': 'application/x-www-form-urlencoded' }
+  if (cookie) headers.cookie = cookie
   const response = await router.fetch(
-    new Request(new URL(path, ORIGIN), {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: encoded,
-    }),
+    new Request(new URL(path, ORIGIN), { method: 'POST', headers, body: encoded }),
   )
   return toRouterResponse(response)
 }

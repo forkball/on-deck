@@ -7,7 +7,7 @@ import { redirect } from 'remix/response/redirect'
 
 import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import type { Db } from '../../data/db.ts'
-import { listFollowedUsers } from '../../data/follows.ts'
+import { listFollowedUsers, listFollowingIds } from '../../data/follows.ts'
 import { syncLetterboxdBeforeReading } from '../../data/imports/letterboxdSync.ts'
 import { loadLoggedTypesByUser } from '../../data/mediaItems.ts'
 import { getDailyRunAllowance, runCostFor, timeUntil } from '../../data/recommendations/dailyLimit.ts'
@@ -129,12 +129,23 @@ function finishedHref(job: GenerationJob): string | null {
 // count at all: the shared form keeps every friend checkbox mounted and only
 // hides them, so a selection made and then switched away from is still in the
 // request.
-function requestedFriendIds(formData: FormData): number[] {
+//
+// Narrowed to people this account actually follows. The picker only offers
+// those, so it costs nothing in the normal case — it stops a hand-posted id
+// pulling a stranger's taste, private or not, into a run. Both run actions read
+// friends through this, so neither can skip the check.
+async function requestedFriendIds(db: Db, userId: number, formData: FormData): Promise<number[]> {
   if (formData.get('mode') !== 'group') return []
-  return formData
-    .getAll('friend_ids')
-    .map((value) => Number(value))
-    .filter((id) => Number.isInteger(id))
+  const requested = [
+    ...new Set(
+      formData
+        .getAll('friend_ids')
+        .map((value) => Number(value))
+        .filter((id) => Number.isInteger(id)),
+    ),
+  ]
+  const followed = await listFollowingIds(db, userId, requested)
+  return requested.filter((id) => followed.has(id))
 }
 
 // "With friends" and nobody else is refused rather than run for one. The forms
@@ -255,11 +266,15 @@ export default createController(routes.recommendations, {
         return new Response('Invalid request', { status: 400 })
       }
 
-      const friendIds = requestedFriendIds(formData)
+      const db = context.get(Database)
+
+      // After the narrowing, so a group of nobody but strangers is refused too
+      // rather than quietly run for one.
+      const friendIds = await requestedFriendIds(db, auth.identity.id, formData)
       if (parsed.value.mode === 'group' && friendIds.length === 0) {
         const mediaType = parseMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
         return context.render(
-          await indexPage(context.get(Database), auth.identity, mediaType, {
+          await indexPage(db, auth.identity, mediaType, {
             error: NO_FRIENDS_PICKED_ERROR,
           }),
           { status: 400 },
@@ -301,8 +316,6 @@ export default createController(routes.recommendations, {
         .map((value) => String(value))
         .map((value) => parseMediaType(value))
         .filter((value): value is ActiveMediaType => value !== null)
-
-      const db = context.get(Database)
 
       // Ahead of everything that reads the log, including the gate below: a run
       // built on a week-stale diary recommends films already watched, and
@@ -427,17 +440,7 @@ export default createController(routes.recommendations, {
 
       const mediaType = parseMediaType(formData.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
 
-      // Narrowed to people this account actually follows. The picker only
-      // offers those, so it costs nothing in the normal case — it stops a
-      // hand-posted id pulling a stranger's taste into a run and notifying them
-      // about it.
-      const requested = new Set(requestedFriendIds(formData))
-      const friendIds =
-        requested.size === 0
-          ? []
-          : (await listFollowedUsers(db, auth.identity.id))
-              .map((friend) => friend.id)
-              .filter((id) => requested.has(id))
+      const friendIds = await requestedFriendIds(db, auth.identity.id, formData)
 
       // After the narrowing, so a group of nobody but strangers is refused too
       // rather than quietly drawn for one.
