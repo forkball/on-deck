@@ -11,7 +11,7 @@ import { updateUserPassword } from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
 import { hashPassword, needsRehash, verifyPassword } from '../password.ts'
 import { LoginPage } from './page.tsx'
-import { safeReturnPath } from '../../../ui/backLink.ts'
+import { formReturnPath, safeReturnPath } from '../../../ui/backLink.ts'
 
 const loginSchema = f.object({
   identifier: f.field(s.defaulted(s.string(), '')),
@@ -69,17 +69,21 @@ export default createController(routes.auth.login, {
     },
     async action(context) {
       const user = await verifyCredentials(passwordProvider, context)
+      const returnTo = formReturnPath(context.get(FormData))
 
+      // Carrying the return path back into the form, or one mistyped password
+      // loses where the login was taking you.
       if (user == null) {
-        return context.render(<LoginPage error="Invalid email/username or password." />, { status: 401 })
+        return context.render(
+          <LoginPage error="Invalid email/username or password." next={returnTo ?? undefined} />,
+          { status: 401 },
+        )
       }
 
       const session = completeAuth(context)
       session.set('auth', { userId: user.id })
 
-      const formData = context.get(FormData)
-      const returnTo = safeReturnPath(String(formData.get('return_to') || ''))
-      return redirect(returnTo || routes.home.href(), 303)
+      return redirect(returnTo ?? routes.home.href(), 303)
     },
   },
 })

@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { backLinkFrom, RETURN_TO_PARAM, safeReturnPath, withReturnTo } from '../app/ui/backLink.ts'
+import {
+  backLinkFrom,
+  formReturnPath,
+  RETURN_TO_PARAM,
+  safeReturnPath,
+  withReturnTo,
+} from '../app/ui/backLink.ts'
 
 // Both ends of the return-path contract: a list writes where it was opened
 // from, and the page it opens reads that back to offer a way there. They only
@@ -114,5 +120,27 @@ describe('safeReturnPath', () => {
       assert.equal(new URL(hostile, 'https://app.test').host, 'evil.test', JSON.stringify(hostile))
       assert.equal(safeReturnPath(hostile), null, JSON.stringify(hostile))
     }
+  })
+})
+
+describe('formReturnPath', () => {
+  function form(entries: [string, string | Blob][]): FormData {
+    const data = new FormData()
+    for (const [name, value] of entries) data.append(name, value)
+    return data
+  }
+
+  it('reads a same-site return_to field', () => {
+    assert.equal(formReturnPath(form([['return_to', '/profile?tab=movie']])), '/profile?tab=movie')
+  })
+
+  it('holds the field to the same rule as a query param', () => {
+    assert.equal(formReturnPath(form([['return_to', '//evil.test']])), null)
+  })
+
+  it('is null when the field is missing, empty or a file', () => {
+    assert.equal(formReturnPath(form([])), null)
+    assert.equal(formReturnPath(form([['return_to', '']])), null)
+    assert.equal(formReturnPath(form([['return_to', new Blob(['/profile'])]])), null)
   })
 })

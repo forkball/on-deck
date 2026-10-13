@@ -40,6 +40,13 @@ export function safeReturnPath(value: string | null | undefined): string | null 
   return value
 }
 
+// The return path a posted form carries in its hidden `return_to` field, under
+// the same rule. A file posted under that name is no path at all.
+export function formReturnPath(formData: FormData): string | null {
+  const value = formData.get('return_to')
+  return typeof value === 'string' ? safeReturnPath(value) : null
+}
+
 // Ordered most-specific first: /profile/watched has to beat /profile.
 const DESTINATIONS: [test: RegExp, label: string][] = [
   [/^\/profile\/watched/, 'your log'],

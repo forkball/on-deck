@@ -53,7 +53,7 @@ import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
 import { ProfilePage } from './page.tsx'
 import { loadWaitingImports } from './waiting-imports.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
-import { safeReturnPath } from '../../ui/backLink.ts'
+import { formReturnPath } from '../../ui/backLink.ts'
 
 const RECENT_COUNT = 5
 const PAGE_SIZE = 10
@@ -148,9 +148,7 @@ export default createController(routes.profile, {
       await chooseTitle(db, auth.identity.id, choice)
       // Back to your profile's Titles tab, which the tap came from, with the
       // toast that says it took.
-      const back =
-        safeReturnPath(String(formData.get('return_to') ?? '')) ??
-        `${routes.profile.index.href()}?tab=${TITLES_TAB}`
+      const back = formReturnPath(formData) ?? `${routes.profile.index.href()}?tab=${TITLES_TAB}`
       return redirect(`${back}${back.includes('?') ? '&' : '?'}titleSaved=1`, 303)
     },
 
@@ -191,7 +189,7 @@ export default createController(routes.profile, {
       const region = parseWatchRegion(formData.get('region'))
       if (region) await updateWatchRegion(context.get(Database), auth.identity.id, region)
 
-      return redirect(safeReturnPath(String(formData.get('return_to') ?? '')) ?? routes.home.href(), 303)
+      return redirect(formReturnPath(formData) ?? routes.home.href(), 303)
     },
 
     async rebuild(context) {
