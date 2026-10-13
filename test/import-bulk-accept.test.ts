@@ -24,7 +24,7 @@ describe('unticking a bulk accept', { skip: skipWithoutDatabase }, () => {
   let batchId: string
 
   before(async () => {
-    userId = await insertUser('import-bulk-accept')
+    userId = (await insertUser('import-bulk-accept')).id
     batchId = await createBatch(db, userId, 'movie', 'letterboxd', [
       { rowIndex: 2, title: 'Kwaidan', year: 1964, rating: 4, consumedAt: null },
       { rowIndex: 3, title: 'Ran', year: 1984, rating: 5, consumedAt: null },

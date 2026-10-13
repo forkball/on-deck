@@ -204,7 +204,7 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
   const itemIds: number[] = []
 
   before(async () => {
-    userId = await insertUser('titles')
+    userId = (await insertUser('titles')).id
     const stamp = Date.now()
     for (let index = 0; index < 10; index++) {
       const {
@@ -270,7 +270,7 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
   })
 
   it('records without notifying when asked to be quiet', async () => {
-    const quietId = await insertUser('titles-quiet')
+    const quietId = (await insertUser('titles-quiet')).id
     try {
       await pool.query(
         `insert into user_media_interactions (user_id, media_item_id, status, created_at, updated_at)
@@ -289,7 +289,7 @@ describe('title unlocks', { skip: skipWithoutDatabase }, () => {
 
   it('tallies who holds and wears each credit', async () => {
     const before = await loadCreditTallies(db)
-    const otherId = await insertUser('titles-tally')
+    const otherId = (await insertUser('titles-tally')).id
     try {
       await checkTitleUnlocks(db, otherId, { notify: false })
       await pool.query(`update users set title_adjective = null where id = $1`, [otherId])

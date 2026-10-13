@@ -27,7 +27,19 @@ const LEGACY_PARAMS: ScryptParams = { N: 16384, r: 8, p: 1 }
 // 64 MiB here, 128 MiB at 2^17 — and these run on 256 MB machines (plus swap,
 // see fly.toml) alongside a generation worker that holds a user's whole log.
 // `derive` queues hashes so only one of these is ever held at a time.
-const CURRENT_PARAMS: ScryptParams = { N: 65536, r: 8, p: 1 }
+const PRODUCTION_PARAMS: ScryptParams = { N: 65536, r: 8, p: 1 }
+
+// Every login a test makes pays a full derive, and the queue above runs them one
+// at a time, so at the production cost a suite of logins is mostly scrypt.
+// Gated on exactly 'test' — the value `npm test` sets and nothing else does —
+// so an unset or misspelt NODE_ENV falls to the production cost, never this.
+//
+// Safe even if it did leak, because the cost travels with the hash: a hash
+// written here reads as below the production cost, and the next login under
+// the right one rehashes it (see needsRehash).
+const TEST_PARAMS: ScryptParams = { N: 1024, r: 8, p: 1 }
+
+const CURRENT_PARAMS: ScryptParams = process.env.NODE_ENV === 'test' ? TEST_PARAMS : PRODUCTION_PARAMS
 
 const KEY_LENGTH = 64
 

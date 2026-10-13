@@ -36,7 +36,7 @@ describe('generation transcripts', { skip: skipWithoutDatabase }, () => {
     ).rows[0]
 
   before(async () => {
-    userId = await insertUser('transcript-owner')
+    userId = (await insertUser('transcript-owner')).id
     created.push(userId)
   })
 
@@ -106,7 +106,7 @@ describe('generation transcripts', { skip: skipWithoutDatabase }, () => {
   })
 
   it('keeps only the most recent few', async () => {
-    const fresh = await insertUser('transcript-pruned')
+    const fresh = (await insertUser('transcript-pruned')).id
     created.push(fresh)
 
     for (let i = 0; i < MAX_TRANSCRIPTS_PER_USER + 2; i++) {

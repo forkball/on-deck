@@ -15,7 +15,7 @@ describe('import row alternates', { skip: skipWithoutDatabase }, () => {
   let batchId: string
 
   before(async () => {
-    userId = await insertUser('import-alternates')
+    userId = (await insertUser('import-alternates')).id
     batchId = await createBatch(db, userId, 'movie', 'letterboxd', [
       { rowIndex: 2, title: 'Little Women', year: null, rating: 4, consumedAt: null },
     ])

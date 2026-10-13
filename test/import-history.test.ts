@@ -23,7 +23,7 @@ describe('has a library been imported', { skip: skipWithoutDatabase }, () => {
     )
 
   before(async () => {
-    userId = await insertUser('import-history')
+    userId = (await insertUser('import-history')).id
   })
 
   after(async () => {

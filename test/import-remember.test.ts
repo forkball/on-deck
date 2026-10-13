@@ -74,8 +74,8 @@ describe('remembering past import answers', { skip: skipWithoutDatabase }, () =>
   let gone: number
 
   before(async () => {
-    userId = await insertUser('import-remember')
-    otherId = await insertUser('import-remember-other')
+    userId = (await insertUser('import-remember')).id
+    otherId = (await insertUser('import-remember-other')).id
     littleWomen = await newItem('Little Women')
     crash = await newItem('Crash')
     gone = await newItem('Solaris')
