@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
 import { randomBytes, scrypt } from 'node:crypto'
 import { describe, it } from 'node:test'
+import { promisify } from 'node:util'
 
 import { hashPassword, needsRehash, verifyPassword } from '../app/actions/auth/password.ts'
 
@@ -107,9 +109,11 @@ describe('needsRehash', () => {
     assert.equal(needsRehash(await legacyHash('hunter2')), true)
   })
 
-  // A format check alone would call this current and never upgrade it.
+  // A format check alone would call this current and never upgrade it. Half of
+  // whatever hashPassword writes, since the suite runs at the test cost.
   it('is true for an encoded hash below the current cost', async () => {
-    assert.equal(needsRehash(await encodedHashAt('hunter2', 32768)), true)
+    const current = Number(/N=(\d+)/.exec(await hashPassword('hunter2'))![1])
+    assert.equal(needsRehash(await encodedHashAt('hunter2', current / 2)), true)
   })
 
   it('is false for an unreadable hash, which rehashing cannot fix', () => {
@@ -132,4 +136,30 @@ describe('the assumed legacy cost', () => {
 
     assert.equal(await verifyPassword(password, stored), true)
   })
+})
+
+// Everything above runs at the test cost, so none of it would notice the
+// switch between the two costs inverted or loosened. Each environment gets a
+// process of its own, since the cost is fixed when the module loads.
+describe('the cost outside tests', () => {
+  async function costUnder(nodeEnv: string | undefined): Promise<string> {
+    const env = { ...process.env, NODE_ENV: nodeEnv }
+    if (nodeEnv === undefined) delete env.NODE_ENV
+    const script = `
+      const { hashPassword } = await import('./app/actions/auth/password.ts')
+      process.stdout.write((await hashPassword('x')).split('$')[1])
+    `
+    const { stdout } = await promisify(execFile)(
+      process.execPath,
+      ['--import', 'remix/node-tsx', '--input-type=module', '-e', script],
+      { env, cwd: new URL('..', import.meta.url) },
+    )
+    return stdout
+  }
+
+  for (const nodeEnv of ['production', 'development', undefined]) {
+    it(`is the production cost with NODE_ENV ${nodeEnv ?? 'unset'}`, async () => {
+      assert.equal(await costUnder(nodeEnv), 'N=65536,r=8,p=1')
+    })
+  }
 })

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
 
 import { hashPassword } from '../app/actions/auth/password.ts'
+import { pool } from '../app/data/db.ts'
 import { get, ORIGIN, post, postMultipart, sessionCookieFrom } from './support/router.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 
@@ -27,8 +28,11 @@ describe('login route', { skip: skipWithoutDatabase, concurrency: true }, () => 
     displayName = user.displayName
   })
 
+  // Ending the pool is what lets the process exit: left open, its idle
+  // connections hold the file for another ten seconds after the last test.
   after(async () => {
     await deleteUsers(userIds)
+    await pool.end()
   })
 
   // An absent field is not malformed: both are `s.defaulted(s.string(), '')`,
