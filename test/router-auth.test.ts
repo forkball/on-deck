@@ -112,6 +112,28 @@ describe('login route', { skip: skipWithoutDatabase, concurrency: true }, () => 
       assert.equal(response.status, 303)
       assert.equal(response.location, '/profile/watched?page=2')
     })
+
+    // A failed login re-renders the form, and the path has to ride along in it,
+    // or the second, correct attempt lands on the home page instead.
+    it('keeps a same-origin return_to through a failed login', async () => {
+      const response = await post('/auth/login', {
+        identifier: email,
+        password: 'wrong',
+        return_to: '/profile/watched?page=2',
+      })
+      assert.equal(response.status, 401)
+      assert.match(response.body, /name="return_to" value="\/profile\/watched\?page=2"/)
+    })
+
+    it('does not carry an off-site return_to into the re-rendered form', async () => {
+      const response = await post('/auth/login', {
+        identifier: email,
+        password: 'wrong',
+        return_to: '//evil.test/path',
+      })
+      assert.equal(response.status, 401)
+      assert.doesNotMatch(response.body, /name="return_to"/)
+    })
   })
 })
 
