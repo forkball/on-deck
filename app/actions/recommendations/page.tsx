@@ -204,7 +204,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
         <p mix={css({ margin: 0, color: 'var(--soft)' })}>
           Rewrites your {ui.attributive} taste profile from what you've logged, then finds picks to try next.
         </p>
-        <p mix={css({ margin: '4px 0 0', color: 'var(--muted)', fontSize: '13px' })}>
+        <p mix={css({ margin: '4px 0 16px', color: 'var(--muted)', fontSize: '13px' })}>
           Only your last {MAX_RUNS_PER_USER} runs are kept — generating a new one deletes the oldest.
         </p>
         <MediaTabLinks
