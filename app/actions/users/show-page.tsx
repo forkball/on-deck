@@ -34,6 +34,9 @@ export interface UserProfilePageProps {
   // Absent when `locked` — there's nothing to show them.
   media?: MediaSummaries
   activeTab?: ActiveMediaType | typeof TITLES_TAB
+  // The viewer's order for the media-type tabs (parseMediaOrder) — theirs,
+  // not the profile owner's.
+  mediaOrder?: ActiveMediaType[]
   bio?: string
   followingCount: number
   followersCount: number
@@ -50,7 +53,7 @@ function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>)
     const { label, summary } = handle.props
 
     return (
-      <details>
+      <details mix={css({ marginTop: '24px' })}>
         <summary class="disclosure">
           <h2 mix={css({ margin: 0 })}>{label}</h2>
           <DisclosureChevron />
@@ -77,43 +80,34 @@ function TasteProfileSummary(handle: Handle<{ label: string; summary: string }>)
 function LoggedList(
   handle: Handle<{
     log: MediaLog
-    total: number
     detailHref: (mediaItemId: number) => string
-    seeAllHref?: string
   }>,
 ) {
   return () => {
-    const { log, total, detailHref, seeAllHref } = handle.props
+    const { log, detailHref } = handle.props
 
     if (log.length === 0) return <p>Nothing logged yet.</p>
 
     return (
-      <>
-        <ul
-          mix={css({
-            listStyle: 'none',
-            margin: 0,
-            padding: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-          })}
-        >
-          {log.map(({ interaction, item }) => (
-            <WatchedListItem
-              key={interaction.id}
-              interaction={interaction}
-              item={item}
-              detailHref={item ? detailHref(item.id) : '#'}
-            />
-          ))}
-        </ul>
-        {seeAllHref && total > log.length && (
-          <p mix={css({ marginTop: '16px' })}>
-            <Link href={seeAllHref}>See all {total} →</Link>
-          </p>
-        )}
-      </>
+      <ul
+        mix={css({
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+        })}
+      >
+        {log.map(({ interaction, item }) => (
+          <WatchedListItem
+            key={interaction.id}
+            interaction={interaction}
+            item={item}
+            detailHref={item ? detailHref(item.id) : '#'}
+          />
+        ))}
+      </ul>
     )
   }
 }
@@ -149,6 +143,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
       viewerFollows,
       media,
       activeTab,
+      mediaOrder,
       bio,
       followingCount,
       followersCount,
@@ -159,11 +154,13 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
     const returnTo = routes.users.show.href({ userId: String(user.id) })
 
     return (
-      <Page title={label} displayName={displayName}>
-        <h1 mix={css({ marginBottom: '4px', overflowWrap: 'break-word' })}>{label}</h1>
+      // Laid out like your own profile (profile/page.tsx) — heading, title,
+      // counts, tabs, log, then the taste profile — so the two read as one page
+      // seen from either side.
+      <Page title={label} heading={label} displayName={displayName}>
         {/* Worn in public: shown even on a private profile, like the name. */}
-        <UserTitle title={composeTitle(user.title_adjective, user.title_noun)} margin="0 0 8px" />
-        <p mix={css({ margin: '0 0 12px', color: 'var(--soft)' })}>
+        <UserTitle title={composeTitle(user.title_adjective, user.title_noun)} />
+        <p mix={css({ margin: '-8px 0 16px', color: 'var(--soft)' })}>
           {locked ? (
             <>
               {followingCount} following · {followersCount} follower{followersCount === 1 ? '' : 's'}
@@ -191,6 +188,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
             <MediaTabs
               idPrefix="user-profile"
               active={activeTab!}
+              order={mediaOrder}
               extraTabs={[
                 {
                   id: TITLES_TAB,
@@ -204,22 +202,30 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
                   const ui = MEDIA_TYPE_UI[type]
                   const { summary, log, total } = media![type]
                   const watchedHref = routes.users.watched.href({ userId: String(user.id) })
+                  const seeAllHref = type === DEFAULT_MEDIA_TYPE ? watchedHref : `${watchedHref}?type=${type}`
 
                   return [
                     type,
                     <>
-                      <TasteProfileSummary
-                        label={`${label}'s ${ui.attributive} taste profile`}
-                        summary={summary}
-                      />
+                      {/* The heading is the way to the whole log, as on your own. */}
                       <h2>
-                        What {label} has {ui.pastParticiple}
+                        {total > 0 ? (
+                          <Link href={seeAllHref} variant="wrap">
+                            What {label} has {ui.pastParticiple} →
+                          </Link>
+                        ) : (
+                          <>
+                            What {label} has {ui.pastParticiple}
+                          </>
+                        )}
                       </h2>
                       <LoggedList
                         log={log}
-                        total={total}
                         detailHref={(id) => withReturnTo(ui.hrefs.show(id), `${returnTo}?tab=${type}`)}
-                        seeAllHref={type === DEFAULT_MEDIA_TYPE ? watchedHref : `${watchedHref}?type=${type}`}
+                      />
+                      <TasteProfileSummary
+                        label={`${label}'s ${ui.attributive} taste profile`}
+                        summary={summary}
                       />
                     </>,
                   ]

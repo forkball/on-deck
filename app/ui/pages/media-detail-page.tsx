@@ -330,7 +330,17 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
               )}
               <PlatformList platforms={platforms} />
             </div>
-            <div mix={css({ '& > p': { margin: 0 }, [PHONE]: { order: 3 } })}>
+            {/* Set off from the facts above by a rule down its left edge, so it
+                reads as the blurb rather than more of the page's own text. */}
+            <div
+              mix={css({
+                '& > p': { margin: 0 },
+                padding: '4px 0 4px 16px',
+                borderLeft: '3px solid var(--rule)',
+                lineHeight: 1.55,
+                [PHONE]: { order: 3, margin: '4px 0' },
+              })}
+            >
               {overview ? (
                 <ExpandableText
                   // Rows stored before the providers stripped jacket copy still
@@ -338,6 +348,7 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
                   // cleaned text changes nothing.
                   text={mediaType === 'book' ? stripPublisherPromo(overview) : overview}
                   id={`overview-${item.id}`}
+                  markdown
                 />
               ) : (
                 <p>No description available.</p>

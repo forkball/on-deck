@@ -2,7 +2,9 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
+import { ActiveTabScroller } from '../../browser/active-tab-scroller.tsx'
 import { Link } from '../shared/form-controls.tsx'
+import { TAB_BAR_SCROLL } from './tabs.tsx'
 
 const PLACEHOLDER_TYPES: string[] = []
 
@@ -15,6 +17,9 @@ export interface MediaTabLinksProps {
   // Given, a People tab at the far end of the bar: the search pages offer
   // finding people beside finding things, so the two are one Search in the nav.
   peopleHref?: string
+  // The viewer's order for the media types (parseMediaOrder); the registry's
+  // when not given.
+  order?: readonly ActiveMediaType[]
 }
 
 // The navigation counterpart to media-tabs.tsx, which can toggle in CSS because
@@ -26,7 +31,7 @@ export interface MediaTabLinksProps {
 // their original props, so the TV search page would fire /movies/suggest.
 export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
   return () => {
-    const { current, hrefFor, peopleHref } = handle.props
+    const { current, hrefFor, peopleHref, order = ACTIVE_MEDIA_TYPES } = handle.props
 
     // Colour and weight are in public/app.css (`a.media-tab`): `.doodle a` is
     // unlayered, so a css() colour here is dropped.
@@ -35,14 +40,15 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
     return (
       <div
         mix={css({
-          display: 'flex',
+          ...TAB_BAR_SCROLL,
           gap: '20px',
           borderBottom: '1px solid var(--rule)',
-          marginTop: '20px',
+          // 20px from what's above, less the 8px of padding the scroll adds.
+          marginTop: '12px',
           marginBottom: '20px',
         })}
       >
-        {ACTIVE_MEDIA_TYPES.map((type) => (
+        {order.map((type) => (
           <Link
             key={type}
             href={hrefFor(type)}
@@ -67,6 +73,7 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
             People
           </Link>
         )}
+        <ActiveTabScroller />
         {PLACEHOLDER_TYPES.map((label) => (
           <span key={label} mix={css({ padding: '0 0 8px', color: 'var(--rule)' })} title="Coming soon">
             {label}

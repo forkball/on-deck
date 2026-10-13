@@ -28,6 +28,11 @@ and middleware modules after the export they carry.
   `parseMediaType`) plus the per-type table of nouns, copy, status verbs and href
   builders. Lives at the app root because every layer reads it and it depends on
   `routes.ts`.
+  It also holds `parseMediaOrder`, a member's chosen order for the media-type
+  tabs (`users.media_order`, set on the Media order tab in settings). Pages that
+  lay out a tab per type take it as `order` on `MediaTabs`/`MediaTabLinks`, and
+  open on its first entry when the URL names no type — not on
+  `DEFAULT_MEDIA_TYPE`, which stays the type a `?type=`-less URL means.
 - `app/interactionStatus.ts` holds the interaction-status vocabulary — parsing,
   per-type labels and badge colors for `want_to_consume`/`in_progress`/`consumed`/
   `not_interested`. Split out from `mediaTypes.ts` since a status isn't a media
@@ -103,9 +108,9 @@ does nothing on its own.
     notification. Credits are kept once earned. Everyone holds the starter
     credits ("Newborn Baby") from signup, worn until they choose; those are never
     announced. `checkTitleUnlocksQuietly` is called after the writes that can
-    earn one, and your own profile and settings check again to catch feed
+    earn one, and your own profile checks again to catch feed
     syncs. Your own credits are chosen on the Titles tab of your own profile
-    (and the same tab in settings); someone else's are the Titles tab on their profile, which lists only
+    (`?tab=titles`), and only there; someone else's are the Titles tab on their profile, which lists only
     the credits they hold. The title
     under the name is plain text. Every credit has a `group` ("Horror",
     "Films", "Social"), which that tab's CSS-only filter reads.

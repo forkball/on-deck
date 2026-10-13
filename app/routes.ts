@@ -53,6 +53,9 @@ export const routes = route({
     // watchRegion is: the profile form asks for a password on some changes, and
     // picking a title should never be one of them.
     title: post('title'),
+    // The order the media-type tabs come in. Its own POST for the same reason
+    // again: each move button submits the whole new order on its own.
+    mediaOrder: post('media-order'),
     rebuild: post('rebuild/:mediaType'),
     password: form('password', { formMethod: 'PUT', names: { action: 'update' } }),
     // Every source in one place: the page that links out to each importer
@@ -149,14 +152,4 @@ export const routes = route({
 // each end: the landing page and the profile both link to it.
 export function luckyRecommendationsHref(): string {
   return routes.recommendations.luckyPage.href()
-}
-
-// The settings tab your titles are chosen on, and where to send someone for
-// them. Spelled once here because the nav's menu links to it, and the nav is
-// shared UI that can't reach into a page for it; the settings page names its
-// tab from this too.
-export const TITLES_SETTINGS_TAB = 'titles'
-
-export function titleSettingsHref(): string {
-  return `${routes.profile.edit.index.href()}?tab=${TITLES_SETTINGS_TAB}`
 }

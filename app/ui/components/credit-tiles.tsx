@@ -172,7 +172,7 @@ function ProgressBar(handle: Handle<{ current: number; goal: number }>) {
 // tap opens a small modal saying what earns it and, on your own, how close you
 // are — and, with `picking`, a button there to wear an earned one. The list is
 // for browsing the words; thirty sentences at once buried them. Shared by the
-// settings tab and the Titles tab on a profile.
+// Titles tab on your own profile and on someone else's.
 //
 // Showing words before they're earned is deliberate: "Jump-Scared" is a better
 // reason to watch ten horror films than a padlock is.
@@ -182,6 +182,7 @@ export function CreditTiles(
   return () => {
     const { heading, credits, picking, earnedOnly } = handle.props
     const earnedCount = credits.filter((credit) => credit.earned).length
+    const closeness = closenessRanks(credits)
     // Someone else's list is only what they've earned, so a section of them
     // can be empty (no roles yet), and "4 of 4 earned" would say nothing.
     if (earnedOnly && credits.length === 0) return null
@@ -205,6 +206,8 @@ export function CreditTiles(
                 class="credit"
                 data-group={groupSlug(title.group)}
                 data-earned={String(isEarned)}
+                // Read by the "Closest to earning" sort, in filterStyle.
+                style={closeness.has(title.key) ? `--closeness: ${closeness.get(title.key)}` : undefined}
               >
                 <ToggleLabel for={modalId} class="credit-tile">
                   <span
@@ -250,6 +253,25 @@ export function CreditTiles(
 
 type CSSStyle = Parameters<typeof css>[0]
 
+// Each credit's place when sorted by how close it is to being earned: the
+// largest share of the way there first, the fewest left to go breaking a tie,
+// and the ones already earned after all of them, in catalog order. Only where
+// there's progress to go by — your own tiles, not someone else's.
+function closenessRanks(credits: Credit[]): Map<string, number> {
+  const share = ({ title, current = 0 }: Credit) => Math.min(current / title.goal, 1)
+  const left = ({ title, current = 0 }: Credit) => title.goal - current
+  const ranked = credits
+    .filter((credit) => credit.current != null)
+    .map((credit, index) => ({ credit, index }))
+    .sort(
+      (a, b) =>
+        Number(a.credit.earned) - Number(b.credit.earned) ||
+        (a.credit.earned ? 0 : share(b.credit) - share(a.credit) || left(a.credit) - left(b.credit)) ||
+        a.index - b.index,
+    )
+  return new Map(ranked.map(({ credit }, rank) => [credit.title.key, rank]))
+}
+
 // A group's name as it sits in a data attribute and an option value.
 function groupSlug(group: string): string {
   return group.toLowerCase().replace(/[^a-z0-9]+/g, '-')
@@ -261,8 +283,9 @@ const STATUSES = [
   { value: 'unearned', label: 'Still to earn', earned: 'false' },
 ] as const
 
-// The filter, in CSS: `:has()` reads which status radio and which group
-// option are checked, and hides the tiles that don't match — the same way
+// The filter and sort, in CSS: `:has()` reads which status radio and which
+// group and sort options are checked, hides the tiles that don't match and
+// orders the rest — the same way
 // tabs.tsx switches panels, so it is instant and needs nothing to run in the
 // browser. A section left with no matching tile goes too, and the "nothing
 // matches" line shows when every section has.
@@ -278,6 +301,10 @@ function filterStyle(groups: string[]): CSSStyle {
     '& .no-match': { display: 'none' },
   }
   const status = (value: string) => `:has(input[name="credit-status"][value="${value}"]:checked)`
+  // The grid lays tiles out by `order`, so sorting is setting it.
+  style['&:has(select[name="credit-sort"] option[value="closest"]:checked) li.credit'] = {
+    order: 'var(--closeness, 0)',
+  }
   const group = (slug: string) => `:has(select[name="credit-group"] option[value="${slug}"]:checked)`
 
   for (const { value, earned } of STATUSES) {
@@ -308,8 +335,8 @@ const filterBarStyle = css({
   margin: '16px 0 0',
 })
 
-// Every credit there is, as genres then roles — what your Titles tab in
-// settings shows — with a filter by what earns them and by whether they're
+// Every credit there is, as genres then roles — what your own profile's Titles
+// tab shows — with a filter by what earns them and by whether they're
 // earned yet. `earnedOnly` is someone else's Titles tab: just the credits they
 // hold, so the earned/still-to-earn switch has nothing to do and goes.
 export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picking; earnedOnly?: boolean }>) {
@@ -355,6 +382,17 @@ export function CreditGroups(handle: Handle<{ credits: Credit[]; picking?: Picki
               ))}
             </Select>
           </Field>
+          {/* Only your own tiles carry progress to sort by. */}
+          {!earnedOnly && (
+            <Field label="Sort">
+              <Select name="credit-sort">
+                <option value="" selected>
+                  As listed
+                </option>
+                <option value="closest">Closest to earning</option>
+              </Select>
+            </Field>
+          )}
           {/* Stacked: in a row, "Still to earn" wrapped onto a line of its
               own on a phone and read as a separate choice. */}
           {!earnedOnly && (

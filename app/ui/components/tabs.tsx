@@ -1,6 +1,8 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import { ActiveTabScroller } from '../../browser/active-tab-scroller.tsx'
+
 // Radio-driven CSS-only tabs: `:has()` on the wrapper reads each radio's
 // `:checked`, so the bar and the panels need no sibling-order relationship and
 // nothing has to run in the browser to switch between them.
@@ -35,6 +37,29 @@ export interface TabsProps {
   // the first tab when absent or unrecognised.
   active?: string
 }
+
+// One line that scrolls sideways when the tabs outgrow a phone, rather than
+// wrapping to a second row that reads as a second set of tabs. Shared with
+// media-tab-links.tsx so the two bars behave alike.
+//
+// Vertical overflow is clipped, not scrolled: a tab's touch band (`tap-area`
+// in app.css) reaches 8px past it top and bottom, and `overflow-x: auto` alone
+// would make that a vertical scroll. The top padding, taken back by the
+// negative margin, keeps the upper half of the band inside the clip; the lower
+// half is given up, since padding there would lift the active underline off
+// the bar's rule.
+export const TAB_BAR_SCROLL = {
+  display: 'flex',
+  flexWrap: 'nowrap',
+  overflowX: 'auto',
+  overflowY: 'hidden',
+  overscrollBehaviorX: 'contain',
+  scrollbarWidth: 'none',
+  '&::-webkit-scrollbar': { display: 'none' },
+  paddingTop: '8px',
+  marginTop: '-8px',
+  '& > *': { flexShrink: 0, whiteSpace: 'nowrap' },
+} satisfies CSSStyle
 
 // Base and active styles share one object: two css() calls land in two @layers
 // ordered by declaration, not specificity, so a later base beats an earlier
@@ -97,12 +122,7 @@ export function Tabs(handle: Handle<TabsProps>) {
 
         <div
           mix={css({
-            display: 'flex',
-            // The gap narrows on a phone so the settings page's four tabs
-            // still fit one line at 375px, and below that the bar wraps
-            // rather than running off the side of the screen.
-            flexWrap: 'wrap',
-            rowGap: '8px',
+            ...TAB_BAR_SCROLL,
             columnGap: 'clamp(12px, 4vw, 20px)',
             borderBottom: '1px solid var(--rule)',
             marginBottom: '16px',
@@ -118,6 +138,7 @@ export function Tabs(handle: Handle<TabsProps>) {
               {tab.label}
             </label>
           ))}
+          <ActiveTabScroller />
         </div>
 
         {tabs.map((tab) => (

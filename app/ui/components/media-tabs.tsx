@@ -22,6 +22,9 @@ export interface MediaTabsProps {
   // detail page always lands on the first one. A media type, or the id of one
   // of `extraTabs`.
   active?: ActiveMediaType | string
+  // The viewer's order for the media types (parseMediaOrder); the registry's
+  // when not given.
+  order?: readonly ActiveMediaType[]
 }
 
 // The media-type reading of Tabs: the registry decides which tabs exist and
@@ -31,10 +34,10 @@ export interface MediaTabsProps {
 // MediaType, and keeps rendered ids stable.
 export function MediaTabs(handle: Handle<MediaTabsProps>) {
   return () => {
-    const { idPrefix, panels, extraTabs = [], active } = handle.props
+    const { idPrefix, panels, extraTabs = [], active, order = ACTIVE_MEDIA_TYPES } = handle.props
 
     const tabs: TabDefinition[] = [
-      ...ACTIVE_MEDIA_TYPES.map((type) => ({
+      ...order.map((type) => ({
         id: MEDIA_TYPE_UI[type].slug,
         label: capitalize(MEDIA_TYPE_UI[type].slug),
         // A wired-up media type whose caller hasn't supplied a panel would

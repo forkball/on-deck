@@ -4,13 +4,14 @@ import { css } from 'remix/ui'
 import { BIO_MAX_LENGTH, USERNAME_HINT, USERNAME_MAX_LENGTH } from '../../../data/users.ts'
 import type { TasteProfileSettings } from '../../../data/recommendations/tasteProfile.ts'
 import { Toast } from '../../../ui/components/toast.tsx'
-import { routes, TITLES_SETTINGS_TAB } from '../../../routes.ts'
+import type { ActiveMediaType } from '../../../mediaTypes.ts'
+import { routes } from '../../../routes.ts'
 import { Page } from '../../../ui/components/page.tsx'
 import { PasswordConfirmModal } from '../../../ui/components/password-confirm-modal.tsx'
 import { Field } from '../../../ui/shared/field.tsx'
 import { Tabs } from '../../../ui/components/tabs.tsx'
 import { Connections, type ConnectionsProps } from './connections.tsx'
-import { Titles, type TitlesProps } from './titles.tsx'
+import { MediaOrder } from './media-order.tsx'
 import {
   Button,
   CheckboxOption,
@@ -31,7 +32,7 @@ import {
 export const PROFILE_TABS = {
   profile: 'profile',
   taste: 'taste',
-  titles: TITLES_SETTINGS_TAB,
+  mediaOrder: 'media-order',
   connections: 'connections',
 } as const
 
@@ -50,9 +51,7 @@ export interface ProfileEditPageProps {
   saved?: boolean
   displayName: string
   connections: ConnectionsProps
-  titles: TitlesProps
-  // Set when a title was just chosen.
-  titleSaved?: boolean
+  mediaOrder: ActiveMediaType[]
   activeTab?: ProfileTab
 }
 
@@ -128,18 +127,8 @@ function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSetting
 
 export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
   return () => {
-    const {
-      values,
-      errors,
-      confirming,
-      settings,
-      saved,
-      displayName,
-      connections,
-      titles,
-      titleSaved,
-      activeTab,
-    } = handle.props
+    const { values, errors, confirming, settings, saved, displayName, connections, mediaOrder, activeTab } =
+      handle.props
 
     // The default width, like the profile page, so this heading lands on the same
     // left edge as the name it edits. The form keeps its own narrower measure.
@@ -150,7 +139,6 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
           <Toast message="Connected. Your recent films are on their way in." />
         )}
         {connections.steam.justConnected && <Toast message="Steam account connected." />}
-        {titleSaved && <Toast message="Title saved." />}
         <Tabs
           idPrefix="profile-edit"
           active={activeTab}
@@ -231,9 +219,9 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
               panel: <TasteProfileSettingsForm settings={settings} saved={saved} />,
             },
             {
-              id: PROFILE_TABS.titles,
-              label: 'Titles',
-              panel: <Titles {...titles} />,
+              id: PROFILE_TABS.mediaOrder,
+              label: 'Media order',
+              panel: <MediaOrder order={mediaOrder} />,
             },
             {
               id: PROFILE_TABS.connections,

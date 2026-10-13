@@ -11,10 +11,13 @@ import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
 import { Toast } from '../components/toast.tsx'
 import { Page } from '../components/page.tsx'
 import { MediaItemCard } from '../components/media-item-card.tsx'
+import { markdownToPlainText } from '../components/markdown.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
+  // The viewer's order for the media-type tabs (parseMediaOrder).
+  mediaOrder: ActiveMediaType[]
   query: string
   results: MediaItem[]
   // How many are visible before scrolling reveals the rest.
@@ -33,7 +36,7 @@ export interface MediaSearchPageProps {
 const SUMMARY_MAX = 200
 
 function summarize(overview: string): string {
-  const text = overview.replace(/\s+/g, ' ').trim()
+  const text = markdownToPlainText(overview).replace(/\s+/g, ' ').trim()
   if (text.length <= SUMMARY_MAX) return text
 
   const cut = text.slice(0, SUMMARY_MAX)
@@ -45,8 +48,16 @@ function summarize(overview: string): string {
 // MEDIA_TYPE_UI.
 export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
   return () => {
-    const { mediaType, query, results, initialVisible, interactionsByItemId, message, displayName } =
-      handle.props
+    const {
+      mediaType,
+      mediaOrder,
+      query,
+      results,
+      initialVisible,
+      interactionsByItemId,
+      message,
+      displayName,
+    } = handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
     const returnTo = `${ui.hrefs.search()}?q=${encodeURIComponent(query)}`
 
@@ -55,6 +66,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
         {message && <Toast message={message} />}
         <MediaTabLinks
           current={mediaType}
+          order={mediaOrder}
           // Switching type starts a fresh search rather than carrying the
           // query across: a title rarely means the same thing in two
           // catalogs, so carrying it just fills the new tab with noise.
