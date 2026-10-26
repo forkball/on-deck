@@ -16,6 +16,16 @@ const log = logger('import')
 
 const IDLE_POLL_MS = 2000
 
+// While the database can't be reached every poll fails the same way, and at
+// 2s a time the stack traces bury everything else in `fly logs`. Failures
+// double the wait up to a minute, and a success drops straight back to idle.
+const MAX_BACKOFF_MS = 60_000
+
+export function pollDelay(failures: number): number {
+  if (failures <= 0) return IDLE_POLL_MS
+  return Math.min(IDLE_POLL_MS * 2 ** failures, MAX_BACKOFF_MS)
+}
+
 // Several beats inside the staleness window, since a claim only needs one of
 // them to have landed.
 const HEARTBEAT_MS = Math.floor(CLAIM_STALE_MS / 6)
@@ -32,9 +42,8 @@ export function startImportWorker(): ImportWorker {
   // both of them slower.
   let running = false
   let stopped = false
-  let timer: NodeJS.Timeout | null = setInterval(() => {
-    void tick().catch((error) => log.error('worker tick failed', error))
-  }, IDLE_POLL_MS)
+  let failures = 0
+  let timer: NodeJS.Timeout | null = null
 
   async function run(batch: ImportBatch): Promise<void> {
     // On a timer rather than per row: matching a large batch can outlast the
@@ -71,13 +80,45 @@ export function startImportWorker(): ImportWorker {
     }
   }
 
+  // The full error once, when an outage starts; after that a line per retry, so
+  // the log still shows it is ongoing without repeating the same trace.
+  async function poll(): Promise<void> {
+    try {
+      await tick()
+      if (failures > 0) log.info(`worker recovered after ${failures} failed ticks`)
+      failures = 0
+    } catch (error) {
+      failures++
+      const retry = `retrying in ${pollDelay(failures) / 1000}s`
+      if (failures === 1) log.error(`worker tick failed, ${retry}`, error)
+      else log.warn(`worker tick failed ${failures} times in a row, ${retry}: ${errorSummary(error)}`)
+    }
+  }
+
+  function schedule(): void {
+    timer = setTimeout(async () => {
+      await poll()
+      if (!stopped) schedule()
+    }, pollDelay(failures))
+  }
+
+  schedule()
+
   return {
     stop() {
       stopped = true
-      if (timer) clearInterval(timer)
+      if (timer) clearTimeout(timer)
       timer = null
     },
     tick,
     busy: () => running,
   }
+}
+
+// pg's connect failures are AggregateErrors with an empty message, one inner
+// error per address tried; the code is what says what went wrong.
+function errorSummary(error: unknown): string {
+  if (!(error instanceof Error)) return String(error)
+  const code = (error as { code?: unknown }).code
+  return [code, error.message].filter(Boolean).join(' ') || error.name
 }
