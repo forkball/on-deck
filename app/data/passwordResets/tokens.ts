@@ -10,6 +10,14 @@ export const RESET_TOKEN_TTL_MS = 60 * 60 * 1000
 // Per account, per hour. Enough for "it didn't arrive, send another" a couple
 // of times; low enough that the form can't be used to flood someone's inbox.
 export const RESETS_PER_HOUR = 3
+
+// Per IP address, per hour, across every account. The per-account cap above
+// stops one inbox being flooded but not one address asking for a link for
+// each of a hundred accounts — which would spend Resend's daily quota and
+// leave real requests unsent. Ten is far more than anyone resetting their own
+// password needs, and a household or office sharing an address still fits.
+export const RESETS_PER_IP_PER_HOUR = 10
+
 export const RESET_LIMIT_WINDOW_MS = 60 * 60 * 1000
 
 export interface NewResetToken {
@@ -43,6 +51,9 @@ export function isUsable(row: { expires_at: number; used_at: number | null }, no
   return row.used_at == null && row.expires_at > now
 }
 
-export function isOverLimit(createdInWindow: number): boolean {
-  return createdInWindow >= RESETS_PER_HOUR
+// `createdInWindow` is how many links went out in the last RESET_LIMIT_WINDOW_MS
+// to the account (limit RESETS_PER_HOUR) or from the address (limit
+// RESETS_PER_IP_PER_HOUR).
+export function isOverLimit(createdInWindow: number, limit: number): boolean {
+  return createdInWindow >= limit
 }

@@ -7,6 +7,7 @@ import { appLink } from '../../../data/mail.ts'
 import { requestPasswordReset } from '../../../data/passwordResets/requests.ts'
 import { logger } from '../../../log.ts'
 import { routes } from '../../../routes.ts'
+import { clientIp } from './client-ip.ts'
 import { ForgotPasswordPage } from './page.tsx'
 
 const log = logger('password-reset')
@@ -34,7 +35,8 @@ export default createController(routes.auth.forgot, {
       // written and an email sent, and a response that waited for that would
       // take measurably longer for a real account than for a made-up one —
       // the same "is this address registered?" leak the page's wording avoids.
-      void requestPasswordReset(context.get(Database), identifier, { linkFor: resetLinkFor }).catch(
+      const ip = clientIp(context.request.headers)
+      void requestPasswordReset(context.get(Database), identifier, { linkFor: resetLinkFor, ip }).catch(
         (error) => {
           log.error('could not send a reset link', error)
         },

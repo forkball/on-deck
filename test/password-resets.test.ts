@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
 
+import { clientIp } from '../app/actions/auth/forgot/client-ip.ts'
 import { hashPassword, verifyPassword } from '../app/actions/auth/password.ts'
 import { pool, db } from '../app/data/db.ts'
 import { readMailConfig, type MailMessage, type SendMail } from '../app/data/mail.ts'
@@ -18,6 +19,7 @@ import {
   newResetToken,
   RESET_TOKEN_TTL_MS,
   RESETS_PER_HOUR,
+  RESETS_PER_IP_PER_HOUR,
 } from '../app/data/passwordResets/tokens.ts'
 import { deleteUsers, insertUser, skipWithoutDatabase } from './support/db.ts'
 import { get, post, sessionCookieFrom } from './support/router.ts'
@@ -48,9 +50,31 @@ describe('reset token rules', () => {
     assert.equal(isUsable({ expires_at: now + 1, used_at: now - 1 }, now), false)
   })
 
-  it(`allows ${RESETS_PER_HOUR} an hour`, () => {
-    assert.equal(isOverLimit(RESETS_PER_HOUR - 1), false)
-    assert.equal(isOverLimit(RESETS_PER_HOUR), true)
+  it('is over a limit once that many have gone out', () => {
+    assert.equal(isOverLimit(RESETS_PER_HOUR - 1, RESETS_PER_HOUR), false)
+    assert.equal(isOverLimit(RESETS_PER_HOUR, RESETS_PER_HOUR), true)
+    assert.ok(
+      RESETS_PER_IP_PER_HOUR > RESETS_PER_HOUR,
+      'one address must be able to reset more than one account',
+    )
+  })
+})
+
+describe('client ip', () => {
+  const headers = (init: Record<string, string>) => new Headers(init)
+
+  it("reads Fly's header, IPv4 or IPv6", () => {
+    assert.equal(clientIp(headers({ 'fly-client-ip': '203.0.113.7' })), '203.0.113.7')
+    assert.equal(clientIp(headers({ 'fly-client-ip': ' 2001:db8::1 ' })), '2001:db8::1')
+  })
+
+  // X-Forwarded-For is whatever the client started it with; only Fly's own
+  // header is overwritten by the proxy.
+  it('ignores X-Forwarded-For, and anything that is not an address', () => {
+    assert.equal(clientIp(headers({ 'x-forwarded-for': '203.0.113.7' })), null)
+    assert.equal(clientIp(headers({ 'fly-client-ip': 'not-an-ip' })), null)
+    assert.equal(clientIp(headers({ 'fly-client-ip': '203.0.113.7, 10.0.0.1' })), null)
+    assert.equal(clientIp(headers({})), null)
   })
 })
 
@@ -169,6 +193,49 @@ describe('password reset requests', { skip: skipWithoutDatabase }, () => {
 
     const later = now + 61 * 60 * 1000
     assert.equal(await requestPasswordReset(db, user.email, { linkFor, send: mail.send, now: later }), 'sent')
+  })
+
+  it(`stops one address after ${RESETS_PER_IP_PER_HOUR} links an hour, across accounts`, async () => {
+    // Random, so a run can't be limited by rows an earlier one left behind.
+    const ip = `198.51.100.${Math.floor(Math.random() * 250) + 1}`
+    const mail = capturingSender()
+    const now = Date.now()
+
+    const accounts = []
+    for (let i = 0; i <= RESETS_PER_IP_PER_HOUR; i++) {
+      const user = await insertUser('reset-ip')
+      userIds.push(user.id)
+      accounts.push(user)
+    }
+
+    for (const user of accounts.slice(0, RESETS_PER_IP_PER_HOUR)) {
+      assert.equal(await requestPasswordReset(db, user.email, { linkFor, ip, send: mail.send, now }), 'sent')
+    }
+    const last = accounts.at(-1)!.email
+    assert.equal(await requestPasswordReset(db, last, { linkFor, ip, send: mail.send, now }), 'limited')
+    assert.equal(mail.sent.length, RESETS_PER_IP_PER_HOUR)
+
+    // Another address, an unknown one, or the same one an hour on, still gets through.
+    assert.equal(
+      await requestPasswordReset(db, last, { linkFor, ip: '192.0.2.1', send: mail.send, now }),
+      'sent',
+    )
+    const second = accounts.at(-2)!.email
+    assert.equal(await requestPasswordReset(db, second, { linkFor, ip: null, send: mail.send, now }), 'sent')
+    const later = now + 61 * 60 * 1000
+    const third = accounts.at(-3)!.email
+    assert.equal(await requestPasswordReset(db, third, { linkFor, ip, send: mail.send, now: later }), 'sent')
+  })
+
+  it('does not count asking about accounts that do not exist', async () => {
+    const ip = `203.0.113.${Math.floor(Math.random() * 250) + 1}`
+    const mail = capturingSender()
+    for (let i = 0; i <= RESETS_PER_IP_PER_HOUR; i++) {
+      await requestPasswordReset(db, `nobody-${i}@example.test`, { linkFor, ip, send: mail.send })
+    }
+    const user = await insertUser('reset-ip-unknown')
+    userIds.push(user.id)
+    assert.equal(await requestPasswordReset(db, user.email, { linkFor, ip, send: mail.send }), 'sent')
   })
 
   it('does not accept a link once it has expired', async () => {

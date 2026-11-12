@@ -14,6 +14,8 @@ import {
   newResetToken,
   RESET_LIMIT_WINDOW_MS,
   RESET_TOKEN_TTL_MS,
+  RESETS_PER_HOUR,
+  RESETS_PER_IP_PER_HOUR,
 } from './tokens.ts'
 
 const log = logger('password-reset')
@@ -22,6 +24,9 @@ export interface RequestResetOptions {
   // The absolute link the email carries. Handed in by the controller, which
   // owns the route table; app/data doesn't import it.
   linkFor: (token: string) => string
+  // Who asked, for the per-IP cap. Null when it isn't known (see clientIp in
+  // the forgot controller); only the per-account cap applies then.
+  ip?: string | null
   send?: SendMail
   now?: number
 }
@@ -35,10 +40,24 @@ export type RequestResetOutcome = 'sent' | 'unknown' | 'limited'
 export async function requestPasswordReset(
   db: Db,
   identifier: string,
-  { linkFor, send = sendMail, now = Date.now() }: RequestResetOptions,
+  { linkFor, ip = null, send = sendMail, now = Date.now() }: RequestResetOptions,
 ): Promise<RequestResetOutcome> {
   const handle = identifier.trim()
   if (!handle) return 'unknown'
+
+  // Before the account lookup, so an address over its cap costs no more than
+  // a count. Only links actually sent are rows, so asking about accounts that
+  // don't exist uses none of it — those send nothing, which is what the cap
+  // is protecting.
+  if (ip) {
+    const fromIp = await db.count(passwordResetTokens, {
+      where: and(eq('requested_ip', ip), gte('created_at', now - RESET_LIMIT_WINDOW_MS)),
+    })
+    if (isOverLimit(fromIp, RESETS_PER_IP_PER_HOUR)) {
+      log.warn(`limit reached for ${ip}, not sending another`)
+      return 'limited'
+    }
+  }
 
   // The same lookup the login form makes — see auth/login/controller.tsx.
   const user = await db.findOne(users, {
@@ -49,7 +68,7 @@ export async function requestPasswordReset(
   const recent = await db.count(passwordResetTokens, {
     where: and(eq('user_id', user.id), gte('created_at', now - RESET_LIMIT_WINDOW_MS)),
   })
-  if (isOverLimit(recent)) {
+  if (isOverLimit(recent, RESETS_PER_HOUR)) {
     log.warn(`limit reached for user ${user.id}, not sending another`)
     return 'limited'
   }
@@ -63,6 +82,7 @@ export async function requestPasswordReset(
       created_at: now,
       expires_at: now + RESET_TOKEN_TTL_MS,
       used_at: null,
+      requested_ip: ip,
     },
     { returnRow: true },
   )

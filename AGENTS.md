@@ -84,7 +84,8 @@ does nothing on its own.
     reset is requested by whoever fills in the form. With no key, nothing is
     sent and development logs the message instead.
   - `app/data/passwordResets/` — "Forgot your password?". `tokens` holds the
-    rules (expiry, single use, the per-account hourly cap) and `email` the
+    rules (expiry, single use, the hourly caps per account and per IP — the IP
+    is Fly's `Fly-Client-IP`, read in `actions/auth/forgot/client-ip.ts`) and `email` the
     message, both database-free; `requests` applies them. Only a token's hash
     is stored. Changing a password, by reset link or on the profile, goes
     through `replaceUserPassword`, which bumps `users.session_version`: login

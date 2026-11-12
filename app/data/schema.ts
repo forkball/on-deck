@@ -394,6 +394,9 @@ export const passwordResetTokens = table({
     created_at: c.integer().notNull(),
     expires_at: c.integer().notNull(),
     used_at: c.integer().nullable(),
+    // Where it was asked for from, for the per-IP cap — see the
+    // 20261113120000 migration.
+    requested_ip: c.text().nullable(),
   },
 })
 
