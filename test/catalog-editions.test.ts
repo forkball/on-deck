@@ -1,0 +1,93 @@
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+
+import {
+  authorSurnameKey,
+  collapseEditions,
+  editionKey,
+  type EditionFacts,
+} from '../app/data/catalog/editions.ts'
+
+interface Result extends EditionFacts {
+  id: number
+}
+
+function result(id: number, title: string, creator: string | null, extra: Partial<EditionFacts> = {}): Result {
+  return { id, title, creator, hasCover: true, logged: false, ...extra }
+}
+
+const ids = (results: Result[]) => collapseEditions(results, (r) => r).map((r) => r.id)
+
+describe('editionKey', () => {
+  // The three Baltimore results a search for it actually returned.
+  it('reads the printings of one book as one', () => {
+    const volumeOne = editionKey('Baltimore Volume I: The Plague Ships', 'Mike Mignola')
+    assert.equal(editionKey('Baltimore: The Plague Ships', 'Michael Mignola'), volumeOne)
+    assert.equal(editionKey('Baltimore, Vol. 1: The Plague Ships', 'Mike Mignola'), volumeOne)
+  })
+
+  it('keeps a sequel apart, though its title holds the first one', () => {
+    assert.notEqual(editionKey('Dune', 'Frank Herbert'), editionKey('Dune Messiah', 'Frank Herbert'))
+  })
+
+  it('keeps later volumes apart', () => {
+    assert.notEqual(editionKey('Saga Volume 1', 'Brian K. Vaughan'), editionKey('Saga Volume 2', 'Brian K. Vaughan'))
+  })
+
+  it('keeps one title by two authors apart', () => {
+    assert.notEqual(editionKey('Rebecca', 'Daphne du Maurier'), editionKey('Rebecca', 'Someone Else'))
+  })
+
+  it('drops "a novel"', () => {
+    assert.equal(editionKey('The Goldfinch: A Novel', 'Donna Tartt'), editionKey('The Goldfinch', 'Donna Tartt'))
+  })
+
+  it('is empty without an author, so nothing is merged on a title alone', () => {
+    assert.equal(editionKey('Rebecca', null), '')
+  })
+})
+
+describe('authorSurnameKey', () => {
+  it('ignores initials spacing and a suffix', () => {
+    assert.equal(authorSurnameKey('J.R.R. Tolkien'), authorSurnameKey('J. R. R. Tolkien'))
+    assert.equal(authorSurnameKey('Harry Turtledove Jr.'), 'turtledove')
+  })
+})
+
+describe('collapseEditions', () => {
+  it('shows one card per book, where its best-ranked edition sat', () => {
+    assert.deepEqual(
+      ids([
+        result(1, 'Baltimore: The Plague Ships', 'Michael Mignola'),
+        result(2, 'Hellboy', 'Mike Mignola'),
+        result(3, 'Baltimore Volume I: The Plague Ships', 'Mike Mignola'),
+      ]),
+      [1, 2],
+    )
+  })
+
+  it('keeps the edition the person logged', () => {
+    assert.deepEqual(
+      ids([
+        result(1, 'Baltimore: The Plague Ships', 'Michael Mignola'),
+        result(2, 'Baltimore Volume I: The Plague Ships', 'Mike Mignola', { logged: true }),
+      ]),
+      [2],
+    )
+  })
+
+  it('prefers an edition with a cover over a better-ranked one without', () => {
+    assert.deepEqual(
+      ids([
+        result(1, 'Baltimore: The Plague Ships', 'Michael Mignola', { hasCover: false }),
+        result(2, 'Baltimore Volume I: The Plague Ships', 'Mike Mignola'),
+        result(3, 'Baltimore Volume I: The Plague Ships', 'Mike Mignola'),
+      ]),
+      [2],
+    )
+  })
+
+  it('leaves results without an author alone', () => {
+    assert.deepEqual(ids([result(1, 'Rebecca', null), result(2, 'Rebecca', null)]), [1, 2])
+  })
+})
