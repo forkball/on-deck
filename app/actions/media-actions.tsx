@@ -12,6 +12,7 @@ import {
   searchCatalog,
   upsertCatalogItem,
 } from '../data/catalog/provider.ts'
+import { collapseEditions } from '../data/catalog/editions.ts'
 import type { Db } from '../data/db.ts'
 import {
   getMediaItemDetail,
@@ -61,13 +62,29 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       const identity: User = auth.identity
 
       const query = context.url.searchParams.get('q')?.trim() ?? ''
-      const results = query ? await searchAndImport(db, mediaType, query) : []
+      const found = query ? await searchAndImport(db, mediaType, query) : []
 
       const interactionsByItemId = await getUserInteractionsForItems(
         db,
         identity.id,
-        results.map((item) => item.id),
+        found.map((item) => item.id),
       )
+
+      // Books only: Google Books answers with one result per printing, and the
+      // other catalogs already id the work. After the interactions, so the edition
+      // this person logged is the one kept — see data/catalog/editions.ts.
+      const results =
+        mediaType === 'book'
+          ? collapseEditions(found, (item) => {
+              const metadata = parseMediaMetadata(item.metadata)
+              return {
+                title: item.title,
+                creator: metadata.creator,
+                hasCover: metadata.posterUrl != null,
+                logged: interactionsByItemId.has(item.id),
+              }
+            })
+          : found
 
       return context.render(
         <MediaSearchPage
