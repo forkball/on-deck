@@ -22,19 +22,24 @@ export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
           <Field label="Email or username">
             <TextInput name="identifier" required />
           </Field>
-          <Field label="Password">
-            <TextInput type="password" name="password" required />
-          </Field>
-          {/* Beside the field it helps with, outside its <label> so a screen
-                reader doesn't read it as part of the field's name. Pulled up
-                into the form's gap so it sits with the field, not the button. */}
-          <Link
-            variant="small"
-            href={routes.auth.forgot.index.href()}
-            mix={css({ alignSelf: 'flex-end', marginTop: '-6px' })}
-          >
-            Forgot your password?
-          </Link>
+          {/* "Forgotten?" sits on the label's row, pinned to its right end.
+                It is a sibling of the Field rather than inside it: inside the
+                <label>, a screen reader would read it as part of the field's
+                name. The aria-label is the whole question, which "Forgotten?"
+                on its own doesn't say when read out of context. */}
+          <div mix={css({ position: 'relative' })}>
+            <Field label="Password">
+              <TextInput type="password" name="password" required />
+            </Field>
+            <Link
+              variant="small"
+              href={routes.auth.forgot.index.href()}
+              aria-label="Forgot your password?"
+              mix={css({ position: 'absolute', top: 0, right: 0 })}
+            >
+              Forgotten?
+            </Link>
+          </div>
           <Button type="submit" variant="primary">
             Log in
           </Button>
