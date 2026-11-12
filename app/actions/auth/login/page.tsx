@@ -25,13 +25,20 @@ export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
           <Field label="Password">
             <TextInput type="password" name="password" required />
           </Field>
+          {/* Beside the field it helps with, outside its <label> so a screen
+                reader doesn't read it as part of the field's name. Pulled up
+                into the form's gap so it sits with the field, not the button. */}
+          <Link
+            variant="small"
+            href={routes.auth.forgot.index.href()}
+            mix={css({ alignSelf: 'flex-end', marginTop: '-6px' })}
+          >
+            Forgot your password?
+          </Link>
           <Button type="submit" variant="primary">
             Log in
           </Button>
         </form>
-        <p>
-          <Link href={routes.auth.forgot.index.href()}>Forgot your password?</Link>
-        </p>
         <p>
           Need an account? <Link href={routes.auth.signup.index.href()}>Sign up</Link>
         </p>
