@@ -5,6 +5,8 @@ import {
   authorSurnameKey,
   collapseEditions,
   editionKey,
+  groupSingleIssues,
+  parseIssue,
   type EditionFacts,
 } from '../app/data/catalog/editions.ts'
 
@@ -100,5 +102,60 @@ describe('collapseEditions', () => {
 
   it('leaves results without an author alone', () => {
     assert.deepEqual(ids([result(1, 'Rebecca', null), result(2, 'Rebecca', null)]), [1, 2])
+  })
+})
+
+describe('parseIssue', () => {
+  it('reads a trailing issue number', () => {
+    assert.deepEqual(parseIssue('Baltimore: The Plague Ships #3'), {
+      series: 'Baltimore: The Plague Ships',
+      number: 3,
+    })
+    assert.deepEqual(parseIssue('Saga Issue 12'), { series: 'Saga', number: 12 })
+    assert.deepEqual(parseIssue('Hellboy: Seed of Destruction #1 (of 4)'), {
+      series: 'Hellboy: Seed of Destruction',
+      number: 1,
+    })
+  })
+
+  it('leaves a number that is part of the name alone', () => {
+    assert.equal(parseIssue('Fahrenheit 451'), null)
+    assert.equal(parseIssue('Saga Volume 2'), null)
+    assert.equal(parseIssue('#1 Fan'), null)
+  })
+})
+
+describe('groupSingleIssues', () => {
+  const shape = (titles: string[]) =>
+    groupSingleIssues(titles, (title) => title).map((entry) =>
+      entry.kind === 'single' ? entry.result : `${entry.series}: [${entry.issues.join(' | ')}]`,
+    )
+
+  // What a search for Baltimore actually returned, issues credited to whichever
+  // writer Google picked, ahead of the collected book.
+  it('gathers a series into one entry where its first issue sat, in number order', () => {
+    assert.deepEqual(
+      shape([
+        'Baltimore: The Plague Ships #3',
+        'Baltimore: The Plague Ships #5',
+        'Baltimore Volume I: The Plague Ships',
+        'Baltimore: The Plague Ships #1',
+      ]),
+      [
+        'Baltimore: The Plague Ships: [Baltimore: The Plague Ships #1 | Baltimore: The Plague Ships #3 | Baltimore: The Plague Ships #5]',
+        'Baltimore Volume I: The Plague Ships',
+      ],
+    )
+  })
+
+  it('leaves a lone issue as an ordinary result', () => {
+    assert.deepEqual(shape(['Saga #1', 'Saga Volume 1']), ['Saga #1', 'Saga Volume 1'])
+  })
+
+  it('keeps two series apart', () => {
+    assert.deepEqual(shape(['Saga #1', 'Paper Girls #1', 'Saga #2', 'Paper Girls #2']), [
+      'Saga: [Saga #1 | Saga #2]',
+      'Paper Girls: [Paper Girls #1 | Paper Girls #2]',
+    ])
   })
 })

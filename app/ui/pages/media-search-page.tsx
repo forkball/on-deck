@@ -3,6 +3,8 @@ import { css } from 'remix/ui'
 
 import type { getUserInteractionForItem } from '../../data/mediaItems.ts'
 import type { MediaItem } from '../../data/schema.ts'
+import type { SearchEntry } from '../../data/catalog/editions.ts'
+import { Collapsible } from '../shared/collapsible.tsx'
 import { MediaTabLinks } from '../components/media-tab-links.tsx'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import { routes } from '../../routes.ts'
@@ -19,7 +21,8 @@ export interface MediaSearchPageProps {
   // The viewer's order for the media-type tabs (parseMediaOrder).
   mediaOrder: ActiveMediaType[]
   query: string
-  results: MediaItem[]
+  // A result, or a series' single issues gathered into one (groupSingleIssues).
+  entries: SearchEntry<MediaItem>[]
   // How many are visible before scrolling reveals the rest.
   initialVisible: number
   interactionsByItemId: Map<number, Awaited<ReturnType<typeof getUserInteractionForItem>>>
@@ -52,7 +55,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
       mediaType,
       mediaOrder,
       query,
-      results,
+      entries,
       initialVisible,
       interactionsByItemId,
       message,
@@ -81,12 +84,12 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
           placeholder={ui.searchPlaceholder}
         />
 
-        {results.length > 0 && (
+        {entries.length > 0 && (
           <section>
             <h2>
               Results{' '}
               <span mix={css({ fontSize: '14px', fontWeight: 400, color: 'var(--muted)' })}>
-                ({results.length})
+                ({entries.length})
               </span>
             </h2>
             <ul
@@ -100,37 +103,142 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                 gap: '16px',
               })}
             >
-              {results.map((item) => {
-                const { overview } = parseMediaMetadata(item.metadata)
-                return (
-                  <MediaItemCard
-                    key={item.id}
-                    item={item}
+              {entries.map((entry) =>
+                entry.kind === 'single' ? (
+                  <ResultCard
+                    key={entry.result.id}
+                    item={entry.result}
                     mediaType={mediaType}
-                    interaction={interactionsByItemId.get(item.id)}
+                    interactionsByItemId={interactionsByItemId}
                     returnTo={returnTo}
-                    lazyImage
-                  >
-                    {overview && (
-                      <p
-                        mix={css({
-                          fontSize: '13px',
-                          color: 'var(--soft)',
-                          margin: '8px 0 0',
-                          lineHeight: 1.4,
-                        })}
-                      >
-                        {summarize(overview)}
-                      </p>
-                    )}
-                  </MediaItemCard>
-                )
-              })}
+                  />
+                ) : (
+                  <IssueGroupCard
+                    key={`issues-${entry.issues[0]!.id}`}
+                    series={entry.series}
+                    issues={entry.issues}
+                    mediaType={mediaType}
+                    interactionsByItemId={interactionsByItemId}
+                    returnTo={returnTo}
+                  />
+                ),
+              )}
             </ul>
             <LazyList listId="search-results" initial={initialVisible} step={initialVisible} />
           </section>
         )}
       </Page>
+    )
+  }
+}
+
+interface ResultCardProps {
+  item: MediaItem
+  mediaType: ActiveMediaType
+  interactionsByItemId: MediaSearchPageProps['interactionsByItemId']
+  returnTo: string
+}
+
+function ResultCard(handle: Handle<ResultCardProps>) {
+  return () => {
+    const { item, mediaType, interactionsByItemId, returnTo } = handle.props
+    const { overview } = parseMediaMetadata(item.metadata)
+    return (
+      <MediaItemCard
+        item={item}
+        mediaType={mediaType}
+        interaction={interactionsByItemId.get(item.id)}
+        returnTo={returnTo}
+        lazyImage
+      >
+        {overview && (
+          <p
+            mix={css({
+              fontSize: '13px',
+              color: 'var(--soft)',
+              margin: '8px 0 0',
+              lineHeight: 1.4,
+            })}
+          >
+            {summarize(overview)}
+          </p>
+        )}
+      </MediaItemCard>
+    )
+  }
+}
+
+// A series' single issues as one row that opens to list them, so a search for
+// the series isn't five near-identical cards ahead of the collected book. Each
+// issue inside is the ordinary card, log control and all. Says how many are
+// logged, since closed it would otherwise hide the viewer's own status.
+function IssueGroupCard(
+  handle: Handle<Omit<ResultCardProps, 'item'> & { series: string; issues: MediaItem[] }>,
+) {
+  return () => {
+    const { series, issues, mediaType, interactionsByItemId, returnTo } = handle.props
+    const ui = MEDIA_TYPE_UI[mediaType]
+    const cover = issues.map((issue) => parseMediaMetadata(issue.metadata).posterUrl).find(Boolean)
+    const logged = issues.filter((issue) => interactionsByItemId.has(issue.id)).length
+
+    return (
+      <li
+        mix={css({
+          border: '1px solid var(--rule)',
+          borderLeft: `4px solid ${ui.hue}`,
+          borderRadius: '8px',
+          padding: '16px',
+        })}
+      >
+        <div mix={css({ display: 'flex', gap: '12px' })}>
+          {cover ? (
+            <img
+              src={cover}
+              alt=""
+              loading="lazy"
+              mix={css({ width: '60px', borderRadius: '4px', display: 'block', flex: '0 0 auto' })}
+            />
+          ) : (
+            <div
+              mix={css({
+                width: '60px',
+                height: '90px',
+                flex: '0 0 auto',
+                border: '1px solid var(--rule)',
+                borderRadius: '4px',
+              })}
+            />
+          )}
+          <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
+            <div>{series}</div>
+            <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>
+              {issues.length} single issues{logged > 0 ? ` · ${logged} logged` : ''}
+            </div>
+            <Collapsible summary="Show issues">
+              <ul
+                mix={css({
+                  listStyle: 'none',
+                  margin: '12px 0 0',
+                  padding: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                })}
+              >
+                {issues.map((issue) => (
+                  <ResultCard
+                    key={issue.id}
+                    item={issue}
+                    mediaType={mediaType}
+                    interactionsByItemId={interactionsByItemId}
+                    returnTo={returnTo}
+                  />
+                ))}
+              </ul>
+            </Collapsible>
+          </div>
+        </div>
+      </li>
     )
   }
 }

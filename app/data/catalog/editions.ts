@@ -11,7 +11,9 @@
 // Nothing here touches those rows — they are shared, and merging them is
 // rematchMediaItem's job. This only decides what one results page shows.
 //
-// Database-free, like titles.ts, so the rule is tested directly.
+// Single issues of a comic are a second, related problem, handled at the bottom.
+//
+// Database-free, like titles.ts, so the rules are tested directly.
 
 import { normalizeTitle, sameWorkKey } from '../titles.ts'
 
@@ -91,4 +93,65 @@ function outranks(candidate: EditionFacts, held: EditionFacts): boolean {
   if (candidate.logged !== held.logged) return candidate.logged
   if (candidate.hasCover !== held.hasCover) return candidate.hasCover
   return false
+}
+
+// Single issues of a comic, gathered into one entry per series.
+//
+// Unlike printings these are separate works — #1 and #3 are different chapters —
+// so they are never collapsed into one. But Google Books files each issue as a
+// volume in its own right, their titles match a search for the series almost word
+// for word, and five of them crowd the collected book down the page. So the page
+// shows them as one entry that opens to list them.
+
+// "Baltimore: The Plague Ships #3", "… Issue 3", "… #3 (of 5)". Trailing only:
+// a number elsewhere in a title is part of the name.
+const ISSUE_SUFFIX = /^(.*?\S)\s*(?:#\s*|\bissue\s+)(\d+)(?:\s*\(\s*of\s+\d+\s*\))?\s*$/i
+
+export interface ParsedIssue {
+  series: string
+  number: number
+}
+
+export function parseIssue(title: string): ParsedIssue | null {
+  const match = ISSUE_SUFFIX.exec(title.trim())
+  if (!match) return null
+  const series = match[1]!.replace(/[\s:,–—-]+$/, '')
+  return series ? { series, number: Number(match[2]) } : null
+}
+
+export type SearchEntry<T> = { kind: 'single'; result: T } | { kind: 'issues'; series: string; issues: T[] }
+
+// Grouped by the series title alone, not the author: one series' issues credit
+// whichever writer Google picked first, Golden on one and Mignola on the next.
+// A lone issue stays an ordinary entry — a group of one hides nothing. A group
+// sits where its best-ranked issue did, and lists its issues in number order.
+export function groupSingleIssues<T>(results: T[], titleOf: (result: T) => string): SearchEntry<T>[] {
+  const parsed = results.map((result) => parseIssue(titleOf(result)))
+  const keys = parsed.map((issue) => (issue ? editionTitleKey(issue.series) : ''))
+
+  const members = new Map<string, number[]>()
+  keys.forEach((key, index) => {
+    if (key) members.set(key, [...(members.get(key) ?? []), index])
+  })
+
+  const placed = new Set<string>()
+  const entries: SearchEntry<T>[] = []
+  results.forEach((result, index) => {
+    const key = keys[index]!
+    const group = key ? members.get(key)! : []
+    if (group.length < 2) {
+      entries.push({ kind: 'single', result })
+      return
+    }
+    if (placed.has(key)) return
+    placed.add(key)
+    // Stable, so two printings of one issue keep their rank order.
+    const ordered = [...group].sort((a, b) => parsed[a]!.number - parsed[b]!.number)
+    entries.push({
+      kind: 'issues',
+      series: parsed[index]!.series,
+      issues: ordered.map((member) => results[member]!),
+    })
+  })
+  return entries
 }
