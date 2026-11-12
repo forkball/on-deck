@@ -89,8 +89,9 @@ does nothing on its own.
     message, both database-free; `requests` applies them. Only a token's hash
     is stored. Changing a password, by reset link or on the profile, goes
     through `replaceUserPassword`, which bumps `users.session_version`: login
-    cookies carry the version they were issued under (`sessionAuthFor` in
-    `middleware/auth.ts`), so every other device is logged out
+    cookies carry the version they were issued under, so every other device is
+    logged out. Every login is written by `logIn` in `middleware/auth.ts` —
+    don't set the session's `auth` by hand, or the cookie won't verify
   - `app/data/catalog/` — external metadata providers behind one `CatalogProvider`
     interface (`provider.ts` is the registry; `tmdb`/`openLibrary`/`igdb` implement it).
     `query.ts` is what a caller asks for — a title, or the text a person typed, plus

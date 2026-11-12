@@ -1,4 +1,3 @@
-import { completeAuth } from 'remix/auth'
 import * as s from 'remix/data-schema'
 import { minLength } from 'remix/data-schema/checks'
 import * as f from 'remix/data-schema/form-data'
@@ -16,7 +15,7 @@ import {
   userFieldErrors,
   usernameSchema,
 } from '../../../data/users.ts'
-import { sessionAuthFor } from '../../../middleware/auth.ts'
+import { logIn } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
 import { hashPassword, PASSWORD_MIN_LENGTH } from '../password.ts'
 import { SignupPage } from './page.tsx'
@@ -85,8 +84,7 @@ export default createController(routes.auth.signup, {
       // first page — rather than from whenever something first checks.
       await checkTitleUnlocksQuietly(db, user.id)
 
-      const session = completeAuth(context)
-      session.set('auth', sessionAuthFor(user))
+      logIn(context, user)
 
       return redirect(routes.home.href(), 303)
     },

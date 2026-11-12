@@ -401,7 +401,6 @@ export const passwordResetTokens = table({
 })
 
 export type User = TableRow<typeof users>
-export type PasswordResetToken = TableRow<typeof passwordResetTokens>
 export type MediaItem = TableRow<typeof mediaItems>
 export type UserMediaInteraction = TableRow<typeof userMediaInteractions>
 export type UserTasteProfile = TableRow<typeof userTasteProfiles>

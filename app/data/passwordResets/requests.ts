@@ -1,14 +1,13 @@
-import { and, eq, gte, or } from 'remix/data-table'
+import { and, eq, gte } from 'remix/data-table'
 
 import type { Db } from '../db.ts'
 import { sendMail, type SendMail } from '../mail.ts'
-import { passwordResetTokens, users, type PasswordResetToken } from '../schema.ts'
-import { displayLabel, replaceUserPassword } from '../users.ts'
+import { passwordResetTokens, type User } from '../schema.ts'
+import { displayLabel, findUserByIdentifier, replaceUserPassword } from '../users.ts'
 import { logger } from '../../log.ts'
 import { resetEmail } from './email.ts'
 import {
   hashResetToken,
-  isOverLimit,
   isUsable,
   isWellFormedToken,
   newResetToken,
@@ -35,40 +34,45 @@ export interface RequestResetOptions {
 // never told: every outcome answers them with the same page.
 export type RequestResetOutcome = 'sent' | 'unknown' | 'limited'
 
+// What the forgot form calls: starts the request and returns at once, without
+// waiting to learn whether an account matched. Whether one did decides
+// whether a row is written and an email sent, and a response that waited for
+// that would take measurably longer for a real account than a made-up one —
+// the same "is this address registered?" leak the page's wording avoids.
+// Returning nothing is what keeps a caller from awaiting it by accident.
+export function queuePasswordReset(db: Db, identifier: string, options: RequestResetOptions): void {
+  requestPasswordReset(db, identifier, options).catch((error) => {
+    log.error('could not send a reset link', error)
+  })
+}
+
 // `identifier` is what the login form takes — an email or a username — so
-// someone who only remembers one of them can still reset.
+// someone who only remembers one of them can still reset. Exported for tests;
+// the app goes through queuePasswordReset.
 export async function requestPasswordReset(
   db: Db,
   identifier: string,
   { linkFor, ip = null, send = sendMail, now = Date.now() }: RequestResetOptions,
 ): Promise<RequestResetOutcome> {
-  const handle = identifier.trim()
-  if (!handle) return 'unknown'
+  // Links sent in the last window, by the given column. Only links actually
+  // sent are rows, so asking about accounts that don't exist counts toward
+  // neither cap — those send nothing, which is what the caps protect.
+  const sentRecently = (column: 'requested_ip' | 'user_id', value: string | number) =>
+    db.count(passwordResetTokens, {
+      where: and(eq(column, value), gte('created_at', now - RESET_LIMIT_WINDOW_MS)),
+    })
 
   // Before the account lookup, so an address over its cap costs no more than
-  // a count. Only links actually sent are rows, so asking about accounts that
-  // don't exist uses none of it — those send nothing, which is what the cap
-  // is protecting.
-  if (ip) {
-    const fromIp = await db.count(passwordResetTokens, {
-      where: and(eq('requested_ip', ip), gte('created_at', now - RESET_LIMIT_WINDOW_MS)),
-    })
-    if (isOverLimit(fromIp, RESETS_PER_IP_PER_HOUR)) {
-      log.warn(`limit reached for ${ip}, not sending another`)
-      return 'limited'
-    }
+  // a count.
+  if (ip && (await sentRecently('requested_ip', ip)) >= RESETS_PER_IP_PER_HOUR) {
+    log.warn(`limit reached for ${ip}, not sending another`)
+    return 'limited'
   }
 
-  // The same lookup the login form makes — see auth/login/controller.tsx.
-  const user = await db.findOne(users, {
-    where: or(eq('email', handle.toLowerCase()), eq('display_name', handle)),
-  })
+  const user = await findUserByIdentifier(db, identifier)
   if (!user) return 'unknown'
 
-  const recent = await db.count(passwordResetTokens, {
-    where: and(eq('user_id', user.id), gte('created_at', now - RESET_LIMIT_WINDOW_MS)),
-  })
-  if (isOverLimit(recent, RESETS_PER_HOUR)) {
+  if ((await sentRecently('user_id', user.id)) >= RESETS_PER_HOUR) {
     log.warn(`limit reached for user ${user.id}, not sending another`)
     return 'limited'
   }
@@ -94,28 +98,19 @@ export async function requestPasswordReset(
   return 'sent'
 }
 
-// The row behind a link, if the link can still be used. Null for every way it
-// can't — malformed, unknown, used or expired — since the page says the same
-// thing for all of them.
-export async function findUsableReset(
-  db: Db,
-  token: string,
-  now = Date.now(),
-): Promise<PasswordResetToken | null> {
-  if (!isWellFormedToken(token)) return null
+// Whether a link can still be used. False for every way it can't — malformed,
+// unknown, used or expired — since the page says the same thing for all of
+// them. A malformed token is turned away here, before it is hashed.
+export async function isResetUsable(db: Db, token: string, now = Date.now()): Promise<boolean> {
+  if (!isWellFormedToken(token)) return false
   const row = await db.findOne(passwordResetTokens, { where: eq('token_hash', hashResetToken(token)) })
-  return row && isUsable(row, now) ? row : null
+  return row != null && isUsable(row, now)
 }
 
-export interface CompletedReset {
-  userId: number
-  sessionVersion: number
-}
-
-// Spends the link and sets the password, or does nothing and answers null if
-// the link can no longer be used.
+// Spends the link and sets the password, answering what logIn needs — or does
+// nothing and answers null if the link can no longer be used.
 //
-// The password is hashed by the caller, after findUsableReset — a hash costs
+// The password is hashed by the caller, after isResetUsable — a hash costs
 // 64 MiB and a few hundred ms, and a bogus token shouldn't be able to buy one.
 // The check is repeated here, inside the transaction, as the conditional
 // update that claims the token: that is what holds when the same link is
@@ -125,9 +120,7 @@ export async function completePasswordReset(
   token: string,
   passwordHash: string,
   now = Date.now(),
-): Promise<CompletedReset | null> {
-  if (!isWellFormedToken(token)) return null
-
+): Promise<Pick<User, 'id' | 'session_version'> | null> {
   return db.transaction(async (tx) => {
     const claimed = await tx.exec(
       `update password_reset_tokens set used_at = $1
@@ -138,7 +131,6 @@ export async function completePasswordReset(
     const userId = (claimed.rows?.[0] as { user_id: number } | undefined)?.user_id
     if (userId == null) return null
 
-    const sessionVersion = await replaceUserPassword(tx, userId, passwordHash, now)
-    return { userId, sessionVersion }
+    return replaceUserPassword(tx, userId, passwordHash, now)
   })
 }

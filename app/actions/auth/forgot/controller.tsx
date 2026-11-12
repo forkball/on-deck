@@ -4,13 +4,10 @@ import { Database } from 'remix/data-table'
 import { createController } from 'remix/router'
 
 import { appLink } from '../../../data/mail.ts'
-import { requestPasswordReset } from '../../../data/passwordResets/requests.ts'
-import { logger } from '../../../log.ts'
+import { queuePasswordReset } from '../../../data/passwordResets/requests.ts'
 import { routes } from '../../../routes.ts'
 import { clientIp } from './client-ip.ts'
 import { ForgotPasswordPage } from './page.tsx'
-
-const log = logger('password-reset')
 
 const forgotSchema = f.object({
   identifier: f.field(s.defaulted(s.string(), '')),
@@ -31,16 +28,12 @@ export default createController(routes.auth.forgot, {
       const parsed = s.parseSafe(forgotSchema, context.get(FormData))
       const identifier = parsed.success ? parsed.value.identifier : ''
 
-      // Not awaited. Whether an account matched decides whether a row is
-      // written and an email sent, and a response that waited for that would
-      // take measurably longer for a real account than for a made-up one —
-      // the same "is this address registered?" leak the page's wording avoids.
-      const ip = clientIp(context.request.headers)
-      void requestPasswordReset(context.get(Database), identifier, { linkFor: resetLinkFor, ip }).catch(
-        (error) => {
-          log.error('could not send a reset link', error)
-        },
-      )
+      // Returns before learning whether an account matched — see
+      // queuePasswordReset for why that matters here.
+      queuePasswordReset(context.get(Database), identifier, {
+        linkFor: resetLinkFor,
+        ip: clientIp(context.request.headers),
+      })
 
       return context.render(<ForgotPasswordPage sent />)
     },

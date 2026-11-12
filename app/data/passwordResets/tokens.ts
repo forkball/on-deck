@@ -20,17 +20,11 @@ export const RESETS_PER_IP_PER_HOUR = 10
 
 export const RESET_LIMIT_WINDOW_MS = 60 * 60 * 1000
 
-export interface NewResetToken {
-  // Goes in the email and nowhere else.
-  token: string
-  // Goes in the database.
-  hash: string
-}
-
 // 32 random bytes: unguessable, so the hash can be a plain SHA-256 rather than
 // a slow one. scrypt exists to protect low-entropy secrets people choose; this
 // one is chosen by the machine.
-export function newResetToken(): NewResetToken {
+// `token` goes in the email and nowhere else; `hash` goes in the database.
+export function newResetToken(): { token: string; hash: string } {
   const token = randomBytes(32).toString('base64url')
   return { token, hash: hashResetToken(token) }
 }
@@ -49,11 +43,4 @@ export function isWellFormedToken(token: string): boolean {
 
 export function isUsable(row: { expires_at: number; used_at: number | null }, now: number): boolean {
   return row.used_at == null && row.expires_at > now
-}
-
-// `createdInWindow` is how many links went out in the last RESET_LIMIT_WINDOW_MS
-// to the account (limit RESETS_PER_HOUR) or from the address (limit
-// RESETS_PER_IP_PER_HOUR).
-export function isOverLimit(createdInWindow: number, limit: number): boolean {
-  return createdInWindow >= limit
 }

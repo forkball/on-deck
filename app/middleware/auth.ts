@@ -1,3 +1,4 @@
+import { completeAuth } from 'remix/auth'
 import { auth, createSessionAuthScheme, requireAuth as requireAuthBase } from 'remix/middleware/auth'
 import { redirect } from 'remix/response/redirect'
 
@@ -9,32 +10,37 @@ import { routes } from '../routes.ts'
 // cookie was issued: changing the password bumps the column, and every cookie
 // carrying the old number stops verifying — the only way to log out other
 // devices when sessions live entirely in the cookie (see session.ts).
-//
-// Optional because cookies issued before it existed don't carry it. They read
-// as 0, which is where every account starts, so the column's arrival logged
-// nobody out.
 interface SessionAuthValue {
   userId: number
-  version?: number
+  version: number
 }
 
-// The one way a login is written to the session, so no path can forget the
-// version and be logged out by the next request.
-export function sessionAuthFor(user: Pick<User, 'id' | 'session_version'>): SessionAuthValue {
-  return { userId: user.id, version: user.session_version }
+// Logs `user` in on this request: a fresh session id, and a cookie stamped
+// with the current session_version. The only place a login is written — every
+// path that logs someone in (login, signup, a reset link, a password change
+// re-issuing its own session) comes through here, so none of them can write a
+// cookie the next request won't verify.
+export function logIn(
+  context: Parameters<typeof completeAuth>[0],
+  user: Pick<User, 'id' | 'session_version'>,
+): void {
+  const value: SessionAuthValue = { userId: user.id, version: user.session_version }
+  completeAuth(context).set('auth', value)
 }
 
 export function loadAuth() {
   return auth({
     schemes: [
       createSessionAuthScheme<User, SessionAuthValue>({
+        // Cookies issued before the version existed don't carry one. They read
+        // as 0, where every account starts, so its arrival logged nobody out.
         read(session) {
-          return (session.get('auth') as SessionAuthValue | null) ?? null
+          const value = session.get('auth') as Partial<SessionAuthValue> | null
+          return value?.userId == null ? null : { userId: value.userId, version: value.version ?? 0 }
         },
         async verify(value) {
           const user = await db.find(users, value.userId)
-          if (!user || (value.version ?? 0) !== user.session_version) return null
-          return user
+          return user && user.session_version === value.version ? user : null
         },
         invalidate(session) {
           session.unset('auth')

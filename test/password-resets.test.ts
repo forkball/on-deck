@@ -8,12 +8,11 @@ import { readMailConfig, type MailMessage, type SendMail } from '../app/data/mai
 import { resetEmail } from '../app/data/passwordResets/email.ts'
 import {
   completePasswordReset,
-  findUsableReset,
+  isResetUsable,
   requestPasswordReset,
 } from '../app/data/passwordResets/requests.ts'
 import {
   hashResetToken,
-  isOverLimit,
   isUsable,
   isWellFormedToken,
   newResetToken,
@@ -50,13 +49,8 @@ describe('reset token rules', () => {
     assert.equal(isUsable({ expires_at: now + 1, used_at: now - 1 }, now), false)
   })
 
-  it('is over a limit once that many have gone out', () => {
-    assert.equal(isOverLimit(RESETS_PER_HOUR - 1, RESETS_PER_HOUR), false)
-    assert.equal(isOverLimit(RESETS_PER_HOUR, RESETS_PER_HOUR), true)
-    assert.ok(
-      RESETS_PER_IP_PER_HOUR > RESETS_PER_HOUR,
-      'one address must be able to reset more than one account',
-    )
+  it('lets one address reset more than one account an hour', () => {
+    assert.ok(RESETS_PER_IP_PER_HOUR > RESETS_PER_HOUR)
   })
 })
 
@@ -160,7 +154,7 @@ describe('password reset requests', { skip: skipWithoutDatabase }, () => {
       'sent',
     )
     assert.equal(mail.sent[0]!.to, user.email)
-    assert.ok(await findUsableReset(db, mail.lastToken()))
+    assert.equal(await isResetUsable(db, mail.lastToken()), true)
 
     assert.equal(
       await requestPasswordReset(db, ` ${user.displayName} `, { linkFor, send: mail.send }),
@@ -246,8 +240,8 @@ describe('password reset requests', { skip: skipWithoutDatabase }, () => {
     await requestPasswordReset(db, user.email, { linkFor, send: mail.send, now })
     const token = mail.lastToken()
 
-    assert.ok(await findUsableReset(db, token, now + RESET_TOKEN_TTL_MS - 1))
-    assert.equal(await findUsableReset(db, token, now + RESET_TOKEN_TTL_MS), null)
+    assert.equal(await isResetUsable(db, token, now + RESET_TOKEN_TTL_MS - 1), true)
+    assert.equal(await isResetUsable(db, token, now + RESET_TOKEN_TTL_MS), false)
     assert.equal(await completePasswordReset(db, token, 'unused', now + RESET_TOKEN_TTL_MS), null)
   })
 
@@ -261,14 +255,14 @@ describe('password reset requests', { skip: skipWithoutDatabase }, () => {
     const second = mail.lastToken()
 
     const completed = await completePasswordReset(db, second, await hashPassword('new-password'))
-    assert.deepEqual(completed, { userId: user.id, sessionVersion: 1 })
+    assert.deepEqual(completed, { id: user.id, session_version: 1 })
 
     const { rows } = await pool.query('select password_hash from users where id = $1', [user.id])
     assert.ok(await verifyPassword('new-password', rows[0].password_hash))
     assert.equal(await verifyPassword('old-password', rows[0].password_hash), false)
 
     assert.equal(await completePasswordReset(db, second, 'again'), null)
-    assert.equal(await findUsableReset(db, first), null)
+    assert.equal(await isResetUsable(db, first), false)
   })
 
   it('lets only one of two simultaneous uses of a link through', async () => {

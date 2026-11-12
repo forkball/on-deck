@@ -26,15 +26,11 @@ export interface MailMessage {
   html: string
 }
 
-export interface SendOptions {
-  // Resend drops a repeat of the same key, so a retry after a timeout can't
-  // deliver the same email twice.
-  idempotencyKey?: string
-}
+// `idempotencyKey`: Resend drops a repeat of the same key, so a retry after a
+// timeout can't deliver the same email twice.
+export type SendMail = (message: MailMessage, options?: { idempotencyKey?: string }) => Promise<void>
 
-export type SendMail = (message: MailMessage, options?: SendOptions) => Promise<void>
-
-export interface MailConfig {
+interface MailConfig {
   apiKey: string | null
   from: string | null
   appUrl: string

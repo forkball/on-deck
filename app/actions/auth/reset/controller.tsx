@@ -1,14 +1,13 @@
-import { completeAuth } from 'remix/auth'
 import * as s from 'remix/data-schema'
 import * as f from 'remix/data-schema/form-data'
 import { Database } from 'remix/data-table'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
-import { completePasswordReset, findUsableReset } from '../../../data/passwordResets/requests.ts'
-import { sessionAuthFor } from '../../../middleware/auth.ts'
+import { completePasswordReset, isResetUsable } from '../../../data/passwordResets/requests.ts'
+import { logIn } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
-import { hashPassword, PASSWORD_MIN_LENGTH } from '../password.ts'
+import { hashPassword, newPasswordErrors } from '../password.ts'
 import { ResetPasswordPage } from './page.tsx'
 
 const resetSchema = f.object({
@@ -26,11 +25,12 @@ export default createController(routes.auth.reset, {
   actions: {
     async index(context) {
       const token = context.url.searchParams.get('token') ?? ''
-      const usable = await findUsableReset(context.get(Database), token)
+      const usable = await isResetUsable(context.get(Database), token)
 
-      return usable
-        ? context.render(<ResetPasswordPage token={token} />, { headers })
-        : context.render(<ResetPasswordPage token={null} />, { status: 410, headers })
+      return context.render(<ResetPasswordPage token={usable ? token : null} />, {
+        status: usable ? 200 : 410,
+        headers,
+      })
     },
 
     async action(context) {
@@ -40,35 +40,25 @@ export default createController(routes.auth.reset, {
         ? parsed.value
         : { token: '', new_password: '', confirm_password: '' }
 
+      const expired = () => context.render(<ResetPasswordPage token={null} />, { status: 410, headers })
+
       // Checked before anything else, and before hashing: a hash costs 64 MiB
       // and a few hundred ms, and a made-up token shouldn't buy one.
-      if (!(await findUsableReset(db, token))) {
-        return context.render(<ResetPasswordPage token={null} />, { status: 410, headers })
-      }
+      if (!(await isResetUsable(db, token))) return expired()
 
-      const reject = (errors: Record<string, string>) =>
-        context.render(<ResetPasswordPage token={token} errors={errors} />, { status: 400, headers })
-
-      if (new_password.length < PASSWORD_MIN_LENGTH) {
-        return reject({ new_password: `Passwords must be at least ${PASSWORD_MIN_LENGTH} characters.` })
-      }
-      if (new_password !== confirm_password) {
-        return reject({ confirm_password: "Those passwords don't match." })
+      const errors = newPasswordErrors(new_password, confirm_password)
+      if (Object.keys(errors).length > 0) {
+        return context.render(<ResetPasswordPage token={token} errors={errors} />, { status: 400, headers })
       }
 
       // Null here means the link was spent between the check above and now —
       // the same link submitted twice at once.
-      const completed = await completePasswordReset(db, token, await hashPassword(new_password))
-      if (!completed) {
-        return context.render(<ResetPasswordPage token={null} />, { status: 410, headers })
-      }
+      const user = await completePasswordReset(db, token, await hashPassword(new_password))
+      if (!user) return expired()
 
       // Opening the link proved the inbox, which is all a login would prove
       // again — so this logs them in rather than sending them to the login form.
-      completeAuth(context).set(
-        'auth',
-        sessionAuthFor({ id: completed.userId, session_version: completed.sessionVersion }),
-      )
+      logIn(context, user)
 
       return redirect(routes.home.href(), 303)
     },
