@@ -1,3 +1,4 @@
+import { completeAuth } from 'remix/auth'
 import * as s from 'remix/data-schema'
 import * as f from 'remix/data-schema/form-data'
 import { Database } from 'remix/data-table'
@@ -6,8 +7,8 @@ import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import type { User } from '../../../data/schema.ts'
-import { displayLabel, updateUserPassword } from '../../../data/users.ts'
-import { requireAuth } from '../../../middleware/auth.ts'
+import { displayLabel, replaceUserPassword } from '../../../data/users.ts'
+import { requireAuth, sessionAuthFor } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
 import { hashPassword, PASSWORD_MIN_LENGTH, verifyPassword } from '../../auth/password.ts'
 import { ProfilePasswordPage } from './page.tsx'
@@ -68,7 +69,19 @@ export default createController(routes.profile.password, {
         )
       }
 
-      await updateUserPassword(context.get(Database), auth.identity.id, await hashPassword(new_password))
+      const sessionVersion = await replaceUserPassword(
+        context.get(Database),
+        auth.identity.id,
+        await hashPassword(new_password),
+      )
+
+      // Every other device is logged out by the version bump; this one is
+      // re-issued under the new version so changing your password doesn't log
+      // out the person who just did it.
+      completeAuth(context).set(
+        'auth',
+        sessionAuthFor({ id: auth.identity.id, session_version: sessionVersion }),
+      )
 
       return redirect(`${routes.profile.index.href()}?saved=1`, 303)
     },

@@ -8,6 +8,7 @@ import { redirect } from 'remix/response/redirect'
 import { db } from '../../../data/db.ts'
 import { users, type User } from '../../../data/schema.ts'
 import { updateUserPassword } from '../../../data/users.ts'
+import { sessionAuthFor } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
 import { hashPassword, needsRehash, verifyPassword } from '../password.ts'
 import { LoginPage } from './page.tsx'
@@ -81,7 +82,7 @@ export default createController(routes.auth.login, {
       }
 
       const session = completeAuth(context)
-      session.set('auth', { userId: user.id })
+      session.set('auth', sessionAuthFor(user))
 
       return redirect(returnTo ?? routes.home.href(), 303)
     },

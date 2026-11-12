@@ -129,6 +129,35 @@ export async function updateMediaOrder(db: Db, userId: number, order: string | n
   await db.update(users, userId, { media_order: order ?? undefined })
 }
 
+// Rewrites the hash of the *same* password — the login rehash. Nothing about
+// who may be logged in changes, so sessions are left alone. A new password
+// goes through replaceUserPassword instead.
 export async function updateUserPassword(db: Db, userId: number, passwordHash: string): Promise<void> {
   await db.update(users, userId, { password_hash: passwordHash })
+}
+
+// Sets a new password and ends every session issued under the old one, then
+// answers the new session version so the caller can keep the person who just
+// changed it logged in. Also spends any reset link still outstanding: a link
+// emailed before the change shouldn't be able to undo it.
+//
+// Both paths that change a password come through here — the profile form and
+// a reset link — so one of them can't forget either half.
+export async function replaceUserPassword(
+  db: Db,
+  userId: number,
+  passwordHash: string,
+  now = Date.now(),
+): Promise<number> {
+  const result = await db.exec(
+    `update users set password_hash = $1, session_version = session_version + 1
+      where id = $2
+      returning session_version`,
+    [passwordHash, userId],
+  )
+  await db.exec(`update password_reset_tokens set used_at = $1 where user_id = $2 and used_at is null`, [
+    now,
+    userId,
+  ])
+  return (result.rows?.[0] as { session_version: number }).session_version
 }

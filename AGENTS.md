@@ -79,6 +79,17 @@ does nothing on its own.
     because it goes stale and is refetched weekly; `watchRegion` is the country
     it is shown for, guessed from Accept-Language and database-free so the
     guess is tested directly
+  - `app/data/mail.ts` sends email through Resend (`RESEND_API_KEY`, `MAIL_FROM`),
+    and builds absolute links from `APP_URL` — never from the request, since a
+    reset is requested by whoever fills in the form. With no key, nothing is
+    sent and development logs the message instead.
+  - `app/data/passwordResets/` — "Forgot your password?". `tokens` holds the
+    rules (expiry, single use, the per-account hourly cap) and `email` the
+    message, both database-free; `requests` applies them. Only a token's hash
+    is stored. Changing a password, by reset link or on the profile, goes
+    through `replaceUserPassword`, which bumps `users.session_version`: login
+    cookies carry the version they were issued under (`sessionAuthFor` in
+    `middleware/auth.ts`), so every other device is logged out
   - `app/data/catalog/` — external metadata providers behind one `CatalogProvider`
     interface (`provider.ts` is the registry; `tmdb`/`openLibrary`/`igdb` implement it).
     `query.ts` is what a caller asks for — a title, or the text a person typed, plus

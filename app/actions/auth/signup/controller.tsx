@@ -16,6 +16,7 @@ import {
   userFieldErrors,
   usernameSchema,
 } from '../../../data/users.ts'
+import { sessionAuthFor } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
 import { hashPassword, PASSWORD_MIN_LENGTH } from '../password.ts'
 import { SignupPage } from './page.tsx'
@@ -85,7 +86,7 @@ export default createController(routes.auth.signup, {
       await checkTitleUnlocksQuietly(db, user.id)
 
       const session = completeAuth(context)
-      session.set('auth', { userId: user.id })
+      session.set('auth', sessionAuthFor(user))
 
       return redirect(routes.home.href(), 303)
     },

@@ -30,6 +30,9 @@ export function LoginPage(handle: Handle<{ error?: string; next?: string }>) {
           </Button>
         </form>
         <p>
+          <Link href={routes.auth.forgot.index.href()}>Forgot your password?</Link>
+        </p>
+        <p>
           Need an account? <Link href={routes.auth.signup.index.href()}>Sign up</Link>
         </p>
       </Page>
