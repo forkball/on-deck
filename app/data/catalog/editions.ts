@@ -34,7 +34,9 @@ const NAME_SUFFIX = new Set(['jr', 'sr', 'ii', 'iii', 'iv'])
 // Surname only: the same author is "Mike Mignola" on one printing and "Michael
 // Mignola" on the next, and "J.R.R. Tolkien" against "J. R. R. Tolkien".
 export function authorSurnameKey(creator: string | null | undefined): string {
-  const words = normalizeTitle(creator ?? '').split(' ').filter(Boolean)
+  const words = normalizeTitle(creator ?? '')
+    .split(' ')
+    .filter(Boolean)
   while (words.length > 1 && NAME_SUFFIX.has(words[words.length - 1]!)) words.pop()
   return words[words.length - 1] ?? ''
 }

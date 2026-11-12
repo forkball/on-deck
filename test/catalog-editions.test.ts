@@ -12,7 +12,12 @@ interface Result extends EditionFacts {
   id: number
 }
 
-function result(id: number, title: string, creator: string | null, extra: Partial<EditionFacts> = {}): Result {
+function result(
+  id: number,
+  title: string,
+  creator: string | null,
+  extra: Partial<EditionFacts> = {},
+): Result {
   return { id, title, creator, hasCover: true, logged: false, ...extra }
 }
 
@@ -31,7 +36,10 @@ describe('editionKey', () => {
   })
 
   it('keeps later volumes apart', () => {
-    assert.notEqual(editionKey('Saga Volume 1', 'Brian K. Vaughan'), editionKey('Saga Volume 2', 'Brian K. Vaughan'))
+    assert.notEqual(
+      editionKey('Saga Volume 1', 'Brian K. Vaughan'),
+      editionKey('Saga Volume 2', 'Brian K. Vaughan'),
+    )
   })
 
   it('keeps one title by two authors apart', () => {
@@ -39,7 +47,10 @@ describe('editionKey', () => {
   })
 
   it('drops "a novel"', () => {
-    assert.equal(editionKey('The Goldfinch: A Novel', 'Donna Tartt'), editionKey('The Goldfinch', 'Donna Tartt'))
+    assert.equal(
+      editionKey('The Goldfinch: A Novel', 'Donna Tartt'),
+      editionKey('The Goldfinch', 'Donna Tartt'),
+    )
   })
 
   it('is empty without an author, so nothing is merged on a title alone', () => {
