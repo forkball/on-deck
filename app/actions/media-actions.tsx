@@ -90,7 +90,10 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       // issue count once.
       const entries: SearchEntry<MediaItem>[] =
         mediaType === 'book'
-          ? groupSingleIssues(results, (item) => item.title)
+          ? groupSingleIssues(results, (item) => ({
+              title: item.title,
+              comic: parseMediaMetadata(item.metadata).tags.includes('graphic novel'),
+            }))
           : results.map((result) => ({ kind: 'single', result }))
 
       return context.render(

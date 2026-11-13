@@ -126,8 +126,9 @@ describe('parseIssue', () => {
 })
 
 describe('groupSingleIssues', () => {
-  const shape = (titles: string[]) =>
-    groupSingleIssues(titles, (title) => title).map((entry) =>
+  // Comics unless a test says otherwise: the title rule is what most cases test.
+  const shape = (titles: string[], notComics: string[] = []) =>
+    groupSingleIssues(titles, (title) => ({ title, comic: !notComics.includes(title) })).map((entry) =>
       entry.kind === 'single' ? entry.result : `${entry.series}: [${entry.issues.join(' | ')}]`,
     )
 
@@ -156,6 +157,18 @@ describe('groupSingleIssues', () => {
     assert.deepEqual(shape(['Saga #1', 'Paper Girls #1', 'Saga #2', 'Paper Girls #2']), [
       'Saga: [Saga #1 | Saga #2]',
       'Paper Girls: [Paper Girls #1 | Paper Girls #2]',
+    ])
+  })
+
+  it('leaves numbered novels alone, which the title pattern also fits', () => {
+    const goosebumps = ['Goosebumps #1', 'Goosebumps #2']
+    assert.deepEqual(shape(goosebumps, goosebumps), goosebumps)
+  })
+
+  it('groups only the issues tagged as comics', () => {
+    assert.deepEqual(shape(['Saga #1', 'Saga #2', 'Saga #3'], ['Saga #3']), [
+      'Saga: [Saga #1 | Saga #2]',
+      'Saga #3',
     ])
   })
 })

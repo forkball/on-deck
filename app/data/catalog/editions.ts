@@ -121,12 +121,30 @@ export function parseIssue(title: string): ParsedIssue | null {
 
 export type SearchEntry<T> = { kind: 'single'; result: T } | { kind: 'issues'; series: string; issues: T[] }
 
+export interface IssueFacts {
+  title: string
+  // Whether the catalog files it as a comic — the "graphic novel" tag, which a
+  // Google Books search hit carries from its top-level "Comics & Graphic Novels"
+  // category.
+  comic: boolean
+}
+
+// Only results tagged as comics count as issues. The title pattern alone also fits
+// numbered novel series — "Goosebumps #1", "Animorphs #2", "The Boxcar Children
+// #3" — which are separate books a person searching for one wants to see, and
+// which the page would mislabel as "single issues". A comic hit Google filed with
+// no category at all is missed, and shows as an ordinary result: the safe way to
+// be wrong.
+//
 // Grouped by the series title alone, not the author: one series' issues credit
 // whichever writer Google picked first, Golden on one and Mignola on the next.
 // A lone issue stays an ordinary entry — a group of one hides nothing. A group
 // sits where its best-ranked issue did, and lists its issues in number order.
-export function groupSingleIssues<T>(results: T[], titleOf: (result: T) => string): SearchEntry<T>[] {
-  const parsed = results.map((result) => parseIssue(titleOf(result)))
+export function groupSingleIssues<T>(results: T[], describe: (result: T) => IssueFacts): SearchEntry<T>[] {
+  const parsed = results.map((result) => {
+    const { title, comic } = describe(result)
+    return comic ? parseIssue(title) : null
+  })
   const keys = parsed.map((issue) => (issue ? editionTitleKey(issue.series) : ''))
 
   const members = new Map<string, number[]>()
