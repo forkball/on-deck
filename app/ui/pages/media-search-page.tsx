@@ -108,6 +108,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                   <ResultCard
                     key={entry.result.id}
                     item={entry.result}
+                    issues={entry.issues}
                     mediaType={mediaType}
                     interactionsByItemId={interactionsByItemId}
                     returnTo={returnTo}
@@ -134,6 +135,8 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
 
 interface ResultCardProps {
   item: MediaItem
+  // The single issues this edition collects, listed under it.
+  issues?: MediaItem[]
   mediaType: ActiveMediaType
   interactionsByItemId: MediaSearchPageProps['interactionsByItemId']
   returnTo: string
@@ -141,7 +144,7 @@ interface ResultCardProps {
 
 function ResultCard(handle: Handle<ResultCardProps>) {
   return () => {
-    const { item, mediaType, interactionsByItemId, returnTo } = handle.props
+    const { item, issues, mediaType, interactionsByItemId, returnTo } = handle.props
     const { overview } = parseMediaMetadata(item.metadata)
     return (
       <MediaItemCard
@@ -150,6 +153,17 @@ function ResultCard(handle: Handle<ResultCardProps>) {
         interaction={interactionsByItemId.get(item.id)}
         returnTo={returnTo}
         lazyImage
+        footer={
+          issues && (
+            <IssueList
+              summary={`Also published as ${issuesLabel(issues, interactionsByItemId)}`}
+              issues={issues}
+              mediaType={mediaType}
+              interactionsByItemId={interactionsByItemId}
+              returnTo={returnTo}
+            />
+          )
+        }
       >
         {overview && (
           <p
@@ -179,7 +193,6 @@ function IssueGroupCard(
     const { series, issues, mediaType, interactionsByItemId, returnTo } = handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
     const cover = issues.map((issue) => parseMediaMetadata(issue.metadata).posterUrl).find(Boolean)
-    const logged = issues.filter((issue) => interactionsByItemId.has(issue.id)).length
 
     return (
       <li
@@ -218,35 +231,65 @@ function IssueGroupCard(
           <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
             <div>{series}</div>
             <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>
-              {issues.length} single issues{logged > 0 ? ` · ${logged} logged` : ''}
+              {issuesLabel(issues, interactionsByItemId)}
             </div>
           </div>
         </div>
         <div mix={css({ marginTop: '12px' })}>
-          <Collapsible summary="Show issues">
-            <ul
-              mix={css({
-                listStyle: 'none',
-                margin: '12px 0 0',
-                padding: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-              })}
-            >
-              {issues.map((issue) => (
-                <ResultCard
-                  key={issue.id}
-                  item={issue}
-                  mediaType={mediaType}
-                  interactionsByItemId={interactionsByItemId}
-                  returnTo={returnTo}
-                />
-              ))}
-            </ul>
-          </Collapsible>
+          <IssueList
+            summary="Show issues"
+            issues={issues}
+            mediaType={mediaType}
+            interactionsByItemId={interactionsByItemId}
+            returnTo={returnTo}
+          />
         </div>
       </li>
+    )
+  }
+}
+
+// "3 single issues · 1 logged". The count of logged ones is there because the list
+// starts closed, and would otherwise hide the viewer's own status.
+function issuesLabel(
+  issues: MediaItem[],
+  interactionsByItemId: MediaSearchPageProps['interactionsByItemId'],
+) {
+  const logged = issues.filter((issue) => interactionsByItemId.has(issue.id)).length
+  const count = issues.length === 1 ? '1 single issue' : `${issues.length} single issues`
+  return logged > 0 ? `${count} · ${logged} logged` : count
+}
+
+// The issues themselves, closed until asked for. Each is the ordinary card, log
+// control and all.
+function IssueList(
+  handle: Handle<Omit<ResultCardProps, 'item' | 'issues'> & { summary: string; issues: MediaItem[] }>,
+) {
+  return () => {
+    const { summary, issues, mediaType, interactionsByItemId, returnTo } = handle.props
+    return (
+      <Collapsible summary={summary}>
+        <ul
+          mix={css({
+            listStyle: 'none',
+            margin: '12px 0 0',
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          })}
+        >
+          {issues.map((issue) => (
+            <ResultCard
+              key={issue.id}
+              item={issue}
+              mediaType={mediaType}
+              interactionsByItemId={interactionsByItemId}
+              returnTo={returnTo}
+            />
+          ))}
+        </ul>
+      </Collapsible>
     )
   }
 }

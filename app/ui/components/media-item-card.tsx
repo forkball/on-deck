@@ -38,10 +38,14 @@ export function MediaItemCard(
     children?: RemixNode
     // For a long list whose lower rows start hidden.
     lazyImage?: boolean
+    // Full width under the whole card, cover column included — for something
+    // too wide for the text column, such as the issues a collected edition
+    // gathers.
+    footer?: RemixNode
   }>,
 ) {
   return () => {
-    const { item, mediaType, interaction, returnTo, children, lazyImage } = handle.props
+    const { item, mediaType, interaction, returnTo, children, lazyImage, footer } = handle.props
     const { releaseYear, posterUrl, creator, tags, platforms } = parseMediaMetadata(item.metadata)
     const ui = MEDIA_TYPE_UI[mediaType]
     const detailHref = withReturnTo(ui.hrefs.show(item.id), returnTo)
@@ -50,6 +54,8 @@ export function MediaItemCard(
       <li
         mix={css({
           display: 'flex',
+          // Only a footer wraps: it alone asks for the whole row.
+          flexWrap: 'wrap',
           gap: '12px',
           border: '1px solid var(--rule)',
           borderLeft: `4px solid ${ui.hue}`,
@@ -176,6 +182,7 @@ export function MediaItemCard(
           {/* Empty for everything but games, so no other type renders a gap here. */}
           <PlatformList platforms={platforms} />
         </div>
+        {footer && <div mix={css({ flexBasis: '100%', minWidth: 0 })}>{footer}</div>}
       </li>
     )
   }

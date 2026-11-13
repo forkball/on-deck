@@ -129,28 +129,48 @@ describe('groupSingleIssues', () => {
   // Comics unless a test says otherwise: the title rule is what most cases test.
   const shape = (titles: string[], notComics: string[] = []) =>
     groupSingleIssues(titles, (title) => ({ title, comic: !notComics.includes(title) })).map((entry) =>
-      entry.kind === 'single' ? entry.result : `${entry.series}: [${entry.issues.join(' | ')}]`,
+      entry.kind === 'single'
+        ? entry.issues
+          ? `${entry.result} < [${entry.issues.join(' | ')}]`
+          : entry.result
+        : `${entry.series}: [${entry.issues.join(' | ')}]`,
     )
 
-  // What a search for Baltimore actually returned, issues credited to whichever
-  // writer Google picked, ahead of the collected book.
-  it('gathers a series into one entry where its first issue sat, in number order', () => {
+  // What a search for Baltimore actually returned: issues credited to whichever
+  // writer Google picked, ahead of the collected book that binds them.
+  it('lists the issues under their collected edition, where the better-ranked sat', () => {
     assert.deepEqual(
       shape([
         'Baltimore: The Plague Ships #3',
         'Baltimore: The Plague Ships #5',
+        'Hellboy',
         'Baltimore Volume I: The Plague Ships',
         'Baltimore: The Plague Ships #1',
       ]),
       [
-        'Baltimore: The Plague Ships: [Baltimore: The Plague Ships #1 | Baltimore: The Plague Ships #3 | Baltimore: The Plague Ships #5]',
-        'Baltimore Volume I: The Plague Ships',
+        'Baltimore Volume I: The Plague Ships < [Baltimore: The Plague Ships #1 | Baltimore: The Plague Ships #3 | Baltimore: The Plague Ships #5]',
+        'Hellboy',
       ],
     )
   })
 
-  it('leaves a lone issue as an ordinary result', () => {
-    assert.deepEqual(shape(['Saga #1', 'Saga Volume 1']), ['Saga #1', 'Saga Volume 1'])
+  it('gathers issues into an entry of their own when no collected edition came back', () => {
+    assert.deepEqual(shape(['Saga #3', 'Paper Girls', 'Saga #1']), [
+      'Saga: [Saga #1 | Saga #3]',
+      'Paper Girls',
+    ])
+  })
+
+  it('puts a lone issue under its collected edition', () => {
+    assert.deepEqual(shape(['Saga #1', 'Saga Volume 1']), ['Saga Volume 1 < [Saga #1]'])
+  })
+
+  it('leaves a lone issue with no collected edition as an ordinary result', () => {
+    assert.deepEqual(shape(['Saga #1', 'Paper Girls']), ['Saga #1', 'Paper Girls'])
+  })
+
+  it('does not take a novel of the same name as the collected edition', () => {
+    assert.deepEqual(shape(['Saga #1', 'Saga #2', 'Saga'], ['Saga']), ['Saga: [Saga #1 | Saga #2]', 'Saga'])
   })
 
   it('keeps two series apart', () => {

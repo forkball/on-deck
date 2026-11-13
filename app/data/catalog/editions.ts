@@ -119,7 +119,11 @@ export function parseIssue(title: string): ParsedIssue | null {
   return series ? { series, number: Number(match[2]) } : null
 }
 
-export type SearchEntry<T> = { kind: 'single'; result: T } | { kind: 'issues'; series: string; issues: T[] }
+// A result, with the single issues it collects when they came back too; or a
+// series' issues with no collected edition among the results to sit under.
+export type SearchEntry<T> =
+  | { kind: 'single'; result: T; issues?: T[] }
+  | { kind: 'issues'; series: string; issues: T[] }
 
 export interface IssueFacts {
   title: string
@@ -138,13 +142,17 @@ export interface IssueFacts {
 //
 // Grouped by the series title alone, not the author: one series' issues credit
 // whichever writer Google picked first, Golden on one and Mignola on the next.
-// A lone issue stays an ordinary entry — a group of one hides nothing. A group
-// sits where its best-ranked issue did, and lists its issues in number order.
+//
+// Where the collected edition came back too — "Baltimore Volume I: The Plague
+// Ships" for issues of "Baltimore: The Plague Ships", the same title once the
+// volume marker is dropped — the issues go under it, since that book is them
+// bound together, and it sits where the better-ranked of the two did. A lone issue
+// joins its volume the same way. Otherwise two or more issues are an entry of
+// their own; a lone one stays an ordinary result, since a group of one hides
+// nothing. Issues are listed in number order.
 export function groupSingleIssues<T>(results: T[], describe: (result: T) => IssueFacts): SearchEntry<T>[] {
-  const parsed = results.map((result) => {
-    const { title, comic } = describe(result)
-    return comic ? parseIssue(title) : null
-  })
+  const facts = results.map(describe)
+  const parsed = facts.map(({ title, comic }) => (comic ? parseIssue(title) : null))
   const keys = parsed.map((issue) => (issue ? editionTitleKey(issue.series) : ''))
 
   const members = new Map<string, number[]>()
@@ -152,24 +160,37 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
     if (key) members.set(key, [...(members.get(key) ?? []), index])
   })
 
+  // The first comic that isn't itself an issue and names the same work.
+  const collectedBy = new Map<string, number>()
+  facts.forEach(({ title, comic }, index) => {
+    if (!comic || parsed[index]) return
+    const key = editionTitleKey(title)
+    if (members.has(key) && !collectedBy.has(key)) collectedBy.set(key, index)
+  })
+  const collects = new Map([...collectedBy].map(([key, index]) => [index, key]))
+
+  const inNumberOrder = (key: string) =>
+    // Stable, so two printings of one issue keep their rank order.
+    [...members.get(key)!].sort((a, b) => parsed[a]!.number - parsed[b]!.number).map((m) => results[m]!)
+
   const placed = new Set<string>()
   const entries: SearchEntry<T>[] = []
   results.forEach((result, index) => {
-    const key = keys[index]!
+    const key = keys[index] || collects.get(index) || ''
+    const collected = key ? collectedBy.get(key) : undefined
     const group = key ? members.get(key)! : []
-    if (group.length < 2) {
+
+    if (collected === undefined && group.length < 2) {
       entries.push({ kind: 'single', result })
       return
     }
     if (placed.has(key)) return
     placed.add(key)
-    // Stable, so two printings of one issue keep their rank order.
-    const ordered = [...group].sort((a, b) => parsed[a]!.number - parsed[b]!.number)
-    entries.push({
-      kind: 'issues',
-      series: parsed[index]!.series,
-      issues: ordered.map((member) => results[member]!),
-    })
+    entries.push(
+      collected === undefined
+        ? { kind: 'issues', series: parsed[index]!.series, issues: inNumberOrder(key) }
+        : { kind: 'single', result: results[collected]!, issues: inNumberOrder(key) },
+    )
   })
   return entries
 }
