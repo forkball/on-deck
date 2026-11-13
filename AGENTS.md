@@ -100,6 +100,10 @@ does nothing on its own.
     field (`intitle:`/`inauthor:`). It imports nothing, for the same reason
     `titles.ts` doesn't: every provider needs it, and importing the registry to get
     it is a cycle.
+    `editions.ts` decides which book search results are printings of one work
+    (Google Books ids a volume, not a work) so the search page shows one card per
+    book, keeping the edition the searcher logged; database-free, and it only
+    filters the page — the rows themselves stay separate.
     `retry.ts` holds the shared GET-with-backoff the two book providers use;
     `circuit.ts` holds the per-provider "stop asking, it's down" rule, which is
     policy each provider opts into rather than something the registry applies
