@@ -6,6 +6,17 @@ import { randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from 'node:c
 // was set under.
 export const PASSWORD_MIN_LENGTH = 8
 
+// The rule for a new password typed twice — the profile form and a reset
+// link. Empty when it is acceptable; otherwise the error for the field to
+// show it under. Signup asks once, and checks the length in its schema.
+export function newPasswordErrors(password: string, confirmation: string): Record<string, string> {
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return { new_password: `Passwords must be at least ${PASSWORD_MIN_LENGTH} characters.` }
+  }
+  if (password !== confirmation) return { confirm_password: "Those passwords don't match." }
+  return {}
+}
+
 interface ScryptParams {
   N: number
   r: number

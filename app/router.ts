@@ -7,7 +7,9 @@ import { session } from 'remix/middleware/session'
 import controller from './actions/controller.tsx'
 import adminController from './actions/admin/controller.tsx'
 import authController from './actions/auth/controller.tsx'
+import authForgotController from './actions/auth/forgot/controller.tsx'
 import authLoginController from './actions/auth/login/controller.tsx'
+import authResetController from './actions/auth/reset/controller.tsx'
 import authSignupController from './actions/auth/signup/controller.tsx'
 import booksController from './actions/books/controller.tsx'
 import gamesController from './actions/games/controller.tsx'
@@ -60,6 +62,8 @@ router.map(routes, controller)
 router.map(routes.admin, adminController)
 router.map(routes.auth, authController)
 router.map(routes.auth.login, authLoginController)
+router.map(routes.auth.forgot, authForgotController)
+router.map(routes.auth.reset, authResetController)
 router.map(routes.auth.signup, authSignupController)
 router.map(routes.movies, moviesController)
 router.map(routes.books, booksController)

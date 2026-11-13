@@ -1,7 +1,7 @@
 import * as s from 'remix/data-schema'
 import type { Issue } from 'remix/data-schema'
 import { email, maxLength, minLength } from 'remix/data-schema/checks'
-import { and, eq, ilike, ne } from 'remix/data-table'
+import { and, eq, ilike, ne, or } from 'remix/data-table'
 
 import type { Db } from './db.ts'
 import { users, type User } from './schema.ts'
@@ -129,6 +129,47 @@ export async function updateMediaOrder(db: Db, userId: number, order: string | n
   await db.update(users, userId, { media_order: order ?? undefined })
 }
 
-export async function updateUserPassword(db: Db, userId: number, passwordHash: string): Promise<void> {
+// What the login form and the forgot-password form both take: an email or a
+// username. They can never both match — both columns are unique and usernames
+// may not contain '@' (USERNAME_PATTERN) — so at most one row comes back.
+//
+// Emails are stored lowercased, so the email arm lowercases what was typed;
+// usernames are stored as written and matched as written.
+export async function findUserByIdentifier(db: Db, identifier: string): Promise<User | null> {
+  const handle = identifier.trim()
+  if (!handle) return null
+  return db.findOne(users, { where: or(eq('email', handle.toLowerCase()), eq('display_name', handle)) })
+}
+
+// Rewrites the hash of the *same* password at the current cost — the login
+// rehash. Nothing about who may be logged in changes, so sessions are left
+// alone. A new password goes through replaceUserPassword instead.
+export async function rehashUserPassword(db: Db, userId: number, passwordHash: string): Promise<void> {
   await db.update(users, userId, { password_hash: passwordHash })
+}
+
+// Sets a new password and ends every session issued under the old one, then
+// answers what logIn needs to keep the person who just changed it logged in.
+// Also spends any reset link still outstanding: a link emailed before the
+// change shouldn't be able to undo it.
+//
+// Both paths that change a password come through here — the profile form and
+// a reset link — so one of them can't forget either half. One statement, so
+// the two halves can't come apart either.
+export async function replaceUserPassword(
+  db: Db,
+  userId: number,
+  passwordHash: string,
+  now = Date.now(),
+): Promise<Pick<User, 'id' | 'session_version'>> {
+  const result = await db.exec(
+    `with spent as (
+       update password_reset_tokens set used_at = $3 where user_id = $2 and used_at is null
+     )
+     update users set password_hash = $1, session_version = session_version + 1
+      where id = $2
+      returning id, session_version`,
+    [passwordHash, userId, now],
+  )
+  return result.rows?.[0] as Pick<User, 'id' | 'session_version'>
 }

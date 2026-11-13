@@ -29,8 +29,12 @@ async function toRouterResponse(response: Response): Promise<RouterResponse> {
   }
 }
 
-export async function get(path: string): Promise<RouterResponse> {
-  return toRouterResponse(await router.fetch(new Request(new URL(path, ORIGIN))))
+// A session cookie (from sessionCookieFrom) makes it a signed-in request, as
+// with post below.
+export async function get(path: string, cookie?: string): Promise<RouterResponse> {
+  const headers: Record<string, string> = {}
+  if (cookie) headers.cookie = cookie
+  return toRouterResponse(await router.fetch(new Request(new URL(path, ORIGIN), { headers })))
 }
 
 // Posts a form the way a browser would, so the form-data middleware sees the
