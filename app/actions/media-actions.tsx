@@ -12,7 +12,7 @@ import {
   searchCatalog,
   upsertCatalogItem,
 } from '../data/catalog/provider.ts'
-import { collapseEditions } from '../data/catalog/editions.ts'
+import { collapseEditions, groupSingleIssues, type SearchEntry } from '../data/catalog/editions.ts'
 import type { Db } from '../data/db.ts'
 import {
   getMediaItemDetail,
@@ -22,7 +22,7 @@ import {
   parseRatingSubmission,
 } from '../data/mediaItems.ts'
 import { checkTitleUnlocksQuietly } from '../data/profileTitles/unlocks.ts'
-import { INTERACTION_SOURCES, INTERACTION_STATUSES, type User } from '../data/schema.ts'
+import { INTERACTION_SOURCES, INTERACTION_STATUSES, type MediaItem, type User } from '../data/schema.ts'
 import type { MediaControllerContext, MediaItemControllerContext } from '../middleware/context.ts'
 import { displayLabel } from '../data/users.ts'
 import { MEDIA_TYPE_UI, parseMediaOrder, type ActiveMediaType } from '../mediaTypes.ts'
@@ -86,12 +86,22 @@ export function createMediaActions(mediaType: ActiveMediaType) {
             })
           : found
 
+      // Books only, after the editions are collapsed so two printings of one
+      // issue count once.
+      const entries: SearchEntry<MediaItem>[] =
+        mediaType === 'book'
+          ? groupSingleIssues(results, (item) => ({
+              title: item.title,
+              comic: parseMediaMetadata(item.metadata).tags.includes('graphic novel'),
+            }))
+          : results.map((result) => ({ kind: 'single', result }))
+
       return context.render(
         <MediaSearchPage
           mediaType={mediaType}
           mediaOrder={parseMediaOrder(identity.media_order)}
           query={query}
-          results={results}
+          entries={entries}
           initialVisible={SEARCH_INITIAL_VISIBLE}
           interactionsByItemId={interactionsByItemId}
           displayName={displayLabel(identity)}

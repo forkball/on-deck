@@ -881,3 +881,18 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   margin-bottom: -4px;
   transform: rotate(-135deg);
 }
+
+/* The single issues under a collected edition or a series group
+   (media-search-page.tsx). A secondary control, so it sits below a soft rule in
+   smaller accent type rather than at body size, where it read as one more line
+   of the card's copy competing with the title. */
+.doodle .issue-list {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.doodle .issue-list > details > summary {
+  font-size: 14px;
+  color: var(--accent);
+}

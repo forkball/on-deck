@@ -102,8 +102,12 @@ does nothing on its own.
     it is a cycle.
     `editions.ts` decides which book search results are printings of one work
     (Google Books ids a volume, not a work) so the search page shows one card per
-    book, keeping the edition the searcher logged; database-free, and it only
-    filters the page — the rows themselves stay separate.
+    book, keeping the edition the searcher logged. It also gathers a comic's
+    single issues ("… #3") under the collected edition that binds them when it
+    came back too, else into one entry per series — separate works, so listed
+    rather than collapsed, and only results tagged as comics, since numbered
+    novel series ("Goosebumps #1") fit the same pattern.
+    Database-free, and it only shapes the page — the rows stay separate.
     `retry.ts` holds the shared GET-with-backoff the two book providers use;
     `circuit.ts` holds the per-provider "stop asking, it's down" rule, which is
     policy each provider opts into rather than something the registry applies
