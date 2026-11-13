@@ -156,7 +156,6 @@ function ResultCard(handle: Handle<ResultCardProps>) {
         footer={
           issues && (
             <IssueList
-              summary={`Also published as ${issuesLabel(issues, interactionsByItemId)}`}
               issues={issues}
               mediaType={mediaType}
               interactionsByItemId={interactionsByItemId}
@@ -230,14 +229,10 @@ function IssueGroupCard(
           )}
           <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
             <div>{series}</div>
-            <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>
-              {issuesLabel(issues, interactionsByItemId)}
-            </div>
           </div>
         </div>
         <div mix={css({ marginTop: '12px' })}>
           <IssueList
-            summary="Show issues"
             issues={issues}
             mediaType={mediaType}
             interactionsByItemId={interactionsByItemId}
@@ -260,15 +255,14 @@ function issuesLabel(
   return logged > 0 ? `${count} · ${logged} logged` : count
 }
 
-// The issues themselves, closed until asked for. Each is the ordinary card, log
-// control and all.
-function IssueList(
-  handle: Handle<Omit<ResultCardProps, 'item' | 'issues'> & { summary: string; issues: MediaItem[] }>,
-) {
+// The issues themselves, closed until asked for, under the same label whether
+// they hang off a collected edition or stand as their own entry. Each is the
+// ordinary card, log control and all.
+function IssueList(handle: Handle<Omit<ResultCardProps, 'item' | 'issues'> & { issues: MediaItem[] }>) {
   return () => {
-    const { summary, issues, mediaType, interactionsByItemId, returnTo } = handle.props
+    const { issues, mediaType, interactionsByItemId, returnTo } = handle.props
     return (
-      <Collapsible summary={summary}>
+      <Collapsible summary={issuesLabel(issues, interactionsByItemId)}>
         <ul
           mix={css({
             listStyle: 'none',
