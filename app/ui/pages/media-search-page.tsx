@@ -231,14 +231,12 @@ function IssueGroupCard(
             <div>{series}</div>
           </div>
         </div>
-        <div mix={css({ marginTop: '12px' })}>
-          <IssueList
-            issues={issues}
-            mediaType={mediaType}
-            interactionsByItemId={interactionsByItemId}
-            returnTo={returnTo}
-          />
-        </div>
+        <IssueList
+          issues={issues}
+          mediaType={mediaType}
+          interactionsByItemId={interactionsByItemId}
+          returnTo={returnTo}
+        />
       </li>
     )
   }
@@ -262,28 +260,32 @@ function IssueList(handle: Handle<Omit<ResultCardProps, 'item' | 'issues'> & { i
   return () => {
     const { issues, mediaType, interactionsByItemId, returnTo } = handle.props
     return (
-      <Collapsible summary={issuesLabel(issues, interactionsByItemId)}>
-        <ul
-          mix={css({
-            listStyle: 'none',
-            margin: '12px 0 0',
-            padding: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          })}
-        >
-          {issues.map((issue) => (
-            <ResultCard
-              key={issue.id}
-              item={issue}
-              mediaType={mediaType}
-              interactionsByItemId={interactionsByItemId}
-              returnTo={returnTo}
-            />
-          ))}
-        </ul>
-      </Collapsible>
+      // .issue-list in app.css: a toggle set apart from the card's own copy,
+      // where Doodle's unlayered summary rules would beat a css() one.
+      <div class="issue-list">
+        <Collapsible summary={issuesLabel(issues, interactionsByItemId)}>
+          <ul
+            mix={css({
+              listStyle: 'none',
+              margin: '12px 0 0',
+              padding: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            })}
+          >
+            {issues.map((issue) => (
+              <ResultCard
+                key={issue.id}
+                item={issue}
+                mediaType={mediaType}
+                interactionsByItemId={interactionsByItemId}
+                returnTo={returnTo}
+              />
+            ))}
+          </ul>
+        </Collapsible>
+      </div>
     )
   }
 }
