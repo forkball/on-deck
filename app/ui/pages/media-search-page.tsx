@@ -196,7 +196,13 @@ function IssueGroupCard(
               src={cover}
               alt=""
               loading="lazy"
-              mix={css({ width: '60px', borderRadius: '4px', display: 'block', flex: '0 0 auto' })}
+              mix={css({
+                width: '60px',
+                borderRadius: '4px',
+                display: 'block',
+                flex: '0 0 auto',
+                alignSelf: 'flex-start',
+              })}
             />
           ) : (
             <div
@@ -214,29 +220,31 @@ function IssueGroupCard(
             <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>
               {issues.length} single issues{logged > 0 ? ` · ${logged} logged` : ''}
             </div>
-            <Collapsible summary="Show issues">
-              <ul
-                mix={css({
-                  listStyle: 'none',
-                  margin: '12px 0 0',
-                  padding: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                })}
-              >
-                {issues.map((issue) => (
-                  <ResultCard
-                    key={issue.id}
-                    item={issue}
-                    mediaType={mediaType}
-                    interactionsByItemId={interactionsByItemId}
-                    returnTo={returnTo}
-                  />
-                ))}
-              </ul>
-            </Collapsible>
           </div>
+        </div>
+        <div mix={css({ marginTop: '12px' })}>
+          <Collapsible summary="Show issues">
+            <ul
+              mix={css({
+                listStyle: 'none',
+                margin: '12px 0 0',
+                padding: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              })}
+            >
+              {issues.map((issue) => (
+                <ResultCard
+                  key={issue.id}
+                  item={issue}
+                  mediaType={mediaType}
+                  interactionsByItemId={interactionsByItemId}
+                  returnTo={returnTo}
+                />
+              ))}
+            </ul>
+          </Collapsible>
         </div>
       </li>
     )
