@@ -50,6 +50,9 @@ export const users = table({
     // app/data/profileTitles/catalog.ts — see the 20261011120000 migration.
     title_adjective: c.text().nullable(),
     title_noun: c.text().nullable(),
+    // Which login cookies are still good — see app/middleware/auth.ts and the
+    // 20261112120000 migration. Bumped whenever the password changes.
+    session_version: c.integer().notNull().default(0),
     created_at: c.integer().notNull(),
   },
 })
@@ -377,6 +380,23 @@ export const notifications = table({
     unlocked_titles: c.json().nullable(),
     read_at: c.integer(),
     created_at: c.integer().notNull(),
+  },
+})
+
+// Reset links emailed by "Forgot your password?" — see app/data/passwordResets/.
+// The token itself is never stored, only its hash.
+export const passwordResetTokens = table({
+  name: 'password_reset_tokens',
+  columns: {
+    id: c.integer().primaryKey().autoIncrement(),
+    user_id: c.integer().notNull().references('users', 'id'),
+    token_hash: c.text().notNull().unique(),
+    created_at: c.integer().notNull(),
+    expires_at: c.integer().notNull(),
+    used_at: c.integer().nullable(),
+    // Where it was asked for from, for the per-IP cap — see the
+    // 20261113120000 migration.
+    requested_ip: c.text().nullable(),
   },
 })
 

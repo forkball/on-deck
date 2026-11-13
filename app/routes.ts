@@ -24,6 +24,12 @@ export const routes = route({
     signup: form('signup'),
     login: form('login'),
     logout: post('logout'),
+    // "Forgot your password?": the form that emails a reset link, and the page
+    // that link opens. The token rides in `?token=` rather than the path
+    // because the access log records paths (middleware/accessLog.ts), and a
+    // live reset token has no business in the logs.
+    forgot: form('forgot'),
+    reset: form('reset'),
   }),
   notifications: route('notifications', {
     index: get('/'),

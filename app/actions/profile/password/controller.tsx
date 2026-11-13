@@ -6,10 +6,10 @@ import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import type { User } from '../../../data/schema.ts'
-import { displayLabel, updateUserPassword } from '../../../data/users.ts'
-import { requireAuth } from '../../../middleware/auth.ts'
+import { displayLabel, replaceUserPassword } from '../../../data/users.ts'
+import { logIn, requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
-import { hashPassword, PASSWORD_MIN_LENGTH, verifyPassword } from '../../auth/password.ts'
+import { hashPassword, newPasswordErrors, verifyPassword } from '../../auth/password.ts'
 import { ProfilePasswordPage } from './page.tsx'
 
 // No shape rules on any of them — what each has to be depends on the others,
@@ -50,12 +50,8 @@ export default createController(routes.profile.password, {
 
       // The new password is judged first, so a form that was never going to
       // be accepted doesn't ask for a password before saying so.
-      if (new_password.length < PASSWORD_MIN_LENGTH) {
-        return reject({ new_password: `Passwords must be at least ${PASSWORD_MIN_LENGTH} characters.` }, 400)
-      }
-      if (new_password !== confirm_password) {
-        return reject({ confirm_password: "Those passwords don't match." }, 400)
-      }
+      const newPasswordProblems = newPasswordErrors(new_password, confirm_password)
+      if (Object.keys(newPasswordProblems).length > 0) return reject(newPasswordProblems, 400)
 
       if (!(await verifyPassword(current_password, auth.identity.password_hash))) {
         // Reopened rather than merely flagged: with JS off the modal is the
@@ -68,7 +64,16 @@ export default createController(routes.profile.password, {
         )
       }
 
-      await updateUserPassword(context.get(Database), auth.identity.id, await hashPassword(new_password))
+      const user = await replaceUserPassword(
+        context.get(Database),
+        auth.identity.id,
+        await hashPassword(new_password),
+      )
+
+      // Every other device is logged out by the version bump; this one is
+      // re-issued under the new version so changing your password doesn't log
+      // out the person who just did it.
+      logIn(context, user)
 
       return redirect(`${routes.profile.index.href()}?saved=1`, 303)
     },

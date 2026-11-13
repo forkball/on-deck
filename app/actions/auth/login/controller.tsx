@@ -1,13 +1,13 @@
-import { completeAuth, createCredentialsAuthProvider, verifyCredentials } from 'remix/auth'
+import { createCredentialsAuthProvider, verifyCredentials } from 'remix/auth'
 import * as s from 'remix/data-schema'
 import * as f from 'remix/data-schema/form-data'
-import { eq, or } from 'remix/data-table'
 import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
 import { db } from '../../../data/db.ts'
-import { users, type User } from '../../../data/schema.ts'
-import { updateUserPassword } from '../../../data/users.ts'
+import type { User } from '../../../data/schema.ts'
+import { findUserByIdentifier, rehashUserPassword } from '../../../data/users.ts'
+import { logIn } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
 import { hashPassword, needsRehash, verifyPassword } from '../password.ts'
 import { LoginPage } from './page.tsx'
@@ -28,18 +28,9 @@ const passwordProvider = createCredentialsAuthProvider<{ identifier: string; pas
     const parsed = s.parseSafe(loginSchema, formData)
     return parsed.success ? parsed.value : { identifier: '', password: '' }
   },
-  // `identifier` matches either handle — email and display_name can never
-  // collide, since both are unique and usernames may not contain '@' (see
-  // data/users.ts), so at most one row matches.
-  //
-  // Emails are stored lowercased, so the email arm has to lowercase what was
-  // typed or an address entered with capitals finds nothing. Usernames are
-  // stored as written and matched as written.
+  // `identifier` is an email or a username — see findUserByIdentifier.
   async verify({ identifier, password }) {
-    const handle = identifier.trim()
-    const user = await db.findOne(users, {
-      where: or(eq('email', handle.toLowerCase()), eq('display_name', handle)),
-    })
+    const user = await findUserByIdentifier(db, identifier)
     if (!user || !(await verifyPassword(password, user.password_hash))) {
       return null
     }
@@ -53,7 +44,7 @@ const passwordProvider = createCredentialsAuthProvider<{ identifier: string; pas
     // leave the account trying again on every future login.
     if (needsRehash(user.password_hash)) {
       const rehashed = await hashPassword(password)
-      await updateUserPassword(db, user.id, rehashed)
+      await rehashUserPassword(db, user.id, rehashed)
       return { ...user, password_hash: rehashed }
     }
 
@@ -80,8 +71,7 @@ export default createController(routes.auth.login, {
         )
       }
 
-      const session = completeAuth(context)
-      session.set('auth', { userId: user.id })
+      logIn(context, user)
 
       return redirect(returnTo ?? routes.home.href(), 303)
     },
