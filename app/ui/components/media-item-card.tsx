@@ -98,9 +98,10 @@ export function MediaItemCard(
                   without the author the two were the same row to read. Films and
                   TV only have it once a detail lookup has run, so a pick nobody
                   has opened can go without. */}
-              {/* Your rating beside the byline, up where the eye lands with the
-                  title, rather than among the pills under the blurb. */}
-              {(creator || interaction?.rating != null) && (
+              {/* Your log beside the byline — stars, then the status pill —
+                  up where the eye lands with the title, rather than among the
+                  genre pills under the blurb. */}
+              {(creator || interaction) && (
                 <div
                   mix={css({
                     display: 'flex',
@@ -114,6 +115,26 @@ export function MediaItemCard(
                 >
                   {creator && <span>{creator}</span>}
                   {interaction?.rating != null && <StarRatingDisplay value={interaction.rating} size={16} />}
+                  {showStatus && (
+                    <span
+                      mix={[
+                        chipStyle,
+                        css({
+                          borderColor: statusBadgeColor(interaction!.status),
+                          color: statusBadgeColor(interaction!.status),
+                        }),
+                      ]}
+                    >
+                      {statusLabelsFor(mediaType)[interaction!.status] ?? interaction!.status}
+                    </span>
+                  )}
+                  {/* A chip, so beside the byline it reads as your verdict
+                      rather than as more of the author's name. */}
+                  {interaction?.disliked && (
+                    <span mix={chipStyle}>
+                      <DislikedDisplay />
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -164,9 +185,7 @@ export function MediaItemCard(
             </div>
           </div>
           {children}
-          {/* The log status leads the pills: one row of labels about the work,
-              rather than a status squeezed between the title and the text. */}
-          {(showStatus || interaction?.disliked || tags.length > 0) && (
+          {tags.length > 0 && (
             <div
               mix={css({
                 display: 'flex',
@@ -178,22 +197,6 @@ export function MediaItemCard(
                 color: 'var(--soft)',
               })}
             >
-              {showStatus && (
-                <span
-                  mix={[
-                    chipStyle,
-                    css({
-                      borderColor: statusBadgeColor(interaction!.status),
-                      color: statusBadgeColor(interaction!.status),
-                    }),
-                  ]}
-                >
-                  {statusLabelsFor(mediaType)[interaction!.status] ?? interaction!.status}
-                </span>
-              )}
-              {/* Beside the status rather than up with the stars: next to the
-                  byline, "Not for me" read as part of the author's name. */}
-              {interaction?.disliked && <DislikedDisplay />}
               {tags.map((tag) => (
                 <span key={tag} mix={chipStyle}>
                   {capitalize(tag)}
