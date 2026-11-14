@@ -6,7 +6,7 @@ import { DISLIKED_INPUT_VALUE } from '../../data/mediaItems.ts'
 
 const STAR_SIZE = 24
 
-function StarIcon(handle: Handle<{ variant: 'outline' | 'filled'; size?: number }>) {
+export function StarIcon(handle: Handle<{ variant: 'outline' | 'filled'; size?: number }>) {
   return () => {
     const { variant, size = STAR_SIZE } = handle.props
     const d =

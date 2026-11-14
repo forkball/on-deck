@@ -10,7 +10,7 @@ import { FloatingDropdown } from './floating-dropdown.tsx'
 import { PencilIcon, PlusIcon } from './log-icons.tsx'
 import { NotesField } from './notes-field.tsx'
 import { PlatformList, chipStyle } from './platform-list.tsx'
-import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from './star-rating.tsx'
+import { DislikedDisplay, StarIcon, StarRatingDisplay, StarRatingInput } from './star-rating.tsx'
 import { StatusSelect } from './status-select.tsx'
 import { Field } from '../shared/field.tsx'
 import { Button, Link } from '../shared/form-controls.tsx'
@@ -63,7 +63,19 @@ export function MediaItemCard(
     const log =
       interaction != null ? (
         <>
-          {interaction.rating != null && <StarRatingDisplay value={interaction.rating} size={16} />}
+          {/* One star and the number, in a pill like the status beside it:
+              five loose stars at this size floated off the title. Number()
+              because the column is a decimal, which reads back as "4.0". */}
+          {interaction.rating != null && (
+            <span
+              mix={[chipStyle, css({ display: 'inline-flex', alignItems: 'center', gap: '4px' })]}
+              role="img"
+              aria-label={`Rated ${Number(interaction.rating)} out of 5`}
+            >
+              <StarIcon variant="filled" size={12} />
+              {Number(interaction.rating)}
+            </span>
+          )}
           {showStatus && (
             <span
               mix={[
