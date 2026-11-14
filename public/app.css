@@ -913,13 +913,6 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   display: none;
 }
 
-/* The narrow log with no author to sit beside: a line of its own, not run on
-   from the year. */
-.doodle .card-log--own-line {
-  display: flex;
-  margin-top: 2px;
-}
-
 @media (min-width: 640px) {
   .doodle .card-log--wide {
     display: inline-flex;

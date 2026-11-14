@@ -49,6 +49,7 @@ export function MediaItemCard(
     const { releaseYear, posterUrl, creator, tags, platforms } = parseMediaMetadata(item.metadata)
     const ui = MEDIA_TYPE_UI[mediaType]
     const detailHref = withReturnTo(ui.hrefs.show(item.id), returnTo)
+    const byline = [creator, releaseYear].filter(Boolean).join(' · ')
     // A rating or "Not for me" already says it was finished, so "Read" beside
     // it repeats itself. Only for a finished row: a rating survives a later
     // change of status (a re-read), and there the status is the news.
@@ -123,19 +124,15 @@ export function MediaItemCard(
           <div mix={css({ display: 'flex', gap: '12px' })}>
             <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
               <Link href={detailHref}>{item.title}</Link>
-              {releaseYear ? ` (${releaseYear})` : ''}
               {log && <span class="card-log card-log--wide">{log}</span>}
-              {/* Searching "Strata" returns one from 1981 and one from 2011, and
-                  without the author the two were the same row to read. Films and
-                  TV only have it once a detail lookup has run, so a pick nobody
-                  has opened can go without. */}
-              {/* Your log beside the byline — stars, then the status pill —
-                  up where the eye lands with the title, rather than among the
-                  genre pills under the blurb. */}
-              {/* With no author yet, a narrow screen still needs a line for
-                  the log; a wide one has it beside the title already. */}
-              {!creator && log && <div class="card-log card-log--narrow card-log--own-line">{log}</div>}
-              {creator && (
+              {/* The byline: author and year, one line under the title, so the
+                  title line is the title and your log. Searching "Strata"
+                  returns one from 1981 and one from 2011, and without these the
+                  two were the same row to read. Films and TV only have an
+                  author once a detail lookup has run, so a pick nobody has
+                  opened can go without. On a narrow screen your log follows
+                  here instead of beside the title, which rarely leaves room. */}
+              {(byline || log) && (
                 <div
                   mix={css({
                     display: 'flex',
@@ -147,7 +144,7 @@ export function MediaItemCard(
                     marginTop: '2px',
                   })}
                 >
-                  {creator && <span>{creator}</span>}
+                  {byline && <span>{byline}</span>}
                   {log && <span class="card-log card-log--narrow">{log}</span>}
                 </div>
               )}
