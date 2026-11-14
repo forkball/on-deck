@@ -49,6 +49,12 @@ export function MediaItemCard(
     const { releaseYear, posterUrl, creator, tags, platforms } = parseMediaMetadata(item.metadata)
     const ui = MEDIA_TYPE_UI[mediaType]
     const detailHref = withReturnTo(ui.hrefs.show(item.id), returnTo)
+    // A rating or "Not for me" already says it was finished, so "Read" beside
+    // it repeats itself. Only for a finished row: a rating survives a later
+    // change of status (a re-read), and there the status is the news.
+    const showStatus =
+      interaction != null &&
+      !(interaction.status === 'consumed' && (interaction.rating != null || interaction.disliked))
 
     return (
       <li
@@ -160,7 +166,7 @@ export function MediaItemCard(
           {children}
           {/* The log status leads the pills: one row of labels about the work,
               rather than a status squeezed between the title and the text. */}
-          {(interaction || tags.length > 0) && (
+          {(showStatus || interaction?.disliked || tags.length > 0) && (
             <div
               mix={css({
                 display: 'flex',
@@ -172,17 +178,17 @@ export function MediaItemCard(
                 color: 'var(--soft)',
               })}
             >
-              {interaction && (
+              {showStatus && (
                 <span
                   mix={[
                     chipStyle,
                     css({
-                      borderColor: statusBadgeColor(interaction.status),
-                      color: statusBadgeColor(interaction.status),
+                      borderColor: statusBadgeColor(interaction!.status),
+                      color: statusBadgeColor(interaction!.status),
                     }),
                   ]}
                 >
-                  {statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}
+                  {statusLabelsFor(mediaType)[interaction!.status] ?? interaction!.status}
                 </span>
               )}
               {/* Beside the status rather than up with the stars: next to the
