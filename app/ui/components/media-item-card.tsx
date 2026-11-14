@@ -56,6 +56,36 @@ export function MediaItemCard(
       interaction != null &&
       !(interaction.status === 'consumed' && (interaction.rating != null || interaction.disliked))
 
+    // Your log: stars, the status pill, "Not for me". Rendered twice — on the
+    // byline for a narrow screen, and beside the title on a wide one — with
+    // .card-log in app.css showing one or the other.
+    const log =
+      interaction != null ? (
+        <>
+          {interaction.rating != null && <StarRatingDisplay value={interaction.rating} size={16} />}
+          {showStatus && (
+            <span
+              mix={[
+                chipStyle,
+                css({
+                  borderColor: statusBadgeColor(interaction.status),
+                  color: statusBadgeColor(interaction.status),
+                }),
+              ]}
+            >
+              {statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}
+            </span>
+          )}
+          {/* A chip, so beside the byline it reads as your verdict
+              rather than as more of the author's name. */}
+          {interaction.disliked && (
+            <span mix={chipStyle}>
+              <DislikedDisplay />
+            </span>
+          )}
+        </>
+      ) : null
+
     return (
       <li
         mix={css({
@@ -94,6 +124,7 @@ export function MediaItemCard(
             <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
               <Link href={detailHref}>{item.title}</Link>
               {releaseYear ? ` (${releaseYear})` : ''}
+              {log && <span class="card-log card-log--wide">{log}</span>}
               {/* Searching "Strata" returns one from 1981 and one from 2011, and
                   without the author the two were the same row to read. Films and
                   TV only have it once a detail lookup has run, so a pick nobody
@@ -101,7 +132,10 @@ export function MediaItemCard(
               {/* Your log beside the byline — stars, then the status pill —
                   up where the eye lands with the title, rather than among the
                   genre pills under the blurb. */}
-              {(creator || interaction) && (
+              {/* With no author yet, a narrow screen still needs a line for
+                  the log; a wide one has it beside the title already. */}
+              {!creator && log && <div class="card-log card-log--narrow card-log--own-line">{log}</div>}
+              {creator && (
                 <div
                   mix={css({
                     display: 'flex',
@@ -114,27 +148,7 @@ export function MediaItemCard(
                   })}
                 >
                   {creator && <span>{creator}</span>}
-                  {interaction?.rating != null && <StarRatingDisplay value={interaction.rating} size={16} />}
-                  {showStatus && (
-                    <span
-                      mix={[
-                        chipStyle,
-                        css({
-                          borderColor: statusBadgeColor(interaction!.status),
-                          color: statusBadgeColor(interaction!.status),
-                        }),
-                      ]}
-                    >
-                      {statusLabelsFor(mediaType)[interaction!.status] ?? interaction!.status}
-                    </span>
-                  )}
-                  {/* A chip, so beside the byline it reads as your verdict
-                      rather than as more of the author's name. */}
-                  {interaction?.disliked && (
-                    <span mix={chipStyle}>
-                      <DislikedDisplay />
-                    </span>
-                  )}
+                  {log && <span class="card-log card-log--narrow">{log}</span>}
                 </div>
               )}
             </div>

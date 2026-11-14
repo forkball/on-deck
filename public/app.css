@@ -896,3 +896,41 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   font-size: 14px;
   color: var(--accent);
 }
+
+/* A card's log (media-item-card.tsx) on the byline when the screen is narrow,
+   beside the title when it is wide. Rendered in both places and
+   switched here, since which fits is a question of width. */
+.doodle .card-log {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--soft);
+}
+
+.doodle .card-log--wide {
+  display: none;
+}
+
+/* The narrow log with no author to sit beside: a line of its own, not run on
+   from the year. */
+.doodle .card-log--own-line {
+  display: flex;
+  margin-top: 2px;
+}
+
+@media (min-width: 640px) {
+  .doodle .card-log--wide {
+    display: inline-flex;
+  }
+
+  .doodle .card-log.card-log--narrow {
+    display: none;
+  }
+}
+
+.doodle .card-log--wide {
+  margin-left: 10px;
+  vertical-align: middle;
+}
