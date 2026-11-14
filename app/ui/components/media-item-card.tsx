@@ -10,7 +10,7 @@ import { FloatingDropdown } from './floating-dropdown.tsx'
 import { PencilIcon, PlusIcon } from './log-icons.tsx'
 import { NotesField } from './notes-field.tsx'
 import { PlatformList, chipStyle } from './platform-list.tsx'
-import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from './star-rating.tsx'
+import { DislikedDisplay, StarIcon, StarRatingDisplay, StarRatingInput } from './star-rating.tsx'
 import { StatusSelect } from './status-select.tsx'
 import { Field } from '../shared/field.tsx'
 import { Button, Link } from '../shared/form-controls.tsx'
@@ -49,6 +49,55 @@ export function MediaItemCard(
     const { releaseYear, posterUrl, creator, tags, platforms } = parseMediaMetadata(item.metadata)
     const ui = MEDIA_TYPE_UI[mediaType]
     const detailHref = withReturnTo(ui.hrefs.show(item.id), returnTo)
+    const byline = [creator, releaseYear].filter(Boolean).join(' · ')
+    // A rating or "Not for me" already says it was finished, so "Read" beside
+    // it repeats itself. Only for a finished row: a rating survives a later
+    // change of status (a re-read), and there the status is the news.
+    const showStatus =
+      interaction != null &&
+      !(interaction.status === 'consumed' && (interaction.rating != null || interaction.disliked))
+
+    // Your log: stars, the status pill, "Not for me". Rendered twice — on the
+    // byline for a narrow screen, and beside the title on a wide one — with
+    // .card-log in app.css showing one or the other.
+    const log =
+      interaction != null ? (
+        <>
+          {/* One star and the number, in a pill like the status beside it:
+              five loose stars at this size floated off the title. Number()
+              because the column is a decimal, which reads back as "4.0". */}
+          {interaction.rating != null && (
+            <span
+              mix={[chipStyle, css({ display: 'inline-flex', alignItems: 'center', gap: '4px' })]}
+              role="img"
+              aria-label={`Rated ${Number(interaction.rating)} out of 5`}
+            >
+              <StarIcon variant="filled" size={12} />
+              {Number(interaction.rating)}
+            </span>
+          )}
+          {showStatus && (
+            <span
+              mix={[
+                chipStyle,
+                css({
+                  borderColor: statusBadgeColor(interaction.status),
+                  color: statusBadgeColor(interaction.status),
+                }),
+              ]}
+            >
+              {statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}
+            </span>
+          )}
+          {/* A chip, so beside the byline it reads as your verdict
+              rather than as more of the author's name. */}
+          {interaction.disliked && (
+            <span mix={chipStyle}>
+              <DislikedDisplay />
+            </span>
+          )}
+        </>
+      ) : null
 
     return (
       <li
@@ -87,13 +136,29 @@ export function MediaItemCard(
           <div mix={css({ display: 'flex', gap: '12px' })}>
             <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
               <Link href={detailHref}>{item.title}</Link>
-              {releaseYear ? ` (${releaseYear})` : ''}
-              {/* Searching "Strata" returns one from 1981 and one from 2011, and
-                  without the author the two were the same row to read. Films and
-                  TV only have it once a detail lookup has run, so a pick nobody
-                  has opened can go without. */}
-              {creator && (
-                <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>{creator}</div>
+              {log && <span class="card-log card-log--wide">{log}</span>}
+              {/* The byline: author and year, one line under the title, so the
+                  title line is the title and your log. Searching "Strata"
+                  returns one from 1981 and one from 2011, and without these the
+                  two were the same row to read. Films and TV only have an
+                  author once a detail lookup has run, so a pick nobody has
+                  opened can go without. On a narrow screen your log follows
+                  here instead of beside the title, which rarely leaves room. */}
+              {(byline || log) && (
+                <div
+                  mix={css({
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '13px',
+                    color: 'var(--soft)',
+                    marginTop: '2px',
+                  })}
+                >
+                  {byline && <span>{byline}</span>}
+                  {log && <span class="card-log card-log--narrow">{log}</span>}
+                </div>
               )}
             </div>
             {/* Beside the title rather than in a column of its own, so the text
@@ -143,9 +208,7 @@ export function MediaItemCard(
             </div>
           </div>
           {children}
-          {/* The log status leads the pills: one row of labels about the work,
-              rather than a status squeezed between the title and the text. */}
-          {(interaction || tags.length > 0) && (
+          {tags.length > 0 && (
             <div
               mix={css({
                 display: 'flex',
@@ -157,21 +220,6 @@ export function MediaItemCard(
                 color: 'var(--soft)',
               })}
             >
-              {interaction && (
-                <span
-                  mix={[
-                    chipStyle,
-                    css({
-                      borderColor: statusBadgeColor(interaction.status),
-                      color: statusBadgeColor(interaction.status),
-                    }),
-                  ]}
-                >
-                  {statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}
-                </span>
-              )}
-              {interaction?.rating != null && <StarRatingDisplay value={interaction.rating} />}
-              {interaction?.disliked && <DislikedDisplay />}
               {tags.map((tag) => (
                 <span key={tag} mix={chipStyle}>
                   {capitalize(tag)}
