@@ -92,8 +92,23 @@ export function MediaItemCard(
                   without the author the two were the same row to read. Films and
                   TV only have it once a detail lookup has run, so a pick nobody
                   has opened can go without. */}
-              {creator && (
-                <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>{creator}</div>
+              {/* Your rating beside the byline, up where the eye lands with the
+                  title, rather than among the pills under the blurb. */}
+              {(creator || interaction?.rating != null) && (
+                <div
+                  mix={css({
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '13px',
+                    color: 'var(--soft)',
+                    marginTop: '2px',
+                  })}
+                >
+                  {creator && <span>{creator}</span>}
+                  {interaction?.rating != null && <StarRatingDisplay value={interaction.rating} size={16} />}
+                </div>
               )}
             </div>
             {/* Beside the title rather than in a column of its own, so the text
@@ -170,7 +185,8 @@ export function MediaItemCard(
                   {statusLabelsFor(mediaType)[interaction.status] ?? interaction.status}
                 </span>
               )}
-              {interaction?.rating != null && <StarRatingDisplay value={interaction.rating} />}
+              {/* Beside the status rather than up with the stars: next to the
+                  byline, "Not for me" read as part of the author's name. */}
               {interaction?.disliked && <DislikedDisplay />}
               {tags.map((tag) => (
                 <span key={tag} mix={chipStyle}>

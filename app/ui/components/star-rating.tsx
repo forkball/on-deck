@@ -6,13 +6,13 @@ import { DISLIKED_INPUT_VALUE } from '../../data/mediaItems.ts'
 
 const STAR_SIZE = 24
 
-function StarIcon(handle: Handle<{ variant: 'outline' | 'filled' }>) {
+function StarIcon(handle: Handle<{ variant: 'outline' | 'filled'; size?: number }>) {
   return () => {
-    const { variant } = handle.props
+    const { variant, size = STAR_SIZE } = handle.props
     const d =
       'M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279L12 19.771l-7.416 3.642 1.48-8.279L.001 9.306l8.332-1.151z'
     return (
-      <svg viewBox="0 0 24 24" width={STAR_SIZE} height={STAR_SIZE} mix={css({ display: 'block' })}>
+      <svg viewBox="0 0 24 24" width={size} height={size} mix={css({ display: 'block' })}>
         <path
           d={d}
           fill={variant === 'filled' ? '#f5b301' : 'none'}
@@ -27,9 +27,11 @@ function StarIcon(handle: Handle<{ variant: 'outline' | 'filled' }>) {
 
 // Half-stars via a clipped overlay: outline underneath, filled on top clipped
 // to 0/50/100% width.
-export function StarRatingDisplay(handle: Handle<{ value: number }>) {
+// `size` is the star's edge in pixels: smaller where the rating sits inside a
+// line of text rather than standing on its own.
+export function StarRatingDisplay(handle: Handle<{ value: number; size?: number }>) {
   return () => {
-    const { value } = handle.props
+    const { value, size = STAR_SIZE } = handle.props
 
     return (
       <span mix={css({ display: 'inline-flex', gap: '2px', verticalAlign: 'middle' })}>
@@ -43,15 +45,15 @@ export function StarRatingDisplay(handle: Handle<{ value: number }>) {
               mix={css({
                 position: 'relative',
                 display: 'inline-block',
-                width: `${STAR_SIZE}px`,
-                height: `${STAR_SIZE}px`,
+                width: `${size}px`,
+                height: `${size}px`,
               })}
             >
               <span mix={css({ position: 'absolute', inset: 0 })}>
-                <StarIcon variant="outline" />
+                <StarIcon variant="outline" size={size} />
               </span>
               <span mix={css({ position: 'absolute', inset: 0, overflow: 'hidden', width: fillWidth })}>
-                <StarIcon variant="filled" />
+                <StarIcon variant="filled" size={size} />
               </span>
             </span>
           )
