@@ -25,10 +25,35 @@ const FIRST_VOLUME = /\b(?:volume|vol|book)\s+(?:1|i|one)\b/g
 // Publisher filler that names no part of the work.
 const FILLER = /\ba novel\b/g
 
+// How a book is packaged rather than which book it is. A search for The Long
+// Halloween came back as "Batman: The Long Halloween", "Batman Noir: The Long
+// Halloween" (the same pages in black and white) and "… Deluxe Edition", three
+// cards for one book. Only ever dropped together with the author check in
+// collapseEditions, so "Spider-Man Noir" stays apart from Spider-Man: the two
+// share no writer. "Absolute" alone is not here — Absolute Batman is a series of
+// its own, by a writer who also wrote Batman.
+const PACKAGING =
+  /\b(?:(?:\d+(?:st|nd|rd|th)\s+)?anniversary|deluxe|noir|absolute|special|collectors?|expanded|definitive|new)\s+edition\b|\bnoir\b|\b(?:hardcover|paperback)\b/g
+
+// The year a digital comics store adds to a series name — "(2024-)", "(2021)",
+// "(2019-2020)" — so "The Last Halloween (2024-) #1" names the same series as
+// the collected "The Last Halloween". Matched on the raw title, before
+// normalising drops the brackets and leaves a bare year that looks like a word.
+const YEAR_TAG = /\(\s*\d{4}\s*(?:[-–]\s*(?:\d{4})?\s*)?\)/g
+
+export function withoutYearTag(title: string): string {
+  return title.replace(YEAR_TAG, ' ').replace(/\s+/g, ' ').trim()
+}
+
 // Why not titleWordsFitInside: "Dune" fits inside "Dune Messiah", same author, a
 // different novel. Dropping only words that name no other book keeps that apart.
 export function editionTitleKey(title: string): string {
-  return sameWorkKey(normalizeTitle(title).replace(FIRST_VOLUME, ' ').replace(FILLER, ' '))
+  return sameWorkKey(
+    normalizeTitle(withoutYearTag(title))
+      .replace(PACKAGING, ' ')
+      .replace(FIRST_VOLUME, ' ')
+      .replace(FILLER, ' '),
+  )
 }
 
 const NAME_SUFFIX = new Set(['jr', 'sr', 'ii', 'iii', 'iv'])
@@ -90,15 +115,34 @@ export function collapseEditions<T>(results: T[], describe: (result: T) => Editi
     while (parent[index] !== index) index = parent[index] = parent[parent[index]!]!
     return index
   }
+  const union = (a: number, b: number) => {
+    const [ra, rb] = [find(a), find(b)]
+    if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb)
+  }
   for (let a = 0; a < facts.length; a++) {
     if (!titleKeys[a] || surnames[a]!.size === 0) continue
     for (let b = a + 1; b < facts.length; b++) {
       if (titleKeys[b] !== titleKeys[a]) continue
       if (![...surnames[b]!].some((name) => surnames[a]!.has(name))) continue
-      const [ra, rb] = [find(a), find(b)]
-      if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb)
+      union(a, b)
     }
   }
+
+  // A result with no author at all joins the book its title names, when only one
+  // book among the results has that title: The Long Halloween came back a fourth
+  // time with no author, cover or genre. With two books of one name (Snyder's
+  // Batman Volume 1 and King's) it could be either, so it stays where it is.
+  facts.forEach((_, index) => {
+    if (!titleKeys[index] || surnames[index]!.size > 0) return
+    const books = new Set(
+      facts.flatMap((__, other) =>
+        other !== index && titleKeys[other] === titleKeys[index] && surnames[other]!.size > 0
+          ? [find(other)]
+          : [],
+      ),
+    )
+    if (books.size === 1) union(index, [...books][0]!)
+  })
 
   const best = new Map<number, number>()
   facts.forEach((fact, index) => {
@@ -141,7 +185,7 @@ export interface ParsedIssue {
 export function parseIssue(title: string): ParsedIssue | null {
   const match = ISSUE_SUFFIX.exec(title.trim())
   if (!match) return null
-  const series = match[1]!.replace(/[\s:,–—-]+$/, '')
+  const series = withoutYearTag(match[1]!).replace(/[\s:,–—-]+$/, '')
   return series ? { series, number: Number(match[2]) } : null
 }
 

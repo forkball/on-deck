@@ -5,6 +5,7 @@ import {
   authorSurnameKey,
   collapseEditions,
   editionKey,
+  editionTitleKey,
   groupSingleIssues,
   parseIssue,
   type EditionFacts,
@@ -247,6 +248,104 @@ describe('collapseEditions across full credit lists', () => {
         result(2, 'Baltimore Volume I: The Plague Ships', 'Mike Mignola', { creators: [] }),
       ]),
       [1],
+    )
+  })
+})
+
+// What a search for "The Long Halloween" returned: ten cards for five works.
+// Run through both steps the search page takes, in its order.
+describe('the Long Halloween search', () => {
+  interface Hit {
+    title: string
+    creator: string | null
+    comic: boolean
+    logged?: boolean
+    cover?: boolean
+  }
+  const hit = (title: string, creator: string | null = 'Jeph Loeb', extra: Partial<Hit> = {}): Hit => ({
+    title,
+    creator,
+    comic: true,
+    ...extra,
+  })
+
+  const hits: Hit[] = [
+    hit('Batman: The Long Halloween', 'Jeph Loeb', { logged: true }),
+    hit('Batman: The Long Halloween #1'),
+    hit('Batman Noir: The Long Halloween'),
+    hit('Batman: The Long Halloween Special (2021) #1'),
+    hit('Batman The Long Halloween: The Last Halloween (2024-) #1'),
+    hit('Batman The Long Halloween: The Last Halloween (2024-) #2'),
+    hit('Batman: The Long Halloween', null, { comic: false, cover: false }),
+    hit('Batman: The Long Halloween Deluxe Edition'),
+    hit('Batman The Long Halloween: The Last Halloween'),
+    hit('Batman The Long Halloween Deluxe Edition The Sequel: Dark Victory'),
+    hit('Batman The Long Halloween: The Last Halloween Noir Edition (2024-) #1'),
+    hit('Batman: The Long Halloween Deluxe Edition The Prequel: Haunted Knight'),
+    hit('Batman: The Long Halloween #2'),
+  ]
+
+  it('shows one card per work, with the issues under the book that collects them', () => {
+    const collapsed = collapseEditions(hits, (h) => ({
+      title: h.title,
+      creator: h.creator,
+      hasCover: h.cover ?? true,
+      logged: h.logged ?? false,
+    }))
+    const entries = groupSingleIssues(collapsed, (h) => ({ title: h.title, comic: h.comic }))
+    const shown = entries.map((entry) =>
+      entry.kind === 'single'
+        ? entry.issues
+          ? `${entry.result.title} < ${entry.issues.length} issues`
+          : entry.result.title
+        : `${entry.series}: ${entry.issues.length} issues`,
+    )
+    assert.deepEqual(shown, [
+      'Batman: The Long Halloween < 2 issues',
+      'Batman: The Long Halloween Special (2021) #1',
+      // #1, #2 — the Noir Edition's #1 is the same issue repackaged, so one.
+      'Batman The Long Halloween: The Last Halloween < 2 issues',
+      'Batman The Long Halloween Deluxe Edition The Sequel: Dark Victory',
+      'Batman: The Long Halloween Deluxe Edition The Prequel: Haunted Knight',
+    ])
+    // The card kept is the one logged, not a repackaging of it.
+    assert.equal(entries[0]!.kind === 'single' && entries[0]!.result.logged, true)
+  })
+})
+
+describe('edition title rules', () => {
+  it('reads packaging as the same book', () => {
+    const plain = editionTitleKey('Batman: The Long Halloween')
+    assert.equal(editionTitleKey('Batman Noir: The Long Halloween'), plain)
+    assert.equal(editionTitleKey('Batman: The Long Halloween Deluxe Edition'), plain)
+    assert.equal(editionTitleKey('Batman: The Long Halloween 30th Anniversary Edition'), plain)
+  })
+
+  it('reads a store year tag as part of no title', () => {
+    assert.equal(editionTitleKey('The Last Halloween (2024-)'), editionTitleKey('The Last Halloween'))
+    assert.deepEqual(parseIssue('Batman The Long Halloween: The Last Halloween (2024-) #3'), {
+      series: 'Batman The Long Halloween: The Last Halloween',
+      number: 3,
+    })
+  })
+
+  it('keeps a sequel and a one-shot apart', () => {
+    const plain = editionTitleKey('Batman: The Long Halloween')
+    assert.notEqual(editionTitleKey('Batman: The Long Halloween Special'), plain)
+    assert.notEqual(
+      editionTitleKey('Batman The Long Halloween Deluxe Edition The Sequel: Dark Victory'),
+      plain,
+    )
+  })
+
+  it('leaves an authorless result alone when two books share its title', () => {
+    assert.deepEqual(
+      ids([
+        result(1, 'Batman Volume 1', 'Scott Snyder'),
+        result(2, 'Batman Volume 1', 'Tom King'),
+        result(3, 'Batman Volume 1', null, { hasCover: false }),
+      ]),
+      [1, 2, 3],
     )
   })
 })
