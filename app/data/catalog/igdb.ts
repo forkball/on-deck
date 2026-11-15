@@ -350,13 +350,6 @@ export async function getGameById(externalId: string): Promise<CatalogSearchResu
   }
 }
 
-export function slugifyTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
 // Pulls a game reference out of whatever someone pasted — a page URL, or a bare
 // numeric id. The character class keeps quotes out of the APICalypse literal
 // built from it.

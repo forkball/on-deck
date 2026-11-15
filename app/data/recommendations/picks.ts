@@ -323,7 +323,7 @@ export async function requestPicks(
   mediaType: MediaType = 'movie',
   sourceTypes: MediaType[] = ['movie'],
 ): Promise<PicksResult> {
-  const { content, requestedCount, hasFilters, searchesCreator } = buildPicksPrompt(
+  const { content, hasFilters, searchesCreator } = buildPicksPrompt(
     profiles,
     excluded,
     filters,

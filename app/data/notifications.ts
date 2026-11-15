@@ -90,10 +90,6 @@ export function countUnreadNotifications(db: Db, userId: number): Promise<number
   return db.count(notifications, { where: { user_id: userId, read_at: null } })
 }
 
-export async function markAllNotificationsRead(db: Db, userId: number): Promise<void> {
-  await db.updateMany(notifications, { read_at: Date.now() }, { where: { user_id: userId, read_at: null } })
-}
-
 // False rather than throwing if it isn't this user's. Already-read
 // notifications keep their original read_at.
 export async function markNotificationRead(db: Db, notificationId: number, userId: number): Promise<boolean> {

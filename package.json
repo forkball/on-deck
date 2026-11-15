@@ -6,7 +6,7 @@
     "dev": "NODE_ENV=development node --env-file-if-exists=.env --watch --import remix/node-tsx server.ts",
     "start": "NODE_ENV=production node --env-file-if-exists=.env --import remix/node-tsx server.ts",
     "test": "NODE_ENV=test node --env-file-if-exists=.env --import remix/node-tsx --test 'test/**/*.test.ts' 'test/**/*.test.tsx'",
-    "typecheck": "tsc --noEmit && node --import remix/node-tsx scripts/check-browser-bundle.ts",
+    "typecheck": "tsc --noEmit && node --import remix/node-tsx scripts/check-browser-bundle.ts && knip --no-progress",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "db:up": "docker compose up -d && docker compose exec -T postgres pg_isready -U ondeck -d ondeck",
@@ -29,6 +29,7 @@
   "devDependencies": {
     "@types/node": "latest",
     "@types/pg": "^8.20.0",
+    "knip": "^6.45.1",
     "oxfmt": "^0.68.0",
     "typescript": "latest"
   }

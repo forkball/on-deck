@@ -15,11 +15,7 @@ import { enqueueJob, getJob, PHASE_LABELS, type GenerationJob } from '../../data
 import { getLuckyState, LUCKY_RUN_NAME } from '../../data/recommendations/lucky.ts'
 import type { User } from '../../data/schema.ts'
 import { requireAuth } from '../../middleware/auth.ts'
-import {
-  findMembersMissingSourceLogs,
-  generateRecommendations,
-  type MissingSourceLogs,
-} from '../../data/recommendations/generate.ts'
+import { findMembersMissingSourceLogs, type MissingSourceLogs } from '../../data/recommendations/generate.ts'
 import type { RecommendationFilters } from '../../data/recommendations/picks.ts'
 import {
   findUnusedDuplicateRun,

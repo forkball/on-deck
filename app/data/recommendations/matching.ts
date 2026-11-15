@@ -655,8 +655,6 @@ export function filterByLength(
   length: LengthBucket,
   lookup: CatalogLookup = lookupForType,
 ): Promise<Candidate[]> {
-  const provider = getCatalogProvider(mediaType)
-
   return filterByDetail(
     candidates,
     mediaType,

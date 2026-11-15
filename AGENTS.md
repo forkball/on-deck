@@ -54,6 +54,13 @@ registry or `app/data` — those are what make the rest of `app/ui` unbundlable.
 compiles every module under `app/browser` and `app/ui/shared` through the real
 asset server, and fails if one of them can no longer be bundled.
 
+`npm run typecheck` also fails on dead code: `tsc` with `noUnusedLocals` on an
+import or variable nothing reads, and then `knip` (`knip.json`) on an export
+nothing imports. An export only its own file uses is allowed. Delete what they
+find rather than silencing it; the one exception is something used in a way an
+import checker can't see — a table read only by name in raw SQL — which takes
+`/** @public */` and a comment saying why.
+
 Server modules importing a client entry (`nav.tsx` rendering
 `<NotificationBell/>`) is normal and expected: that is how one gets placed on a
 page. What should not happen is the reverse — a client entry importing server

@@ -4,7 +4,6 @@ import { css } from 'remix/ui'
 import { routes } from '../../../routes.ts'
 import { LetterboxdImportForm } from '../../../browser/letterboxd-import-form.tsx'
 import { Page } from '../../../ui/components/page.tsx'
-import { Toast } from '../../../ui/components/toast.tsx'
 import { Link } from '../../../ui/shared/form-controls.tsx'
 
 export interface LetterboxdImportPageProps {

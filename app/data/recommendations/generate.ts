@@ -2,7 +2,7 @@ import { inList } from 'remix/data-table'
 
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import { platformFamilies } from '../catalog/igdb.ts'
-import { getCatalogProvider, upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
+import { upsertCatalogItem, type CatalogSearchResult } from '../catalog/provider.ts'
 import type { Db } from '../db.ts'
 import { isFollowing } from '../follows.ts'
 import { countUserMediaLog, listUserMediaLog, CONSUMPTION_STATUSES, type MediaType } from '../mediaItems.ts'
@@ -39,13 +39,7 @@ import {
   type Pick,
   type RecommendationFilters,
 } from './picks.ts'
-import {
-  MAX_RUNS_PER_USER,
-  pruneOldRuns,
-  saveRun,
-  type GenerationParams,
-  type RecommendationResult,
-} from './runs.ts'
+import { pruneOldRuns, saveRun, type GenerationParams, type RecommendationResult } from './runs.ts'
 import { emptyDrops, logPickTally, type PickTally } from './tally.ts'
 import { finishTranscript, startTranscript } from './transcripts.ts'
 import { ensureTasteProfile, profileSettingsFor } from './tasteProfile.ts'
