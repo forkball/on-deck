@@ -55,35 +55,61 @@ export function editionKey(title: string, creator: string | null | undefined): s
 export interface EditionFacts {
   title: string
   creator: string | null
+  // Every credited name where the catalog gives them, the first included. An
+  // anthology's printings each put a different contributor first — Creepshow
+  // Volume 1 came back as Chris Burnham's, Paul Dini's and "AA.VV."'s — so the
+  // first name alone kept three printings of one book apart.
+  creators?: string[]
   hasCover: boolean
   // Whether the person searching has this exact row in their log. The card that
   // shows their status is the one to keep, or their entry disappears from search.
   logged: boolean
 }
 
+function surnamesOf(fact: EditionFacts): Set<string> {
+  const names = fact.creators?.length ? fact.creators : [fact.creator]
+  return new Set(names.map(authorSurnameKey).filter(Boolean))
+}
+
 // One result per book, in the place of that book's best-ranked edition. The one
 // kept is the edition they logged, else one with a cover, else the best-ranked.
+//
+// Two results are one book when their titles match (editionTitleKey) and their
+// credits share a surname — any surname, not only the first: that is what still
+// tells "Batman Volume 1" by Snyder from "Batman Volume 1" by King, which share
+// a title and no one. Shared through a third counts too, so three printings that
+// each overlap the next are one book.
 export function collapseEditions<T>(results: T[], describe: (result: T) => EditionFacts): T[] {
   const facts = results.map(describe)
-  const keys = facts.map((fact) => editionKey(fact.title, fact.creator))
+  const titleKeys = facts.map((fact) => editionTitleKey(fact.title))
+  const surnames = facts.map(surnamesOf)
 
-  const best = new Map<string, number>()
-  keys.forEach((key, index) => {
-    if (!key) return
-    const held = best.get(key)
-    if (held === undefined || outranks(facts[index]!, facts[held]!)) best.set(key, index)
+  // Union-find over indexes; each group's root is its best-ranked member.
+  const parent = facts.map((_, index) => index)
+  const find = (index: number): number => {
+    while (parent[index] !== index) index = parent[index] = parent[parent[index]!]!
+    return index
+  }
+  for (let a = 0; a < facts.length; a++) {
+    if (!titleKeys[a] || surnames[a]!.size === 0) continue
+    for (let b = a + 1; b < facts.length; b++) {
+      if (titleKeys[b] !== titleKeys[a]) continue
+      if (![...surnames[b]!].some((name) => surnames[a]!.has(name))) continue
+      const [ra, rb] = [find(a), find(b)]
+      if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb)
+    }
+  }
+
+  const best = new Map<number, number>()
+  facts.forEach((fact, index) => {
+    const root = find(index)
+    const held = best.get(root)
+    if (held === undefined || outranks(fact, facts[held]!)) best.set(root, index)
   })
 
-  const placed = new Set<string>()
   const kept: T[] = []
-  keys.forEach((key, index) => {
-    if (!key) {
-      kept.push(results[index]!)
-      return
-    }
-    if (placed.has(key)) return
-    placed.add(key)
-    kept.push(results[best.get(key)!]!)
+  facts.forEach((_, index) => {
+    if (find(index) === index) kept.push(results[best.get(index)!]!)
   })
   return kept
 }

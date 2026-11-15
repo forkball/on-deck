@@ -150,6 +150,9 @@ function toResult(doc: OpenLibraryDoc): CatalogSearchResult {
     runtimeMinutes: null,
     pageCount: doc.number_of_pages_median ?? null,
     creator: doc.author_name?.[0] ?? null,
+    // Every author, for telling an anthology's printings apart from different
+    // books of one name (editions.ts) — each printing credits someone else first.
+    creators: doc.author_name ?? [],
   }
 }
 

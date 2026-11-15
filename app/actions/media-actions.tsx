@@ -80,6 +80,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
               return {
                 title: item.title,
                 creator: metadata.creator,
+                creators: metadata.creators,
                 hasCover: metadata.posterUrl != null,
                 logged: interactionsByItemId.has(item.id),
               }
