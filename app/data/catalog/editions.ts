@@ -41,7 +41,7 @@ const PACKAGING =
 // normalising drops the brackets and leaves a bare year that looks like a word.
 const YEAR_TAG = /\(\s*\d{4}\s*(?:[-–]\s*(?:\d{4})?\s*)?\)/g
 
-export function withoutYearTag(title: string): string {
+function withoutYearTag(title: string): string {
   return title.replace(YEAR_TAG, ' ').replace(/\s+/g, ' ').trim()
 }
 
@@ -68,23 +68,15 @@ export function authorSurnameKey(creator: string | null | undefined): string {
   return words[words.length - 1] ?? ''
 }
 
-// Empty when either half is missing: with no author, two same-titled books are as
-// likely to be different works as editions of one, and a card wrongly hidden is
-// worse than one shown twice.
-export function editionKey(title: string, creator: string | null | undefined): string {
-  const titleKey = editionTitleKey(title)
-  const surname = authorSurnameKey(creator)
-  return titleKey && surname ? `${surname}|${titleKey}` : ''
-}
-
 export interface EditionFacts {
   title: string
-  creator: string | null
-  // Every credited name where the catalog gives them, the first included. An
-  // anthology's printings each put a different contributor first — Creepshow
-  // Volume 1 came back as Chris Burnham's, Paul Dini's and "AA.VV."'s — so the
-  // first name alone kept three printings of one book apart.
-  creators?: string[]
+  // Every credited name. An anthology's printings each put a different
+  // contributor first — Creepshow Volume 1 came back as Chris Burnham's, Paul
+  // Dini's and "AA.VV."'s — so the first name alone kept them apart. Empty when
+  // the catalog names no one: two same-titled books with no author are as likely
+  // to be different works as editions of one, so such a result only ever joins a
+  // book its title names unambiguously.
+  creators: string[]
   hasCover: boolean
   // Whether the person searching has this exact row in their log. The card that
   // shows their status is the one to keep, or their entry disappears from search.
@@ -92,8 +84,7 @@ export interface EditionFacts {
 }
 
 function surnamesOf(fact: EditionFacts): Set<string> {
-  const names = fact.creators?.length ? fact.creators : [fact.creator]
-  return new Set(names.map(authorSurnameKey).filter(Boolean))
+  return new Set(fact.creators.map(authorSurnameKey).filter(Boolean))
 }
 
 // One result per book, in the place of that book's best-ranked edition. The one
@@ -177,7 +168,7 @@ function outranks(candidate: EditionFacts, held: EditionFacts): boolean {
 // a number elsewhere in a title is part of the name.
 const ISSUE_SUFFIX = /^(.*?\S)\s*(?:#\s*|\bissue\s+)(\d+)(?:\s*\(\s*of\s+\d+\s*\))?\s*$/i
 
-export interface ParsedIssue {
+interface ParsedIssue {
   series: string
   number: number
 }
@@ -263,4 +254,14 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
     )
   })
   return entries
+}
+
+// What the book search page shows: printings collapsed to one card per book,
+// then a comic's single issues gathered — in that order, so two printings of one
+// issue count once.
+export function arrangeBookResults<T>(
+  results: T[],
+  describe: (result: T) => EditionFacts & IssueFacts,
+): SearchEntry<T>[] {
+  return groupSingleIssues(collapseEditions(results, describe), describe)
 }

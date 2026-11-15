@@ -16,6 +16,57 @@ import { Field } from '../shared/field.tsx'
 import { Button, Link } from '../shared/form-controls.tsx'
 import { withReturnTo } from '../backLink.ts'
 
+// The frame every card in a result list shares, marked down its left edge in the
+// media type's colour. Also used by the search page's group of single issues, so
+// that it reads as one of the cards.
+export function cardFrame(hue: string) {
+  return css({
+    border: '1px solid var(--rule)',
+    borderLeft: `4px solid ${hue}`,
+    borderRadius: '8px',
+    padding: '16px',
+  })
+}
+
+const COVER_WIDTH = '60px'
+
+// A card's cover, or an empty frame of the same size when the catalog has none,
+// so the text beside it lines up either way. A link to the detail page when given
+// one.
+export function CardCover(
+  handle: Handle<{ src: string | null; alt: string; href?: string; lazy?: boolean }>,
+) {
+  return () => {
+    const { src, alt, href, lazy } = handle.props
+    const place = css({ flex: '0 0 auto', alignSelf: 'flex-start' })
+    if (!src) {
+      return (
+        <div
+          mix={[
+            place,
+            css({ width: COVER_WIDTH, height: '90px', border: '1px solid var(--rule)', borderRadius: '4px' }),
+          ]}
+        />
+      )
+    }
+    const img = (
+      <img
+        src={src}
+        alt={alt}
+        loading={lazy ? 'lazy' : undefined}
+        mix={[css({ width: COVER_WIDTH, borderRadius: '4px', display: 'block' }), ...(href ? [] : [place])]}
+      />
+    )
+    return href ? (
+      <Link variant="wrap" href={href} mix={place}>
+        {img}
+      </Link>
+    ) : (
+      img
+    )
+  }
+}
+
 function capitalize(tag: string): string {
   return tag.replace(/^./, (c) => c.toUpperCase())
 }
@@ -101,37 +152,13 @@ export function MediaItemCard(
 
     return (
       <li
-        mix={css({
-          display: 'flex',
+        mix={[
+          cardFrame(ui.hue),
           // Only a footer wraps: it alone asks for the whole row.
-          flexWrap: 'wrap',
-          gap: '12px',
-          border: '1px solid var(--rule)',
-          borderLeft: `4px solid ${ui.hue}`,
-          borderRadius: '8px',
-          padding: '16px',
-        })}
+          css({ display: 'flex', flexWrap: 'wrap', gap: '12px' }),
+        ]}
       >
-        {posterUrl ? (
-          <Link variant="wrap" href={detailHref} mix={css({ flex: '0 0 auto', alignSelf: 'flex-start' })}>
-            <img
-              src={posterUrl}
-              alt={`${item.title} poster`}
-              loading={lazyImage ? 'lazy' : undefined}
-              mix={css({ width: '60px', borderRadius: '4px', display: 'block' })}
-            />
-          </Link>
-        ) : (
-          <div
-            mix={css({
-              width: '60px',
-              height: '90px',
-              flex: '0 0 auto',
-              border: '1px solid var(--rule)',
-              borderRadius: '4px',
-            })}
-          />
-        )}
+        <CardCover src={posterUrl} alt={`${item.title} poster`} href={detailHref} lazy={lazyImage} />
         <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
           <div mix={css({ display: 'flex', gap: '12px' })}>
             <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
