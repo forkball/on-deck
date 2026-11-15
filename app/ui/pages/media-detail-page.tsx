@@ -312,7 +312,10 @@ export function MediaDetailPage(handle: Handle<MediaDetailPageProps>) {
               )}
               {creator && (
                 <p mix={css({ margin: 0, color: 'var(--soft)' })}>
-                  {creators.length > 1 ? ui.creditLabelPlural : ui.creditLabel}: <strong>{creator}</strong>
+                  {/* Every name when there are several: a film's `creator` already
+                      joins them, a book's is only the first. */}
+                  {creators.length > 1 ? ui.creditLabelPlural : ui.creditLabel}:{' '}
+                  <strong>{creators.length > 1 ? creators.join(', ') : creator}</strong>
                 </p>
               )}
               {/* The year leads the details rather than riding in the title,

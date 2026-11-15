@@ -192,3 +192,61 @@ describe('groupSingleIssues', () => {
     ])
   })
 })
+
+// An anthology's printings each credit a different contributor first, so the
+// first name alone kept them apart; the full credit list joins them.
+describe('collapseEditions across full credit lists', () => {
+  it("joins an anthology's printings that share any contributor", () => {
+    assert.deepEqual(
+      ids([
+        result(1, 'Creepshow Volume 1', 'Chris Burnham', {
+          creators: ['Chris Burnham', 'Paul Dini', 'Joe Hill'],
+          logged: true,
+        }),
+        result(2, 'Creepshow, volume 1', 'Paul Dini', { creators: ['Paul Dini', 'Stephen Langford'] }),
+      ]),
+      [1],
+    )
+  })
+
+  it('joins printings that overlap only through a third', () => {
+    assert.deepEqual(
+      ids([
+        result(1, 'Creepshow Volume 1', 'Chris Burnham', { creators: ['Chris Burnham', 'Paul Dini'] }),
+        result(2, 'Creepshow Volume 1', 'Paul Dini', { creators: ['Paul Dini', 'Joe Hill'] }),
+        result(3, 'Creepshow Volume 1', 'Joe Hill', { creators: ['Joe Hill'] }),
+      ]),
+      [1],
+    )
+  })
+
+  it('keeps different books of one name apart when no one is credited on both', () => {
+    assert.deepEqual(
+      ids([
+        result(1, 'Batman Volume 1', 'Scott Snyder', { creators: ['Scott Snyder', 'Greg Capullo'] }),
+        result(2, 'Batman Volume 1', 'Tom King', { creators: ['Tom King', 'David Finch'] }),
+      ]),
+      [1, 2],
+    )
+  })
+
+  it('keeps an edition credited only as "various authors" apart', () => {
+    assert.deepEqual(
+      ids([
+        result(1, 'Creepshow vol. 1', 'AA.VV.', { creators: ['AA.VV.'] }),
+        result(2, 'Creepshow Volume 1', 'Chris Burnham', { creators: ['Chris Burnham', 'Paul Dini'] }),
+      ]),
+      [1, 2],
+    )
+  })
+
+  it('falls back to the first credit when there is no list', () => {
+    assert.deepEqual(
+      ids([
+        result(1, 'Baltimore: The Plague Ships', 'Michael Mignola'),
+        result(2, 'Baltimore Volume I: The Plague Ships', 'Mike Mignola', { creators: [] }),
+      ]),
+      [1],
+    )
+  })
+})

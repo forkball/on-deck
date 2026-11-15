@@ -119,6 +119,9 @@ function toResult(volume: GoogleBooksVolume): CatalogSearchResult {
     runtimeMinutes: null,
     pageCount: info.pageCount ?? null,
     creator: info.authors?.[0] ?? null,
+    // Every author, for telling an anthology's printings apart from different
+    // books of one name (editions.ts) — each printing credits someone else first.
+    creators: info.authors ?? [],
   }
 }
 
