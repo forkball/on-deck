@@ -33,11 +33,6 @@ describe('syncing a diary that changed', { skip: skipWithoutDatabase }, () => {
     return `<item> <guid isPermaLink="false">letterboxd-watch-${guid}</guid> <pubDate>${pubDate}</pubDate> <letterboxd:watchedDate>${watched}</letterboxd:watchedDate> <letterboxd:filmTitle>Film ${tmdbId}</letterboxd:filmTitle> <letterboxd:filmYear>2026</letterboxd:filmYear> <tmdb:movieId>${tmdbId}</tmdb:movieId> </item>`
   }
 
-  const OLDER = [
-    item('111', 1, 'Mon, 1 Sep 2026 10:00:00 +0000', '2026-08-31'),
-    item('222', 2, 'Tue, 2 Sep 2026 10:00:00 +0000', '2026-09-01'),
-  ]
-
   const feed = (items: string[]) => `<?xml version='1.0'?><rss><channel>${items.join('')}</channel></rss>`
 
   const row = () => getUserInteractionForItem(db, userId, itemIds.get(FILM)!)

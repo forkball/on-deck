@@ -75,6 +75,7 @@ export const mediaItems = table({
 
 // Streaming availability for a movie or show, every country at once. Refetched
 // on a clock, unlike metadata — see watchProviders.ts and the migration.
+/** @public Read and written in raw SQL by its table name, which an import checker can't see. */
 export const mediaWatchProviders = table({
   name: 'media_watch_providers',
   primaryKey: ['media_item_id'],
@@ -265,6 +266,7 @@ export const unconfirmedRuns = table({
 // What the Open Library → Google Books backfill already tried, so a re-run spends
 // its Google Books quota on rows it has not asked about yet. Written only by
 // scripts/backfill-google-books.ts; nothing the app serves reads it.
+/** @public Read and written in raw SQL by its table name, which an import checker can't see. */
 export const bookBackfillAttempts = table({
   name: 'book_backfill_attempts',
   columns: {
@@ -404,15 +406,8 @@ export type User = TableRow<typeof users>
 export type MediaItem = TableRow<typeof mediaItems>
 export type UserMediaInteraction = TableRow<typeof userMediaInteractions>
 export type UserTasteProfile = TableRow<typeof userTasteProfiles>
-export type UserRecommendation = TableRow<typeof userRecommendations>
-export type UserFollow = TableRow<typeof userFollows>
-export type GenerationTranscript = TableRow<typeof generationTranscripts>
 export type UnconfirmedRun = TableRow<typeof unconfirmedRuns>
 export type RecommendationRun = TableRow<typeof recommendationRuns>
 export type RecommendationJob = TableRow<typeof recommendationJobs>
-export type RecommendationRunMember = TableRow<typeof recommendationRunMembers>
-export type RecommendationRunUsage = TableRow<typeof recommendationRunUsage>
-export type ProfileRebuildUsage = TableRow<typeof profileRebuildUsage>
-export type Notification = TableRow<typeof notifications>
 export type ImportBatch = TableRow<typeof importBatches>
 export type ImportRow = TableRow<typeof importRows>

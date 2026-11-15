@@ -897,9 +897,9 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
   color: var(--accent);
 }
 
-/* A card's log (media-item-card.tsx) on the byline when the screen is narrow,
-   beside the title when it is wide. Rendered in both places and
-   switched here, since which fits is a question of width. */
+/* A card's log (media-item-card.tsx): on the byline when the screen is narrow,
+   beside the title when it is wide. Rendered in both places and switched here,
+   since which fits is a question of width. */
 .doodle .card-log {
   display: inline-flex;
   flex-wrap: wrap;
@@ -911,6 +911,8 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
 
 .doodle .card-log--wide {
   display: none;
+  margin-left: 10px;
+  vertical-align: middle;
 }
 
 @media (min-width: 640px) {
@@ -918,12 +920,7 @@ form:has(select[name='status'] option[value='consumed']:checked) .watched-only-f
     display: inline-flex;
   }
 
-  .doodle .card-log.card-log--narrow {
+  .doodle .card-log--narrow {
     display: none;
   }
-}
-
-.doodle .card-log--wide {
-  margin-left: 10px;
-  vertical-align: middle;
 }

@@ -476,7 +476,6 @@ export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult>
   const { rows, model } = await loadReview(db, batch)
   await db.update(importBatches, batch.id, { status: 'saving', updated_at: Date.now() })
 
-  const byId = new Map(rows.map((row) => [row.id, row]))
   const conflicted = new Set(model.conflicts.map(({ row }) => row.id))
   const held = new Set<number>()
   for (const { verdict } of model.duplicates) {
@@ -536,15 +535,6 @@ export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult>
   await db.update(importBatches, batch.id, { status: 'done', completed_at: now, updated_at: now })
 
   return { saved: writable.length, unchanged: model.counts.unchanged, leftOut: model.counts.leftOut }
-}
-
-// Everything the person could still come back to, newest first.
-export async function listBatches(db: Db, userId: number, limit = 10): Promise<ImportBatch[]> {
-  return db.findMany(importBatches, {
-    where: { user_id: userId },
-    orderBy: ['created_at', 'desc'],
-    limit,
-  })
 }
 
 // Whether this member has ever brought a library across for this media type.

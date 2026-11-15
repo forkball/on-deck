@@ -25,10 +25,35 @@ const FIRST_VOLUME = /\b(?:volume|vol|book)\s+(?:1|i|one)\b/g
 // Publisher filler that names no part of the work.
 const FILLER = /\ba novel\b/g
 
+// How a book is packaged rather than which book it is. A search for The Long
+// Halloween came back as "Batman: The Long Halloween", "Batman Noir: The Long
+// Halloween" (the same pages in black and white) and "… Deluxe Edition", three
+// cards for one book. Only ever dropped together with the author check in
+// collapseEditions, so "Spider-Man Noir" stays apart from Spider-Man: the two
+// share no writer. "Absolute" alone is not here — Absolute Batman is a series of
+// its own, by a writer who also wrote Batman.
+const PACKAGING =
+  /\b(?:(?:\d+(?:st|nd|rd|th)\s+)?anniversary|deluxe|noir|absolute|special|collectors?|expanded|definitive|new)\s+edition\b|\bnoir\b|\b(?:hardcover|paperback)\b/g
+
+// The year a digital comics store adds to a series name — "(2024-)", "(2021)",
+// "(2019-2020)" — so "The Last Halloween (2024-) #1" names the same series as
+// the collected "The Last Halloween". Matched on the raw title, before
+// normalising drops the brackets and leaves a bare year that looks like a word.
+const YEAR_TAG = /\(\s*\d{4}\s*(?:[-–]\s*(?:\d{4})?\s*)?\)/g
+
+function withoutYearTag(title: string): string {
+  return title.replace(YEAR_TAG, ' ').replace(/\s+/g, ' ').trim()
+}
+
 // Why not titleWordsFitInside: "Dune" fits inside "Dune Messiah", same author, a
 // different novel. Dropping only words that name no other book keeps that apart.
 export function editionTitleKey(title: string): string {
-  return sameWorkKey(normalizeTitle(title).replace(FIRST_VOLUME, ' ').replace(FILLER, ' '))
+  return sameWorkKey(
+    normalizeTitle(withoutYearTag(title))
+      .replace(PACKAGING, ' ')
+      .replace(FIRST_VOLUME, ' ')
+      .replace(FILLER, ' '),
+  )
 }
 
 const NAME_SUFFIX = new Set(['jr', 'sr', 'ii', 'iii', 'iv'])
@@ -43,23 +68,15 @@ export function authorSurnameKey(creator: string | null | undefined): string {
   return words[words.length - 1] ?? ''
 }
 
-// Empty when either half is missing: with no author, two same-titled books are as
-// likely to be different works as editions of one, and a card wrongly hidden is
-// worse than one shown twice.
-export function editionKey(title: string, creator: string | null | undefined): string {
-  const titleKey = editionTitleKey(title)
-  const surname = authorSurnameKey(creator)
-  return titleKey && surname ? `${surname}|${titleKey}` : ''
-}
-
 export interface EditionFacts {
   title: string
-  creator: string | null
-  // Every credited name where the catalog gives them, the first included. An
-  // anthology's printings each put a different contributor first — Creepshow
-  // Volume 1 came back as Chris Burnham's, Paul Dini's and "AA.VV."'s — so the
-  // first name alone kept three printings of one book apart.
-  creators?: string[]
+  // Every credited name. An anthology's printings each put a different
+  // contributor first — Creepshow Volume 1 came back as Chris Burnham's, Paul
+  // Dini's and "AA.VV."'s — so the first name alone kept them apart. Empty when
+  // the catalog names no one: two same-titled books with no author are as likely
+  // to be different works as editions of one, so such a result only ever joins a
+  // book its title names unambiguously.
+  creators: string[]
   hasCover: boolean
   // Whether the person searching has this exact row in their log. The card that
   // shows their status is the one to keep, or their entry disappears from search.
@@ -67,8 +84,7 @@ export interface EditionFacts {
 }
 
 function surnamesOf(fact: EditionFacts): Set<string> {
-  const names = fact.creators?.length ? fact.creators : [fact.creator]
-  return new Set(names.map(authorSurnameKey).filter(Boolean))
+  return new Set(fact.creators.map(authorSurnameKey).filter(Boolean))
 }
 
 // One result per book, in the place of that book's best-ranked edition. The one
@@ -90,15 +106,34 @@ export function collapseEditions<T>(results: T[], describe: (result: T) => Editi
     while (parent[index] !== index) index = parent[index] = parent[parent[index]!]!
     return index
   }
+  const union = (a: number, b: number) => {
+    const [ra, rb] = [find(a), find(b)]
+    if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb)
+  }
   for (let a = 0; a < facts.length; a++) {
     if (!titleKeys[a] || surnames[a]!.size === 0) continue
     for (let b = a + 1; b < facts.length; b++) {
       if (titleKeys[b] !== titleKeys[a]) continue
       if (![...surnames[b]!].some((name) => surnames[a]!.has(name))) continue
-      const [ra, rb] = [find(a), find(b)]
-      if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb)
+      union(a, b)
     }
   }
+
+  // A result with no author at all joins the book its title names, when only one
+  // book among the results has that title: The Long Halloween came back a fourth
+  // time with no author, cover or genre. With two books of one name (Snyder's
+  // Batman Volume 1 and King's) it could be either, so it stays where it is.
+  facts.forEach((_, index) => {
+    if (!titleKeys[index] || surnames[index]!.size > 0) return
+    const books = new Set(
+      facts.flatMap((__, other) =>
+        other !== index && titleKeys[other] === titleKeys[index] && surnames[other]!.size > 0
+          ? [find(other)]
+          : [],
+      ),
+    )
+    if (books.size === 1) union(index, [...books][0]!)
+  })
 
   const best = new Map<number, number>()
   facts.forEach((fact, index) => {
@@ -133,7 +168,7 @@ function outranks(candidate: EditionFacts, held: EditionFacts): boolean {
 // a number elsewhere in a title is part of the name.
 const ISSUE_SUFFIX = /^(.*?\S)\s*(?:#\s*|\bissue\s+)(\d+)(?:\s*\(\s*of\s+\d+\s*\))?\s*$/i
 
-export interface ParsedIssue {
+interface ParsedIssue {
   series: string
   number: number
 }
@@ -141,7 +176,7 @@ export interface ParsedIssue {
 export function parseIssue(title: string): ParsedIssue | null {
   const match = ISSUE_SUFFIX.exec(title.trim())
   if (!match) return null
-  const series = match[1]!.replace(/[\s:,–—-]+$/, '')
+  const series = withoutYearTag(match[1]!).replace(/[\s:,–—-]+$/, '')
   return series ? { series, number: Number(match[2]) } : null
 }
 
@@ -219,4 +254,14 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
     )
   })
   return entries
+}
+
+// What the book search page shows: printings collapsed to one card per book,
+// then a comic's single issues gathered — in that order, so two printings of one
+// issue count once.
+export function arrangeBookResults<T>(
+  results: T[],
+  describe: (result: T) => EditionFacts & IssueFacts,
+): SearchEntry<T>[] {
+  return groupSingleIssues(collapseEditions(results, describe), describe)
 }

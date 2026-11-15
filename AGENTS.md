@@ -54,6 +54,13 @@ registry or `app/data` — those are what make the rest of `app/ui` unbundlable.
 compiles every module under `app/browser` and `app/ui/shared` through the real
 asset server, and fails if one of them can no longer be bundled.
 
+`npm run typecheck` also fails on dead code: `tsc` with `noUnusedLocals` on an
+import or variable nothing reads, and then `knip` (`knip.json`) on an export
+nothing imports. An export only its own file uses is allowed. Delete what they
+find rather than silencing it; the one exception is something used in a way an
+import checker can't see — a table read only by name in raw SQL — which takes
+`/** @public */` and a comment saying why.
+
 Server modules importing a client entry (`nav.tsx` rendering
 `<NotificationBell/>`) is normal and expected: that is how one gets placed on a
 page. What should not happen is the reverse — a client entry importing server
@@ -104,7 +111,9 @@ does nothing on its own.
     (Google Books ids a volume, not a work) so the search page shows one card per
     book, keeping the edition the searcher logged — the same title and any shared
     credited name, so an anthology whose printings each list a different
-    contributor first still reads as one book. It also gathers a comic's
+    contributor first still reads as one book. The title comparison ignores
+    packaging ("Deluxe Edition", "Noir") and a store's year tag ("(2024-)"); a
+    result with no author joins the one book of its title, if only one. It also gathers a comic's
     single issues ("… #3") under the collected edition that binds them when it
     came back too, else into one entry per series — separate works, so listed
     rather than collapsed, and only results tagged as comics, since numbered

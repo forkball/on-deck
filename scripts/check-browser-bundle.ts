@@ -7,7 +7,7 @@
 // Runs the real asset server from app/assets.ts rather than reimplementing the
 // allowlist, so the two can't drift apart.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
 
 import { assetServer } from '../app/assets.ts'
 

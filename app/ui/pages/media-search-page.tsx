@@ -12,7 +12,7 @@ import { LazyList } from '../../browser/lazy-list.tsx'
 import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
 import { Toast } from '../components/toast.tsx'
 import { Page } from '../components/page.tsx'
-import { MediaItemCard } from '../components/media-item-card.tsx'
+import { CardCover, MediaItemCard, cardFrame } from '../components/media-item-card.tsx'
 import { markdownToPlainText } from '../components/markdown.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 
@@ -21,7 +21,7 @@ export interface MediaSearchPageProps {
   // The viewer's order for the media-type tabs (parseMediaOrder).
   mediaOrder: ActiveMediaType[]
   query: string
-  // A result, or a series' single issues gathered into one (groupSingleIssues).
+  // A result, or a series' single issues gathered into one (arrangeBookResults).
   entries: SearchEntry<MediaItem>[]
   // How many are visible before scrolling reveals the rest.
   initialVisible: number
@@ -47,6 +47,19 @@ function summarize(overview: string): string {
   return `${(lastSpace > SUMMARY_MAX * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`
 }
 
+// A plain list of cards, one under another.
+function stack(gap: string) {
+  return css({ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap })
+}
+
+// What every card on the page needs to know besides its own item.
+interface ResultContext {
+  mediaType: ActiveMediaType
+  interactionsByItemId: MediaSearchPageProps['interactionsByItemId']
+  // Where a log submitted from a card comes back to.
+  returnTo: string
+}
+
 // Shared by every media type's search route. Everything that varies comes from
 // MEDIA_TYPE_UI.
 export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
@@ -62,7 +75,11 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
       displayName,
     } = handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
-    const returnTo = `${ui.hrefs.search()}?q=${encodeURIComponent(query)}`
+    const ctx: ResultContext = {
+      mediaType,
+      interactionsByItemId,
+      returnTo: `${ui.hrefs.search()}?q=${encodeURIComponent(query)}`,
+    }
 
     return (
       <Page heading={ui.searchHeading} width="wide" displayName={displayName}>
@@ -92,35 +109,16 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
                 ({entries.length})
               </span>
             </h2>
-            <ul
-              id="search-results"
-              mix={css({
-                listStyle: 'none',
-                margin: 0,
-                padding: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-              })}
-            >
+            <ul id="search-results" mix={stack('16px')}>
               {entries.map((entry) =>
                 entry.kind === 'single' ? (
-                  <ResultCard
-                    key={entry.result.id}
-                    item={entry.result}
-                    issues={entry.issues}
-                    mediaType={mediaType}
-                    interactionsByItemId={interactionsByItemId}
-                    returnTo={returnTo}
-                  />
+                  <ResultCard key={entry.result.id} item={entry.result} issues={entry.issues} ctx={ctx} />
                 ) : (
                   <IssueGroupCard
                     key={`issues-${entry.issues[0]!.id}`}
                     series={entry.series}
                     issues={entry.issues}
-                    mediaType={mediaType}
-                    interactionsByItemId={interactionsByItemId}
-                    returnTo={returnTo}
+                    ctx={ctx}
                   />
                 ),
               )}
@@ -133,46 +131,22 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
   }
 }
 
-interface ResultCardProps {
-  item: MediaItem
-  // The single issues this edition collects, listed under it.
-  issues?: MediaItem[]
-  mediaType: ActiveMediaType
-  interactionsByItemId: MediaSearchPageProps['interactionsByItemId']
-  returnTo: string
-}
-
-function ResultCard(handle: Handle<ResultCardProps>) {
+// A result, with the single issues it collects listed under it when it has any.
+function ResultCard(handle: Handle<{ item: MediaItem; issues?: MediaItem[]; ctx: ResultContext }>) {
   return () => {
-    const { item, issues, mediaType, interactionsByItemId, returnTo } = handle.props
+    const { item, issues, ctx } = handle.props
     const { overview } = parseMediaMetadata(item.metadata)
     return (
       <MediaItemCard
         item={item}
-        mediaType={mediaType}
-        interaction={interactionsByItemId.get(item.id)}
-        returnTo={returnTo}
+        mediaType={ctx.mediaType}
+        interaction={ctx.interactionsByItemId.get(item.id)}
+        returnTo={ctx.returnTo}
         lazyImage
-        footer={
-          issues && (
-            <IssueList
-              issues={issues}
-              mediaType={mediaType}
-              interactionsByItemId={interactionsByItemId}
-              returnTo={returnTo}
-            />
-          )
-        }
+        footer={issues && <IssueList issues={issues} ctx={ctx} />}
       >
         {overview && (
-          <p
-            mix={css({
-              fontSize: '13px',
-              color: 'var(--soft)',
-              margin: '8px 0 0',
-              lineHeight: 1.4,
-            })}
-          >
+          <p mix={css({ fontSize: '13px', color: 'var(--soft)', margin: '8px 0 0', lineHeight: 1.4 })}>
             {summarize(overview)}
           </p>
         )}
@@ -181,62 +155,21 @@ function ResultCard(handle: Handle<ResultCardProps>) {
   }
 }
 
-// A series' single issues as one row that opens to list them, so a search for
-// the series isn't five near-identical cards ahead of the collected book. Each
-// issue inside is the ordinary card, log control and all. Says how many are
-// logged, since closed it would otherwise hide the viewer's own status.
-function IssueGroupCard(
-  handle: Handle<Omit<ResultCardProps, 'item'> & { series: string; issues: MediaItem[] }>,
-) {
+// A series' single issues with no collected edition among the results to sit
+// under: one card, the series and its first cover, that opens to list them, so a
+// search for the series isn't five near-identical cards.
+function IssueGroupCard(handle: Handle<{ series: string; issues: MediaItem[]; ctx: ResultContext }>) {
   return () => {
-    const { series, issues, mediaType, interactionsByItemId, returnTo } = handle.props
-    const ui = MEDIA_TYPE_UI[mediaType]
-    const cover = issues.map((issue) => parseMediaMetadata(issue.metadata).posterUrl).find(Boolean)
+    const { series, issues, ctx } = handle.props
+    const cover = issues.map((issue) => parseMediaMetadata(issue.metadata).posterUrl).find(Boolean) ?? null
 
     return (
-      <li
-        mix={css({
-          border: '1px solid var(--rule)',
-          borderLeft: `4px solid ${ui.hue}`,
-          borderRadius: '8px',
-          padding: '16px',
-        })}
-      >
+      <li mix={cardFrame(MEDIA_TYPE_UI[ctx.mediaType].hue)}>
         <div mix={css({ display: 'flex', gap: '12px' })}>
-          {cover ? (
-            <img
-              src={cover}
-              alt=""
-              loading="lazy"
-              mix={css({
-                width: '60px',
-                borderRadius: '4px',
-                display: 'block',
-                flex: '0 0 auto',
-                alignSelf: 'flex-start',
-              })}
-            />
-          ) : (
-            <div
-              mix={css({
-                width: '60px',
-                height: '90px',
-                flex: '0 0 auto',
-                border: '1px solid var(--rule)',
-                borderRadius: '4px',
-              })}
-            />
-          )}
-          <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
-            <div>{series}</div>
-          </div>
+          <CardCover src={cover} alt="" lazy />
+          <div mix={css({ flex: '1 1 0', minWidth: 0 })}>{series}</div>
         </div>
-        <IssueList
-          issues={issues}
-          mediaType={mediaType}
-          interactionsByItemId={interactionsByItemId}
-          returnTo={returnTo}
-        />
+        <IssueList issues={issues} ctx={ctx} />
       </li>
     )
   }
@@ -244,44 +177,26 @@ function IssueGroupCard(
 
 // "3 single issues · 1 logged". The count of logged ones is there because the list
 // starts closed, and would otherwise hide the viewer's own status.
-function issuesLabel(
-  issues: MediaItem[],
-  interactionsByItemId: MediaSearchPageProps['interactionsByItemId'],
-) {
-  const logged = issues.filter((issue) => interactionsByItemId.has(issue.id)).length
+function issuesLabel(issues: MediaItem[], ctx: ResultContext) {
+  const logged = issues.filter((issue) => ctx.interactionsByItemId.has(issue.id)).length
   const count = issues.length === 1 ? '1 single issue' : `${issues.length} single issues`
   return logged > 0 ? `${count} · ${logged} logged` : count
 }
 
 // The issues themselves, closed until asked for, under the same label whether
 // they hang off a collected edition or stand as their own entry. Each is the
-// ordinary card, log control and all.
-function IssueList(handle: Handle<Omit<ResultCardProps, 'item' | 'issues'> & { issues: MediaItem[] }>) {
+// ordinary card, log control and all. .issue-list in app.css sets the toggle
+// apart from the card's own copy, where Doodle's unlayered summary rules would
+// beat a css() one.
+function IssueList(handle: Handle<{ issues: MediaItem[]; ctx: ResultContext }>) {
   return () => {
-    const { issues, mediaType, interactionsByItemId, returnTo } = handle.props
+    const { issues, ctx } = handle.props
     return (
-      // .issue-list in app.css: a toggle set apart from the card's own copy,
-      // where Doodle's unlayered summary rules would beat a css() one.
       <div class="issue-list">
-        <Collapsible summary={issuesLabel(issues, interactionsByItemId)}>
-          <ul
-            mix={css({
-              listStyle: 'none',
-              margin: '12px 0 0',
-              padding: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-            })}
-          >
+        <Collapsible summary={issuesLabel(issues, ctx)}>
+          <ul mix={[stack('12px'), css({ marginTop: '12px' })]}>
             {issues.map((issue) => (
-              <ResultCard
-                key={issue.id}
-                item={issue}
-                mediaType={mediaType}
-                interactionsByItemId={interactionsByItemId}
-                returnTo={returnTo}
-              />
+              <ResultCard key={issue.id} item={issue} ctx={ctx} />
             ))}
           </ul>
         </Collapsible>

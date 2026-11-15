@@ -27,11 +27,9 @@ export function StarIcon(handle: Handle<{ variant: 'outline' | 'filled'; size?: 
 
 // Half-stars via a clipped overlay: outline underneath, filled on top clipped
 // to 0/50/100% width.
-// `size` is the star's edge in pixels: smaller where the rating sits inside a
-// line of text rather than standing on its own.
-export function StarRatingDisplay(handle: Handle<{ value: number; size?: number }>) {
+export function StarRatingDisplay(handle: Handle<{ value: number }>) {
   return () => {
-    const { value, size = STAR_SIZE } = handle.props
+    const { value } = handle.props
 
     return (
       <span mix={css({ display: 'inline-flex', gap: '2px', verticalAlign: 'middle' })}>
@@ -45,15 +43,15 @@ export function StarRatingDisplay(handle: Handle<{ value: number; size?: number 
               mix={css({
                 position: 'relative',
                 display: 'inline-block',
-                width: `${size}px`,
-                height: `${size}px`,
+                width: `${STAR_SIZE}px`,
+                height: `${STAR_SIZE}px`,
               })}
             >
               <span mix={css({ position: 'absolute', inset: 0 })}>
-                <StarIcon variant="outline" size={size} />
+                <StarIcon variant="outline" />
               </span>
               <span mix={css({ position: 'absolute', inset: 0, overflow: 'hidden', width: fillWidth })}>
-                <StarIcon variant="filled" size={size} />
+                <StarIcon variant="filled" />
               </span>
             </span>
           )

@@ -5,7 +5,7 @@ import { IGDB_MAX_CONCURRENCY } from '../catalog/igdb.ts'
 import type { Db } from '../db.ts'
 import { logInteraction, type LogInteractionInput } from '../mediaItems.ts'
 import { INTERACTION_SOURCES, users } from '../schema.ts'
-import { fetchSteamLibrary, fetchSteamPersona, type SteamGame } from './steamApi.ts'
+import { fetchSteamLibrary, fetchSteamPersona } from './steamApi.ts'
 
 export interface SteamImportResult {
   totalGames: number

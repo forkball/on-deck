@@ -12,7 +12,7 @@ import {
   searchCatalog,
   upsertCatalogItem,
 } from '../data/catalog/provider.ts'
-import { collapseEditions, groupSingleIssues, type SearchEntry } from '../data/catalog/editions.ts'
+import { arrangeBookResults, type SearchEntry } from '../data/catalog/editions.ts'
 import type { Db } from '../data/db.ts'
 import {
   getMediaItemDetail,
@@ -73,29 +73,20 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       // Books only: Google Books answers with one result per printing, and the
       // other catalogs already id the work. After the interactions, so the edition
       // this person logged is the one kept — see data/catalog/editions.ts.
-      const results =
+      const entries: SearchEntry<MediaItem>[] =
         mediaType === 'book'
-          ? collapseEditions(found, (item) => {
+          ? arrangeBookResults(found, (item) => {
               const metadata = parseMediaMetadata(item.metadata)
               return {
                 title: item.title,
-                creator: metadata.creator,
-                creators: metadata.creators,
+                // Rows from before the full list was stored have only the first.
+                creators: metadata.creators.length ? metadata.creators : [metadata.creator ?? ''],
                 hasCover: metadata.posterUrl != null,
                 logged: interactionsByItemId.has(item.id),
+                comic: metadata.tags.includes('graphic novel'),
               }
             })
-          : found
-
-      // Books only, after the editions are collapsed so two printings of one
-      // issue count once.
-      const entries: SearchEntry<MediaItem>[] =
-        mediaType === 'book'
-          ? groupSingleIssues(results, (item) => ({
-              title: item.title,
-              comic: parseMediaMetadata(item.metadata).tags.includes('graphic novel'),
-            }))
-          : results.map((result) => ({ kind: 'single', result }))
+          : found.map((result) => ({ kind: 'single', result }))
 
       return context.render(
         <MediaSearchPage

@@ -67,9 +67,9 @@ const LIMIT_LABELS = new Map<number | null, string>([
 // these in would put that prompt in front of someone who only wanted to stop
 // sending their notes — the same reasoning that keeps the password on a page
 // of its own.
-function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSettings; saved?: boolean }>) {
+function TasteProfileSettingsForm(handle: Handle<{ settings: TasteProfileSettings }>) {
   return () => {
-    const { settings, saved } = handle.props
+    const { settings } = handle.props
 
     // No top margin of its own any more: the tab bar above supplies the
     // separation this used to need from the form it sat under.
@@ -216,7 +216,7 @@ export function ProfileEditPage(handle: Handle<ProfileEditPageProps>) {
             {
               id: PROFILE_TABS.taste,
               label: 'Taste',
-              panel: <TasteProfileSettingsForm settings={settings} saved={saved} />,
+              panel: <TasteProfileSettingsForm settings={settings} />,
             },
             {
               id: PROFILE_TABS.mediaOrder,
