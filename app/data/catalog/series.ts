@@ -20,16 +20,17 @@ import type { Db } from '../db.ts'
 import { upsertMediaItem } from '../mediaItems.ts'
 import { parseMediaMetadata } from '../mediaMetadata.ts'
 import { mediaItems, type MediaItem } from '../schema.ts'
-import { editionTitleKey } from './editions.ts'
+import { seriesIdentity } from './editions.ts'
 
 export const SERIES_SOURCE = 'series'
 
-// Keyed on the series title alone, as groupSingleIssues groups by it: one
+// Keyed on the series title and its run, as groupSingleIssues groups by them:
+// "Batman (2016–)" and "Batman (2011–2016)" are two rows. Not on the author: one
 // series' issues credit whichever writer Google picked first, so a key with the
-// author in it would make two rows of one series. Two different series sharing a
-// name share a row too; that is the price, and the same one the grouping pays.
+// author in it would make two rows of one series. Two runs that came back with
+// no year tag at all can't be told apart and share a row.
 export function seriesExternalId(series: string): string {
-  return editionTitleKey(series)
+  return seriesIdentity(series)
 }
 
 // `issues` in number order, as groupSingleIssues lists them: the cover is the

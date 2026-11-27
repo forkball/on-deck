@@ -105,11 +105,13 @@ describe('parseIssue', () => {
     assert.deepEqual(parseIssue('Baltimore: The Plague Ships #3'), {
       series: 'Baltimore: The Plague Ships',
       number: 3,
+      run: null,
     })
-    assert.deepEqual(parseIssue('Saga Issue 12'), { series: 'Saga', number: 12 })
+    assert.deepEqual(parseIssue('Saga Issue 12'), { series: 'Saga', number: 12, run: null })
     assert.deepEqual(parseIssue('Hellboy: Seed of Destruction #1 (of 4)'), {
       series: 'Hellboy: Seed of Destruction',
       number: 1,
+      run: null,
     })
   })
 
@@ -311,6 +313,8 @@ describe('edition title rules', () => {
     assert.deepEqual(parseIssue('Batman The Long Halloween: The Last Halloween (2024-) #3'), {
       series: 'Batman The Long Halloween: The Last Halloween',
       number: 3,
+      // Kept apart from the title: it is what tells one run from the next.
+      run: { start: 2024, end: null },
     })
   })
 
@@ -361,5 +365,96 @@ describe('the Animal Pound search', () => {
       issues: ['Animal Pound #1', 'Animal Pound #2', 'Animal Pound #3'],
     })
     assert.equal(entries.length, 2)
+  })
+})
+
+describe('the runs of a series', () => {
+  interface Hit {
+    title: string
+    creator?: string
+    year?: number
+    comic?: boolean
+  }
+  const arrange = (hits: Hit[]) =>
+    arrangeBookResults(hits, (h) => ({
+      title: h.title,
+      creators: [h.creator ?? 'Tom King'],
+      hasCover: true,
+      logged: false,
+      comic: h.comic ?? true,
+      year: h.year ?? null,
+    }))
+  const shown = (hits: Hit[]) =>
+    arrange(hits).map((entry) =>
+      entry.kind === 'single'
+        ? entry.issues
+          ? `${entry.result.title} < ${entry.issues.map((i) => i.title).join(', ')}`
+          : entry.result.title
+        : `${entry.series}: ${entry.issues.map((i) => i.title).join(', ')}`,
+    )
+
+  it("keeps two runs of one title apart, by the store's year tag", () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman (2016-) #1' },
+        { title: 'Batman (2011-2016) #1', creator: 'Scott Snyder' },
+        { title: 'Batman (2016-) #2' },
+        { title: 'Batman (2011-2016) #2', creator: 'Scott Snyder' },
+      ]),
+      [
+        'Batman (2016–): Batman (2016-) #1, Batman (2016-) #2',
+        'Batman (2011–2016): Batman (2011-2016) #1, Batman (2011-2016) #2',
+      ],
+    )
+  })
+
+  it('does not fold two runs\' #1s into one, though one writer is on both', () => {
+    assert.deepEqual(
+      shown([{ title: 'Batman (2016-) #1' }, { title: 'Batman (2011-2016) #1' }]),
+      ['Batman (2016-) #1', 'Batman (2011-2016) #1'],
+    )
+  })
+
+  it('puts an untagged issue in the run whose years hold it', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman (2016-) #1' },
+        { title: 'Batman (2011-2016) #1', creator: 'Scott Snyder' },
+        { title: 'Batman #40', year: 2018 },
+        { title: 'Batman #12', creator: 'Scott Snyder', year: 2012 },
+      ]),
+      [
+        'Batman (2016–): Batman (2016-) #1, Batman #40',
+        'Batman (2011–2016): Batman (2011-2016) #1, Batman #12',
+      ],
+    )
+  })
+
+  it('groups an untagged issue no run holds by its title alone', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman (2016-) #1' },
+        { title: 'Batman (2016-) #2' },
+        { title: 'Batman #400', year: 1986 },
+        { title: 'Batman #401', year: 1986 },
+      ]),
+      ['Batman (2016–): Batman (2016-) #1, Batman (2016-) #2', 'Batman: Batman #400, Batman #401'],
+    )
+  })
+
+  it('puts a collected volume under the run that had begun by its year', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman Vol. 1', year: 2017, comic: true },
+        { title: 'Batman (2016-) #1' },
+        { title: 'Batman (2011-2016) #1', creator: 'Scott Snyder' },
+        { title: 'Batman (2016-) #2' },
+        { title: 'Batman (2011-2016) #2', creator: 'Scott Snyder' },
+      ]),
+      [
+        'Batman Vol. 1 < Batman (2016-) #1, Batman (2016-) #2',
+        'Batman (2011–2016): Batman (2011-2016) #1, Batman (2011-2016) #2',
+      ],
+    )
   })
 })

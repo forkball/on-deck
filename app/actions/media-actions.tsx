@@ -85,6 +85,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
                 hasCover: metadata.posterUrl != null,
                 logged: interactionsByItemId.has(item.id),
                 comic: metadata.tags.includes('graphic novel'),
+                year: metadata.releaseYear,
               }
             })
           : found.map((result) => ({ kind: 'single', result }))

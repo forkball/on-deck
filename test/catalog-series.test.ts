@@ -8,10 +8,12 @@ import type { MediaItem } from '../app/data/schema.ts'
 import { skipWithoutDatabase } from './support/db.ts'
 
 describe('series external id', () => {
-  it('is the series as the issue grouping keys it', () => {
-    // A store's year tag and a first-volume marker name no different series.
-    assert.equal(seriesExternalId('The Last Halloween (2024-)'), seriesExternalId('The Last Halloween'))
+  it('is the series and its run, as the issue grouping keys them', () => {
     assert.notEqual(seriesExternalId('Animal Pound'), seriesExternalId('Animal Farm'))
+    // Snyder's run and King's.
+    assert.notEqual(seriesExternalId('Batman (2011–2016)'), seriesExternalId('Batman (2016–)'))
+    // The page writes a run with an en dash; a store, with a hyphen.
+    assert.equal(seriesExternalId('Batman (2016–)'), seriesExternalId('Batman (2016-)'))
   })
 })
 
@@ -60,7 +62,7 @@ describe('series rows', { skip: skipWithoutDatabase }, () => {
   })
 
   it('is the same row on the next search, whichever issues it turns up', async () => {
-    const again = await upsertSeriesItem(db, `${series} (2023-)`, [
+    const again = await upsertSeriesItem(db, series, [
       issue(3, { releaseYear: 2024, posterUrl: 'https://covers.test/3.jpg' }),
     ])
     made.push(again.id)
