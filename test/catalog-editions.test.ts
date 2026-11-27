@@ -363,7 +363,6 @@ describe('the Animal Pound search', () => {
       series: 'Animal Pound',
       // The plain #1 kept over its reprint, though the reprint ranked higher.
       issues: ['Animal Pound #1', 'Animal Pound #2', 'Animal Pound #3'],
-      split: false,
     })
     assert.equal(entries.length, 2)
   })
@@ -482,12 +481,12 @@ describe('two untagged runs of one title', () => {
         ? entry.issues
           ? `${entry.result.title} < ${entry.issues.map((i) => i.title).join(', ')}`
           : entry.result.title
-        : `${entry.split ? 'split ' : ''}${entry.series}: ${entry.issues.map((i) => i.title).join(', ')}`,
+        : `${entry.series}: ${entry.issues.map((i) => i.title).join(', ')}`,
     )
   const snyder = ['Scott Snyder', 'Greg Capullo']
   const king = ['Tom King', 'David Finch']
 
-  it('parts them by who made them when an issue number turns up twice', () => {
+  it('parts them by who made them when an issue number turns up twice, each named for its most credited', () => {
     assert.deepEqual(
       shown([
         { title: 'Batman #1', creators: king },
@@ -496,7 +495,8 @@ describe('two untagged runs of one title', () => {
         // Joined to King's through Finch, though King isn't credited.
         { title: 'Batman #2', creators: ['David Finch', 'Mikel Janin'] },
       ]),
-      ['split Batman: Batman #1, Batman #2', 'split Batman: Batman #1, Batman #2'],
+      // Finch is on both of King's issues and King on one, so Finch names it.
+      ['Batman (Finch): Batman #1, Batman #2', 'Batman (Capullo): Batman #1, Batman #2'],
     )
     const [kings] = arrange([
       { title: 'Batman #1', creators: king },
@@ -535,7 +535,18 @@ describe('two untagged runs of one title', () => {
         { title: 'Batman #2', creators: snyder },
         { title: 'Batman Vol. 1', creators: ['Scott Snyder'] },
       ]),
-      ['split Batman: Batman #1, Batman #2', 'Batman Vol. 1 < Batman #1, Batman #2'],
+      ['Batman (King): Batman #1, Batman #2', 'Batman Vol. 1 < Batman #1, Batman #2'],
+    )
+  })
+
+  it('drops a suffix from the name it is named for', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Spawn #1', creators: ['Todd McFarlane'] },
+        { title: 'Spawn #1', creators: ['Robert Kirkman Jr.'] },
+        { title: 'Spawn #2', creators: ['Robert Kirkman Jr.', 'Greg Capullo'] },
+      ]),
+      ['Spawn #1', 'Spawn (Kirkman): Spawn #1, Spawn #2'],
     )
   })
 })

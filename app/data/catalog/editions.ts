@@ -257,9 +257,7 @@ export function parseIssue(title: string): ParsedIssue | null {
 // series' issues with no collected edition among the results to sit under.
 export type SearchEntry<T> =
   | { kind: 'single'; result: T; issues?: T[] }
-  // `split` marks a run told apart from another of its title by credits alone:
-  // there is no year tag to name it by, so nothing to key a row of its own on.
-  | { kind: 'issues'; series: string; issues: T[]; split: boolean }
+  | { kind: 'issues'; series: string; issues: T[] }
 
 export interface IssueFacts {
   title: string
@@ -388,9 +386,10 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
       collected === undefined
         ? {
             kind: 'issues',
-            series: seriesName(group.map((m) => parsed[m]!), key),
+            series: split.has(key)
+              ? creditedName(seriesName(group.map((m) => parsed[m]!), key), group.map((m) => facts[m]!.creators ?? []))
+              : seriesName(group.map((m) => parsed[m]!), key),
             issues: inNumberOrder(key),
-            split: split.has(key),
           }
         : { kind: 'single', result: results[collected]!, issues: inNumberOrder(key) },
     )
@@ -458,6 +457,33 @@ function seriesName(issues: ParsedIssue[], key: string): string {
   const name = (issues.find((issue) => !isPackaged(issue.series)) ?? issues[0]!).series
   const run = issues.find((issue) => issue.run && key.endsWith(` ${runLabel(issue.run)}`))?.run
   return run ? `${name} ${runLabel(run)}` : name
+}
+
+// A run parted by credits, named after the name credited on most of its issues
+// — "Batman (King)" — since it has no year tag to be named by. The name is what
+// its series row is keyed on (seriesIdentity), so it has to come out the same on
+// the next search: the most credited name is the steadiest thing the issues
+// carry, though not certain, since Google may credit the artist on more of
+// them. Two runs parted this way share no credited name, so never a name here.
+// A run credited to no one keeps the plain title.
+function creditedName(series: string, credits: string[][]): string {
+  const counts = new Map<string, { count: number; shown: string }>()
+  for (const names of credits) {
+    for (const name of new Set(names)) {
+      const key = authorSurnameKey(name)
+      if (!key) continue
+      const words = name.trim().split(/\s+/)
+      while (words.length > 1 && NAME_SUFFIX.has(normalizeTitle(words.at(-1)!))) words.pop()
+      const held = counts.get(key)
+      counts.set(key, { count: (held?.count ?? 0) + 1, shown: held?.shown ?? words.at(-1)! })
+    }
+  }
+  // Ties go to the name met first, which is the best-ranked issue's.
+  const top = [...counts.values()].reduce<{ count: number; shown: string } | null>(
+    (best, entry) => (best && best.count >= entry.count ? best : entry),
+    null,
+  )
+  return top ? `${series} (${top.shown})` : series
 }
 
 // What the book search page shows: printings collapsed to one card per book,

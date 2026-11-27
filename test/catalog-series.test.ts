@@ -14,6 +14,9 @@ describe('series external id', () => {
     assert.notEqual(seriesExternalId('Batman (2011–2016)'), seriesExternalId('Batman (2016–)'))
     // The page writes a run with an en dash; a store, with a hyphen.
     assert.equal(seriesExternalId('Batman (2016–)'), seriesExternalId('Batman (2016-)'))
+    // A run told apart by credits, named for its most credited name.
+    assert.notEqual(seriesExternalId('Batman (King)'), seriesExternalId('Batman'))
+    assert.notEqual(seriesExternalId('Batman (King)'), seriesExternalId('Batman (Snyder)'))
   })
 })
 

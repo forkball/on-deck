@@ -120,8 +120,10 @@ does nothing on its own.
     "Batman (2016-)" stay two series, and an untagged issue joins the run whose
     years hold it. Untagged issues of one title that repeat an issue number are
     two runs no tag named, and are parted by shared credits — only then, since
-    credits are what Google gets wrong; such a run has nothing stable to key a
-    series row on, so it shows as a group with no log control. Separate works, so listed
+    credits are what Google gets wrong — and each named for the name credited on
+    most of its issues ("Batman (King)"), which is what its series row is keyed
+    on; usually stable, though Google crediting the artist on more issues can
+    name it for them. Separate works, so listed
     rather than collapsed, and only results tagged as comics, since numbered
     novel series ("Goosebumps #1") fit the same pattern.
     Database-free, and it only shapes the page — the rows stay separate.
