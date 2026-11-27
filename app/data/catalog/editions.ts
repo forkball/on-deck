@@ -31,9 +31,12 @@ const FILLER = /\ba novel\b/g
 // cards for one book. Only ever dropped together with the author check in
 // collapseEditions, so "Spider-Man Noir" stays apart from Spider-Man: the two
 // share no writer. "Absolute" alone is not here — Absolute Batman is a series of
-// its own, by a writer who also wrote Batman.
+// its own, by a writer who also wrote Batman. "Pen & Ink" is Noir under another
+// name — "Animal Pound Pen & Ink #1" is #1 again in black and white, and sat
+// outside the group the rest of the issues made. Matched after normalizeTitle has
+// spelled the ampersand out.
 const PACKAGING =
-  /\b(?:(?:\d+(?:st|nd|rd|th)\s+)?anniversary|deluxe|noir|absolute|special|collectors?|expanded|definitive|new)\s+edition\b|\bnoir\b|\b(?:hardcover|paperback)\b/g
+  /\b(?:(?:\d+(?:st|nd|rd|th)\s+)?anniversary|deluxe|noir|absolute|special|collectors?|expanded|definitive|new)\s+edition\b|\bnoir\b|\bpen and ink\b|\b(?:hardcover|paperback)\b/g
 
 // The year a digital comics store adds to a series name — "(2024-)", "(2021)",
 // "(2019-2020)" — so "The Last Halloween (2024-) #1" names the same series as

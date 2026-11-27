@@ -303,6 +303,7 @@ describe('edition title rules', () => {
     assert.equal(editionTitleKey('Batman Noir: The Long Halloween'), plain)
     assert.equal(editionTitleKey('Batman: The Long Halloween Deluxe Edition'), plain)
     assert.equal(editionTitleKey('Batman: The Long Halloween 30th Anniversary Edition'), plain)
+    assert.equal(editionTitleKey('Animal Pound Pen & Ink'), editionTitleKey('Animal Pound'))
   })
 
   it('reads a store year tag as part of no title', () => {
