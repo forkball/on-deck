@@ -11,16 +11,15 @@ import { LazyList } from '../../browser/lazy-list.tsx'
 import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
 import { Toast } from '../components/toast.tsx'
 import { Page } from '../components/page.tsx'
-import { MediaItemCard } from '../components/media-item-card.tsx'
+import { CardCover, MediaItemCard, cardFrame } from '../components/media-item-card.tsx'
 import { markdownToPlainText } from '../components/markdown.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 
 // A result, with the single issues it collects when it has any: a volume's
-// (arrangeBookResults), or a series' own (data/catalog/series.ts).
-export interface SearchResult {
-  result: MediaItem
-  issues?: MediaItem[]
-}
+// (arrangeBookResults), or a series' own (data/catalog/series.ts). Or a run of
+// a series with no row to log it by — told apart from another run of its title
+// by credits alone (splitByCredits in data/catalog/editions.ts).
+export type SearchResult = { result: MediaItem; issues?: MediaItem[] } | { series: string; issues: MediaItem[] }
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
@@ -115,9 +114,18 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
               </span>
             </h2>
             <ul id="search-results" mix={stack('16px')}>
-              {results.map(({ result, issues }) => (
-                <ResultCard key={result.id} item={result} issues={issues} ctx={ctx} />
-              ))}
+              {results.map((entry) =>
+                'result' in entry ? (
+                  <ResultCard key={entry.result.id} item={entry.result} issues={entry.issues} ctx={ctx} />
+                ) : (
+                  <IssueGroupCard
+                    key={`issues-${entry.issues[0]!.id}`}
+                    series={entry.series}
+                    issues={entry.issues}
+                    ctx={ctx}
+                  />
+                ),
+              )}
             </ul>
             <LazyList listId="search-results" initial={initialVisible} step={initialVisible} />
           </section>
@@ -147,6 +155,37 @@ function ResultCard(handle: Handle<{ item: MediaItem; issues?: MediaItem[]; ctx:
           </p>
         )}
       </MediaItemCard>
+    )
+  }
+}
+
+// A run of a series with no row of its own: the series, its first cover, and
+// who made it and when — which is what tells it from the other run of the same
+// name beside it — over the issues. No log control, there being nothing to log.
+function IssueGroupCard(handle: Handle<{ series: string; issues: MediaItem[]; ctx: ResultContext }>) {
+  return () => {
+    const { series, issues, ctx } = handle.props
+    const metadata = issues.map((issue) => parseMediaMetadata(issue.metadata))
+    const cover = metadata.map((m) => m.posterUrl).find(Boolean) ?? null
+    const creator = metadata.map((m) => m.creator).find(Boolean)
+    const years = metadata.flatMap((m) => (m.releaseYear ? [m.releaseYear] : []))
+    const [first, last] = [Math.min(...years), Math.max(...years)]
+    const span = years.length === 0 ? null : first === last ? `${first}` : `${first}–${last}`
+    const byline = [creator, span].filter(Boolean).join(' · ')
+
+    return (
+      // display: flex, as MediaItemCard's <li> has: left a list-item, Doodle
+      // marks it with a "*" hanging outside the card.
+      <li mix={[cardFrame(MEDIA_TYPE_UI[ctx.mediaType].hue), css({ display: 'flex', flexDirection: 'column' })]}>
+        <div mix={css({ display: 'flex', gap: '12px' })}>
+          <CardCover src={cover} alt="" lazy />
+          <div mix={css({ flex: '1 1 0', minWidth: 0 })}>
+            {series}
+            {byline && <div mix={css({ fontSize: '13px', color: 'var(--soft)', marginTop: '2px' })}>{byline}</div>}
+          </div>
+        </div>
+        <IssueList issues={issues} ctx={ctx} />
+      </li>
     )
   }
 }

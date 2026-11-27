@@ -93,15 +93,19 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       // A series' issues with no collected edition among the results go under a
       // row for the series itself, so the series can be logged — see
       // data/catalog/series.ts. Its card is then an ordinary result with the
-      // issues under it, exactly as under a volume.
+      // issues under it, exactly as under a volume. Not a run told apart from
+      // another by credits alone: with no year tag there is nothing stable to key
+      // its row on, so it is shown as a group without one.
       const results: SearchResult[] = await Promise.all(
         entries.map(async (entry) =>
-          entry.kind === 'single'
+          entry.kind === 'single' || entry.split
             ? entry
             : { result: await upsertSeriesItem(db, entry.series, entry.issues), issues: entry.issues },
         ),
       )
-      const seriesIds = results.flatMap((entry, index) => (entries[index]!.kind === 'issues' ? [entry.result.id] : []))
+      const seriesIds = results.flatMap((entry, index) =>
+        entries[index]!.kind === 'issues' && 'result' in entry ? [entry.result.id] : [],
+      )
       for (const [id, interaction] of await getUserInteractionsForItems(db, identity.id, seriesIds)) {
         interactionsByItemId.set(id, interaction)
       }

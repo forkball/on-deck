@@ -363,6 +363,7 @@ describe('the Animal Pound search', () => {
       series: 'Animal Pound',
       // The plain #1 kept over its reprint, though the reprint ranked higher.
       issues: ['Animal Pound #1', 'Animal Pound #2', 'Animal Pound #3'],
+      split: false,
     })
     assert.equal(entries.length, 2)
   })
@@ -455,6 +456,86 @@ describe('the runs of a series', () => {
         'Batman Vol. 1 < Batman (2016-) #1, Batman (2016-) #2',
         'Batman (2011–2016): Batman (2011-2016) #1, Batman (2011-2016) #2',
       ],
+    )
+  })
+})
+
+describe('two untagged runs of one title', () => {
+  interface Hit {
+    title: string
+    creators: string[]
+    year?: number
+    comic?: boolean
+  }
+  const arrange = (hits: Hit[]) =>
+    arrangeBookResults(hits, (h) => ({
+      title: h.title,
+      creators: h.creators,
+      hasCover: true,
+      logged: false,
+      comic: h.comic ?? true,
+      year: h.year ?? null,
+    }))
+  const shown = (hits: Hit[]) =>
+    arrange(hits).map((entry) =>
+      entry.kind === 'single'
+        ? entry.issues
+          ? `${entry.result.title} < ${entry.issues.map((i) => i.title).join(', ')}`
+          : entry.result.title
+        : `${entry.split ? 'split ' : ''}${entry.series}: ${entry.issues.map((i) => i.title).join(', ')}`,
+    )
+  const snyder = ['Scott Snyder', 'Greg Capullo']
+  const king = ['Tom King', 'David Finch']
+
+  it('parts them by who made them when an issue number turns up twice', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman #1', creators: king },
+        { title: 'Batman #1', creators: snyder },
+        { title: 'Batman #2', creators: ['Greg Capullo'] },
+        // Joined to King's through Finch, though King isn't credited.
+        { title: 'Batman #2', creators: ['David Finch', 'Mikel Janin'] },
+      ]),
+      ['split Batman: Batman #1, Batman #2', 'split Batman: Batman #1, Batman #2'],
+    )
+    const [kings] = arrange([
+      { title: 'Batman #1', creators: king },
+      { title: 'Batman #1', creators: snyder },
+      { title: 'Batman #2', creators: ['David Finch'] },
+    ])
+    assert.deepEqual(kings!.kind === 'issues' && kings!.issues.map((i) => i.creators), [king, ['David Finch']])
+  })
+
+  it('leaves one run whole, however its credits disagree, while no number repeats', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Baltimore: The Plague Ships #1', creators: ['Christopher Golden'] },
+        { title: 'Baltimore: The Plague Ships #2', creators: ['Mike Mignola'] },
+      ]),
+      ['Baltimore: The Plague Ships: Baltimore: The Plague Ships #1, Baltimore: The Plague Ships #2'],
+    )
+  })
+
+  it('reads a repeated number that shares a credit as one issue printed twice', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman #1', creators: ['Tom King'] },
+        { title: 'Batman #1', creators: ['Tom King', 'Mikel Janin'], year: 2017 },
+      ]).length,
+      1,
+    )
+  })
+
+  it('puts a collected volume under the run it shares a credit with', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman #1', creators: king },
+        { title: 'Batman #1', creators: snyder },
+        { title: 'Batman #2', creators: king },
+        { title: 'Batman #2', creators: snyder },
+        { title: 'Batman Vol. 1', creators: ['Scott Snyder'] },
+      ]),
+      ['split Batman: Batman #1, Batman #2', 'Batman Vol. 1 < Batman #1, Batman #2'],
     )
   })
 })

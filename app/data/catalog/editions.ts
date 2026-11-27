@@ -257,7 +257,9 @@ export function parseIssue(title: string): ParsedIssue | null {
 // series' issues with no collected edition among the results to sit under.
 export type SearchEntry<T> =
   | { kind: 'single'; result: T; issues?: T[] }
-  | { kind: 'issues'; series: string; issues: T[] }
+  // `split` marks a run told apart from another of its title by credits alone:
+  // there is no year tag to name it by, so nothing to key a row of its own on.
+  | { kind: 'issues'; series: string; issues: T[]; split: boolean }
 
 export interface IssueFacts {
   title: string
@@ -268,6 +270,9 @@ export interface IssueFacts {
   // The year it came out, for placing an issue or a volume with no year tag in a
   // run that has one. Left out, it goes by its title alone.
   year?: number | null
+  // Every credited name, for telling two untagged runs of one title apart. See
+  // splitByCredits.
+  creators?: string[]
 }
 
 // Only results tagged as comics count as issues. The title pattern alone also fits
@@ -282,7 +287,9 @@ export interface IssueFacts {
 // The run is the store's year tag, which is what keeps Snyder's "Batman
 // (2011-2016)" apart from King's "Batman (2016-)". An issue without one joins the
 // run of its title whose years hold its own, when exactly one does; otherwise it
-// is grouped by title alone, as every issue was before the tag was read.
+// is grouped by title alone, as every issue was before the tag was read —
+// unless that leaves one issue number there twice, which is two runs no tag
+// named; splitByCredits then parts them by who made them.
 //
 // Where the collected edition came back too — "Baltimore Volume I: The Plague
 // Ships" for issues of "Baltimore: The Plague Ships", the same title once the
@@ -314,6 +321,9 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
     return seriesKey(titleKey, holding.length === 1 ? holding[0]! : null)
   })
 
+  const surnames = facts.map((fact) => new Set((fact.creators ?? []).map(authorSurnameKey).filter(Boolean)))
+  const split = splitByCredits(keys, titleKeys, parsed, surnames)
+
   const members = new Map<string, number[]>()
   keys.forEach((key, index) => {
     if (key) members.set(key, [...(members.get(key) ?? []), index])
@@ -328,7 +338,10 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
     const titleKey = titleKeys[indexes[0]!]!
     groupsOf.set(titleKey, [...(groupsOf.get(titleKey) ?? []), key])
   }
-  const boundGroup = ({ title, year }: IssueFacts): string | undefined => {
+  //
+  // Two runs parted by credits are told apart the same way: the volume goes
+  // under the one it shares a credited name with, when only one does.
+  const boundGroup = ({ title, year }: IssueFacts, credited: Set<string>): string | undefined => {
     const titleKey = editionTitleKey(title)
     const groups = groupsOf.get(titleKey) ?? []
     const run = parseRun(title)
@@ -338,14 +351,18 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
       .filter((r) => year != null && r.start <= year)
       .sort((a, b) => b.start - a.start)[0]
     const key = started ? seriesKey(titleKey, started) : titleKey
-    return groups.includes(key) ? key : undefined
+    if (groups.includes(key)) return key
+    const sharing = groups.filter(
+      (group) => split.has(group) && members.get(group)!.some((m) => [...surnames[m]!].some((n) => credited.has(n))),
+    )
+    return sharing.length === 1 ? sharing[0] : undefined
   }
 
   // The first comic that isn't itself an issue and names the same work.
   const collectedBy = new Map<string, number>()
   facts.forEach((fact, index) => {
     if (!fact.comic || parsed[index]) return
-    const key = boundGroup(fact)
+    const key = boundGroup(fact, surnames[index]!)
     if (key && !collectedBy.has(key)) collectedBy.set(key, index)
   })
   const collects = new Map([...collectedBy].map(([key, index]) => [index, key]))
@@ -369,11 +386,68 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
     placed.add(key)
     entries.push(
       collected === undefined
-        ? { kind: 'issues', series: seriesName(group.map((m) => parsed[m]!), key), issues: inNumberOrder(key) }
+        ? {
+            kind: 'issues',
+            series: seriesName(group.map((m) => parsed[m]!), key),
+            issues: inNumberOrder(key),
+            split: split.has(key),
+          }
         : { kind: 'single', result: results[collected]!, issues: inNumberOrder(key) },
     )
   })
   return entries
+}
+
+// Two runs of one title the store tagged neither of. Snyder's Batman and King's
+// both open with a #1, and with no year tag both are plain "Batman" — so when an
+// issue number turns up twice under one untagged title (printings were folded
+// together before this, so it is two issues, not two copies of one), the issues
+// are parted by credit: those sharing a credited name, directly or through a
+// third, are one run. Only then: credits are what Google Books gets wrong, an
+// issue credited to its artist alone on one and its writer on the next, and
+// used on every series they would break one run into several.
+//
+// An issue credited to no one, or to no one the others share, comes out as a run
+// of its own; a run of one is shown as an ordinary result, so it is only loose,
+// not mislabeled. Rewrites `keys` in place and returns the keys it made.
+function splitByCredits(
+  keys: string[],
+  titleKeys: string[],
+  parsed: (ParsedIssue | null)[],
+  surnames: Set<string>[],
+): Set<string> {
+  const untagged = new Map<string, number[]>()
+  keys.forEach((key, index) => {
+    if (key && key === titleKeys[index]) untagged.set(key, [...(untagged.get(key) ?? []), index])
+  })
+
+  const made = new Set<string>()
+  for (const [key, indexes] of untagged) {
+    const numbers = indexes.map((index) => parsed[index]!.number)
+    if (new Set(numbers).size === numbers.length) continue
+
+    const parent = new Map(indexes.map((index) => [index, index]))
+    const find = (index: number): number => {
+      while (parent.get(index) !== index) index = parent.get(index)!
+      return index
+    }
+    for (const a of indexes) {
+      for (const b of indexes) {
+        if (a < b && [...surnames[a]!].some((name) => surnames[b]!.has(name))) {
+          parent.set(find(b), find(a))
+        }
+      }
+    }
+    const roots = [...new Set(indexes.map(find))]
+    if (roots.length < 2) continue
+    for (const index of indexes) {
+      // Numbered by the run's best-ranked issue, so the key is the same however
+      // the loop above happened to join them.
+      keys[index] = `${key} ~${roots.indexOf(find(index))}`
+      made.add(keys[index]!)
+    }
+  }
+  return made
 }
 
 // What a group of issues is called: the best-ranked issue's series, unless that
