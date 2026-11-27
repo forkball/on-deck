@@ -13,6 +13,7 @@ import {
   upsertCatalogItem,
 } from '../data/catalog/provider.ts'
 import { arrangeBookResults, type SearchEntry } from '../data/catalog/editions.ts'
+import { upsertSeriesItem } from '../data/catalog/series.ts'
 import type { Db } from '../data/db.ts'
 import {
   getMediaItemDetail,
@@ -30,7 +31,7 @@ import { parseMediaMetadata } from '../data/mediaMetadata.ts'
 import { loadWatchProviders } from '../data/watchProviders.ts'
 import { guessWatchRegion, parseWatchRegion } from '../data/watchRegion.ts'
 import { MediaDetailPage } from '../ui/pages/media-detail-page.tsx'
-import { MediaSearchPage } from '../ui/pages/media-search-page.tsx'
+import { MediaSearchPage, type SearchResult } from '../ui/pages/media-search-page.tsx'
 import { RETURN_TO_PARAM, withReturnTo } from '../ui/backLink.ts'
 
 const SUGGESTION_LIMIT = 6
@@ -88,12 +89,28 @@ export function createMediaActions(mediaType: ActiveMediaType) {
             })
           : found.map((result) => ({ kind: 'single', result }))
 
+      // A series' issues with no collected edition among the results go under a
+      // row for the series itself, so the series can be logged — see
+      // data/catalog/series.ts. Its card is then an ordinary result with the
+      // issues under it, exactly as under a volume.
+      const results: SearchResult[] = await Promise.all(
+        entries.map(async (entry) =>
+          entry.kind === 'single'
+            ? entry
+            : { result: await upsertSeriesItem(db, entry.series, entry.issues), issues: entry.issues },
+        ),
+      )
+      const seriesIds = results.flatMap((entry, index) => (entries[index]!.kind === 'issues' ? [entry.result.id] : []))
+      for (const [id, interaction] of await getUserInteractionsForItems(db, identity.id, seriesIds)) {
+        interactionsByItemId.set(id, interaction)
+      }
+
       return context.render(
         <MediaSearchPage
           mediaType={mediaType}
           mediaOrder={parseMediaOrder(identity.media_order)}
           query={query}
-          entries={entries}
+          results={results}
           initialVisible={SEARCH_INITIAL_VISIBLE}
           interactionsByItemId={interactionsByItemId}
           displayName={displayLabel(identity)}

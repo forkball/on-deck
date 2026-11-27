@@ -119,6 +119,11 @@ does nothing on its own.
     rather than collapsed, and only results tagged as comics, since numbered
     novel series ("Goosebumps #1") fit the same pattern.
     Database-free, and it only shapes the page — the rows stay separate.
+    `series.ts` gives a series whose issues came back with no collected edition
+    a book row of its own (`external_source` `series`, keyed on the series
+    title), made by the search that needs it, so the series can be logged; its
+    issues fold out under it as they would under a volume. No catalog owns that
+    source, so it is never enriched and has no catalog page.
     `retry.ts` holds the shared GET-with-backoff the two book providers use;
     `circuit.ts` holds the per-provider "stop asking, it's down" rule, which is
     policy each provider opts into rather than something the registry applies

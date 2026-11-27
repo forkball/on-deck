@@ -44,6 +44,15 @@ const PACKAGING =
 // normalising drops the brackets and leaves a bare year that looks like a word.
 const YEAR_TAG = /\(\s*\d{4}\s*(?:[-–]\s*(?:\d{4})?\s*)?\)/g
 
+// Whether a title names a repackaging rather than the book itself. Of two
+// editions otherwise equal, the plain one is kept — "Animal Pound #1" over
+// "Animal Pound Pen & Ink #1" — and a series is named after its plain issues.
+// A fresh RegExp each time, since PACKAGING is global and test() would carry
+// lastIndex from one call to the next.
+function isPackaged(title: string): boolean {
+  return new RegExp(PACKAGING.source).test(normalizeTitle(title))
+}
+
 function withoutYearTag(title: string): string {
   return title.replace(YEAR_TAG, ' ').replace(/\s+/g, ' ').trim()
 }
@@ -156,6 +165,8 @@ export function collapseEditions<T>(results: T[], describe: (result: T) => Editi
 function outranks(candidate: EditionFacts, held: EditionFacts): boolean {
   if (candidate.logged !== held.logged) return candidate.logged
   if (candidate.hasCover !== held.hasCover) return candidate.hasCover
+  const [plain, heldPlain] = [!isPackaged(candidate.title), !isPackaged(held.title)]
+  if (plain !== heldPlain) return plain
   return false
 }
 
@@ -252,11 +263,17 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
     placed.add(key)
     entries.push(
       collected === undefined
-        ? { kind: 'issues', series: parsed[index]!.series, issues: inNumberOrder(key) }
+        ? { kind: 'issues', series: seriesName(group.map((m) => parsed[m]!.series)), issues: inNumberOrder(key) }
         : { kind: 'single', result: results[collected]!, issues: inNumberOrder(key) },
     )
   })
   return entries
+}
+
+// What a group of issues is called: the best-ranked issue's series, unless that
+// one is a repackaging and a plain issue came back too.
+function seriesName(names: string[]): string {
+  return names.find((name) => !isPackaged(name)) ?? names[0]!
 }
 
 // What the book search page shows: printings collapsed to one card per book,

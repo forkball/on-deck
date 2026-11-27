@@ -334,3 +334,32 @@ describe('edition title rules', () => {
     )
   })
 })
+
+describe('the Animal Pound search', () => {
+  // As Google Books ranked them: the black-and-white reprint of #1 ahead of #1
+  // itself, and no collected edition at all.
+  const titles = [
+    'Annually. US Privatization Programs and Regulations Handbook',
+    'Animal Pound Pen & Ink #1',
+    'Animal Pound #1',
+    'Animal Pound #2',
+    'Animal Pound #3',
+  ]
+  const entries = arrangeBookResults(titles, (title) => ({
+    title,
+    creators: title.startsWith('Animal') ? ['Tom King'] : [],
+    hasCover: true,
+    logged: false,
+    comic: title.startsWith('Animal'),
+  }))
+
+  it('gathers the reprint with the issues, named after the plain ones', () => {
+    assert.deepEqual(entries[1], {
+      kind: 'issues',
+      series: 'Animal Pound',
+      // The plain #1 kept over its reprint, though the reprint ranked higher.
+      issues: ['Animal Pound #1', 'Animal Pound #2', 'Animal Pound #3'],
+    })
+    assert.equal(entries.length, 2)
+  })
+})
