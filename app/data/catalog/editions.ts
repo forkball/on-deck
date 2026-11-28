@@ -31,15 +31,81 @@ const FILLER = /\ba novel\b/g
 // cards for one book. Only ever dropped together with the author check in
 // collapseEditions, so "Spider-Man Noir" stays apart from Spider-Man: the two
 // share no writer. "Absolute" alone is not here — Absolute Batman is a series of
-// its own, by a writer who also wrote Batman.
+// its own, by a writer who also wrote Batman. "Pen & Ink" is Noir under another
+// name — "Animal Pound Pen & Ink #1" is #1 again in black and white, and sat
+// outside the group the rest of the issues made. Matched after normalizeTitle has
+// spelled the ampersand out.
 const PACKAGING =
-  /\b(?:(?:\d+(?:st|nd|rd|th)\s+)?anniversary|deluxe|noir|absolute|special|collectors?|expanded|definitive|new)\s+edition\b|\bnoir\b|\b(?:hardcover|paperback)\b/g
+  /\b(?:(?:\d+(?:st|nd|rd|th)\s+)?anniversary|deluxe|noir|absolute|special|collectors?|expanded|definitive|new)\s+edition\b|\bnoir\b|\bpen and ink\b|\b(?:hardcover|paperback)\b/g
 
 // The year a digital comics store adds to a series name — "(2024-)", "(2021)",
 // "(2019-2020)" — so "The Last Halloween (2024-) #1" names the same series as
 // the collected "The Last Halloween". Matched on the raw title, before
 // normalising drops the brackets and leaves a bare year that looks like a word.
-const YEAR_TAG = /\(\s*\d{4}\s*(?:[-–]\s*(?:\d{4})?\s*)?\)/g
+//
+// Left out of the title, but not thrown away: it is also what tells one run of a
+// series from the next. "Batman (2011-2016) #1" is Snyder's and "Batman (2016-)
+// #1" King's, and the title alone makes them one series — see Run below.
+const YEAR_TAG = /\(\s*(\d{4})\s*(?:([-–])\s*(\d{4})?\s*)?\)/g
+
+// One run of a series, from its year tag: "(2016-)" is 2016 on, "(2011-2016)"
+// those years, "(2021)" that year alone.
+export interface Run {
+  start: number
+  // Null for a run the store still lists as open.
+  end: number | null
+}
+
+// The last year tag in a title, which on an issue is the one just before its
+// number. Null when the store gave none.
+export function parseRun(title: string): Run | null {
+  const match = [...title.matchAll(YEAR_TAG)].at(-1)
+  if (!match) return null
+  const start = Number(match[1])
+  // "(2021)" has no dash: that year alone. "(2016-)" has one and no end: open.
+  const end = match[3] ? Number(match[3]) : match[2] ? null : start
+  return { start, end }
+}
+
+function runKey(run: Run): string {
+  return `${run.start}-${run.end ?? ''}`
+}
+
+// How a run is written after a series' name: "(2016–)", "(2011–2016)", "(2021)".
+function runLabel(run: Run): string {
+  return run.end === run.start ? `(${run.start})` : `(${run.start}–${run.end ?? ''})`
+}
+
+function sameRun(a: Run | null, b: Run | null): boolean {
+  return !a || !b || runKey(a) === runKey(b)
+}
+
+// Whether a year falls inside a run. An open run takes any year from its start.
+function runHolds(run: Run, year: number): boolean {
+  return year >= run.start && (run.end === null || year <= run.end)
+}
+
+// A series, run and all, as one key: the title as editionTitleKey compares it,
+// and the run when the store named one. What series.ts keys a series' row on, so
+// that Snyder's Batman and King's are two rows, and an untagged series stays
+// keyed on its title as before.
+export function seriesIdentity(series: string): string {
+  const run = parseRun(series)
+  return seriesKey(editionTitleKey(series), run)
+}
+
+function seriesKey(titleKey: string, run: Run | null): string {
+  return run ? `${titleKey} ${runLabel(run)}` : titleKey
+}
+
+// Whether a title names a repackaging rather than the book itself. Of two
+// editions otherwise equal, the plain one is kept — "Animal Pound #1" over
+// "Animal Pound Pen & Ink #1" — and a series is named after its plain issues.
+// A fresh RegExp each time, since PACKAGING is global and test() would carry
+// lastIndex from one call to the next.
+function isPackaged(title: string): boolean {
+  return new RegExp(PACKAGING.source).test(normalizeTitle(title))
+}
 
 function withoutYearTag(title: string): string {
   return title.replace(YEAR_TAG, ' ').replace(/\s+/g, ' ').trim()
@@ -98,6 +164,8 @@ function surnamesOf(fact: EditionFacts): Set<string> {
 export function collapseEditions<T>(results: T[], describe: (result: T) => EditionFacts): T[] {
   const facts = results.map(describe)
   const titleKeys = facts.map((fact) => editionTitleKey(fact.title))
+  // Two runs' #1s are different issues, even with a writer credited on both.
+  const runs = facts.map((fact) => parseRun(fact.title))
   const surnames = facts.map(surnamesOf)
 
   // Union-find over indexes; each group's root is its best-ranked member.
@@ -114,6 +182,7 @@ export function collapseEditions<T>(results: T[], describe: (result: T) => Editi
     if (!titleKeys[a] || surnames[a]!.size === 0) continue
     for (let b = a + 1; b < facts.length; b++) {
       if (titleKeys[b] !== titleKeys[a]) continue
+      if (!sameRun(runs[a]!, runs[b]!)) continue
       if (![...surnames[b]!].some((name) => surnames[a]!.has(name))) continue
       union(a, b)
     }
@@ -153,6 +222,8 @@ export function collapseEditions<T>(results: T[], describe: (result: T) => Editi
 function outranks(candidate: EditionFacts, held: EditionFacts): boolean {
   if (candidate.logged !== held.logged) return candidate.logged
   if (candidate.hasCover !== held.hasCover) return candidate.hasCover
+  const [plain, heldPlain] = [!isPackaged(candidate.title), !isPackaged(held.title)]
+  if (plain !== heldPlain) return plain
   return false
 }
 
@@ -169,15 +240,17 @@ function outranks(candidate: EditionFacts, held: EditionFacts): boolean {
 const ISSUE_SUFFIX = /^(.*?\S)\s*(?:#\s*|\bissue\s+)(\d+)(?:\s*\(\s*of\s+\d+\s*\))?\s*$/i
 
 interface ParsedIssue {
+  // The series' name, without the run: "Batman" for "Batman (2016-) #3".
   series: string
   number: number
+  run: Run | null
 }
 
 export function parseIssue(title: string): ParsedIssue | null {
   const match = ISSUE_SUFFIX.exec(title.trim())
   if (!match) return null
   const series = withoutYearTag(match[1]!).replace(/[\s:,–—-]+$/, '')
-  return series ? { series, number: Number(match[2]) } : null
+  return series ? { series, number: Number(match[2]), run: parseRun(match[1]!) } : null
 }
 
 // A result, with the single issues it collects when they came back too; or a
@@ -192,6 +265,12 @@ export interface IssueFacts {
   // Google Books search hit carries from its top-level "Comics & Graphic Novels"
   // category.
   comic: boolean
+  // The year it came out, for placing an issue or a volume with no year tag in a
+  // run that has one. Left out, it goes by its title alone.
+  year?: number | null
+  // Every credited name, for telling two untagged runs of one title apart. See
+  // splitByCredits.
+  creators?: string[]
 }
 
 // Only results tagged as comics count as issues. The title pattern alone also fits
@@ -201,8 +280,14 @@ export interface IssueFacts {
 // no category at all is missed, and shows as an ordinary result: the safe way to
 // be wrong.
 //
-// Grouped by the series title alone, not the author: one series' issues credit
+// Grouped by the series title and run, not the author: one series' issues credit
 // whichever writer Google picked first, Golden on one and Mignola on the next.
+// The run is the store's year tag, which is what keeps Snyder's "Batman
+// (2011-2016)" apart from King's "Batman (2016-)". An issue without one joins the
+// run of its title whose years hold its own, when exactly one does; otherwise it
+// is grouped by title alone, as every issue was before the tag was read —
+// unless that leaves one issue number there twice, which is two runs no tag
+// named; splitByCredits then parts them by who made them.
 //
 // Where the collected edition came back too — "Baltimore Volume I: The Plague
 // Ships" for issues of "Baltimore: The Plague Ships", the same title once the
@@ -214,19 +299,72 @@ export interface IssueFacts {
 export function groupSingleIssues<T>(results: T[], describe: (result: T) => IssueFacts): SearchEntry<T>[] {
   const facts = results.map(describe)
   const parsed = facts.map(({ title, comic }) => (comic ? parseIssue(title) : null))
-  const keys = parsed.map((issue) => (issue ? editionTitleKey(issue.series) : ''))
+  const titleKeys = parsed.map((issue) => (issue ? editionTitleKey(issue.series) : ''))
+
+  // Every run the results name for each series title.
+  const runsOf = new Map<string, Map<string, Run>>()
+  parsed.forEach((issue, index) => {
+    if (!issue?.run) return
+    const runs = runsOf.get(titleKeys[index]!) ?? new Map<string, Run>()
+    runs.set(runKey(issue.run), issue.run)
+    runsOf.set(titleKeys[index]!, runs)
+  })
+
+  const keys = parsed.map((issue, index) => {
+    if (!issue) return ''
+    const titleKey = titleKeys[index]!
+    if (issue.run) return seriesKey(titleKey, issue.run)
+    const year = facts[index]!.year
+    const holding = [...(runsOf.get(titleKey)?.values() ?? [])].filter(
+      (run) => year != null && runHolds(run, year),
+    )
+    return seriesKey(titleKey, holding.length === 1 ? holding[0]! : null)
+  })
+
+  const surnames = facts.map((fact) => new Set((fact.creators ?? []).map(authorSurnameKey).filter(Boolean)))
+  const split = splitByCredits(keys, titleKeys, parsed, surnames)
 
   const members = new Map<string, number[]>()
   keys.forEach((key, index) => {
     if (key) members.set(key, [...(members.get(key) ?? []), index])
   })
 
+  // Which group a comic that isn't itself an issue binds, if any: its own run
+  // when it names one; the only group of its title when there is one; else the
+  // run that had started by the year it came out — the latest such, since a
+  // volume collects a run that is under way or over, never one yet to begin.
+  const groupsOf = new Map<string, string[]>()
+  for (const [key, indexes] of members) {
+    const titleKey = titleKeys[indexes[0]!]!
+    groupsOf.set(titleKey, [...(groupsOf.get(titleKey) ?? []), key])
+  }
+  //
+  // Two runs parted by credits are told apart the same way: the volume goes
+  // under the one it shares a credited name with, when only one does.
+  const boundGroup = ({ title, year }: IssueFacts, credited: Set<string>): string | undefined => {
+    const titleKey = editionTitleKey(title)
+    const groups = groupsOf.get(titleKey) ?? []
+    const run = parseRun(title)
+    if (run) return groups.find((key) => key === seriesKey(titleKey, run))
+    if (groups.length <= 1) return groups[0]
+    const started = [...(runsOf.get(titleKey)?.values() ?? [])]
+      .filter((r) => year != null && r.start <= year)
+      .sort((a, b) => b.start - a.start)[0]
+    const key = started ? seriesKey(titleKey, started) : titleKey
+    if (groups.includes(key)) return key
+    const sharing = groups.filter(
+      (group) =>
+        split.has(group) && members.get(group)!.some((m) => [...surnames[m]!].some((n) => credited.has(n))),
+    )
+    return sharing.length === 1 ? sharing[0] : undefined
+  }
+
   // The first comic that isn't itself an issue and names the same work.
   const collectedBy = new Map<string, number>()
-  facts.forEach(({ title, comic }, index) => {
-    if (!comic || parsed[index]) return
-    const key = editionTitleKey(title)
-    if (members.has(key) && !collectedBy.has(key)) collectedBy.set(key, index)
+  facts.forEach((fact, index) => {
+    if (!fact.comic || parsed[index]) return
+    const key = boundGroup(fact, surnames[index]!)
+    if (key && !collectedBy.has(key)) collectedBy.set(key, index)
   })
   const collects = new Map([...collectedBy].map(([key, index]) => [index, key]))
 
@@ -249,11 +387,115 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
     placed.add(key)
     entries.push(
       collected === undefined
-        ? { kind: 'issues', series: parsed[index]!.series, issues: inNumberOrder(key) }
+        ? {
+            kind: 'issues',
+            series: split.has(key)
+              ? creditedName(
+                  seriesName(
+                    group.map((m) => parsed[m]!),
+                    key,
+                  ),
+                  group.map((m) => facts[m]!.creators ?? []),
+                )
+              : seriesName(
+                  group.map((m) => parsed[m]!),
+                  key,
+                ),
+            issues: inNumberOrder(key),
+          }
         : { kind: 'single', result: results[collected]!, issues: inNumberOrder(key) },
     )
   })
   return entries
+}
+
+// Two runs of one title the store tagged neither of. Snyder's Batman and King's
+// both open with a #1, and with no year tag both are plain "Batman" — so when an
+// issue number turns up twice under one untagged title (printings were folded
+// together before this, so it is two issues, not two copies of one), the issues
+// are parted by credit: those sharing a credited name, directly or through a
+// third, are one run. Only then: credits are what Google Books gets wrong, an
+// issue credited to its artist alone on one and its writer on the next, and
+// used on every series they would break one run into several.
+//
+// An issue credited to no one, or to no one the others share, comes out as a run
+// of its own; a run of one is shown as an ordinary result, so it is only loose,
+// not mislabeled. Rewrites `keys` in place and returns the keys it made.
+function splitByCredits(
+  keys: string[],
+  titleKeys: string[],
+  parsed: (ParsedIssue | null)[],
+  surnames: Set<string>[],
+): Set<string> {
+  const untagged = new Map<string, number[]>()
+  keys.forEach((key, index) => {
+    if (key && key === titleKeys[index]) untagged.set(key, [...(untagged.get(key) ?? []), index])
+  })
+
+  const made = new Set<string>()
+  for (const [key, indexes] of untagged) {
+    const numbers = indexes.map((index) => parsed[index]!.number)
+    if (new Set(numbers).size === numbers.length) continue
+
+    const parent = new Map(indexes.map((index) => [index, index]))
+    const find = (index: number): number => {
+      while (parent.get(index) !== index) index = parent.get(index)!
+      return index
+    }
+    for (const a of indexes) {
+      for (const b of indexes) {
+        if (a < b && [...surnames[a]!].some((name) => surnames[b]!.has(name))) {
+          parent.set(find(b), find(a))
+        }
+      }
+    }
+    const roots = [...new Set(indexes.map(find))]
+    if (roots.length < 2) continue
+    for (const index of indexes) {
+      // Numbered by the run's best-ranked issue, so the key is the same however
+      // the loop above happened to join them.
+      keys[index] = `${key} ~${roots.indexOf(find(index))}`
+      made.add(keys[index]!)
+    }
+  }
+  return made
+}
+
+// What a group of issues is called: the best-ranked issue's series, unless that
+// one is a repackaging and a plain issue came back too — with its run after it,
+// when the group is one run of several ("Batman (2016–)"). seriesIdentity reads
+// that back into the same key.
+function seriesName(issues: ParsedIssue[], key: string): string {
+  const name = (issues.find((issue) => !isPackaged(issue.series)) ?? issues[0]!).series
+  const run = issues.find((issue) => issue.run && key.endsWith(` ${runLabel(issue.run)}`))?.run
+  return run ? `${name} ${runLabel(run)}` : name
+}
+
+// A run parted by credits, named after the name credited on most of its issues
+// — "Batman (King)" — since it has no year tag to be named by. The name is what
+// its series row is keyed on (seriesIdentity), so it has to come out the same on
+// the next search: the most credited name is the steadiest thing the issues
+// carry, though not certain, since Google may credit the artist on more of
+// them. Two runs parted this way share no credited name, so never a name here.
+// A run credited to no one keeps the plain title.
+function creditedName(series: string, credits: string[][]): string {
+  const counts = new Map<string, { count: number; shown: string }>()
+  for (const names of credits) {
+    for (const name of new Set(names)) {
+      const key = authorSurnameKey(name)
+      if (!key) continue
+      const words = name.trim().split(/\s+/)
+      while (words.length > 1 && NAME_SUFFIX.has(normalizeTitle(words.at(-1)!))) words.pop()
+      const held = counts.get(key)
+      counts.set(key, { count: (held?.count ?? 0) + 1, shown: held?.shown ?? words.at(-1)! })
+    }
+  }
+  // Ties go to the name met first, which is the best-ranked issue's.
+  const top = [...counts.values()].reduce<{ count: number; shown: string } | null>(
+    (best, entry) => (best && best.count >= entry.count ? best : entry),
+    null,
+  )
+  return top ? `${series} (${top.shown})` : series
 }
 
 // What the book search page shows: printings collapsed to one card per book,

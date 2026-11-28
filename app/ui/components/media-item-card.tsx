@@ -17,9 +17,8 @@ import { Button, Link } from '../shared/form-controls.tsx'
 import { withReturnTo } from '../backLink.ts'
 
 // The frame every card in a result list shares, marked down its left edge in the
-// media type's colour. Also used by the search page's group of single issues, so
-// that it reads as one of the cards.
-export function cardFrame(hue: string) {
+// media type's colour.
+function cardFrame(hue: string) {
   return css({
     border: '1px solid var(--rule)',
     borderLeft: `4px solid ${hue}`,
@@ -33,9 +32,7 @@ const COVER_WIDTH = '60px'
 // A card's cover, or an empty frame of the same size when the catalog has none,
 // so the text beside it lines up either way. A link to the detail page when given
 // one.
-export function CardCover(
-  handle: Handle<{ src: string | null; alt: string; href?: string; lazy?: boolean }>,
-) {
+function CardCover(handle: Handle<{ src: string | null; alt: string; href?: string; lazy?: boolean }>) {
   return () => {
     const { src, alt, href, lazy } = handle.props
     const place = css({ flex: '0 0 auto', alignSelf: 'flex-start' })

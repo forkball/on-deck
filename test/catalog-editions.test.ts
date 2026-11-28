@@ -105,11 +105,13 @@ describe('parseIssue', () => {
     assert.deepEqual(parseIssue('Baltimore: The Plague Ships #3'), {
       series: 'Baltimore: The Plague Ships',
       number: 3,
+      run: null,
     })
-    assert.deepEqual(parseIssue('Saga Issue 12'), { series: 'Saga', number: 12 })
+    assert.deepEqual(parseIssue('Saga Issue 12'), { series: 'Saga', number: 12, run: null })
     assert.deepEqual(parseIssue('Hellboy: Seed of Destruction #1 (of 4)'), {
       series: 'Hellboy: Seed of Destruction',
       number: 1,
+      run: null,
     })
   })
 
@@ -303,6 +305,7 @@ describe('edition title rules', () => {
     assert.equal(editionTitleKey('Batman Noir: The Long Halloween'), plain)
     assert.equal(editionTitleKey('Batman: The Long Halloween Deluxe Edition'), plain)
     assert.equal(editionTitleKey('Batman: The Long Halloween 30th Anniversary Edition'), plain)
+    assert.equal(editionTitleKey('Animal Pound Pen & Ink'), editionTitleKey('Animal Pound'))
   })
 
   it('reads a store year tag as part of no title', () => {
@@ -310,6 +313,8 @@ describe('edition title rules', () => {
     assert.deepEqual(parseIssue('Batman The Long Halloween: The Last Halloween (2024-) #3'), {
       series: 'Batman The Long Halloween: The Last Halloween',
       number: 3,
+      // Kept apart from the title: it is what tells one run from the next.
+      run: { start: 2024, end: null },
     })
   })
 
@@ -330,6 +335,221 @@ describe('edition title rules', () => {
         result(3, 'Batman Volume 1', null, { hasCover: false }),
       ]),
       [1, 2, 3],
+    )
+  })
+})
+
+describe('the Animal Pound search', () => {
+  // As Google Books ranked them: the black-and-white reprint of #1 ahead of #1
+  // itself, and no collected edition at all.
+  const titles = [
+    'Annually. US Privatization Programs and Regulations Handbook',
+    'Animal Pound Pen & Ink #1',
+    'Animal Pound #1',
+    'Animal Pound #2',
+    'Animal Pound #3',
+  ]
+  const entries = arrangeBookResults(titles, (title) => ({
+    title,
+    creators: title.startsWith('Animal') ? ['Tom King'] : [],
+    hasCover: true,
+    logged: false,
+    comic: title.startsWith('Animal'),
+  }))
+
+  it('gathers the reprint with the issues, named after the plain ones', () => {
+    assert.deepEqual(entries[1], {
+      kind: 'issues',
+      series: 'Animal Pound',
+      // The plain #1 kept over its reprint, though the reprint ranked higher.
+      issues: ['Animal Pound #1', 'Animal Pound #2', 'Animal Pound #3'],
+    })
+    assert.equal(entries.length, 2)
+  })
+})
+
+describe('the runs of a series', () => {
+  interface Hit {
+    title: string
+    creator?: string
+    year?: number
+    comic?: boolean
+  }
+  const arrange = (hits: Hit[]) =>
+    arrangeBookResults(hits, (h) => ({
+      title: h.title,
+      creators: [h.creator ?? 'Tom King'],
+      hasCover: true,
+      logged: false,
+      comic: h.comic ?? true,
+      year: h.year ?? null,
+    }))
+  const shown = (hits: Hit[]) =>
+    arrange(hits).map((entry) =>
+      entry.kind === 'single'
+        ? entry.issues
+          ? `${entry.result.title} < ${entry.issues.map((i) => i.title).join(', ')}`
+          : entry.result.title
+        : `${entry.series}: ${entry.issues.map((i) => i.title).join(', ')}`,
+    )
+
+  it("keeps two runs of one title apart, by the store's year tag", () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman (2016-) #1' },
+        { title: 'Batman (2011-2016) #1', creator: 'Scott Snyder' },
+        { title: 'Batman (2016-) #2' },
+        { title: 'Batman (2011-2016) #2', creator: 'Scott Snyder' },
+      ]),
+      [
+        'Batman (2016–): Batman (2016-) #1, Batman (2016-) #2',
+        'Batman (2011–2016): Batman (2011-2016) #1, Batman (2011-2016) #2',
+      ],
+    )
+  })
+
+  it("does not fold two runs' #1s into one, though one writer is on both", () => {
+    assert.deepEqual(shown([{ title: 'Batman (2016-) #1' }, { title: 'Batman (2011-2016) #1' }]), [
+      'Batman (2016-) #1',
+      'Batman (2011-2016) #1',
+    ])
+  })
+
+  it('puts an untagged issue in the run whose years hold it', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman (2016-) #1' },
+        { title: 'Batman (2011-2016) #1', creator: 'Scott Snyder' },
+        { title: 'Batman #40', year: 2018 },
+        { title: 'Batman #12', creator: 'Scott Snyder', year: 2012 },
+      ]),
+      [
+        'Batman (2016–): Batman (2016-) #1, Batman #40',
+        'Batman (2011–2016): Batman (2011-2016) #1, Batman #12',
+      ],
+    )
+  })
+
+  it('groups an untagged issue no run holds by its title alone', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman (2016-) #1' },
+        { title: 'Batman (2016-) #2' },
+        { title: 'Batman #400', year: 1986 },
+        { title: 'Batman #401', year: 1986 },
+      ]),
+      ['Batman (2016–): Batman (2016-) #1, Batman (2016-) #2', 'Batman: Batman #400, Batman #401'],
+    )
+  })
+
+  it('puts a collected volume under the run that had begun by its year', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman Vol. 1', year: 2017, comic: true },
+        { title: 'Batman (2016-) #1' },
+        { title: 'Batman (2011-2016) #1', creator: 'Scott Snyder' },
+        { title: 'Batman (2016-) #2' },
+        { title: 'Batman (2011-2016) #2', creator: 'Scott Snyder' },
+      ]),
+      [
+        'Batman Vol. 1 < Batman (2016-) #1, Batman (2016-) #2',
+        'Batman (2011–2016): Batman (2011-2016) #1, Batman (2011-2016) #2',
+      ],
+    )
+  })
+})
+
+describe('two untagged runs of one title', () => {
+  interface Hit {
+    title: string
+    creators: string[]
+    year?: number
+    comic?: boolean
+  }
+  const arrange = (hits: Hit[]) =>
+    arrangeBookResults(hits, (h) => ({
+      title: h.title,
+      creators: h.creators,
+      hasCover: true,
+      logged: false,
+      comic: h.comic ?? true,
+      year: h.year ?? null,
+    }))
+  const shown = (hits: Hit[]) =>
+    arrange(hits).map((entry) =>
+      entry.kind === 'single'
+        ? entry.issues
+          ? `${entry.result.title} < ${entry.issues.map((i) => i.title).join(', ')}`
+          : entry.result.title
+        : `${entry.series}: ${entry.issues.map((i) => i.title).join(', ')}`,
+    )
+  const snyder = ['Scott Snyder', 'Greg Capullo']
+  const king = ['Tom King', 'David Finch']
+
+  it('parts them by who made them when an issue number turns up twice, each named for its most credited', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman #1', creators: king },
+        { title: 'Batman #1', creators: snyder },
+        { title: 'Batman #2', creators: ['Greg Capullo'] },
+        // Joined to King's through Finch, though King isn't credited.
+        { title: 'Batman #2', creators: ['David Finch', 'Mikel Janin'] },
+      ]),
+      // Finch is on both of King's issues and King on one, so Finch names it.
+      ['Batman (Finch): Batman #1, Batman #2', 'Batman (Capullo): Batman #1, Batman #2'],
+    )
+    const [kings] = arrange([
+      { title: 'Batman #1', creators: king },
+      { title: 'Batman #1', creators: snyder },
+      { title: 'Batman #2', creators: ['David Finch'] },
+    ])
+    assert.deepEqual(kings!.kind === 'issues' && kings!.issues.map((i) => i.creators), [
+      king,
+      ['David Finch'],
+    ])
+  })
+
+  it('leaves one run whole, however its credits disagree, while no number repeats', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Baltimore: The Plague Ships #1', creators: ['Christopher Golden'] },
+        { title: 'Baltimore: The Plague Ships #2', creators: ['Mike Mignola'] },
+      ]),
+      ['Baltimore: The Plague Ships: Baltimore: The Plague Ships #1, Baltimore: The Plague Ships #2'],
+    )
+  })
+
+  it('reads a repeated number that shares a credit as one issue printed twice', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman #1', creators: ['Tom King'] },
+        { title: 'Batman #1', creators: ['Tom King', 'Mikel Janin'], year: 2017 },
+      ]).length,
+      1,
+    )
+  })
+
+  it('puts a collected volume under the run it shares a credit with', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Batman #1', creators: king },
+        { title: 'Batman #1', creators: snyder },
+        { title: 'Batman #2', creators: king },
+        { title: 'Batman #2', creators: snyder },
+        { title: 'Batman Vol. 1', creators: ['Scott Snyder'] },
+      ]),
+      ['Batman (King): Batman #1, Batman #2', 'Batman Vol. 1 < Batman #1, Batman #2'],
+    )
+  })
+
+  it('drops a suffix from the name it is named for', () => {
+    assert.deepEqual(
+      shown([
+        { title: 'Spawn #1', creators: ['Todd McFarlane'] },
+        { title: 'Spawn #1', creators: ['Robert Kirkman Jr.'] },
+        { title: 'Spawn #2', creators: ['Robert Kirkman Jr.', 'Greg Capullo'] },
+      ]),
+      ['Spawn #1', 'Spawn (Kirkman): Spawn #1, Spawn #2'],
     )
   })
 })

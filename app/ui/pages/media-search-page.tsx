@@ -3,7 +3,6 @@ import { css } from 'remix/ui'
 
 import type { getUserInteractionForItem } from '../../data/mediaItems.ts'
 import type { MediaItem } from '../../data/schema.ts'
-import type { SearchEntry } from '../../data/catalog/editions.ts'
 import { Collapsible } from '../shared/collapsible.tsx'
 import { MediaTabLinks } from '../components/media-tab-links.tsx'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
@@ -12,17 +11,23 @@ import { LazyList } from '../../browser/lazy-list.tsx'
 import { MovieSearchForm } from '../../browser/movie-search-form.tsx'
 import { Toast } from '../components/toast.tsx'
 import { Page } from '../components/page.tsx'
-import { CardCover, MediaItemCard, cardFrame } from '../components/media-item-card.tsx'
+import { MediaItemCard } from '../components/media-item-card.tsx'
 import { markdownToPlainText } from '../components/markdown.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
+
+// A result, with the single issues it collects when it has any: a volume's
+// (arrangeBookResults), or a series' own (data/catalog/series.ts).
+export interface SearchResult {
+  result: MediaItem
+  issues?: MediaItem[]
+}
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
   // The viewer's order for the media-type tabs (parseMediaOrder).
   mediaOrder: ActiveMediaType[]
   query: string
-  // A result, or a series' single issues gathered into one (arrangeBookResults).
-  entries: SearchEntry<MediaItem>[]
+  results: SearchResult[]
   // How many are visible before scrolling reveals the rest.
   initialVisible: number
   interactionsByItemId: Map<number, Awaited<ReturnType<typeof getUserInteractionForItem>>>
@@ -68,7 +73,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
       mediaType,
       mediaOrder,
       query,
-      entries,
+      results,
       initialVisible,
       interactionsByItemId,
       message,
@@ -101,27 +106,18 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
           placeholder={ui.searchPlaceholder}
         />
 
-        {entries.length > 0 && (
+        {results.length > 0 && (
           <section>
             <h2>
               Results{' '}
               <span mix={css({ fontSize: '14px', fontWeight: 400, color: 'var(--muted)' })}>
-                ({entries.length})
+                ({results.length})
               </span>
             </h2>
             <ul id="search-results" mix={stack('16px')}>
-              {entries.map((entry) =>
-                entry.kind === 'single' ? (
-                  <ResultCard key={entry.result.id} item={entry.result} issues={entry.issues} ctx={ctx} />
-                ) : (
-                  <IssueGroupCard
-                    key={`issues-${entry.issues[0]!.id}`}
-                    series={entry.series}
-                    issues={entry.issues}
-                    ctx={ctx}
-                  />
-                ),
-              )}
+              {results.map(({ result, issues }) => (
+                <ResultCard key={result.id} item={result} issues={issues} ctx={ctx} />
+              ))}
             </ul>
             <LazyList listId="search-results" initial={initialVisible} step={initialVisible} />
           </section>
@@ -151,26 +147,6 @@ function ResultCard(handle: Handle<{ item: MediaItem; issues?: MediaItem[]; ctx:
           </p>
         )}
       </MediaItemCard>
-    )
-  }
-}
-
-// A series' single issues with no collected edition among the results to sit
-// under: one card, the series and its first cover, that opens to list them, so a
-// search for the series isn't five near-identical cards.
-function IssueGroupCard(handle: Handle<{ series: string; issues: MediaItem[]; ctx: ResultContext }>) {
-  return () => {
-    const { series, issues, ctx } = handle.props
-    const cover = issues.map((issue) => parseMediaMetadata(issue.metadata).posterUrl).find(Boolean) ?? null
-
-    return (
-      <li mix={cardFrame(MEDIA_TYPE_UI[ctx.mediaType].hue)}>
-        <div mix={css({ display: 'flex', gap: '12px' })}>
-          <CardCover src={cover} alt="" lazy />
-          <div mix={css({ flex: '1 1 0', minWidth: 0 })}>{series}</div>
-        </div>
-        <IssueList issues={issues} ctx={ctx} />
-      </li>
     )
   }
 }
