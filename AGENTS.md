@@ -129,7 +129,10 @@ does nothing on its own.
     settles the whole batch at once so a nearest-year fallback can't take an
     entry an exact match already holds. `classify` and `review` hold the rules —
     confidence, conflicts, duplicates, counts — and are free of the database so
-    they can be tested directly
+    they can be tested directly. `importError` is the one failure whose message
+    an import page shows (a file that isn't the export, a private Letterboxd or
+    Steam profile); anything else thrown is logged and the page gets a generic
+    line — the rule `GenerationError` holds for recommendation runs
   - `app/data/profileTitles/` — titles. A title is a genre and a role ("Art
     House Projectionist"), and each is a credit a member earns. `catalog` holds
     every credit, the one word it earns and the threshold that earns it
