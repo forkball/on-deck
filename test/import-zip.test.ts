@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
+import { ImportError } from '../app/data/imports/importError.ts'
 import { looksLikeZip, openZip } from '../app/data/imports/zip.ts'
 import { buildZip } from './support/build-zip.ts'
 
@@ -59,5 +60,11 @@ describe('openZip', () => {
 
   it('refuses a file that is not an archive', () => {
     assert.throws(() => openZip(new Uint8Array(Buffer.from('Date,Name,Rating\n'))), /not a zip archive/)
+  })
+
+  it('refuses it as an ImportError, so the import page shows the wording', () => {
+    // Anything else thrown on an upload is reworded generically; the parsers'
+    // messages only reach the member because of the class.
+    assert.throws(() => openZip(new Uint8Array(Buffer.from('Date,Name,Rating\n'))), ImportError)
   })
 })

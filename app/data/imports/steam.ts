@@ -6,6 +6,7 @@ import type { Db } from '../db.ts'
 import { logInteraction, type LogInteractionInput } from '../mediaItems.ts'
 import { INTERACTION_SOURCES, users } from '../schema.ts'
 import { fetchSteamLibrary, fetchSteamPersona } from './steamApi.ts'
+import { ImportError } from './importError.ts'
 
 export interface SteamImportResult {
   totalGames: number
@@ -34,7 +35,7 @@ export async function importSteamLibrary(
   steamId: string,
 ): Promise<SteamImportResult> {
   const outcome = await fetchSteamLibrary(steamId)
-  if (!outcome.ok) throw new Error(outcome.message)
+  if (!outcome.ok) throw new ImportError(outcome.message)
 
   // Refreshed on the way past, since an import is already talking to Steam and
   // a rename there would otherwise leave settings naming an account by a name

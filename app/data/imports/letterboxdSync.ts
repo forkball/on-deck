@@ -13,6 +13,7 @@ import {
   type User,
 } from '../schema.ts'
 import { fetchLetterboxdFeed, letterboxdSyncAvailableTo, type LetterboxdEntry } from './letterboxdFeed.ts'
+import { ImportError } from './importError.ts'
 import { logger } from '../../log.ts'
 
 const log = logger('letterboxd')
@@ -66,7 +67,7 @@ export async function syncLetterboxdDiary(
   username: string,
 ): Promise<LetterboxdSyncResult> {
   const outcome = await fetchLetterboxdFeed(username)
-  if (!outcome.ok) throw new Error(outcome.message)
+  if (!outcome.ok) throw new ImportError(outcome.message)
 
   // Read before the writes below touch anything: this is what the *last* fetch
   // saw, and comparing the two is the only way to know why the window moved.

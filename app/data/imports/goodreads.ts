@@ -1,4 +1,5 @@
 import { cleanCell, headerIndex, parseCsv } from './csv.ts'
+import { ImportError } from './importError.ts'
 import { normalizeRating } from '../mediaItems.ts'
 import type { ParsedRow } from './batches.ts'
 import type { LogInteractionInput } from '../mediaItems.ts'
@@ -17,7 +18,7 @@ export function parseGoodreadsLibrary(csvText: string): ParsedRow[] {
   const titleIndex = indexOf('title')
   const shelfIndex = indexOf('exclusive shelf')
   if (titleIndex === -1 || shelfIndex === -1) {
-    throw new Error(
+    throw new ImportError(
       'That doesn\'t look like a Goodreads export — expected "Title" and "Exclusive Shelf" columns.',
     )
   }

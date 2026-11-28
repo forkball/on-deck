@@ -3,11 +3,15 @@ import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
 
 import type { User } from '../../../data/schema.ts'
+import { memberFacingMessage } from '../../../data/imports/importError.ts'
 import { importSteamLibrary } from '../../../data/imports/steam.ts'
+import { logger } from '../../../log.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { displayLabel } from '../../../data/users.ts'
 import { routes } from '../../../routes.ts'
 import { SteamImportPage } from './page.tsx'
+
+const log = logger('steam-import')
 
 // Like import-movies and import-books, but the source is a linked account
 // rather than an uploaded file. Linking it is settings' job — the sign-in
@@ -52,14 +56,15 @@ export default createController(routes.profile.importGames, {
           <SteamImportPage displayName={displayLabel(auth.identity)} steamId={steamId} result={result} />,
         )
       } catch (error) {
-        // Steam's own wording, already written to be read.
+        // Steam's outcome is worded for the member; anything else (a catalog
+        // or database failure) is logged and gets the generic line.
+        const message = memberFacingMessage(error)
+        if (message === null) log.error(`import failed for user ${auth.identity.id}`, error)
         return context.render(
           <SteamImportPage
             displayName={displayLabel(auth.identity)}
             steamId={steamId}
-            error={
-              error instanceof Error ? error.message : 'Something went wrong reading your Steam library.'
-            }
+            error={message ?? 'Something went wrong reading your Steam library.'}
           />,
           { status: 400 },
         )

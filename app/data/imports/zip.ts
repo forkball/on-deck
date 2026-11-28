@@ -1,4 +1,5 @@
 import { inflateRawSync } from 'node:zlib'
+import { ImportError } from './importError.ts'
 
 const END_OF_DIRECTORY = 0x06054b50
 const DIRECTORY_ENTRY = 0x02014b50
@@ -57,19 +58,20 @@ function baseName(path: string): string {
 
 function readDirectory(view: Buffer): DirectoryEntry[] {
   const end = findEndRecord(view)
-  if (end === -1) throw new Error('That file is not a zip archive, or it arrived incomplete.')
+  if (end === -1) throw new ImportError('That file is not a zip archive, or it arrived incomplete.')
 
   const count = view.readUInt16LE(end + 10)
   const directoryOffset = view.readUInt32LE(end + 16)
 
-  if (directoryOffset === 0xffffffff) throw new Error('That zip uses zip64, which this importer cannot read.')
+  if (directoryOffset === 0xffffffff)
+    throw new ImportError('That zip uses zip64, which this importer cannot read.')
 
   const entries: DirectoryEntry[] = []
   let cursor = directoryOffset
 
   for (let i = 0; i < count; i++) {
     if (cursor + 46 > view.length || view.readUInt32LE(cursor) !== DIRECTORY_ENTRY) {
-      throw new Error('That zip archive is damaged — its file listing does not read.')
+      throw new ImportError('That zip archive is damaged — its file listing does not read.')
     }
 
     const method = view.readUInt16LE(cursor + 10)
@@ -87,7 +89,7 @@ function readDirectory(view: Buffer): DirectoryEntry[] {
 
     // 0xffffffff is the format's "look in the zip64 record for the real value".
     if (compressedSize === 0xffffffff || uncompressedSize === 0xffffffff || localOffset === 0xffffffff) {
-      throw new Error('That zip uses zip64, which this importer cannot read.')
+      throw new ImportError('That zip uses zip64, which this importer cannot read.')
     }
 
     entries.push({ name, method, compressedSize, uncompressedSize, localOffset })
@@ -108,11 +110,11 @@ function findEndRecord(view: Buffer): number {
 
 function readEntry(view: Buffer, entry: DirectoryEntry): Buffer {
   if (entry.uncompressedSize > MAX_ENTRY_BYTES) {
-    throw new Error(`${entry.name} is too large to read from that archive.`)
+    throw new ImportError(`${entry.name} is too large to read from that archive.`)
   }
 
   if (entry.localOffset + 30 > view.length || view.readUInt32LE(entry.localOffset) !== LOCAL_ENTRY) {
-    throw new Error(`That zip archive is damaged — ${entry.name} does not read.`)
+    throw new ImportError(`That zip archive is damaged — ${entry.name} does not read.`)
   }
 
   // Lengths come from the local header, not the directory: the two carry
@@ -125,7 +127,7 @@ function readEntry(view: Buffer, entry: DirectoryEntry): Buffer {
   if (entry.method === STORED) return raw
   if (entry.method === DEFLATED) return inflateRawSync(raw, { maxOutputLength: MAX_ENTRY_BYTES })
 
-  throw new Error(`${entry.name} is compressed in a way this importer cannot read.`)
+  throw new ImportError(`${entry.name} is compressed in a way this importer cannot read.`)
 }
 
 function decodeText(data: Buffer): string {

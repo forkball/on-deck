@@ -11,6 +11,8 @@ import {
   type ImportPageProps,
   type ParsedUpload,
 } from '../app/actions/profile/file-import-actions.tsx'
+import { ImportError } from '../app/data/imports/importError.ts'
+import { parseLetterboxdUpload } from '../app/data/imports/letterboxd.ts'
 import type { AuthedControllerContext } from '../app/middleware/context.ts'
 import type { ImportBatch, User } from '../app/data/schema.ts'
 
@@ -160,14 +162,43 @@ describe('file import upload', () => {
       formData: formWith('library', new File(['x'], 'export.csv')),
     })
     const response = await actionsWith(async () => {
-      throw new Error('That looks like a single file rather than the export archive.')
+      throw new ImportError('That looks like a single file rather than the export archive.')
     }).upload(context)
 
     assert.equal(response.status, 400)
     assert.equal(rendered[0]!.props.error, 'That looks like a single file rather than the export archive.')
   })
 
-  it('falls back to a general message when a parser throws a non-Error', async () => {
+  it('shows the general message, not the cause, for an error not written for the page', async (t) => {
+    // A missing API key or a bug in a parser is the server's business, and its
+    // wording is for the log. It is still logged, so the cause isn't lost.
+    const logged = t.mock.method(console, 'error', () => {})
+    const { context, rendered } = fakeContext({
+      formData: formWith('library', new File(['x'], 'export.csv')),
+    })
+    const response = await actionsWith(async () => {
+      throw new Error('relation "import_batches" does not exist')
+    }).upload(context)
+
+    assert.equal(response.status, 400)
+    assert.equal(rendered[0]!.props.error, 'Something went wrong reading that file.')
+    assert.equal(logged.mock.callCount(), 1)
+    assert.match(String(logged.mock.calls[0]!.arguments[1]), /import_batches/)
+  })
+
+  it('reaches the real parsers through ImportError, so their wording still shows', async () => {
+    const { context, rendered } = fakeContext({
+      formData: formWith('library', new File(['Date,Name,Rating\n'], 'ratings.csv')),
+    })
+    await actionsWith(async (file) => parseLetterboxdUpload(new Uint8Array(await file.arrayBuffer()))).upload(
+      context,
+    )
+
+    assert.match(rendered[0]!.props.error!, /single file rather than the export archive/)
+  })
+
+  it('falls back to a general message when a parser throws a non-Error', async (t) => {
+    t.mock.method(console, 'error', () => {})
     const { context, rendered } = fakeContext({
       formData: formWith('library', new File(['x'], 'export.csv')),
     })

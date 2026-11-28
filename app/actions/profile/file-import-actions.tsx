@@ -5,9 +5,13 @@ import type { Handle, RemixNode } from 'remix/ui'
 
 import { activeBatch, createBatch, type ParsedRow } from '../../data/imports/batches.ts'
 import type { MediaType } from '../../data/mediaItems.ts'
+import { memberFacingMessage } from '../../data/imports/importError.ts'
 import { displayLabel } from '../../data/users.ts'
+import { logger } from '../../log.ts'
 import type { AuthedControllerContext } from '../../middleware/context.ts'
 import { routes } from '../../routes.ts'
+
+const log = logger('file-import')
 
 // Uploading an export and staging it as a batch — the shape shared by
 // import-movies (Letterboxd) and import-books (Goodreads). import-games is not
@@ -48,8 +52,9 @@ export interface FileImportConfig<Extra extends object> {
   // The form field the file arrives in.
   fieldName: string
   // Decoding belongs to the source: a Goodreads export is text, a Letterboxd
-  // one is a zip that has to be read as bytes. Throwing from here is fine —
-  // the message reaches the page.
+  // one is a zip that has to be read as bytes. Throw an ImportError for a file
+  // that isn't the export — its message reaches the page. Anything else thrown
+  // is logged and the page gets a generic line instead.
   parse: (file: File) => Promise<ParsedUpload>
   // Shown when the form arrives with no file, and when the file parsed but
   // held nothing importable. Both name the actual export, so they're per source.
@@ -136,21 +141,25 @@ export function createFileImportActions<Extra extends object = Record<string, ne
 
       const db = context.get(Database)
 
+      // Only the parse is guarded: it is the step a bad file can fail. A
+      // failure staging the batch below is the server's, not the file's, and
+      // goes to the error handler like any other.
+      let parsed: ParsedUpload
       try {
-        const { rows, reviewsOnly } = await parse(file)
-
-        if (rows.length === 0) return await fail(context, emptyError)
-
-        // The request ends here: matching a few hundred rows is tens of seconds
-        // of catalog lookups, which a worker does while this redirect lands.
-        const batchId = await createBatch(db, auth.identity.id, mediaType, source, rows)
-        return redirect(stagedBatchHref(batchId, reviewsOnly), 303)
+        parsed = await parse(file)
       } catch (error) {
-        return await fail(
-          context,
-          error instanceof Error ? error.message : 'Something went wrong reading that file.',
-        )
+        const message = memberFacingMessage(error)
+        if (message === null) log.error(`${source} upload failed to parse`, error)
+        return await fail(context, message ?? 'Something went wrong reading that file.')
       }
+
+      const { rows, reviewsOnly } = parsed
+      if (rows.length === 0) return await fail(context, emptyError)
+
+      // The request ends here: matching a few hundred rows is tens of seconds
+      // of catalog lookups, which a worker does while this redirect lands.
+      const batchId = await createBatch(db, auth.identity.id, mediaType, source, rows)
+      return redirect(stagedBatchHref(batchId, reviewsOnly), 303)
     },
   }
 }

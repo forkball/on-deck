@@ -1,4 +1,5 @@
 import { headerIndex, parseCsv } from './csv.ts'
+import { ImportError } from './importError.ts'
 import { normalizeTitle } from '../titles.ts'
 import { looksLikeZip, openZip } from './zip.ts'
 import { normalizeRating } from '../mediaItems.ts'
@@ -24,7 +25,7 @@ export interface LetterboxdUpload {
 
 export function parseLetterboxdUpload(bytes: Uint8Array): LetterboxdUpload {
   if (!looksLikeZip(bytes)) {
-    throw new Error(
+    throw new ImportError(
       'That looks like a single file rather than the export archive. Upload the .zip Letterboxd emails you — your reviews are in there too.',
     )
   }
@@ -34,7 +35,7 @@ export function parseLetterboxdUpload(bytes: Uint8Array): LetterboxdUpload {
   const reviews = zip.readText(REVIEWS_FILE) ?? undefined
 
   if (!ratings && !reviews) {
-    throw new Error(
+    throw new ImportError(
       'That zip has no ratings.csv or reviews.csv in it. Upload the export Letterboxd emails you, not a folder you built yourself.',
     )
   }
@@ -101,7 +102,7 @@ function readRatings(csvText: string): SourceRow[] {
   const ratingIndex = indexOf('rating')
 
   if (dateIndex === -1 || nameIndex === -1 || ratingIndex === -1) {
-    throw new Error('ratings.csv is missing expected columns (Date, Name, Rating).')
+    throw new ImportError('ratings.csv is missing expected columns (Date, Name, Rating).')
   }
 
   const yearIndex = indexOf('year')
@@ -136,7 +137,7 @@ function readReviews(csvText: string): SourceRow[] {
   const reviewIndex = indexOf('review')
 
   if (nameIndex === -1 || reviewIndex === -1) {
-    throw new Error('reviews.csv is missing expected columns (Name, Review).')
+    throw new ImportError('reviews.csv is missing expected columns (Name, Review).')
   }
 
   const yearIndex = indexOf('year')

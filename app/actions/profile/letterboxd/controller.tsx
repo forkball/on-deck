@@ -3,6 +3,7 @@ import { Auth } from 'remix/middleware/auth'
 import { createController, type Middleware } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 
+import { memberFacingMessage } from '../../../data/imports/importError.ts'
 import {
   fetchLetterboxdFeed,
   letterboxdSyncAvailableTo,
@@ -16,7 +17,10 @@ import {
 import { users, type User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
+import { logger } from '../../../log.ts'
 import { count } from '../../../ui/shared/count.ts'
+
+const log = logger('letterboxd')
 
 // Hiding the form isn't enough: these routes stay mapped, so a POST would
 // still connect an account the gate is meant to have closed. 404 rather than
@@ -152,10 +156,13 @@ export default createController(routes.profile.letterboxd, {
         result = await syncLetterboxdNow(db, auth.identity)
       } catch (error) {
         // fetchLetterboxdFeed's messages are already written for a member — a
-        // private profile, a bad name, Letterboxd being down — so the one case
-        // worth rewording is anything else that got this far.
-        const message = error instanceof Error ? error.message : 'Something went wrong reading your diary.'
-        return back(`letterboxdError=${encodeURIComponent(message)}`)
+        // private profile, a bad name, Letterboxd being down — and arrive as an
+        // ImportError. Anything else that got this far is reworded, and logged.
+        const message = memberFacingMessage(error)
+        if (message === null) log.error(`sync failed for user ${auth.identity.id}`, error)
+        return back(
+          `letterboxdError=${encodeURIComponent(message ?? 'Something went wrong reading your diary.')}`,
+        )
       }
 
       if (!result) {
