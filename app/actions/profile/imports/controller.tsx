@@ -1,3 +1,5 @@
+import * as s from 'remix/data-schema'
+import * as f from 'remix/data-schema/form-data'
 import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
@@ -27,7 +29,9 @@ import type { ImportBatch, User } from '../../../data/schema.ts'
 import { displayLabel } from '../../../data/users.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import type { ImportBatchContext, ImportRowContext } from '../../../middleware/context.ts'
+import { mediaTypeUiFor } from '../../../mediaTypes.ts'
 import { routes } from '../../../routes.ts'
+import { notFound, parseIdParam } from '../../route-params.ts'
 import { ImportMatchingPage } from './matching-page.tsx'
 import { ImportReviewPage } from './review-page.tsx'
 
@@ -64,11 +68,28 @@ export function offersFeed(batch: ImportBatch, identity: User): boolean {
 const ANCHOR = /^(row-\d+|import-save)$/
 
 function backToReview(batch: ImportBatch, error?: string, anchor?: string): Response {
-  const href = routes.profile.imports.review.href({ batchId: batch.id })
-  const query = error ? `?error=${encodeURIComponent(error)}` : ''
+  const href = routes.profile.imports.review.href({ batchId: batch.id }, { error })
   const fragment = anchor && ANCHOR.test(anchor) ? `#${anchor}` : ''
-  return redirect(`${href}${query}${fragment}`, 303)
+  return redirect(`${href}${fragment}`, 303)
 }
+
+// The buttons on a review row. 'take' is the conflict notice's word for confirm.
+const resolveSchema = f.object({
+  action: f.field(s.enum_(['confirm', 'take', 'keep', 'skip', 'reopen', 'repoint'] as const)),
+  anchor: f.field(s.defaulted(s.string(), '')),
+  external_id: f.field(s.defaulted(s.string(), '').transform((value) => value.trim())),
+})
+
+// An unknown kind goes back to the review untouched, as it always has.
+const bulkSchema = f.object({
+  kind: f.field(s.defaulted(s.string(), '')),
+  undo: f.field(s.defaulted(s.string(), '')),
+})
+
+// Anything but 'take' keeps what the log already has, the safe reading.
+const conflictsSchema = f.object({
+  choice: f.field(s.defaulted(s.string(), '').transform((value) => (value === 'take' ? 'take' : 'keep'))),
+})
 
 export default createController(routes.profile.imports, {
   middleware: [requireAuth<User>()],
@@ -80,10 +101,11 @@ export default createController(routes.profile.imports, {
       if (!found.ok) return found.response
       const { batch, displayName } = found
 
-      const partial = context.url.searchParams.get('partial') === 'reviews' ? '?partial=reviews' : ''
+      const partial = context.url.searchParams.get('partial') === 'reviews' ? 'reviews' : null
+      const reviewHref = routes.profile.imports.review.href({ batchId: batch.id }, { partial })
 
       if (batch.status === 'review' || batch.status === 'done') {
-        return redirect(`${routes.profile.imports.review.href({ batchId: batch.id })}${partial}`, 303)
+        return redirect(reviewHref, 303)
       }
 
       return context.render(
@@ -95,7 +117,7 @@ export default createController(routes.profile.imports, {
           error={batch.error ?? undefined}
           progressHref={routes.profile.imports.progress.href({ batchId: batch.id })}
           discardHref={routes.profile.imports.discard.href({ batchId: batch.id })}
-          reviewHref={`${routes.profile.imports.review.href({ batchId: batch.id })}${partial}`}
+          reviewHref={reviewHref}
         />,
       )
     },
@@ -147,9 +169,12 @@ export default createController(routes.profile.imports, {
       if (!found.ok) return found.response
       const { batch } = found
 
+      const rowId = parseIdParam(context.params.rowId)
+      if (rowId == null) return notFound()
+
       const rows = await loadRows(context.get(Database), batch.id)
-      const row = rows.find((candidate) => candidate.id === Number(context.params.rowId))
-      if (!row) return new Response('Not found', { status: 404 })
+      const row = rows.find((candidate) => candidate.id === rowId)
+      if (!row) return notFound()
 
       const provider = getCatalogProvider(batch.media_type as MediaType)
       const typed = context.url.searchParams.get('q')?.trim()
@@ -200,26 +225,37 @@ export default createController(routes.profile.imports, {
       if (!found.ok) return found.response
       const { batch } = found
 
+      const rowId = parseIdParam(context.params.rowId)
+      if (rowId == null) return notFound()
+
+      const parsed = s.parseSafe(resolveSchema, context.get(FormData))
+      if (!parsed.success) return new Response('Invalid request', { status: 400 })
+      const { action, anchor, external_id: externalId } = parsed.value
+
       const db = context.get(Database)
-      const formData = context.get(FormData)
-      const rowId = Number(context.params.rowId)
-      const action = String(formData.get('action') ?? '')
-      const anchor = String(formData.get('anchor') ?? '')
+      switch (action) {
+        case 'confirm':
+        case 'take':
+          await confirmRow(db, batch, rowId)
+          break
+        case 'keep':
+          await keepRow(db, batch, rowId)
+          break
+        case 'skip':
+          await skipRow(db, batch, rowId)
+          break
+        case 'reopen':
+          await reopenRow(db, batch, rowId)
+          break
+        case 'repoint': {
+          if (!externalId) {
+            return backToReview(batch, `Choose a ${mediaTypeUiFor(batch.media_type).singular} first.`)
+          }
 
-      if (action === 'confirm' || action === 'take') {
-        await confirmRow(db, batch, rowId)
-      } else if (action === 'keep') {
-        await keepRow(db, batch, rowId)
-      } else if (action === 'skip') {
-        await skipRow(db, batch, rowId)
-      } else if (action === 'reopen') {
-        await reopenRow(db, batch, rowId)
-      } else if (action === 'repoint') {
-        const externalId = String(formData.get('external_id') ?? '').trim()
-        if (!externalId) return backToReview(batch, 'Choose a film first.')
-
-        const outcome = await repointRow(db, batch, rowId, externalId)
-        if (!outcome.ok) return backToReview(batch, outcome.error, anchor)
+          const outcome = await repointRow(db, batch, rowId, externalId)
+          if (!outcome.ok) return backToReview(batch, outcome.error, anchor)
+          break
+        }
       }
 
       return backToReview(batch, undefined, anchor)
@@ -231,12 +267,13 @@ export default createController(routes.profile.imports, {
       const { batch } = found
 
       const db = context.get(Database)
-      const form = context.get(FormData)
-      const kind = parseBulkKind(form.get('kind'))
+      const parsed = s.parseSafe(bulkSchema, context.get(FormData))
+      if (!parsed.success) return new Response('Invalid request', { status: 400 })
+      const kind = parseBulkKind(parsed.value.kind)
       if (!kind) return backToReview(batch)
 
       // A toggle: ticked, the same press gives back the rows that accept took.
-      if (form.get('undo') === '1') {
+      if (parsed.value.undo === '1') {
         await unacceptBulk(db, batch, kind)
       } else {
         // Recomputed rather than read from the form, so it takes what the page offered.
@@ -251,8 +288,9 @@ export default createController(routes.profile.imports, {
       if (!found.ok) return found.response
       const { batch } = found
 
-      const choice = String(context.get(FormData).get('choice') ?? '') === 'take' ? 'take' : 'keep'
-      await setConflictChoice(context.get(Database), batch.id, choice)
+      const parsed = s.parseSafe(conflictsSchema, context.get(FormData))
+      if (!parsed.success) return new Response('Invalid request', { status: 400 })
+      await setConflictChoice(context.get(Database), batch.id, parsed.value.choice)
 
       return backToReview(batch)
     },

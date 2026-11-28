@@ -4,12 +4,7 @@ import { css } from 'remix/ui'
 import { DisclosureChevron } from '../../ui/shared/collapsible.tsx'
 
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
-import {
-  ACTIVE_MEDIA_TYPES,
-  DEFAULT_MEDIA_TYPE,
-  MEDIA_TYPE_UI,
-  type ActiveMediaType,
-} from '../../mediaTypes.ts'
+import { ACTIVE_MEDIA_TYPES, mediaTypeParam, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
@@ -151,7 +146,9 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
       displayName,
     } = handle.props
     const label = displayLabel(user)
-    const returnTo = routes.users.show.href({ userId: String(user.id) })
+    const returnTo = routes.users.show.href({ userId: user.id })
+    // This profile, open on one tab, for a detail page to come back to.
+    const tabHref = (tab: string) => routes.users.show.href({ userId: user.id }, { tab })
 
     return (
       // Laid out like your own profile (profile/page.tsx) — heading, title,
@@ -201,8 +198,10 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
                 ACTIVE_MEDIA_TYPES.map((type) => {
                   const ui = MEDIA_TYPE_UI[type]
                   const { summary, log, total } = media![type]
-                  const watchedHref = routes.users.watched.href({ userId: String(user.id) })
-                  const seeAllHref = type === DEFAULT_MEDIA_TYPE ? watchedHref : `${watchedHref}?type=${type}`
+                  const seeAllHref = routes.users.watched.href(
+                    { userId: user.id },
+                    { type: mediaTypeParam(type) },
+                  )
 
                   return [
                     type,
@@ -221,7 +220,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
                       </h2>
                       <LoggedList
                         log={log}
-                        detailHref={(id) => withReturnTo(ui.hrefs.show(id), `${returnTo}?tab=${type}`)}
+                        detailHref={(id) => withReturnTo(ui.hrefs.show(id), tabHref(type))}
                       />
                       <TasteProfileSummary
                         label={`${label}'s ${ui.attributive} taste profile`}

@@ -25,7 +25,7 @@ export interface ImportHubProps {
   waitingImports: WaitingImport[]
 }
 
-const CONNECTIONS_HREF = `${routes.profile.edit.index.href()}?tab=${PROFILE_TABS.connections}`
+const CONNECTIONS_HREF = routes.profile.edit.index.href(null, { tab: PROFILE_TABS.connections })
 
 const CARD = css({
   border: '1px solid var(--rule)',

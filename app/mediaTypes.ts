@@ -32,13 +32,12 @@ export function serializeMediaOrder(order: readonly ActiveMediaType[]): string |
   return normalized.every((type, index) => type === ACTIVE_MEDIA_TYPES[index]) ? null : normalized.join(',')
 }
 
-// The `type` a list URL carries, for appending to a query string that already
-// has something in it — hence the leading `&`. Empty for the default type,
-// because a reader that finds no `type` falls back to DEFAULT_MEDIA_TYPE: the
-// writing end and the reading end have to name the same constant, so it is
-// named once, here.
-export function mediaTypeQuery(mediaType: ActiveMediaType): string {
-  return mediaType === DEFAULT_MEDIA_TYPE ? '' : `&type=${mediaType}`
+// The `type` a list URL carries, as a search param for `href()`. Null — left
+// out — for the default type, because a reader that finds no `type` falls back
+// to DEFAULT_MEDIA_TYPE: the writing end and the reading end have to name the
+// same constant, so it is named once, here.
+export function mediaTypeParam(mediaType: ActiveMediaType): ActiveMediaType | null {
+  return mediaType === DEFAULT_MEDIA_TYPE ? null : mediaType
 }
 
 interface StatusVerbs {

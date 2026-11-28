@@ -40,7 +40,6 @@ export function LuckyPickPage(handle: Handle<LuckyPickPageProps>) {
       errorLink,
     } = handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
-    const luckyPageHref = routes.recommendations.luckyPage.href()
 
     return (
       <Page title="Today's lucky pick" heading="🎲 Today's lucky pick" displayName={displayName}>
@@ -51,7 +50,7 @@ export function LuckyPickPage(handle: Handle<LuckyPickPageProps>) {
         <MediaTabLinks
           current={mediaType}
           order={mediaOrder}
-          hrefFor={(type) => `${luckyPageHref}?mediaType=${type}`}
+          hrefFor={(type) => routes.recommendations.luckyPage.href(null, { mediaType: type })}
         />
 
         {error && <ErrorNotice error={error} link={errorLink} />}

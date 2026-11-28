@@ -1,3 +1,5 @@
+import * as s from 'remix/data-schema'
+import * as f from 'remix/data-schema/form-data'
 import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
 import { createController, type Middleware } from 'remix/router'
@@ -17,6 +19,7 @@ import { users, type User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
 import { count } from '../../../ui/shared/count.ts'
+import { PROFILE_TABS } from '../edit/page.tsx'
 
 // Hiding the form isn't enough: these routes stay mapped, so a POST would
 // still connect an account the gate is meant to have closed. 404 rather than
@@ -44,10 +47,13 @@ const requireLetterboxdSync: Middleware = async (context, next) => {
 //
 // Callers pass bare `key=value`, since the leading `?` belongs to the tab that
 // always comes first.
-function back(params = ''): Response {
-  const query = params ? `?tab=connections&${params}` : '?tab=connections'
-  return redirect(`${routes.profile.edit.index.href()}${query}`, 303)
+type BackParams = { letterboxdError?: string; letterboxdConnected?: 1; letterboxdNotice?: string }
+
+function back(params: BackParams = {}): Response {
+  return redirect(routes.profile.edit.index.href(null, { tab: PROFILE_TABS.connections, ...params }), 303)
 }
+
+const connectSchema = f.object({ username: f.field(s.defaulted(s.string(), '')) })
 
 // What a member gets back for pressing Sync now. Counts rather than a bare
 // "done", because the question behind the button is usually whether the feed
@@ -89,22 +95,22 @@ export default createController(routes.profile.letterboxd, {
   actions: {
     async connect(context) {
       const auth = context.get(Auth)
-      const formData = context.get(FormData)
+      const parsed = s.parseSafe(connectSchema, context.get(FormData))
+      if (!parsed.success) return new Response('Invalid request', { status: 400 })
 
-      const username = normalizeLetterboxdUsername(String(formData.get('username') ?? ''))
+      const username = normalizeLetterboxdUsername(parsed.value.username)
       if (!username) {
-        return back(
-          `letterboxdError=${encodeURIComponent(
+        return back({
+          letterboxdError:
             "That doesn't look like a Letterboxd username. They're letters, numbers and underscores — the last part of your profile URL.",
-          )}`,
-        )
+        })
       }
 
       // Probed before it is stored, so a typo is caught here rather than
       // failing silently in a background sync nobody is watching.
       const outcome = await fetchLetterboxdFeed(username)
       if (!outcome.ok) {
-        return back(`letterboxdError=${encodeURIComponent(outcome.message)}`)
+        return back({ letterboxdError: outcome.message })
       }
 
       const db = context.get(Database)
@@ -136,7 +142,7 @@ export default createController(routes.profile.letterboxd, {
         letterboxd_synced_at: null,
       })
 
-      return back('letterboxdConnected=1')
+      return back({ letterboxdConnected: 1 })
     },
 
     // Deliberately the only path that skips the cooldown, and deliberately
@@ -155,14 +161,14 @@ export default createController(routes.profile.letterboxd, {
         // private profile, a bad name, Letterboxd being down — so the one case
         // worth rewording is anything else that got this far.
         const message = error instanceof Error ? error.message : 'Something went wrong reading your diary.'
-        return back(`letterboxdError=${encodeURIComponent(message)}`)
+        return back({ letterboxdError: message })
       }
 
       if (!result) {
-        return back(`letterboxdError=${encodeURIComponent('Connect a Letterboxd username first.')}`)
+        return back({ letterboxdError: 'Connect a Letterboxd username first.' })
       }
 
-      return back(`letterboxdNotice=${encodeURIComponent(describeSync(result))}`)
+      return back({ letterboxdNotice: describeSync(result) })
     },
 
     async disconnect(context) {

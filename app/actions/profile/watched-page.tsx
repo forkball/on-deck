@@ -8,7 +8,7 @@ import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedList } from '../../ui/components/watched-list.tsx'
 import { Field } from '../../ui/shared/field.tsx'
-import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, mediaTypeQuery, type ActiveMediaType } from '../../mediaTypes.ts'
+import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, mediaTypeParam, type ActiveMediaType } from '../../mediaTypes.ts'
 import { statusLabelsFor, statusOptionsFor } from '../../interactionStatus.ts'
 import { Button, Select } from '../../ui/shared/form-controls.tsx'
 import { SubmitOnChange } from '../../browser/submit-on-change.tsx'
@@ -27,12 +27,12 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
   return () => {
     const { movieLog, mediaType, status, page, totalPages, displayName } = handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
-    const typeQuery = mediaTypeQuery(mediaType)
-    // Everything that has to survive a page change. Kept as one string so the
+    // Everything that has to survive a page change. Built in one place so the
     // pagination links and the "back to here" the edit modal posts can't
     // disagree about which list you were looking at.
-    const filterQuery = `${typeQuery}${status ? `&status=${status}` : ''}`
-    const returnTo = `${routes.profile.watched.href()}?page=${page}${filterQuery}`
+    const pageHref = (p: number) =>
+      routes.profile.watched.href(null, { page: p, type: mediaTypeParam(mediaType), status })
+    const returnTo = pageHref(page)
     // Not "What I've watched" any more: this list includes what you've
     // declined, and the dropdown below says which slice you're on.
     const heading = `My ${ui.attributive} log`
@@ -100,13 +100,7 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
             )}
           />
 
-          {totalPages > 1 && (
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              pageHref={(p) => `${routes.profile.watched.href()}?page=${p}${filterQuery}`}
-            />
-          )}
+          {totalPages > 1 && <Pagination page={page} totalPages={totalPages} pageHref={pageHref} />}
         </div>
       </Page>
     )

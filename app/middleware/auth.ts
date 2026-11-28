@@ -56,7 +56,7 @@ export function requireAuth<identity = unknown>() {
   return requireAuthBase<identity>({
     onFailure(context) {
       const next = context.url.pathname + context.url.search
-      return redirect(`${routes.auth.login.index.href()}?next=${encodeURIComponent(next)}`, 303)
+      return redirect(routes.auth.login.index.href(null, { next }), 303)
     },
   })
 }

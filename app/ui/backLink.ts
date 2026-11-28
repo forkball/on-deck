@@ -47,6 +47,15 @@ export function formReturnPath(formData: FormData): string | null {
   return typeof value === 'string' ? safeReturnPath(value) : null
 }
 
+// `path` with `params` set on its query, for a return path that may or may not
+// already carry one. Expects a path safeReturnPath has let through; resolved
+// against the same placeholder origin, which is then dropped again.
+export function withSearchParams(path: string, params: Record<string, string>): string {
+  const url = new URL(path, RESOLVE_BASE)
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value)
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
 // Ordered most-specific first: /profile/watched has to beat /profile.
 const DESTINATIONS: [test: RegExp, label: string][] = [
   [/^\/profile\/watched/, 'your log'],

@@ -75,7 +75,7 @@ export default createController(routes.profile.password, {
       // out the person who just did it.
       logIn(context, user)
 
-      return redirect(`${routes.profile.index.href()}?saved=1`, 303)
+      return redirect(routes.profile.index.href(null, { saved: 1 }), 303)
     },
   },
 })

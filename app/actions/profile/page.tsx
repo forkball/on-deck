@@ -3,12 +3,7 @@ import { css } from 'remix/ui'
 
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
 import type { TasteProfileSettings } from '../../data/recommendations/tasteProfile.ts'
-import {
-  ACTIVE_MEDIA_TYPES,
-  DEFAULT_MEDIA_TYPE,
-  MEDIA_TYPE_UI,
-  type ActiveMediaType,
-} from '../../mediaTypes.ts'
+import { ACTIVE_MEDIA_TYPES, mediaTypeParam, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { DisclosureChevron } from '../../ui/shared/collapsible.tsx'
 import { Toast } from '../../ui/components/toast.tsx'
@@ -263,8 +258,8 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
       titleSaved,
       isAdmin,
     } = handle.props
-    const profileHref = routes.profile.index.href()
-    const savedReturnTo = `${profileHref}?saved=1`
+    const savedReturnTo = routes.profile.index.href(null, { saved: 1 })
+    const tabHref = (tab: string) => routes.profile.index.href(null, { tab })
 
     return (
       <Page title="My profile" heading={displayName} displayName={displayName}>
@@ -312,7 +307,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                     credits={credits}
                     picking={{
                       ...worn,
-                      returnTo: `${profileHref}?tab=${TITLES_TAB}`,
+                      returnTo: tabHref(TITLES_TAB),
                     }}
                   />
                   {isAdmin && (
@@ -330,10 +325,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             ACTIVE_MEDIA_TYPES.map((type) => {
               const ui = MEDIA_TYPE_UI[type]
               const { summary, profileUpdatedAt, log, total } = media[type]
-              const seeAllHref =
-                type === DEFAULT_MEDIA_TYPE
-                  ? routes.profile.watched.href()
-                  : `${routes.profile.watched.href()}?type=${type}`
+              const seeAllHref = routes.profile.watched.href(null, { type: mediaTypeParam(type) })
 
               return [
                 type,
@@ -353,7 +345,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
                   <LoggedList
                     log={log}
                     // Carries the tab, so "back" returns to the one you left.
-                    detailHref={(id) => withReturnTo(ui.hrefs.show(id), `${profileHref}?tab=${type}`)}
+                    detailHref={(id) => withReturnTo(ui.hrefs.show(id), tabHref(type))}
                     emptyHref={ui.hrefs.search()}
                     emptyLabel={`search for a ${ui.itemNoun}`}
                     returnTo={savedReturnTo}

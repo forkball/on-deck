@@ -15,6 +15,7 @@ import { Page } from '../components/page.tsx'
 import { CardCover, MediaItemCard, cardFrame } from '../components/media-item-card.tsx'
 import { markdownToPlainText } from '../components/markdown.tsx'
 import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
+import { withSearchParams } from '../backLink.ts'
 
 export interface MediaSearchPageProps {
   mediaType: ActiveMediaType
@@ -78,7 +79,7 @@ export function MediaSearchPage(handle: Handle<MediaSearchPageProps>) {
     const ctx: ResultContext = {
       mediaType,
       interactionsByItemId,
-      returnTo: `${ui.hrefs.search()}?q=${encodeURIComponent(query)}`,
+      returnTo: withSearchParams(ui.hrefs.search(), { q: query }),
     }
 
     return (

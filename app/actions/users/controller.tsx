@@ -26,6 +26,7 @@ import { DEFAULT_MEDIA_TYPE, parseMediaOrder, parseMediaType } from '../../media
 import { TITLES } from '../../data/profileTitles/catalog.ts'
 import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
+import { notFound, parseIdParam } from '../route-params.ts'
 import { UserSearchPage } from './search-page.tsx'
 import { UserProfilePage } from './show-page.tsx'
 import { UserWatchedPage } from './watched-page.tsx'
@@ -100,7 +101,8 @@ export default createController(routes.users, {
     async show(context) {
       const auth = context.get(Auth)
 
-      const userId = Number(context.params.userId)
+      const userId = parseIdParam(context.params.userId)
+      if (userId == null) return notFound()
       if (userId === auth.identity.id) return redirect(routes.profile.index.href(), 303)
 
       const db = context.get(Database)
@@ -160,7 +162,8 @@ export default createController(routes.users, {
     async watched(context) {
       const auth = context.get(Auth)
 
-      const userId = Number(context.params.userId)
+      const userId = parseIdParam(context.params.userId)
+      if (userId == null) return notFound()
       const db = context.get(Database)
       const target = await requireViewableProfile(db, auth.identity.id, userId)
       if (target instanceof Response) return target
@@ -192,7 +195,8 @@ export default createController(routes.users, {
     async following(context) {
       const auth = context.get(Auth)
 
-      const userId = Number(context.params.userId)
+      const userId = parseIdParam(context.params.userId)
+      if (userId == null) return notFound()
       const db = context.get(Database)
       const target = await requireViewableProfile(db, auth.identity.id, userId)
       if (target instanceof Response) return target
@@ -222,7 +226,8 @@ export default createController(routes.users, {
     async followers(context) {
       const auth = context.get(Auth)
 
-      const userId = Number(context.params.userId)
+      const userId = parseIdParam(context.params.userId)
+      if (userId == null) return notFound()
       const db = context.get(Database)
       const target = await requireViewableProfile(db, auth.identity.id, userId)
       if (target instanceof Response) return target
@@ -252,7 +257,8 @@ export default createController(routes.users, {
     async follow(context) {
       const auth = context.get(Auth)
 
-      const userId = Number(context.params.userId)
+      const userId = parseIdParam(context.params.userId)
+      if (userId == null) return notFound()
       const db = context.get(Database)
       await followUser(db, auth.identity.id, userId)
       // Both ends moved: one more followed, one more follower.
@@ -269,7 +275,8 @@ export default createController(routes.users, {
     async unfollow(context) {
       const auth = context.get(Auth)
 
-      const userId = Number(context.params.userId)
+      const userId = parseIdParam(context.params.userId)
+      if (userId == null) return notFound()
       const db = context.get(Database)
       await unfollowUser(db, auth.identity.id, userId)
 

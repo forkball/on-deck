@@ -33,6 +33,7 @@ import {
   type ActiveMediaType,
 } from '../../mediaTypes.ts'
 import { RETURN_TO_PARAM } from '../../ui/backLink.ts'
+import { notFound, parseIdParam } from '../route-params.ts'
 import { SEEN_BY_OPTIONS } from '../../ui/shared/seen-by.ts'
 import { LUCKY_PAGE_ORIGIN } from '../../browser/draw-lucky-form.tsx'
 import { GeneratingPage } from './generating-page.tsx'
@@ -43,22 +44,74 @@ import { LuckyPickPage, type LuckyPickPageProps } from './lucky-page.tsx'
 import { RecommendationsPage, type RecommendationsPageProps } from './page.tsx'
 import { RecommendationRunPage } from './run-page.tsx'
 
+// A select whose "Any" option posts ''. Missing reads the same as "Any", so the
+// duplicate-run form can send back a lever that was never set.
+function optionalChoice<const values extends readonly [string, ...string[]]>(values: values) {
+  return f.field(s.defaulted(s.enum_(['', ...values] as const), ''))
+}
+
+// The form's decades are years ending in 0. Anything else posted by hand is
+// refused rather than handed to the prompt as NaN.
+const decadeField = f.field(
+  s
+    .defaulted(s.string(), '')
+    .refine((value) => value === '' || /^\d{3}0$/.test(value), 'Expected a decade')
+    .transform((value) => (value === '' ? undefined : Number(value))),
+)
+
+// Ticked friends. Ids that aren't integers are dropped rather than refused, and
+// the rest still have to be people this account follows — see requestedFriendIds.
+const friendIdsField = f.fields(
+  s
+    .array(s.string())
+    .transform((values) => [
+      ...new Set(values.map((value) => Number(value)).filter((id) => Number.isInteger(id))),
+    ]),
+  { name: 'friend_ids' },
+)
+
+const modeField = f.field(s.enum_(['self', 'group'] as const))
+
 const generateSchema = f.object({
-  mode: f.field(s.union([s.literal('self'), s.literal('group')])),
+  mode: modeField,
   // Validated against the registry below rather than a literal union here: a
   // union would reject any newly-wired-up type until someone edited this
   // schema, and TypeScript can't flag the omission in a runtime schema.
   mediaType: f.field(s.defaulted(s.string(), DEFAULT_MEDIA_TYPE)),
   genre: f.field(s.defaulted(s.string(), '')),
-  decade: f.field(s.defaulted(s.string(), '')),
-  decade_relation: f.field(s.defaulted(s.string(), '')),
-  length: f.field(s.defaulted(s.string(), '')),
+  decade: decadeField,
+  decade_relation: optionalChoice(['before', 'within', 'after']),
+  length: optionalChoice(['short', 'medium', 'long', 'very_long']),
   player_type: f.field(s.defaulted(s.string(), '')),
   multiplayer_type: f.field(s.defaulted(s.string(), '')),
   platform: f.field(s.defaulted(s.string(), '')),
   series: f.field(s.defaulted(s.string(), '')),
   seen_by: f.field(s.defaulted(s.string(), '')),
   name: f.field(s.defaulted(s.string(), '')),
+  friendIds: friendIdsField,
+  // The taste profiles to base picks on. Unknown types are dropped, the way the
+  // form's own checkboxes can only send known ones.
+  source: f.fields(
+    s
+      .array(s.string())
+      .transform((values) =>
+        values
+          .map((value) => parseMediaType(value))
+          .filter((value): value is ActiveMediaType => value !== null),
+      ),
+  ),
+  // Present only on the "run it anyway" button of the duplicate notice.
+  force: f.field(s.defaulted(s.string(), '')),
+})
+
+// The lucky draw has no levers: only the medium, who's in it, and which page
+// asked, so a failure goes back there.
+const luckySchema = f.object({
+  // Missing means "Just me", as it always has for the draw page's form.
+  mode: f.field(s.defaulted(s.enum_(['self', 'group'] as const), 'self')),
+  mediaType: f.field(s.defaulted(s.string(), DEFAULT_MEDIA_TYPE)),
+  friendIds: friendIdsField,
+  origin: f.field(s.defaulted(s.string(), '')),
 })
 
 async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
@@ -112,8 +165,10 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
 // the generating page runs both need it and must not be able to disagree.
 function finishedHref(job: GenerationJob): string | null {
   if (job.runId != null) {
-    const href = routes.recommendations.show.href({ runId: String(job.runId) })
-    return job.prunedOldestRun ? `${href}?prunedOldest=1` : href
+    return routes.recommendations.show.href(
+      { runId: String(job.runId) },
+      { prunedOldest: job.prunedOldestRun ? 1 : null },
+    )
   }
   if (job.unconfirmedRunId != null) {
     return routes.recommendations.unconfirmed.href({ unconfirmedId: String(job.unconfirmedRunId) })
@@ -130,16 +185,13 @@ function finishedHref(job: GenerationJob): string | null {
 // those, so it costs nothing in the normal case — it stops a hand-posted id
 // pulling a stranger's taste, private or not, into a run. Both run actions read
 // friends through this, so neither can skip the check.
-async function requestedFriendIds(db: Db, userId: number, formData: FormData): Promise<number[]> {
-  if (formData.get('mode') !== 'group') return []
-  const requested = [
-    ...new Set(
-      formData
-        .getAll('friend_ids')
-        .map((value) => Number(value))
-        .filter((id) => Number.isInteger(id)),
-    ),
-  ]
+async function requestedFriendIds(
+  db: Db,
+  userId: number,
+  mode: 'self' | 'group',
+  requested: number[],
+): Promise<number[]> {
+  if (mode !== 'group') return []
   const followed = await listFollowingIds(db, userId, requested)
   return requested.filter((id) => followed.has(id))
 }
@@ -266,7 +318,12 @@ export default createController(routes.recommendations, {
 
       // After the narrowing, so a group of nobody but strangers is refused too
       // rather than quietly run for one.
-      const friendIds = await requestedFriendIds(db, auth.identity.id, formData)
+      const friendIds = await requestedFriendIds(
+        db,
+        auth.identity.id,
+        parsed.value.mode,
+        parsed.value.friendIds,
+      )
       if (parsed.value.mode === 'group' && friendIds.length === 0) {
         const mediaType = parseMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
         return context.render(
@@ -279,22 +336,9 @@ export default createController(routes.recommendations, {
 
       const filters: RecommendationFilters = {}
       if (parsed.value.genre) filters.genre = parsed.value.genre
-      if (parsed.value.decade) filters.decade = Number(parsed.value.decade)
-      if (
-        parsed.value.decade_relation === 'before' ||
-        parsed.value.decade_relation === 'within' ||
-        parsed.value.decade_relation === 'after'
-      ) {
-        filters.decadeRelation = parsed.value.decade_relation
-      }
-      if (
-        parsed.value.length === 'short' ||
-        parsed.value.length === 'medium' ||
-        parsed.value.length === 'long' ||
-        parsed.value.length === 'very_long'
-      ) {
-        filters.length = parsed.value.length
-      }
+      if (parsed.value.decade != null) filters.decade = parsed.value.decade
+      if (parsed.value.decade_relation) filters.decadeRelation = parsed.value.decade_relation
+      if (parsed.value.length) filters.length = parsed.value.length
       if (parsed.value.player_type) filters.playerType = parsed.value.player_type
       if (parsed.value.multiplayer_type) filters.multiplayerType = parsed.value.multiplayer_type
       if (parsed.value.platform) filters.platform = parsed.value.platform
@@ -307,11 +351,7 @@ export default createController(routes.recommendations, {
         SEEN_BY_OPTIONS.find((option) => option.value === parsed.value.seen_by)?.value ?? 'no_one'
       if (friendIds.length > 0 && seenBy !== 'half') filters.seenBy = seenBy
 
-      const sourceTypes = formData
-        .getAll('source')
-        .map((value) => String(value))
-        .map((value) => parseMediaType(value))
-        .filter((value): value is ActiveMediaType => value !== null)
+      const sourceTypes = parsed.value.source
 
       // Ahead of everything that reads the log, including the gate below: a run
       // built on a week-stale diary recommends films already watched, and
@@ -358,7 +398,7 @@ export default createController(routes.recommendations, {
         )
       }
 
-      if (!formData.get('force')) {
+      if (!parsed.value.force) {
         const duplicate = await findUnusedDuplicateRun(
           db,
           auth.identity.id,
@@ -427,20 +467,29 @@ export default createController(routes.recommendations, {
       const auth = context.get(Auth)
 
       const db = context.get(Database)
-      const formData = context.get(FormData)
-      const fromLuckyPage = formData.get('origin') === LUCKY_PAGE_ORIGIN
+      const parsed = s.parseSafe(luckySchema, context.get(FormData))
+      if (!parsed.success) {
+        return new Response('Invalid request', { status: 400 })
+      }
+
+      const fromLuckyPage = parsed.value.origin === LUCKY_PAGE_ORIGIN
       const renderFailure = (mediaType: ActiveMediaType, error: string, errorLink?: ErrorLink) =>
         fromLuckyPage
           ? luckyDrawPage(db, auth.identity, mediaType, { error, errorLink })
           : indexPage(db, auth.identity, mediaType, { error, errorLink })
 
-      const mediaType = parseMediaType(formData.get('mediaType')) ?? DEFAULT_MEDIA_TYPE
+      const mediaType = parseMediaType(parsed.value.mediaType) ?? DEFAULT_MEDIA_TYPE
 
-      const friendIds = await requestedFriendIds(db, auth.identity.id, formData)
+      const friendIds = await requestedFriendIds(
+        db,
+        auth.identity.id,
+        parsed.value.mode,
+        parsed.value.friendIds,
+      )
 
       // After the narrowing, so a group of nobody but strangers is refused too
       // rather than quietly drawn for one.
-      if (formData.get('mode') === 'group' && friendIds.length === 0) {
+      if (parsed.value.mode === 'group' && friendIds.length === 0) {
         return context.render(await renderFailure(mediaType, NO_FRIENDS_PICKED_ERROR), { status: 400 })
       }
 
@@ -545,12 +594,11 @@ export default createController(routes.recommendations, {
     async unconfirmed(context) {
       const auth = context.get(Auth)
 
-      const run = await getUnconfirmedRun(
-        context.get(Database),
-        Number(context.params.unconfirmedId),
-        auth.identity.id,
-      )
-      if (!run) return new Response('Not Found', { status: 404 })
+      const unconfirmedId = parseIdParam(context.params.unconfirmedId)
+      if (unconfirmedId == null) return notFound()
+
+      const run = await getUnconfirmedRun(context.get(Database), unconfirmedId, auth.identity.id)
+      if (!run) return notFound()
 
       return context.render(<UnconfirmedRunPage run={run} displayName={displayLabel(auth.identity)} />)
     },
@@ -558,9 +606,12 @@ export default createController(routes.recommendations, {
     async show(context) {
       const auth = context.get(Auth)
 
+      const runId = parseIdParam(context.params.runId)
+      if (runId == null) return notFound()
+
       const db = context.get(Database)
-      const run = await getRecommendationRun(db, Number(context.params.runId), auth.identity.id)
-      if (!run) return new Response('Not Found', { status: 404 })
+      const run = await getRecommendationRun(db, runId, auth.identity.id)
+      if (!run) return notFound()
 
       return context.render(
         <RecommendationRunPage

@@ -10,6 +10,7 @@ import { checkTitleUnlocksQuietly } from '../../data/profileTitles/unlocks.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { INTERACTION_STATUSES, type User } from '../../data/schema.ts'
 import { routes } from '../../routes.ts'
+import { notFound, parseIdParam } from '../route-params.ts'
 
 const updateSchema = f.object({
   status: f.field(s.enum_(INTERACTION_STATUSES)),
@@ -24,7 +25,9 @@ export default createController(routes.interactions, {
     async update(context) {
       const auth = context.get(Auth)
 
-      const interactionId = Number(context.params.interactionId)
+      const interactionId = parseIdParam(context.params.interactionId)
+      if (interactionId == null) return notFound()
+
       const formData = context.get(FormData)
       const parsed = s.parseSafe(updateSchema, formData)
 
@@ -54,7 +57,9 @@ export default createController(routes.interactions, {
     async destroy(context) {
       const auth = context.get(Auth)
 
-      const interactionId = Number(context.params.interactionId)
+      const interactionId = parseIdParam(context.params.interactionId)
+      if (interactionId == null) return notFound()
+
       const formData = context.get(FormData)
       const returnTo = String(formData.get('return_to') || '')
 

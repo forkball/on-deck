@@ -186,7 +186,7 @@ export default createController(routes.profile.edit, {
 
       await updateUserProfile(db, auth.identity.id, { email, display_name, bio, is_private })
 
-      return redirect(`${routes.profile.index.href()}?saved=1`, 303)
+      return redirect(routes.profile.index.href(null, { saved: 1 }), 303)
     },
   },
 })

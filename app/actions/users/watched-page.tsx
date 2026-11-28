@@ -7,7 +7,7 @@ import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedList } from '../../ui/components/watched-list.tsx'
-import { MEDIA_TYPE_UI, mediaTypeQuery, type ActiveMediaType } from '../../mediaTypes.ts'
+import { MEDIA_TYPE_UI, mediaTypeParam, type ActiveMediaType } from '../../mediaTypes.ts'
 
 export interface UserWatchedPageProps {
   user: User
@@ -22,10 +22,10 @@ export function UserWatchedPage(handle: Handle<UserWatchedPageProps>) {
   return () => {
     const { user, movieLog, mediaType, page, totalPages, displayName } = handle.props
     const label = displayLabel(user)
-    const watchedHref = routes.users.watched.href({ userId: String(user.id) })
     const ui = MEDIA_TYPE_UI[mediaType]
-    const typeQuery = mediaTypeQuery(mediaType)
-    const returnTo = `${watchedHref}?page=${page}${typeQuery}`
+    const pageHref = (p: number) =>
+      routes.users.watched.href({ userId: user.id }, { page: p, type: mediaTypeParam(mediaType) })
+    const returnTo = pageHref(page)
     const noun = ui.tabLabel
     // See the profile copy of this page — the verb is per medium.
     const heading = `What ${label} has ${ui.pastParticiple} (${noun})`
@@ -35,13 +35,7 @@ export function UserWatchedPage(handle: Handle<UserWatchedPageProps>) {
         {/* No actions: this is someone else's log, not yours to edit. */}
         <WatchedList log={movieLog} mediaType={mediaType} returnTo={returnTo} />
 
-        {totalPages > 1 && (
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            pageHref={(p) => `${watchedHref}?page=${p}${typeQuery}`}
-          />
-        )}
+        {totalPages > 1 && <Pagination page={page} totalPages={totalPages} pageHref={pageHref} />}
       </Page>
     )
   }

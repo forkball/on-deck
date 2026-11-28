@@ -1,3 +1,5 @@
+import * as s from 'remix/data-schema'
+import * as f from 'remix/data-schema/form-data'
 import { Database } from 'remix/data-table'
 import { Auth } from 'remix/middleware/auth'
 import { createController } from 'remix/router'
@@ -53,7 +55,28 @@ import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
 import { ProfilePage } from './page.tsx'
 import { loadWaitingImports } from './waiting-imports.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
-import { formReturnPath } from '../../ui/backLink.ts'
+import { formReturnPath, withSearchParams } from '../../ui/backLink.ts'
+
+// A text field that may be left out. Each action below then reads the value with
+// its own parse* rule, which owns the fallback for one that isn't recognised.
+const optionalText = () => f.field(s.defaulted(s.string(), ''))
+
+const titleSchema = f.object({ adjective: optionalText(), noun: optionalText() })
+
+const settingsSchema = f.object({
+  log_limit: optionalText(),
+  // An unchecked checkbox sends nothing at all, so the missing key is the
+  // "off" — same shape as is_private on the edit form.
+  use_notes: f.field(s.optional(s.string()).transform((value) => value !== undefined)),
+})
+
+const mediaOrderSchema = f.object({ media_order: optionalText() })
+
+const watchRegionSchema = f.object({ region: optionalText() })
+
+function invalidRequest(): Response {
+  return new Response('Invalid request', { status: 400 })
+}
 
 const RECENT_COUNT = 5
 const PAGE_SIZE = 10
@@ -134,36 +157,32 @@ export default createController(routes.profile, {
     async title(context) {
       const auth = context.get(Auth)
       const formData = context.get(FormData)
-      const db = context.get(Database)
+      const parsed = s.parseSafe(titleSchema, formData)
+      if (!parsed.success) return invalidRequest()
 
-      const choice = parseTitleChoice(
-        {
-          adjective: String(formData.get('adjective') ?? ''),
-          noun: String(formData.get('noun') ?? ''),
-        },
-        await loadUnlockedTitleKeys(db, auth.identity.id),
-      )
+      const db = context.get(Database)
+      const choice = parseTitleChoice(parsed.value, await loadUnlockedTitleKeys(db, auth.identity.id))
       if (!choice) return new Response("You haven't earned that title.", { status: 400 })
 
       await chooseTitle(db, auth.identity.id, choice)
       // Back to your profile's Titles tab, which the tap came from, with the
       // toast that says it took.
-      const back = formReturnPath(formData) ?? `${routes.profile.index.href()}?tab=${TITLES_TAB}`
-      return redirect(`${back}${back.includes('?') ? '&' : '?'}titleSaved=1`, 303)
+      const back = formReturnPath(formData) ?? routes.profile.index.href(null, { tab: TITLES_TAB })
+      return redirect(withSearchParams(back, { titleSaved: '1' }), 303)
     },
 
     async settings(context) {
       const auth = context.get(Auth)
 
-      const formData = context.get(FormData)
+      const parsed = s.parseSafe(settingsSchema, context.get(FormData))
+      if (!parsed.success) return invalidRequest()
+
       await updateProfileSettings(context.get(Database), auth.identity.id, {
-        logLimit: parseProfileLogLimit(String(formData.get('log_limit') ?? '')),
-        // An unchecked checkbox sends nothing at all, so the missing key is
-        // the "off" — same shape as is_private on the edit form.
-        useNotes: formData.get('use_notes') != null,
+        logLimit: parseProfileLogLimit(parsed.value.log_limit),
+        useNotes: parsed.value.use_notes,
       })
 
-      return redirect(`${routes.profile.edit.index.href()}?tab=taste&saved=1`, 303)
+      return redirect(routes.profile.edit.index.href(null, { tab: PROFILE_TABS.taste, saved: 1 }), 303)
     },
 
     // Posted by the move buttons on the settings tab, each carrying the whole
@@ -171,12 +190,13 @@ export default createController(routes.profile, {
     // only ever come out as some order of the real types.
     async mediaOrder(context) {
       const auth = context.get(Auth)
-      const formData = context.get(FormData)
+      const parsed = s.parseSafe(mediaOrderSchema, context.get(FormData))
+      if (!parsed.success) return invalidRequest()
 
-      const order = parseMediaOrder(String(formData.get('media_order') ?? ''))
+      const order = parseMediaOrder(parsed.value.media_order)
       await updateMediaOrder(context.get(Database), auth.identity.id, serializeMediaOrder(order))
 
-      return redirect(`${routes.profile.edit.index.href()}?tab=${PROFILE_TABS.mediaOrder}`, 303)
+      return redirect(routes.profile.edit.index.href(null, { tab: PROFILE_TABS.mediaOrder }), 303)
     },
 
     // Posted from a detail page's "where to watch" list, and sends you back to
@@ -185,8 +205,10 @@ export default createController(routes.profile, {
     async watchRegion(context) {
       const auth = context.get(Auth)
       const formData = context.get(FormData)
+      const parsed = s.parseSafe(watchRegionSchema, formData)
+      if (!parsed.success) return invalidRequest()
 
-      const region = parseWatchRegion(formData.get('region'))
+      const region = parseWatchRegion(parsed.value.region)
       if (region) await updateWatchRegion(context.get(Database), auth.identity.id, region)
 
       return redirect(formReturnPath(formData) ?? routes.home.href(), 303)
@@ -207,9 +229,10 @@ export default createController(routes.profile, {
       if (logged === 0) {
         const noun = mediaTypeUiFor(mediaType).plural
         return redirect(
-          `${routes.profile.index.href()}?tab=${mediaType}&rebuildError=${encodeURIComponent(
-            `You have no ${noun} logged yet, so there's nothing to write a profile from.`,
-          )}`,
+          routes.profile.index.href(null, {
+            tab: mediaType,
+            rebuildError: `You have no ${noun} logged yet, so there's nothing to write a profile from.`,
+          }),
           303,
         )
       }
@@ -218,9 +241,10 @@ export default createController(routes.profile, {
       if (!allowance.unlimited && allowance.remaining <= 0) {
         const wait = allowance.resetsAt ? timeUntil(allowance.resetsAt) : 'a while'
         return redirect(
-          `${routes.profile.index.href()}?tab=${mediaType}&rebuildError=${encodeURIComponent(
-            `You've used all ${allowance.limit} profile rebuilds for today — the next one frees up in ${wait}.`,
-          )}`,
+          routes.profile.index.href(null, {
+            tab: mediaType,
+            rebuildError: `You've used all ${allowance.limit} profile rebuilds for today — the next one frees up in ${wait}.`,
+          }),
           303,
         )
       }
@@ -231,7 +255,7 @@ export default createController(routes.profile, {
       await recordProfileRebuild(db, auth.identity.id)
       await regenerateTasteProfile(db, auth.identity.id, mediaType, profileSettingsFor(auth.identity))
 
-      return redirect(`${routes.profile.index.href()}?tab=${mediaType}&rebuilt=1`, 303)
+      return redirect(routes.profile.index.href(null, { tab: mediaType, rebuilt: 1 }), 303)
     },
 
     async watched(context) {

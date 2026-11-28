@@ -24,6 +24,7 @@ import {
 import { checkTitleUnlocksQuietly } from '../data/profileTitles/unlocks.ts'
 import { INTERACTION_SOURCES, INTERACTION_STATUSES, type MediaItem, type User } from '../data/schema.ts'
 import type { MediaControllerContext, MediaItemControllerContext } from '../middleware/context.ts'
+import { notFound, parseIdParam } from './route-params.ts'
 import { displayLabel } from '../data/users.ts'
 import { MEDIA_TYPE_UI, parseMediaOrder, type ActiveMediaType } from '../mediaTypes.ts'
 import { parseMediaMetadata } from '../data/mediaMetadata.ts'
@@ -42,6 +43,12 @@ const logSchema = f.object({
   rating: f.field(s.defaulted(s.string(), '')),
   notes: f.field(s.defaulted(s.string(), '')),
   return_to: f.field(s.defaulted(s.string(), '')),
+})
+
+// The pasted catalog link. Left empty, it is refused below with the provider's
+// hint rather than a bare 400, since that is the mistake it most likely is.
+const rematchSchema = f.object({
+  catalog_link: f.field(s.defaulted(s.string(), '')),
 })
 
 // Written out rather than inferred. createController derives action types from
@@ -141,7 +148,9 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       const auth = context.get(Auth)
       const identity: User = auth.identity
 
-      const mediaItemId = Number(context.params.mediaItemId)
+      const mediaItemId = parseIdParam(context.params.mediaItemId)
+      if (mediaItemId == null) return notFound()
+
       const db: Db = context.get(Database)
       const item = await getMediaItemDetail(db, mediaItemId)
       if (!item) return new Response('Not Found', { status: 404 })
@@ -192,9 +201,13 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       const auth = context.get(Auth)
       if (!auth.identity.is_admin) return new Response('Forbidden', { status: 403 })
 
-      const mediaItemId = Number(context.params.mediaItemId)
+      const mediaItemId = parseIdParam(context.params.mediaItemId)
+      if (mediaItemId == null) return notFound()
+
       const formData = context.get(FormData)
-      const link = String(formData.get('catalog_link') || '')
+      const parsed = s.parseSafe(rematchSchema, formData)
+      if (!parsed.success) return new Response('Invalid request', { status: 400 })
+      const link = parsed.value.catalog_link
       const returnTo = String(formData.get('return_to') || '') || ui.hrefs.show(mediaItemId)
       const separator = returnTo.includes('?') ? '&' : '?'
 
@@ -223,7 +236,9 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       const auth = context.get(Auth)
       const identity: User = auth.identity
 
-      const mediaItemId = Number(context.params.mediaItemId)
+      const mediaItemId = parseIdParam(context.params.mediaItemId)
+      if (mediaItemId == null) return notFound()
+
       const formData = context.get(FormData)
       const parsed = s.parseSafe(logSchema, formData)
 

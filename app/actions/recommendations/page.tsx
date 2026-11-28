@@ -196,7 +196,6 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
       errorLink,
       duplicate,
     } = handle.props
-    const recsHref = routes.recommendations.index.href()
     const ui = MEDIA_TYPE_UI[mediaType]
 
     return (
@@ -210,7 +209,7 @@ export function RecommendationsPage(handle: Handle<RecommendationsPageProps>) {
         <MediaTabLinks
           current={mediaType}
           order={mediaOrder}
-          hrefFor={(type) => `${recsHref}?mediaType=${type}`}
+          hrefFor={(type) => routes.recommendations.index.href(null, { mediaType: type })}
         />
 
         {duplicate && <DuplicateNotice duplicate={duplicate} />}

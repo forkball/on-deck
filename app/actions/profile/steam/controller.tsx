@@ -7,7 +7,13 @@ import { buildSteamLoginUrl, fetchSteamPersona, verifySteamCallback } from '../.
 import { users, type User } from '../../../data/schema.ts'
 import { requireAuth } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
+import { PROFILE_TABS } from '../edit/page.tsx'
 import { externalOrigin } from './request-origin.ts'
+
+// Every outcome lands back on the Connections tab, with what happened.
+function connectionsHref(outcome: { steamError?: 1 | 'taken'; steamConnected?: 1 } = {}): string {
+  return routes.profile.edit.index.href(null, { tab: PROFILE_TABS.connections, ...outcome })
+}
 
 // Not an app login — this only records which Steam account to read a library
 // from.
@@ -30,7 +36,7 @@ export default createController(routes.profile.steam, {
       // confirm it signed them; anything forged or replayed returns null.
       const steamId = await verifySteamCallback(context.url.searchParams)
       if (!steamId) {
-        return redirect(`${routes.profile.edit.index.href()}?tab=connections&steamError=1`, 303)
+        return redirect(connectionsHref({ steamError: 1 }), 303)
       }
 
       const db = context.get(Database)
@@ -39,7 +45,7 @@ export default createController(routes.profile.steam, {
       // library; surface that rather than letting the write throw.
       const existing = await db.findOne(users, { where: { steam_id: steamId } })
       if (existing && existing.id !== auth.identity.id) {
-        return redirect(`${routes.profile.edit.index.href()}?tab=connections&steamError=taken`, 303)
+        return redirect(connectionsHref({ steamError: 'taken' }), 303)
       }
 
       // Fetched here because this is the one moment Steam is already being
@@ -48,7 +54,7 @@ export default createController(routes.profile.steam, {
       const persona = await fetchSteamPersona(steamId)
 
       await db.update(users, auth.identity.id, { steam_id: steamId, steam_persona: persona ?? undefined })
-      return redirect(`${routes.profile.edit.index.href()}?tab=connections&steamConnected=1`, 303)
+      return redirect(connectionsHref({ steamConnected: 1 }), 303)
     },
 
     async disconnect(context) {
@@ -59,7 +65,7 @@ export default createController(routes.profile.steam, {
       // verified against the database, and the same thing updateUserBio
       // relies on. The column type won't accept a literal null.
       await db.update(users, auth.identity.id, { steam_id: undefined, steam_persona: undefined })
-      return redirect(`${routes.profile.edit.index.href()}?tab=connections`, 303)
+      return redirect(connectionsHref(), 303)
     },
   },
 })

@@ -13,9 +13,9 @@ const forgotSchema = f.object({
   identifier: f.field(s.defaulted(s.string(), '')),
 })
 
-// Where the emailed link goes. The token is base64url, so it needs no escaping.
+// Where the emailed link goes.
 function resetLinkFor(token: string): string {
-  return appLink(`${routes.auth.reset.index.href()}?token=${token}`)
+  return appLink(routes.auth.reset.index.href(null, { token }))
 }
 
 export default createController(routes.auth.forgot, {

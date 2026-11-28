@@ -14,6 +14,7 @@ import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
+import { notFound, parseIdParam } from '../route-params.ts'
 import { NotificationsPage } from './page.tsx'
 
 export default createController(routes.notifications, {
@@ -44,18 +45,18 @@ export default createController(routes.notifications, {
     async read(context) {
       const auth = context.get(Auth)
 
-      const notificationId = Number(context.params.notificationId)
+      const notificationId = parseIdParam(context.params.notificationId)
+      if (notificationId == null) return notFound()
+
       const db = context.get(Database)
       const notification = await db.find(notifications, notificationId)
-      if (!notification || notification.user_id !== auth.identity.id) {
-        return new Response('Not Found', { status: 404 })
-      }
+      if (!notification || notification.user_id !== auth.identity.id) return notFound()
 
       await markNotificationRead(db, notificationId, auth.identity.id)
 
       // Each kind opens the thing it's about.
       if (notification.type === 'title') {
-        return redirect(`${routes.profile.index.href()}?tab=${TITLES_TAB}`, 303)
+        return redirect(routes.profile.index.href(null, { tab: TITLES_TAB }), 303)
       }
       if (notification.type === 'follow') {
         return redirect(

@@ -21,9 +21,7 @@ export interface UserSearchPageProps {
 export function UserSearchPage(handle: Handle<UserSearchPageProps>) {
   return () => {
     const { query, mediaOrder, results, followingByUserId, displayName } = handle.props
-    const returnTo = query
-      ? `${routes.users.search.href()}?q=${encodeURIComponent(query)}`
-      : routes.users.search.href()
+    const returnTo = routes.users.search.href(null, { q: query || null })
 
     return (
       // Wide, like the media searches, so the shared tab bar sits the same.
