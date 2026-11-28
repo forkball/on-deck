@@ -1,7 +1,10 @@
 import type { MediaType } from './data/mediaItems.ts'
+import { MEDIA_TYPES } from './data/schema.ts'
 import { routes } from './routes.ts'
 
-export const ACTIVE_MEDIA_TYPES = ['movie', 'tv', 'book', 'game'] as const
+// The list itself lives in schema.ts, next to the columns it constrains, so the
+// schema and the registry can't name different sets.
+export const ACTIVE_MEDIA_TYPES = MEDIA_TYPES
 
 export type ActiveMediaType = (typeof ACTIVE_MEDIA_TYPES)[number]
 
@@ -32,13 +35,23 @@ export function serializeMediaOrder(order: readonly ActiveMediaType[]): string |
   return normalized.every((type, index) => type === ACTIVE_MEDIA_TYPES[index]) ? null : normalized.join(',')
 }
 
-// The `type` a list URL carries, for appending to a query string that already
-// has something in it — hence the leading `&`. Empty for the default type,
-// because a reader that finds no `type` falls back to DEFAULT_MEDIA_TYPE: the
-// writing end and the reading end have to name the same constant, so it is
-// named once, here.
-export function mediaTypeQuery(mediaType: ActiveMediaType): string {
-  return mediaType === DEFAULT_MEDIA_TYPE ? '' : `&type=${mediaType}`
+// The media type a page opens on: the one its URL names, else the member's
+// first tab (`parseMediaOrder(user.media_order)`) — not DEFAULT_MEDIA_TYPE. So
+// a link that means a particular type has to name it, default or not.
+export function openingMediaType(value: unknown, order: readonly ActiveMediaType[]): ActiveMediaType {
+  return parseMediaType(value) ?? order[0]
+}
+
+// The same, for a page whose tabs include some that aren't a media type — a
+// profile's Titles tab. One of `extras` the URL names wins; anything else is
+// read as a media type.
+export function openingTab<extra extends string>(
+  value: string | null,
+  order: readonly ActiveMediaType[],
+  extras: readonly extra[],
+): ActiveMediaType | extra {
+  const extra = extras.find((tab) => tab === value)
+  return extra ?? openingMediaType(value, order)
 }
 
 interface StatusVerbs {

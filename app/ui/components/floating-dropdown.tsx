@@ -25,7 +25,9 @@ export function FloatingDropdown(
     const { triggerLabel, children, align = 'left', compact, icon } = handle.props
 
     return (
-      <details mix={css({ position: 'relative', display: 'inline-block' })}>
+      // data-close-on-submit: a form inside posted in place folds the dropdown
+      // once it has saved (browser/shared/submit-in-place.ts).
+      <details mix={css({ position: 'relative', display: 'inline-block' })} data-close-on-submit>
         <summary
           // `icon` and `compact` are sized in app.css: `.doodle-border` is
           // unlayered, so a css() mix can't set its border width.

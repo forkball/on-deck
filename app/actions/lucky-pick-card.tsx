@@ -5,7 +5,7 @@ import { parseMediaMetadata } from '../data/mediaMetadata.ts'
 import type { LuckyPick } from '../data/recommendations/lucky.ts'
 import { mediaTypeUiFor } from '../mediaTypes.ts'
 import { routes } from '../routes.ts'
-import { withReturnTo } from '../ui/backLink.ts'
+import { withReturnTo } from '../ui/back-link.ts'
 import { Link } from '../ui/shared/form-controls.tsx'
 
 // What the day's pick is called, wherever it is named. Exported because the

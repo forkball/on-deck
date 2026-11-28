@@ -8,7 +8,7 @@ import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedList } from '../../ui/components/watched-list.tsx'
 import { Field } from '../../ui/shared/field.tsx'
-import { DEFAULT_MEDIA_TYPE, MEDIA_TYPE_UI, mediaTypeQuery, type ActiveMediaType } from '../../mediaTypes.ts'
+import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import { statusLabelsFor, statusOptionsFor } from '../../interactionStatus.ts'
 import { Button, Select } from '../../ui/shared/form-controls.tsx'
 import { SubmitOnChange } from '../../browser/submit-on-change.tsx'
@@ -27,7 +27,8 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
   return () => {
     const { movieLog, mediaType, status, page, totalPages, displayName } = handle.props
     const ui = MEDIA_TYPE_UI[mediaType]
-    const typeQuery = mediaTypeQuery(mediaType)
+    // Always named: a URL without a type opens on your first tab.
+    const typeQuery = `&type=${mediaType}`
     // Everything that has to survive a page change. Kept as one string so the
     // pagination links and the "back to here" the edit modal posts can't
     // disagree about which list you were looking at.
@@ -51,7 +52,7 @@ export function ProfileWatchedPage(handle: Handle<ProfileWatchedPageProps>) {
           action={routes.profile.watched.href()}
           mix={css({ display: 'flex', alignItems: 'flex-end', gap: '8px', margin: '0 0 24px' })}
         >
-          {mediaType !== DEFAULT_MEDIA_TYPE && <input type="hidden" name="type" value={mediaType} />}
+          <input type="hidden" name="type" value={mediaType} />
           {/* The whole width: the button beside it is only there with JS off. */}
           <div mix={css({ flex: '1 1 auto' })}>
             <Field label="Status">

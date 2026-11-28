@@ -7,7 +7,7 @@ import { routes } from '../../routes.ts'
 import { Page } from '../../ui/components/page.tsx'
 import { Pagination } from '../../ui/components/pagination.tsx'
 import { WatchedList } from '../../ui/components/watched-list.tsx'
-import { MEDIA_TYPE_UI, mediaTypeQuery, type ActiveMediaType } from '../../mediaTypes.ts'
+import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 
 export interface UserWatchedPageProps {
   user: User
@@ -24,7 +24,8 @@ export function UserWatchedPage(handle: Handle<UserWatchedPageProps>) {
     const label = displayLabel(user)
     const watchedHref = routes.users.watched.href({ userId: String(user.id) })
     const ui = MEDIA_TYPE_UI[mediaType]
-    const typeQuery = mediaTypeQuery(mediaType)
+    // Always named: a URL without a type opens on the viewer's first tab.
+    const typeQuery = `&type=${mediaType}`
     const returnTo = `${watchedHref}?page=${page}${typeQuery}`
     const noun = ui.tabLabel
     // See the profile copy of this page — the verb is per medium.

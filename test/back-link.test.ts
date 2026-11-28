@@ -7,7 +7,7 @@ import {
   RETURN_TO_PARAM,
   safeReturnPath,
   withReturnTo,
-} from '../app/ui/backLink.ts'
+} from '../app/ui/back-link.ts'
 
 // Both ends of the return-path contract: a list writes where it was opened
 // from, and the page it opens reads that back to offer a way there. They only

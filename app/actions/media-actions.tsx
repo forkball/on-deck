@@ -23,7 +23,7 @@ import {
 } from '../data/mediaItems.ts'
 import { checkTitleUnlocksQuietly } from '../data/profileTitles/unlocks.ts'
 import { INTERACTION_SOURCES, INTERACTION_STATUSES, type MediaItem, type User } from '../data/schema.ts'
-import type { MediaControllerContext, MediaItemControllerContext } from '../middleware/context.ts'
+import type { AuthedControllerContext, MediaItemControllerContext } from '../middleware/context.ts'
 import { displayLabel } from '../data/users.ts'
 import { MEDIA_TYPE_UI, parseMediaOrder, type ActiveMediaType } from '../mediaTypes.ts'
 import { parseMediaMetadata } from '../data/mediaMetadata.ts'
@@ -31,7 +31,7 @@ import { loadWatchProviders } from '../data/watchProviders.ts'
 import { guessWatchRegion, parseWatchRegion } from '../data/watchRegion.ts'
 import { MediaDetailPage } from '../ui/pages/media-detail-page.tsx'
 import { MediaSearchPage } from '../ui/pages/media-search-page.tsx'
-import { RETURN_TO_PARAM, withReturnTo } from '../ui/backLink.ts'
+import { RETURN_TO_PARAM, withReturnTo } from '../ui/back-link.ts'
 
 const SUGGESTION_LIMIT = 6
 
@@ -56,7 +56,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
   const provider = getCatalogProvider(mediaType)
 
   return {
-    async search(context: MediaControllerContext) {
+    async search(context: AuthedControllerContext) {
       const db: Db = context.get(Database)
       const auth = context.get(Auth)
       const identity: User = auth.identity
@@ -101,7 +101,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       )
     },
 
-    async suggest(context: MediaControllerContext) {
+    async suggest(context: AuthedControllerContext) {
       const query = context.url.searchParams.get('q')?.trim() ?? ''
       if (query.length < 2) return Response.json({ suggestions: [] })
 
@@ -122,7 +122,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       return Response.json({ suggestions })
     },
 
-    async import(context: MediaControllerContext) {
+    async import(context: AuthedControllerContext) {
       const externalId = context.url.searchParams.get('externalId')?.trim() ?? ''
       if (!externalId) return redirect(ui.hrefs.search(), 303)
 

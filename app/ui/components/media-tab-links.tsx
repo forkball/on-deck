@@ -6,8 +6,6 @@ import { ActiveTabScroller } from '../../browser/active-tab-scroller.tsx'
 import { Link } from '../shared/form-controls.tsx'
 import { TAB_BAR_SCROLL } from './tabs.tsx'
 
-const PLACEHOLDER_TYPES: string[] = []
-
 export interface MediaTabLinksProps {
   // A media type, or 'people' on the people search the bar also leads to.
   current: ActiveMediaType | 'people'
@@ -74,11 +72,6 @@ export function MediaTabLinks(handle: Handle<MediaTabLinksProps>) {
           </Link>
         )}
         <ActiveTabScroller />
-        {PLACEHOLDER_TYPES.map((label) => (
-          <span key={label} mix={css({ padding: '0 0 8px', color: 'var(--rule)' })} title="Coming soon">
-            {label}
-          </span>
-        ))}
       </div>
     )
   }

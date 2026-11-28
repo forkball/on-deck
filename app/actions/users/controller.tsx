@@ -22,10 +22,10 @@ import { checkTitleUnlocksQuietly, loadUnlockedTitleKeys } from '../../data/prof
 import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel, searchUsers } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
-import { DEFAULT_MEDIA_TYPE, parseMediaOrder, parseMediaType } from '../../mediaTypes.ts'
+import { openingMediaType, openingTab, parseMediaOrder } from '../../mediaTypes.ts'
 import { TITLES } from '../../data/profileTitles/catalog.ts'
 import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
-import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
+import { followListPage } from '../../ui/pages/follow-list-page.tsx'
 import { UserSearchPage } from './search-page.tsx'
 import { UserProfilePage } from './show-page.tsx'
 import { UserWatchedPage } from './watched-page.tsx'
@@ -135,8 +135,7 @@ export default createController(routes.users, {
       // The viewer's order, not the profile owner's: it is how they asked to
       // see the tabs, wherever the tabs are.
       const mediaOrder = parseMediaOrder(auth.identity.media_order)
-      const tab = context.url.searchParams.get('tab')
-      const activeTab = tab === TITLES_TAB ? TITLES_TAB : (parseMediaType(tab) ?? mediaOrder[0])
+      const activeTab = openingTab(context.url.searchParams.get('tab'), mediaOrder, [TITLES_TAB])
 
       return context.render(
         <UserProfilePage
@@ -166,7 +165,11 @@ export default createController(routes.users, {
       if (target instanceof Response) return target
 
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
-      const mediaType = parseMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
+      // The viewer's first tab when the URL names none, as on the profile.
+      const mediaType = openingMediaType(
+        context.url.searchParams.get('type'),
+        parseMediaOrder(auth.identity.media_order),
+      )
       // Someone else's log, so no status filter and no declined items — what
       // they turned down is a note to themselves, not something to browse.
       const filter = { type: mediaType, statuses: CONSUMPTION_STATUSES }
@@ -198,24 +201,13 @@ export default createController(routes.users, {
       if (target instanceof Response) return target
 
       const label = displayLabel(target)
-      const targetUsers = await listFollowedUsers(db, userId)
-      const followingIds = await listFollowingIds(
-        db,
-        auth.identity.id,
-        targetUsers.map((u) => u.id),
-      )
-
       return context.render(
-        <FollowListPage
-          title={`${label}'s following`}
-          heading={`Who ${label} follows`}
-          users={targetUsers}
-          viewerId={auth.identity.id}
-          followingByUserId={new Map(targetUsers.map((u) => [u.id, followingIds.has(u.id)]))}
-          emptyMessage={`${label} isn't following anyone yet.`}
-          returnTo={routes.users.following.href({ userId: String(userId) })}
-          displayName={displayLabel(auth.identity)}
-        />,
+        await followListPage(db, auth.identity, await listFollowedUsers(db, userId), {
+          title: `${label}'s following`,
+          heading: `Who ${label} follows`,
+          emptyMessage: `${label} isn't following anyone yet.`,
+          returnTo: routes.users.following.href({ userId: String(userId) }),
+        }),
       )
     },
 
@@ -228,24 +220,13 @@ export default createController(routes.users, {
       if (target instanceof Response) return target
 
       const label = displayLabel(target)
-      const targetUsers = await listFollowers(db, userId)
-      const followingIds = await listFollowingIds(
-        db,
-        auth.identity.id,
-        targetUsers.map((u) => u.id),
-      )
-
       return context.render(
-        <FollowListPage
-          title={`${label}'s followers`}
-          heading={`${label}'s followers`}
-          users={targetUsers}
-          viewerId={auth.identity.id}
-          followingByUserId={new Map(targetUsers.map((u) => [u.id, followingIds.has(u.id)]))}
-          emptyMessage={`No one follows ${label} yet.`}
-          returnTo={routes.users.followers.href({ userId: String(userId) })}
-          displayName={displayLabel(auth.identity)}
-        />,
+        await followListPage(db, auth.identity, await listFollowers(db, userId), {
+          title: `${label}'s followers`,
+          heading: `${label}'s followers`,
+          emptyMessage: `No one follows ${label} yet.`,
+          returnTo: routes.users.followers.href({ userId: String(userId) }),
+        }),
       )
     },
 

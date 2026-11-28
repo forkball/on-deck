@@ -14,7 +14,7 @@ import { DislikedDisplay, StarIcon, StarRatingInput } from './star-rating.tsx'
 import { StatusSelect } from './status-select.tsx'
 import { Field } from '../shared/field.tsx'
 import { Button, Link } from '../shared/form-controls.tsx'
-import { withReturnTo } from '../backLink.ts'
+import { withReturnTo } from '../back-link.ts'
 
 // The frame every card in a result list shares, marked down its left edge in the
 // media type's colour. Also used by the search page's group of single issues, so

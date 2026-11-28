@@ -28,11 +28,12 @@ import { routes } from '../../routes.ts'
 import {
   DEFAULT_MEDIA_TYPE,
   mediaTypeUiFor,
+  openingMediaType,
   parseMediaOrder,
   parseMediaType,
   type ActiveMediaType,
 } from '../../mediaTypes.ts'
-import { RETURN_TO_PARAM } from '../../ui/backLink.ts'
+import { RETURN_TO_PARAM } from '../../ui/back-link.ts'
 import { SEEN_BY_OPTIONS } from '../../ui/shared/seen-by.ts'
 import { LUCKY_PAGE_ORIGIN } from '../../browser/draw-lucky-form.tsx'
 import { GeneratingPage } from './generating-page.tsx'
@@ -61,27 +62,36 @@ const generateSchema = f.object({
   name: f.field(s.defaulted(s.string(), '')),
 })
 
+// Who the viewer can generate with, and which types each of them — and the
+// viewer — has logged: one query for everyone the picker can offer, so the form
+// can grey out a run before it's requested rather than after it's refused.
+// Both the index and the lucky page's pickers read it.
+async function loadFriendsWithLoggedTypes(db: Db, user: User) {
+  const friends = await listFollowedUsers(db, user.id)
+  const loggedByUser = await loadLoggedTypesByUser([user.id, ...friends.map((friend) => friend.id)])
+  return {
+    friends,
+    loggedTypesOf: (userId: number) => [...(loggedByUser.get(userId) ?? [])],
+  }
+}
+
 async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
-  const [allRuns, runsFromOthers, friends, dailyRuns, lucky, unconfirmedRuns] = await Promise.all([
-    listRecommendationRuns(db, user.id, mediaType),
-    listRecommendationRunsFromOthers(db, user.id, mediaType),
-    listFollowedUsers(db, user.id),
-    getDailyRunAllowance(db, user),
-    getLuckyState(user),
-    // Not filtered by media type, unlike the runs above: there are at most three,
-    // and a list this small hiding two thirds of itself behind a tab is a way to
-    // lose them.
-    listUnconfirmedRuns(db, user.id),
-  ])
+  const [allRuns, runsFromOthers, { friends, loggedTypesOf }, dailyRuns, lucky, unconfirmedRuns] =
+    await Promise.all([
+      listRecommendationRuns(db, user.id, mediaType),
+      listRecommendationRunsFromOthers(db, user.id, mediaType),
+      loadFriendsWithLoggedTypes(db, user),
+      getDailyRunAllowance(db, user),
+      getLuckyState(user),
+      // Not filtered by media type, unlike the runs above: there are at most three,
+      // and a list this small hiding two thirds of itself behind a tab is a way to
+      // lose them.
+      listUnconfirmedRuns(db, user.id),
+    ])
 
   // The page shows these as separate sections rather than one list.
   const runs = allRuns.filter((run) => !run.isLucky)
   const luckyRuns = allRuns.filter((run) => run.isLucky)
-
-  // After the fetch above rather than alongside it, since it needs the ids it
-  // returns. One query for everyone the picker can offer, so the form can grey
-  // out a run before it's requested rather than after it's refused.
-  const loggedByUser = await loadLoggedTypesByUser([user.id, ...friends.map((friend) => friend.id)])
 
   const provider = getCatalogProvider(mediaType)
 
@@ -93,10 +103,8 @@ async function loadIndexData(db: Db, user: User, mediaType: ActiveMediaType) {
     luckyRuns,
     runsFromOthers,
     friends,
-    loggedTypes: Object.fromEntries(
-      friends.map((friend) => [friend.id, [...(loggedByUser.get(friend.id) ?? [])]]),
-    ),
-    viewerLoggedTypes: [...(loggedByUser.get(user.id) ?? [])],
+    loggedTypes: Object.fromEntries(friends.map((friend) => [friend.id, loggedTypesOf(friend.id)])),
+    viewerLoggedTypes: loggedTypesOf(user.id),
     genres: provider.genres,
     lengthOptions: provider.lengthOptions.map(({ value, label }) => ({ value, label })),
     playerTypes: provider.playerTypes ?? [],
@@ -189,18 +197,19 @@ async function indexPage(
 }
 
 async function loadLuckyPageData(db: Db, user: User, mediaType: ActiveMediaType) {
-  const [friends, lucky] = await Promise.all([listFollowedUsers(db, user.id), getLuckyState(user)])
-
-  const loggedByUser = await loadLoggedTypesByUser([user.id, ...friends.map((friend) => friend.id)])
+  const [{ friends, loggedTypesOf }, lucky] = await Promise.all([
+    loadFriendsWithLoggedTypes(db, user),
+    getLuckyState(user),
+  ])
 
   return {
     lucky,
     friends: friends.map((friend) => ({
       id: friend.id,
       label: displayLabel(friend),
-      loggedTypes: [...(loggedByUser.get(friend.id) ?? [])],
+      loggedTypes: loggedTypesOf(friend.id),
     })),
-    viewerLoggedTypes: [...(loggedByUser.get(user.id) ?? [])],
+    viewerLoggedTypes: loggedTypesOf(user.id),
     displayName: displayLabel(user),
   }
 }
@@ -230,10 +239,10 @@ export default createController(routes.recommendations, {
     async index(context) {
       const auth = context.get(Auth)
 
-      // No type in the URL opens on the viewer's first tab, not the registry's.
-      const mediaType =
-        parseMediaType(context.url.searchParams.get('mediaType')) ??
-        parseMediaOrder(auth.identity.media_order)[0]
+      const mediaType = openingMediaType(
+        context.url.searchParams.get('mediaType'),
+        parseMediaOrder(auth.identity.media_order),
+      )
 
       const db = context.get(Database)
 
@@ -243,10 +252,10 @@ export default createController(routes.recommendations, {
     async luckyPage(context) {
       const auth = context.get(Auth)
 
-      // No type in the URL opens on the viewer's first tab, not the registry's.
-      const mediaType =
-        parseMediaType(context.url.searchParams.get('mediaType')) ??
-        parseMediaOrder(auth.identity.media_order)[0]
+      const mediaType = openingMediaType(
+        context.url.searchParams.get('mediaType'),
+        parseMediaOrder(auth.identity.media_order),
+      )
 
       const db = context.get(Database)
 

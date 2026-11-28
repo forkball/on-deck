@@ -14,14 +14,7 @@ import { ModelProvided } from './model-provided.tsx'
 import { UnconfirmedPickList } from './unconfirmed-pick.tsx'
 import { getCatalogProvider } from '../../data/catalog/provider.ts'
 import { DEFAULT_MEDIA_TYPE, mediaTypeUiFor, parseMediaType } from '../../mediaTypes.ts'
-import { backLinkFrom } from '../../ui/backLink.ts'
-
-const SOURCE_LABELS: Record<MediaType, string> = {
-  movie: 'Movie taste',
-  tv: 'TV taste',
-  book: 'Book taste',
-  game: 'Game taste',
-}
+import { backLinkFrom } from '../../ui/back-link.ts'
 
 const PLAYER_TYPE_LABELS: Record<string, string> = {
   singleplayer: 'Singleplayer',
@@ -50,9 +43,14 @@ const SERIES_NOTE =
   "Applied from the model's own answer for each pick. No catalogue the app reads records " +
   'whether a work belongs to a series.'
 
+function sourceLabel(type: MediaType): string {
+  const { attributive } = mediaTypeUiFor(type)
+  return `${attributive.replace(/^./, (c) => c.toUpperCase())} taste`
+}
+
 export function describeParams(params: GenerationParams, mediaType: MediaType): ParamLine[] {
   const lines: ParamLine[] = [
-    { text: `Based on: ${params.sourceTypes.map((type) => SOURCE_LABELS[type]).join(', ')}` },
+    { text: `Based on: ${params.sourceTypes.map((type) => sourceLabel(type)).join(', ')}` },
   ]
   if (params.genre) {
     lines.push({

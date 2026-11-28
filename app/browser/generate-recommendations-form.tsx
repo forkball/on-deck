@@ -71,8 +71,6 @@ const PLAYER_TYPE_LABELS: Record<string, string> = {
 const MULTIPLAYER_TYPE_LABELS: Record<string, string> = { coop: 'Co-op', versus: 'Versus' }
 const SERIES_TYPE_LABELS: Record<string, string> = { series: 'Part of a series', standalone: 'Standalone' }
 
-const PLACEHOLDER_SOURCES: string[] = []
-
 // The shortlist's caption, which otherwise promises a rule the group just
 // changed. Alone, the default reads the same: one person is "most of you".
 function shortlistCaption(count: number, seenBy: SeenBy, isGroup: boolean): string {
@@ -336,11 +334,6 @@ export const GenerateRecommendationsForm = clientEntry<GenerateRecommendationsFo
                     })}
                   >
                     {source.label}
-                  </CheckboxOption>
-                ))}
-                {PLACEHOLDER_SOURCES.map((label) => (
-                  <CheckboxOption key={label} disabled>
-                    {label} <span mix={css({ fontStyle: 'italic', fontSize: '12px' })}>(soon)</span>
                   </CheckboxOption>
                 ))}
               </ChoiceGroup>

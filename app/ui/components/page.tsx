@@ -1,7 +1,7 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { BackLink } from '../backLink.ts'
+import type { BackLink } from '../back-link.ts'
 import { Document } from './document.tsx'
 import { Nav, NAV_WIDTH } from './nav.tsx'
 import { Link } from '../shared/form-controls.tsx'

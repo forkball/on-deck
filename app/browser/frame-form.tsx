@@ -6,7 +6,8 @@ import { submitInPlace } from './shared/submit-in-place.ts'
 // the form's fields are server UI a client bundle can't import. With JS off
 // nothing attaches and the form posts natively.
 //
-// One client entry per form; pages with many use InPlaceForms.
+// One client entry per form; pages with many use InPlaceForms. Both close the
+// form's dropdown or modal the same way — see submitInPlace.
 export const FrameForm = clientEntry(import.meta.url, function FrameForm(handle) {
   return () => (
     <span
@@ -20,17 +21,7 @@ export const FrameForm = clientEntry(import.meta.url, function FrameForm(handle)
           (event) => {
             event.preventDefault()
 
-            void submitInPlace(form, signal, async () => {
-              // Reload happens before the frame swap replaces this form's
-              // DOM, so these ancestor lookups still resolve.
-              const overlay = form.closest('.modal-overlay')
-              const toggle = overlay?.parentElement?.querySelector<HTMLInputElement>('input.modal-toggle')
-              if (toggle) toggle.checked = false
-              const details = form.closest('details')
-              if (details) details.open = false
-
-              await handle.frames.top.reload()
-            })
+            void submitInPlace(form, signal, () => handle.frames.top.reload())
           },
           { signal },
         )

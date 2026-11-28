@@ -31,8 +31,12 @@ and middleware modules after the export they carry.
   It also holds `parseMediaOrder`, a member's chosen order for the media-type
   tabs (`users.media_order`, set on the Media order tab in settings). Pages that
   lay out a tab per type take it as `order` on `MediaTabs`/`MediaTabLinks`, and
-  open on its first entry when the URL names no type — not on
-  `DEFAULT_MEDIA_TYPE`, which stays the type a `?type=`-less URL means.
+  open on its first entry when the URL names no type (`openingMediaType`, or
+  `openingTab` for a page with tabs that aren't a type) — not on
+  `DEFAULT_MEDIA_TYPE`, which is left only as the fallback for a form post that
+  names no type. So a link meaning a particular type names it, default or not.
+  The list of types itself is `MEDIA_TYPES` in `data/schema.ts`, next to the
+  columns it constrains; `ACTIVE_MEDIA_TYPES` is that list.
 - `app/interactionStatus.ts` holds the interaction-status vocabulary — parsing,
   per-type labels and badge colors for `want_to_consume`/`in_progress`/`consumed`/
   `not_interested`. Split out from `mediaTypes.ts` since a status isn't a media
@@ -73,7 +77,9 @@ gates the whole transitive import graph and fails closed: a client entry that
 reaches server code answers `IMPORT_NOT_ALLOWED` rather than bundling it. Widening that
 list is what makes a directory reachable from the browser — the directory name
 does nothing on its own.
-- `app/middleware/` holds request lifecycle concerns
+- `app/middleware/` holds request lifecycle concerns. `stack.ts` is the
+  router's middleware list, kept out of `router.ts` so `context.ts` can derive
+  the action context types from it without a cycle
 - `app/data/` holds persistence and the services built on it, in subdirectories:
   - `app/data/` root: `db`, `schema`, `mediaItems`, `mediaMetadata`, `users`,
     `follows`, `notifications`, `mediaSummary`, `watchProviders`, `watchRegion`,

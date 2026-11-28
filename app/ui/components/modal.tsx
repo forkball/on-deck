@@ -75,8 +75,11 @@ export function Modal(
     } = handle.props
 
     return (
-      <div mix={css(modalStyle(id))}>
-        <input type="checkbox" id={id} class="modal-toggle" checked={defaultOpen} />
+      // data-modal and data-modal-toggle are how a form posted in place finds
+      // the modal to close (browser/shared/submit-in-place.ts); the classes
+      // are only for the styles above.
+      <div mix={css(modalStyle(id))} data-modal>
+        <input type="checkbox" id={id} class="modal-toggle" checked={defaultOpen} data-modal-toggle />
 
         {triggerLabel && (
           <ToggleLabel

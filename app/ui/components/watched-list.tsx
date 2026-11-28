@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import { WatchedListItem } from './watched-list-item.tsx'
-import { withReturnTo } from '../backLink.ts'
+import { withReturnTo } from '../back-link.ts'
 
 type LogEntries = Awaited<ReturnType<typeof listUserMediaLog>>
 

@@ -21,7 +21,7 @@ import { parseMediaMetadata } from '../../data/mediaMetadata.ts'
 import { stripPublisherPromo } from '../../data/catalog/blurb.ts'
 import { catalogPageFor } from '../../data/catalog/links.ts'
 import { DislikedDisplay, StarRatingDisplay, StarRatingInput } from '../components/star-rating.tsx'
-import { backLinkFrom, withReturnTo } from '../backLink.ts'
+import { backLinkFrom, withReturnTo } from '../back-link.ts'
 import { Button, Link, TextInput } from '../shared/form-controls.tsx'
 import { MediaTypeTag } from '../components/media-type-tag.tsx'
 

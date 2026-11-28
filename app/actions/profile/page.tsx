@@ -3,12 +3,7 @@ import { css } from 'remix/ui'
 
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
 import type { TasteProfileSettings } from '../../data/recommendations/tasteProfile.ts'
-import {
-  ACTIVE_MEDIA_TYPES,
-  DEFAULT_MEDIA_TYPE,
-  MEDIA_TYPE_UI,
-  type ActiveMediaType,
-} from '../../mediaTypes.ts'
+import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import { DisclosureChevron } from '../../ui/shared/collapsible.tsx'
 import { Toast } from '../../ui/components/toast.tsx'
@@ -20,7 +15,7 @@ import { Page } from '../../ui/components/page.tsx'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { MediaLogEditModal } from '../../ui/components/media-log-edit-modal.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
-import { withReturnTo } from '../../ui/backLink.ts'
+import { withReturnTo } from '../../ui/back-link.ts'
 import { WaitingImports, type WaitingImport } from './waiting-imports.tsx'
 import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
@@ -330,10 +325,7 @@ export function ProfilePage(handle: Handle<ProfilePageProps>) {
             ACTIVE_MEDIA_TYPES.map((type) => {
               const ui = MEDIA_TYPE_UI[type]
               const { summary, profileUpdatedAt, log, total } = media[type]
-              const seeAllHref =
-                type === DEFAULT_MEDIA_TYPE
-                  ? routes.profile.watched.href()
-                  : `${routes.profile.watched.href()}?type=${type}`
+              const seeAllHref = `${routes.profile.watched.href()}?type=${type}`
 
               return [
                 type,

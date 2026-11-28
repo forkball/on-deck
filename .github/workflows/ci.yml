@@ -16,8 +16,8 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     services:
-      # Without DATABASE_URL, 12 of 28 test files skip themselves and the run
-      # reports 254 passing instead of 322. Pinned to 17, as docker-compose is.
+      # Without DATABASE_URL the database-backed test files skip themselves, so
+      # CI runs against a real Postgres. Pinned to 17, as docker-compose is.
       postgres:
         image: postgres:17
         env:

@@ -1,7 +1,10 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
+import type { Db } from '../../data/db.ts'
+import { listFollowingIds } from '../../data/follows.ts'
 import type { User } from '../../data/schema.ts'
+import { displayLabel } from '../../data/users.ts'
 import { Page } from '../components/page.tsx'
 import { UserCard } from '../components/user-card.tsx'
 
@@ -64,4 +67,28 @@ export function FollowListPage(handle: Handle<FollowListPageProps>) {
       </Page>
     )
   }
+}
+
+// What the four follow-list routes say about their list — everything else on
+// the page is the same for all of them.
+export type FollowListCopy = Pick<FollowListPageProps, 'title' | 'heading' | 'emptyMessage' | 'returnTo'>
+
+// The page for one follow list, with the viewer's own follow-state looked up
+// for everyone on it. The routes differ only in which list they pass and the
+// copy.
+export async function followListPage(db: Db, viewer: User, listed: User[], copy: FollowListCopy) {
+  const followingIds = await listFollowingIds(
+    db,
+    viewer.id,
+    listed.map((user) => user.id),
+  )
+  return (
+    <FollowListPage
+      {...copy}
+      users={listed}
+      viewerId={viewer.id}
+      followingByUserId={new Map(listed.map((user) => [user.id, followingIds.has(user.id)]))}
+      displayName={displayLabel(viewer)}
+    />
+  )
 }

@@ -11,7 +11,7 @@ import { logIn } from '../../../middleware/auth.ts'
 import { routes } from '../../../routes.ts'
 import { hashPassword, needsRehash, verifyPassword } from '../password.ts'
 import { LoginPage } from './page.tsx'
-import { formReturnPath, safeReturnPath } from '../../../ui/backLink.ts'
+import { formReturnPath, safeReturnPath } from '../../../ui/back-link.ts'
 
 const loginSchema = f.object({
   identifier: f.field(s.defaulted(s.string(), '')),

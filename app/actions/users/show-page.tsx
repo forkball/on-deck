@@ -4,12 +4,7 @@ import { css } from 'remix/ui'
 import { DisclosureChevron } from '../../ui/shared/collapsible.tsx'
 
 import type { MediaSummaries } from '../../data/mediaSummary.ts'
-import {
-  ACTIVE_MEDIA_TYPES,
-  DEFAULT_MEDIA_TYPE,
-  MEDIA_TYPE_UI,
-  type ActiveMediaType,
-} from '../../mediaTypes.ts'
+import { ACTIVE_MEDIA_TYPES, MEDIA_TYPE_UI, type ActiveMediaType } from '../../mediaTypes.ts'
 import type { listUserMediaLog } from '../../data/mediaItems.ts'
 import type { User } from '../../data/schema.ts'
 import { displayLabel } from '../../data/users.ts'
@@ -20,7 +15,7 @@ import { UserTitle } from '../../ui/components/user-title.tsx'
 import { composeTitle } from '../../data/profileTitles/catalog.ts'
 import { MediaTabs } from '../../ui/components/media-tabs.tsx'
 import { WatchedListItem } from '../../ui/components/watched-list-item.tsx'
-import { withReturnTo } from '../../ui/backLink.ts'
+import { withReturnTo } from '../../ui/back-link.ts'
 import { Button, Link } from '../../ui/shared/form-controls.tsx'
 
 type MediaLog = Awaited<ReturnType<typeof listUserMediaLog>>
@@ -202,7 +197,7 @@ export function UserProfilePage(handle: Handle<UserProfilePageProps>) {
                   const ui = MEDIA_TYPE_UI[type]
                   const { summary, log, total } = media![type]
                   const watchedHref = routes.users.watched.href({ userId: String(user.id) })
-                  const seeAllHref = type === DEFAULT_MEDIA_TYPE ? watchedHref : `${watchedHref}?type=${type}`
+                  const seeAllHref = `${watchedHref}?type=${type}`
 
                   return [
                     type,

@@ -25,13 +25,7 @@ import {
 import { updateMediaOrder, updateProfileSettings, updateWatchRegion } from '../../data/users.ts'
 import { parseWatchRegion } from '../../data/watchRegion.ts'
 
-import {
-  countFollowers,
-  countFollowing,
-  listFollowedUsers,
-  listFollowers,
-  listFollowingIds,
-} from '../../data/follows.ts'
+import { countFollowers, countFollowing, listFollowedUsers, listFollowers } from '../../data/follows.ts'
 import { CONSUMPTION_STATUSES, countUserMediaLog, listUserMediaLog } from '../../data/mediaItems.ts'
 import { loadMediaSummaries } from '../../data/mediaSummary.ts'
 import type { User } from '../../data/schema.ts'
@@ -39,21 +33,22 @@ import { requireAuth } from '../../middleware/auth.ts'
 import { displayLabel } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import {
-  DEFAULT_MEDIA_TYPE,
   mediaTypeUiFor,
+  openingMediaType,
+  openingTab,
   parseMediaOrder,
   parseMediaType,
   serializeMediaOrder,
 } from '../../mediaTypes.ts'
 import { parseInteractionStatus } from '../../interactionStatus.ts'
-import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
+import { followListPage } from '../../ui/pages/follow-list-page.tsx'
 import { PROFILE_TABS } from './edit/page.tsx'
 import { ImportPage } from './import-page.tsx'
 import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
 import { ProfilePage } from './page.tsx'
 import { loadWaitingImports } from './waiting-imports.tsx'
 import { ProfileWatchedPage } from './watched-page.tsx'
-import { formReturnPath } from '../../ui/backLink.ts'
+import { formReturnPath } from '../../ui/back-link.ts'
 
 const RECENT_COUNT = 5
 const PAGE_SIZE = 10
@@ -66,8 +61,7 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
       const mediaOrder = parseMediaOrder(auth.identity.media_order)
-      const tab = context.url.searchParams.get('tab')
-      const activeTab = tab === TITLES_TAB ? TITLES_TAB : (parseMediaType(tab) ?? mediaOrder[0])
+      const activeTab = openingTab(context.url.searchParams.get('tab'), mediaOrder, [TITLES_TAB])
 
       // Only the log waits on the feed; everything else loads alongside it. The
       // title check waits too, so whatever the feed just logged can earn one.
@@ -239,7 +233,11 @@ export default createController(routes.profile, {
 
       const db = context.get(Database)
       const page = Math.max(1, Number(context.url.searchParams.get('page')) || 1)
-      const mediaType = parseMediaType(context.url.searchParams.get('type')) ?? DEFAULT_MEDIA_TYPE
+      // Your first tab when the URL names none, as on the profile.
+      const mediaType = openingMediaType(
+        context.url.searchParams.get('type'),
+        parseMediaOrder(auth.identity.media_order),
+      )
       const status = parseInteractionStatus(context.url.searchParams.get('status'))
       const filter = {
         type: mediaType,
@@ -275,24 +273,13 @@ export default createController(routes.profile, {
       const auth = context.get(Auth)
 
       const db = context.get(Database)
-      const users = await listFollowedUsers(db, auth.identity.id)
-      const followingIds = await listFollowingIds(
-        db,
-        auth.identity.id,
-        users.map((u) => u.id),
-      )
-
       return context.render(
-        <FollowListPage
-          title="Following"
-          heading="Following"
-          users={users}
-          viewerId={auth.identity.id}
-          followingByUserId={new Map(users.map((u) => [u.id, followingIds.has(u.id)]))}
-          emptyMessage="You're not following anyone yet."
-          returnTo={routes.profile.following.href()}
-          displayName={displayLabel(auth.identity)}
-        />,
+        await followListPage(db, auth.identity, await listFollowedUsers(db, auth.identity.id), {
+          title: 'Following',
+          heading: 'Following',
+          emptyMessage: "You're not following anyone yet.",
+          returnTo: routes.profile.following.href(),
+        }),
       )
     },
 
@@ -300,24 +287,13 @@ export default createController(routes.profile, {
       const auth = context.get(Auth)
 
       const db = context.get(Database)
-      const users = await listFollowers(db, auth.identity.id)
-      const followingIds = await listFollowingIds(
-        db,
-        auth.identity.id,
-        users.map((u) => u.id),
-      )
-
       return context.render(
-        <FollowListPage
-          title="Followers"
-          heading="Followers"
-          users={users}
-          viewerId={auth.identity.id}
-          followingByUserId={new Map(users.map((u) => [u.id, followingIds.has(u.id)]))}
-          emptyMessage="No one follows you yet."
-          returnTo={routes.profile.followers.href()}
-          displayName={displayLabel(auth.identity)}
-        />,
+        await followListPage(db, auth.identity, await listFollowers(db, auth.identity.id), {
+          title: 'Followers',
+          heading: 'Followers',
+          emptyMessage: 'No one follows you yet.',
+          returnTo: routes.profile.followers.href(),
+        }),
       )
     },
   },

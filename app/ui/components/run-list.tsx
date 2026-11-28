@@ -4,7 +4,7 @@ import { css } from 'remix/ui'
 import { mediaTypeUiFor } from '../../mediaTypes.ts'
 import type { RecommendationRunSummary } from '../../data/recommendations/runs.ts'
 import { routes } from '../../routes.ts'
-import { withReturnTo } from '../backLink.ts'
+import { withReturnTo } from '../back-link.ts'
 import { Link } from '../shared/form-controls.tsx'
 
 // 'list' is a full-width row, everything on one line, the way the

@@ -1,6 +1,11 @@
 import { column as c, table } from 'remix/data-table'
 import type { TableRow } from 'remix/data-table'
 
+// Every media type a row can be, in the registry's order. Defined here rather
+// than in app/mediaTypes.ts because the columns below need it and the registry
+// imports routes.ts; mediaTypes.ts takes it from here as ACTIVE_MEDIA_TYPES.
+export const MEDIA_TYPES = ['movie', 'tv', 'book', 'game'] as const
+
 export const users = table({
   name: 'users',
   columns: {
@@ -61,7 +66,7 @@ export const mediaItems = table({
   name: 'media_items',
   columns: {
     id: c.integer().primaryKey().autoIncrement(),
-    type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
+    type: c.enum(MEDIA_TYPES).notNull(),
     external_source: c.text().notNull(),
     external_id: c.text().notNull(),
     title: c.text().notNull(),
@@ -146,7 +151,7 @@ export const userTasteProfiles = table({
   primaryKey: ['user_id', 'media_type'],
   columns: {
     user_id: c.integer().notNull().references('users', 'id'),
-    media_type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
+    media_type: c.enum(MEDIA_TYPES).notNull(),
     profile: c.text().notNull().default('{}'), // JSON string: { liked_tags: string[], disliked_tags: string[] }
     summary: c.text(),
     updated_at: c.integer().notNull(),
@@ -186,7 +191,7 @@ export const recommendationRuns = table({
     user_id: c.integer().notNull().references('users', 'id'), // the requester
     // What was recommended, independent of which profiles it drew on
     // (sourceTypes). MAX_RUNS_PER_USER is scoped per media_type.
-    media_type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
+    media_type: c.enum(MEDIA_TYPES).notNull(),
     created_at: c.integer().notNull(),
     name: c.text(),
     params: c.text().notNull().default('{}'),
@@ -296,7 +301,7 @@ export const importBatches = table({
   columns: {
     id: c.text().primaryKey(),
     user_id: c.integer().notNull().references('users', 'id'),
-    media_type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
+    media_type: c.enum(MEDIA_TYPES).notNull(),
     source: c.text().notNull(),
     // matching | review | saving | done | failed
     status: c.text().notNull(),

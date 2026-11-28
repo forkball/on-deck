@@ -15,7 +15,7 @@ export const sessionCookie = createCookie('session', {
   path: '/',
 })
 
-// Session data (just { userId }) lives entirely in the signed cookie — no
+// Session data lives entirely in the signed cookie — no
 // server-side store to keep in sync, which is what makes this correct on more
 // than one machine. Anything disk-backed is visible to only one of them.
 export const sessionStorage = createCookieSessionStorage()
