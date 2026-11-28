@@ -1,0 +1,12 @@
+-- Returns imports stranded in 'saving' to review.
+--
+-- saveBatch used to commit 'saving' on its own and then write the log row by
+-- row outside any transaction, so a save that threw or a machine lost mid-loop
+-- left the batch in 'saving' for good: discard refused it, the import pages
+-- didn't list it, and nothing resumed it. It now claims, writes and finishes in
+-- one transaction, so 'saving' is never committed again and these are the only
+-- ones there will be.
+--
+-- Some of their rows may already be in the log. Saving again is safe: each row
+-- is an upsert of the same values onto the same (user, item) pair.
+update import_batches set status = 'review' where status = 'saving';

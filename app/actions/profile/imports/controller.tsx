@@ -262,12 +262,14 @@ export default createController(routes.profile.imports, {
       if (!found.ok) return found.response
       const { batch } = found
 
-      // Saving twice would re-upsert every row over the log it just wrote.
+      // Saving twice would re-upsert every row over the log it just wrote. This
+      // check only spares a round trip: saveBatch's claim is what stops a
+      // double submit, and the loser gets null.
       if (batch.status !== 'review') return backToReview(batch)
 
       const db = context.get(Database)
-      await saveBatch(db, batch)
-      await checkTitleUnlocksQuietly(db, batch.user_id)
+      const saved = await saveBatch(db, batch)
+      if (saved) await checkTitleUnlocksQuietly(db, batch.user_id)
       return backToReview(batch)
     },
 

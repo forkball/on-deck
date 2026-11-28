@@ -14,6 +14,7 @@ import {
   mediaItems,
   userMediaInteractions,
   type ImportBatch,
+  type ImportBatchStatus,
   type ImportRow,
 } from '../schema.ts'
 import {
@@ -472,9 +473,38 @@ export interface SaveResult {
 // The only place an import touches user_media_interactions. Everything before
 // this is staging, which is what makes every decision on the review page
 // reversible right up to the moment this runs.
-export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult> {
+//
+// One transaction, from claiming the batch to marking it done. The claim is a
+// conditional `review → saving` update, so of two saves racing for a batch the
+// second waits on the first's row lock and then finds it no longer in review:
+// it gets null and writes nothing. And because the log writes and `done` commit
+// together, a save that throws — or a machine lost halfway — rolls back to a
+// batch still in review, which can be saved again or discarded, rather than one
+// stuck in `saving` with half its rows in the log.
+//
+// Transactional rather than swept for staleness the way the matcher's claims
+// are: a save is a few thousand upserts at most with no catalog calls in it, so
+// it holds its locks for seconds, and a sweep would have to guess when a slow
+// save had died — and leave half a batch in the log when it guessed.
+export async function saveBatch(db: Db, batch: ImportBatch): Promise<SaveResult | null> {
+  return db.transaction(async (tx) => {
+    const claim = await tx.updateMany(
+      importBatches,
+      { status: 'saving', updated_at: Date.now() },
+      { where: and(eq('id', batch.id), eq('status', 'review')) },
+    )
+    if (claim.affectedRows === 0) return null
+
+    // Read again under the lock: the batch the caller holds was loaded before
+    // the claim, and the conflict choice may have changed since.
+    const claimed = await tx.find(importBatches, batch.id)
+    if (!claimed) return null
+    return writeBatch(tx, claimed)
+  })
+}
+
+async function writeBatch(db: Db, batch: ImportBatch): Promise<SaveResult> {
   const { rows, model } = await loadReview(db, batch)
-  await db.update(importBatches, batch.id, { status: 'saving', updated_at: Date.now() })
 
   const conflicted = new Set(model.conflicts.map(({ row }) => row.id))
   const held = new Set<number>()
@@ -553,7 +583,7 @@ export async function hasImportedLibrary(db: Db, userId: number, mediaType: Medi
 
 // One unfinished import at a time, so a second upload can't quietly orphan the
 // batch someone is halfway through reviewing.
-const UNFINISHED = ['matching', 'review']
+const UNFINISHED: ImportBatchStatus[] = ['matching', 'review']
 
 export async function activeBatch(db: Db, userId: number, mediaType: MediaType): Promise<ImportBatch | null> {
   const batch = await db.findOne(importBatches, {
@@ -566,12 +596,18 @@ export async function activeBatch(db: Db, userId: number, mediaType: MediaType):
 // all there is to lose — nothing reaches the log until saveBatch — so this never
 // touches a logged interaction. A failed batch can go too; one saving or done
 // cannot: the first is mid-write, the second is the record the import happened.
-const DISCARDABLE = [...UNFINISHED, 'failed']
+//
+// Conditional in the statement, not just checked beforehand: a discard that
+// lands while a save holds the batch waits on its lock, and must then find the
+// batch done and leave it, not delete the record of what was just written.
+const DISCARDABLE: ImportBatchStatus[] = [...UNFINISHED, 'failed']
 
 export async function discardBatch(db: Db, batch: ImportBatch): Promise<boolean> {
   if (!DISCARDABLE.includes(batch.status)) return false
-  await db.delete(importBatches, batch.id)
-  return true
+  const { affectedRows } = await db.deleteMany(importBatches, {
+    where: and(eq('id', batch.id), inList('status', DISCARDABLE)),
+  })
+  return affectedRows > 0
 }
 
 // Every import still matching or waiting for review, newest first.

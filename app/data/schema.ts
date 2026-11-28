@@ -291,6 +291,14 @@ export const userRecommendations = table({
 
 // A CSV upload held between matching and the log — see the 20260818120000
 // migration for why matching results need somewhere to live.
+// A batch's life: the worker matches it, the member reviews it, then it is
+// saved into the log. `saving` is never seen from outside — it is set inside
+// the transaction saveBatch writes the log in, as the conditional claim that
+// stops a second save, and that transaction either commits it on to `done` or
+// rolls it back to `review`. `failed` is matching that gave up.
+export const IMPORT_BATCH_STATUSES = ['matching', 'review', 'saving', 'done', 'failed'] as const
+export type ImportBatchStatus = (typeof IMPORT_BATCH_STATUSES)[number]
+
 export const importBatches = table({
   name: 'import_batches',
   columns: {
@@ -298,8 +306,7 @@ export const importBatches = table({
     user_id: c.integer().notNull().references('users', 'id'),
     media_type: c.enum(['movie', 'tv', 'book', 'game']).notNull(),
     source: c.text().notNull(),
-    // matching | review | saving | done | failed
-    status: c.text().notNull(),
+    status: c.enum(IMPORT_BATCH_STATUSES).notNull(),
     total_rows: c.integer().notNull().default(0),
     matched_rows: c.integer().notNull().default(0),
     // keep | take — what a conflicting row does by default.
