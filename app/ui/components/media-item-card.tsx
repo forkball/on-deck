@@ -32,9 +32,7 @@ const COVER_WIDTH = '60px'
 // A card's cover, or an empty frame of the same size when the catalog has none,
 // so the text beside it lines up either way. A link to the detail page when given
 // one.
-function CardCover(
-  handle: Handle<{ src: string | null; alt: string; href?: string; lazy?: boolean }>,
-) {
+function CardCover(handle: Handle<{ src: string | null; alt: string; href?: string; lazy?: boolean }>) {
   return () => {
     const { src, alt, href, lazy } = handle.props
     const place = css({ flex: '0 0 auto', alignSelf: 'flex-start' })

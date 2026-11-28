@@ -315,7 +315,9 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
     const titleKey = titleKeys[index]!
     if (issue.run) return seriesKey(titleKey, issue.run)
     const year = facts[index]!.year
-    const holding = [...(runsOf.get(titleKey)?.values() ?? [])].filter((run) => year != null && runHolds(run, year))
+    const holding = [...(runsOf.get(titleKey)?.values() ?? [])].filter(
+      (run) => year != null && runHolds(run, year),
+    )
     return seriesKey(titleKey, holding.length === 1 ? holding[0]! : null)
   })
 
@@ -351,7 +353,8 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
     const key = started ? seriesKey(titleKey, started) : titleKey
     if (groups.includes(key)) return key
     const sharing = groups.filter(
-      (group) => split.has(group) && members.get(group)!.some((m) => [...surnames[m]!].some((n) => credited.has(n))),
+      (group) =>
+        split.has(group) && members.get(group)!.some((m) => [...surnames[m]!].some((n) => credited.has(n))),
     )
     return sharing.length === 1 ? sharing[0] : undefined
   }
@@ -387,8 +390,17 @@ export function groupSingleIssues<T>(results: T[], describe: (result: T) => Issu
         ? {
             kind: 'issues',
             series: split.has(key)
-              ? creditedName(seriesName(group.map((m) => parsed[m]!), key), group.map((m) => facts[m]!.creators ?? []))
-              : seriesName(group.map((m) => parsed[m]!), key),
+              ? creditedName(
+                  seriesName(
+                    group.map((m) => parsed[m]!),
+                    key,
+                  ),
+                  group.map((m) => facts[m]!.creators ?? []),
+                )
+              : seriesName(
+                  group.map((m) => parsed[m]!),
+                  key,
+                ),
             issues: inNumberOrder(key),
           }
         : { kind: 'single', result: results[collected]!, issues: inNumberOrder(key) },

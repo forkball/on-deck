@@ -47,8 +47,9 @@ export async function upsertSeriesItem(db: Db, series: string, issues: MediaItem
   const years = [...metadata, ...(existing ? [parseMediaMetadata(existing.metadata)] : [])].flatMap((m) =>
     m.releaseYear ? [m.releaseYear] : [],
   )
-  const creators = [...new Set(metadata.flatMap((m) => (m.creators.length ? m.creators : [m.creator ?? ''])))]
-    .filter(Boolean)
+  const creators = [
+    ...new Set(metadata.flatMap((m) => (m.creators.length ? m.creators : [m.creator ?? '']))),
+  ].filter(Boolean)
 
   return upsertMediaItem(
     db,

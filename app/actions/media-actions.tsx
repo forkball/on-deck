@@ -101,7 +101,9 @@ export function createMediaActions(mediaType: ActiveMediaType) {
             : { result: await upsertSeriesItem(db, entry.series, entry.issues), issues: entry.issues },
         ),
       )
-      const seriesIds = results.flatMap((entry, index) => (entries[index]!.kind === 'issues' ? [entry.result.id] : []))
+      const seriesIds = results.flatMap((entry, index) =>
+        entries[index]!.kind === 'issues' ? [entry.result.id] : [],
+      )
       for (const [id, interaction] of await getUserInteractionsForItems(db, identity.id, seriesIds)) {
         interactionsByItemId.set(id, interaction)
       }

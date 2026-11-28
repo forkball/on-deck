@@ -408,11 +408,11 @@ describe('the runs of a series', () => {
     )
   })
 
-  it('does not fold two runs\' #1s into one, though one writer is on both', () => {
-    assert.deepEqual(
-      shown([{ title: 'Batman (2016-) #1' }, { title: 'Batman (2011-2016) #1' }]),
-      ['Batman (2016-) #1', 'Batman (2011-2016) #1'],
-    )
+  it("does not fold two runs' #1s into one, though one writer is on both", () => {
+    assert.deepEqual(shown([{ title: 'Batman (2016-) #1' }, { title: 'Batman (2011-2016) #1' }]), [
+      'Batman (2016-) #1',
+      'Batman (2011-2016) #1',
+    ])
   })
 
   it('puts an untagged issue in the run whose years hold it', () => {
@@ -503,7 +503,10 @@ describe('two untagged runs of one title', () => {
       { title: 'Batman #1', creators: snyder },
       { title: 'Batman #2', creators: ['David Finch'] },
     ])
-    assert.deepEqual(kings!.kind === 'issues' && kings!.issues.map((i) => i.creators), [king, ['David Finch']])
+    assert.deepEqual(kings!.kind === 'issues' && kings!.issues.map((i) => i.creators), [
+      king,
+      ['David Finch'],
+    ])
   })
 
   it('leaves one run whole, however its credits disagree, while no number repeats', () => {
