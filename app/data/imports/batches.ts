@@ -34,6 +34,7 @@ import {
   type ReviewModel,
   type StagedRow,
 } from './review.ts'
+import { planEditionMerge } from './steam.ts'
 
 export interface ParsedRow {
   rowIndex: number
@@ -202,6 +203,40 @@ export async function setMatchedCount(db: Db, batchId: string, matched: number):
     matched_rows: matched,
     claimed_at: Date.now(),
     updated_at: Date.now(),
+  })
+}
+
+// Folds the editions of one game into a single row — the rule is
+// planEditionMerge's; this applies it. Only for a source whose rows are copies
+// of one thing rather than separate entries (Steam), and run once every row
+// has a match, since only then is it known which listings are the same game.
+// The batch's counts shrink with it, so the progress and review pages count
+// games rather than listings.
+export async function mergeEditions(db: Db, batchId: string): Promise<void> {
+  const rows = await loadRows(db, batchId)
+  const { restatus, drop } = planEditionMerge(
+    rows.map((row) => ({
+      id: row.id,
+      rowIndex: row.row_index,
+      state: row.state,
+      mediaItemId: row.media_item_id ?? null,
+      logStatus: (row.log_status ?? 'consumed') as StagedRow['logStatus'],
+    })),
+  )
+  if (drop.length === 0) return
+
+  const now = Date.now()
+  await db.transaction(async (tx) => {
+    for (const { id, logStatus } of restatus) {
+      await tx.update(importRows, id, { log_status: logStatus, updated_at: now })
+    }
+    await tx.deleteMany(importRows, { where: and(eq('batch_id', batchId), inList('id', drop)) })
+    const remaining = rows.length - drop.length
+    await tx.update(importBatches, batchId, {
+      total_rows: remaining,
+      matched_rows: remaining,
+      updated_at: now,
+    })
   })
 }
 

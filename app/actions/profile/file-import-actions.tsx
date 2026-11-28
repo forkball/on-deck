@@ -10,8 +10,9 @@ import type { AuthedControllerContext } from '../../middleware/context.ts'
 import { routes } from '../../routes.ts'
 
 // Uploading an export and staging it as a batch — the shape shared by
-// import-movies (Letterboxd) and import-books (Goodreads). import-games is not
-// one of these: Steam is a linked account, so it has no file and no upload form.
+// import-movies (Letterboxd) and import-books (Goodreads). import-games stages
+// its batch the same way but is not one of these: Steam is a linked account, so
+// it has no file and no upload form.
 //
 // The pages are deliberately not shared. Their copy, their layout and what they
 // tell you to export all differ per source; only the three props a controller

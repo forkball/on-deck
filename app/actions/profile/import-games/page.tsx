@@ -1,7 +1,6 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { SteamImportResult } from '../../../data/imports/steam.ts'
 import { routes } from '../../../routes.ts'
 import { Page } from '../../../ui/components/page.tsx'
 import { Button, Link } from '../../../ui/shared/form-controls.tsx'
@@ -13,66 +12,17 @@ export interface SteamImportPageProps {
   // says where to go when there isn't one.
   steamId: string | null
   error?: string
-  result?: SteamImportResult
-}
-
-// Counts are split because a Steam library imports into two statuses, which no
-// other importer does: "imported 300 games" would hide that most landed on the
-// want-to-play pile.
-function ImportSummary(handle: Handle<{ result: SteamImportResult }>) {
-  return () => {
-    const { result } = handle.props
-
-    return (
-      <>
-        <p mix={css({ color: 'var(--success)' })}>
-          Imported {result.imported} games — {result.played} you've played, {result.unplayed} you own but
-          haven't started.
-        </p>
-        {result.skipped > 0 && (
-          <p mix={css({ fontSize: '13px', color: 'var(--muted)' })}>
-            Skipped {result.skipped} non-game items in your library, like soundtracks, demos and server tools.
-          </p>
-        )}
-        {result.notFound.length > 0 && (
-          <section mix={css({ marginTop: '24px' })}>
-            <h2>Couldn't match {result.notFound.length}</h2>
-            <p mix={css({ fontSize: '13px', color: 'var(--muted)' })}>
-              These are in your Steam library but had no confident match in the games catalog — usually
-              something listed there under a different name. You can add any of them by searching for it.
-            </p>
-            <ul
-              mix={css({
-                margin: 0,
-                padding: 0,
-                listStyle: 'none',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px',
-              })}
-            >
-              {result.notFound.map((title) => (
-                <li key={title} mix={css({ fontSize: '14px' })}>
-                  {title}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-        <p mix={css({ marginTop: '24px' })}>
-          <Link href={routes.profile.index.href()}>Back to your profile →</Link>
-        </p>
-      </>
-    )
-  }
+  // Set when an earlier games import is still being matched or reviewed.
+  pendingHref?: string
 }
 
 // Reads the connection rather than owning it: linking a Steam account is
 // account state that outlives any one import, so it is managed in settings and
-// this page is the import itself.
+// this page is the import itself. What the import found is shown by the review
+// page every import lands on, not here.
 export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
   return () => {
-    const { displayName, steamId, error, result } = handle.props
+    const { displayName, steamId, error, pendingHref } = handle.props
 
     return (
       <Page
@@ -82,9 +32,14 @@ export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
       >
         {error && <p mix={css({ color: 'var(--danger)' })}>{error}</p>}
 
-        {result ? (
-          <ImportSummary result={result} />
-        ) : steamId ? (
+        {pendingHref && (
+          <div mix={css({ fontSize: '14px', marginBottom: '12px' })}>
+            You have a games import waiting. <Link href={pendingHref}>Pick it back up</Link> — save or discard
+            it to import your library again.
+          </div>
+        )}
+
+        {steamId ? (
           <>
             <p mix={css({ color: 'var(--soft)' })}>
               Connected to Steam account <code>{steamId}</code>. Importing brings in the games you own, using
@@ -92,8 +47,9 @@ export function SteamImportPage(handle: Handle<SteamImportPageProps>) {
               you've never launched goes on your want-to-play list.
             </p>
             <p mix={css({ fontSize: '13px', color: 'var(--muted)' })}>
-              A large library takes a few minutes — each game is looked up individually. Leave the tab open
-              until it finishes.
+              Soundtracks, demos and server tools are left out. Each game is looked up in the games catalog in
+              the background — you can leave the page and come back — and nothing reaches your log until
+              you've reviewed the matches and saved.
             </p>
             <div mix={css({ marginTop: '16px' })}>
               <form method="post" action={routes.profile.importGames.upload.href()}>

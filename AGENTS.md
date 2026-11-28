@@ -129,7 +129,14 @@ does nothing on its own.
     settles the whole batch at once so a nearest-year fallback can't take an
     entry an exact match already holds. `classify` and `review` hold the rules —
     confidence, conflicts, duplicates, counts — and are free of the database so
-    they can be tested directly
+    they can be tested directly.
+    A Steam library is staged the same way (`import-games` reads it from
+    `steamApi` and calls `createBatch`), but matched by a strategy of its own,
+    chosen in `matcher` by the batch's source: no year to settle on, so exact
+    title over a few search variants or `not_found`, and editions that land on
+    one game folded into one row (`mergeEditions`). Those rules — which entries
+    are games, status from playtime, the variants, the merge — are in `steam`,
+    database-free
   - `app/data/profileTitles/` — titles. A title is a genre and a role ("Art
     House Projectionist"), and each is a credit a member earns. `catalog` holds
     every credit, the one word it earns and the threshold that earns it

@@ -115,16 +115,23 @@ export async function fetchSteamLibrary(steamId: string): Promise<SteamLibraryOu
   url.searchParams.set('include_appinfo', '1')
   url.searchParams.set('include_played_free_games', '1')
 
-  const response = await fetch(url)
-  if (!response.ok) {
-    return {
-      ok: false,
-      reason: 'unavailable',
-      message: `Steam returned ${response.status}. Try again shortly.`,
+  // Every failure is an outcome, a dropped connection and a garbled body
+  // included: the import page shows the message, so nothing here throws.
+  let data: OwnedGamesResponse
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      return {
+        ok: false,
+        reason: 'unavailable',
+        message: `Steam returned ${response.status}. Try again shortly.`,
+      }
     }
+    data = (await response.json()) as OwnedGamesResponse
+  } catch {
+    return { ok: false, reason: 'unavailable', message: "Couldn't reach Steam. Try again shortly." }
   }
 
-  const data = (await response.json()) as OwnedGamesResponse
   const games = data.response?.games
 
   if (!games) {
