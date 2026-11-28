@@ -7,10 +7,10 @@ import { redirect } from 'remix/response/redirect'
 
 import { deleteInteraction, parseRatingSubmission, updateInteraction } from '../../data/mediaItems.ts'
 import { checkTitleUnlocksQuietly } from '../../data/profileTitles/unlocks.ts'
+import { notFound, parseIdParam } from '../route-params.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { INTERACTION_STATUSES, type User } from '../../data/schema.ts'
 import { routes } from '../../routes.ts'
-import { notFound, parseIdParam } from '../route-params.ts'
 
 const updateSchema = f.object({
   status: f.field(s.enum_(INTERACTION_STATUSES)),
