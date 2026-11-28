@@ -31,7 +31,7 @@ import { loadWatchProviders } from '../data/watchProviders.ts'
 import { guessWatchRegion, parseWatchRegion } from '../data/watchRegion.ts'
 import { MediaDetailPage } from '../ui/pages/media-detail-page.tsx'
 import { MediaSearchPage } from '../ui/pages/media-search-page.tsx'
-import { RETURN_TO_PARAM, withReturnTo } from '../ui/backLink.ts'
+import { formReturnPath, RETURN_TO_PARAM, withReturnTo } from '../ui/backLink.ts'
 
 const SUGGESTION_LIMIT = 6
 
@@ -41,7 +41,6 @@ const logSchema = f.object({
   status: f.field(s.enum_(INTERACTION_STATUSES)),
   rating: f.field(s.defaulted(s.string(), '')),
   notes: f.field(s.defaulted(s.string(), '')),
-  return_to: f.field(s.defaulted(s.string(), '')),
 })
 
 // Written out rather than inferred. createController derives action types from
@@ -195,7 +194,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       const mediaItemId = Number(context.params.mediaItemId)
       const formData = context.get(FormData)
       const link = String(formData.get('catalog_link') || '')
-      const returnTo = String(formData.get('return_to') || '') || ui.hrefs.show(mediaItemId)
+      const returnTo = formReturnPath(formData) ?? ui.hrefs.show(mediaItemId)
       const separator = returnTo.includes('?') ? '&' : '?'
 
       const db: Db = context.get(Database)
@@ -245,7 +244,7 @@ export function createMediaActions(mediaType: ActiveMediaType) {
       })
       await checkTitleUnlocksQuietly(db, identity.id)
 
-      return redirect(parsed.value.return_to || ui.hrefs.search(), 303)
+      return redirect(formReturnPath(formData) ?? ui.hrefs.search(), 303)
     },
   }
 }

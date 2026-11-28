@@ -24,6 +24,7 @@ import { displayLabel, searchUsers } from '../../data/users.ts'
 import { routes } from '../../routes.ts'
 import { DEFAULT_MEDIA_TYPE, parseMediaOrder, parseMediaType } from '../../mediaTypes.ts'
 import { TITLES } from '../../data/profileTitles/catalog.ts'
+import { formReturnPath } from '../../ui/backLink.ts'
 import { TITLES_TAB } from '../../ui/components/credit-tiles.tsx'
 import { FollowListPage } from '../../ui/pages/follow-list-page.tsx'
 import { UserSearchPage } from './search-page.tsx'
@@ -261,9 +262,7 @@ export default createController(routes.users, {
         checkTitleUnlocksQuietly(db, userId),
       ])
 
-      const formData = context.get(FormData)
-      const returnTo = String(formData.get('return_to') || '')
-      return redirect(returnTo || routes.users.search.href(), 303)
+      return redirect(formReturnPath(context.get(FormData)) ?? routes.users.search.href(), 303)
     },
 
     async unfollow(context) {
@@ -273,9 +272,7 @@ export default createController(routes.users, {
       const db = context.get(Database)
       await unfollowUser(db, auth.identity.id, userId)
 
-      const formData = context.get(FormData)
-      const returnTo = String(formData.get('return_to') || '')
-      return redirect(returnTo || routes.users.search.href(), 303)
+      return redirect(formReturnPath(context.get(FormData)) ?? routes.users.search.href(), 303)
     },
   },
 })

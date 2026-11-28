@@ -10,12 +10,12 @@ import { checkTitleUnlocksQuietly } from '../../data/profileTitles/unlocks.ts'
 import { requireAuth } from '../../middleware/auth.ts'
 import { INTERACTION_STATUSES, type User } from '../../data/schema.ts'
 import { routes } from '../../routes.ts'
+import { formReturnPath } from '../../ui/backLink.ts'
 
 const updateSchema = f.object({
   status: f.field(s.enum_(INTERACTION_STATUSES)),
   rating: f.field(s.defaulted(s.string(), '')),
   notes: f.field(s.defaulted(s.string(), '')),
-  return_to: f.field(s.defaulted(s.string(), '')),
 })
 
 export default createController(routes.interactions, {
@@ -48,7 +48,7 @@ export default createController(routes.interactions, {
       }
       await checkTitleUnlocksQuietly(db, auth.identity.id)
 
-      return redirect(parsed.value.return_to || `${routes.profile.index.href()}?saved=1`, 303)
+      return redirect(formReturnPath(formData) ?? `${routes.profile.index.href()}?saved=1`, 303)
     },
 
     async destroy(context) {
@@ -56,7 +56,7 @@ export default createController(routes.interactions, {
 
       const interactionId = Number(context.params.interactionId)
       const formData = context.get(FormData)
-      const returnTo = String(formData.get('return_to') || '')
+      const returnTo = formReturnPath(formData)
 
       const db = context.get(Database)
       const deleted = await deleteInteraction(db, interactionId, auth.identity.id)
@@ -65,7 +65,7 @@ export default createController(routes.interactions, {
         return new Response('Not Found', { status: 404 })
       }
 
-      return redirect(returnTo || `${routes.profile.index.href()}?saved=1`, 303)
+      return redirect(returnTo ?? `${routes.profile.index.href()}?saved=1`, 303)
     },
   },
 })
